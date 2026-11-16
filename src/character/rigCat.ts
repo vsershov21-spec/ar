@@ -301,7 +301,8 @@ export class RigCat implements Character {
       for (let f = 0; f < 4; f++) this.blob(hand, white, [0.025, 0.028, 0.03], [(-0.03 + f * 0.02), -0.04, 0.025], 8);
     }
     // голова ≈39% роста, шире тела; щёки-пух
-    const neck = this.bone('Neck', spine1, [0, 0.14, 0]);
+    const neck = this.bone('Neck', spine1, [0, 0.1, 0]);
+    this.blob(neck, fur, [0.2, 0.12, 0.18], [0, 0.02, 0]); // шея/загривок — без зазора между головой и телом
     const head = this.bone('Head', neck, [0, 0.03, 0]);
     const hc = 0.19; // центр головы над костью Head
     this.blob(head, fur, [0.46, 0.36, 0.4], [0, hc, 0], 28);
@@ -494,7 +495,11 @@ export class RigCat implements Character {
       if (this.emoteName === 'happy') lids = Math.max(lids, 0.55);
       if (this.emoteName === 'wink') this.lids[1].scale.y = 0.12;
     }
-    this.lids.forEach((l, i) => (l.scale.y = i === 1 && this.emoteName === 'wink' && this.time < this.emoteUntil ? 0.12 : Math.max(0.001, lids * 0.12)));
+    this.lids.forEach((l, i) => {
+      const v = i === 1 && this.emoteName === 'wink' && this.time < this.emoteUntil ? 0.12 : lids * 0.12;
+      l.visible = v > 0.01; // сплющенное веко иначе видно полоской поперёк глаза
+      l.scale.y = Math.max(0.001, v);
+    });
 
     // взгляд к камере / точке
     const head = this.bones.get('Head')!;

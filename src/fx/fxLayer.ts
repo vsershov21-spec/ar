@@ -273,6 +273,22 @@ export class FxLayer {
     this.stickers = [];
   }
 
+  /** убрать все эффекты (debug, смена сцены) */
+  reset() {
+    this.parts = [];
+    this.scratches = [];
+    this.splats = [];
+    this.trails = [];
+    this.stickers = [];
+    this.bubble = null;
+    this.glassCat = null;
+    this.fogState = 'off';
+    this.fogAlpha = 0;
+    this.heart = null;
+    this.glitchDur = 0;
+    this.onGlitch(false);
+  }
+
   stickerAt(x: number, y: number): Sticker | null {
     for (let i = this.stickers.length - 1; i >= 0; i--) {
       const s = this.stickers[i];

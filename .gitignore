@@ -3,3 +3,5 @@ dist
 *.log
 .DS_Store
 bench-out/
+public/external/
+public/models/vosk-ru-small/

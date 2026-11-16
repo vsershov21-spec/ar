@@ -140,16 +140,33 @@ try {
     await click(page, 'mode:glb');
     await wait(2500);
     await shot(page, '26_glb_stub');
+    // липсинк: записанная реплика (cues Rhubarb) в спрайт- и риг-режиме, панель отладки открыта (визуализация визем)
+    const intro = 'Ты чё, с картой, что ли? Ничего себе. Как тебя зовут?';
+    for (const m of ['sprite', 'rig']) {
+      await click(page, 'mode:' + m);
+      await wait(900);
+      await page.evaluate(() => { window.__app.fx.reset(); window.__app.director.setPersona('hooligan'); });
+      await page.evaluate((t) => window.__app.director.speakText('hooligan', t), intro);
+      await wait(1300);
+      await page.evaluate(() => document.querySelector('.dbg')?.classList.remove('closed'));
+      await page.evaluate(() => document.querySelector('.dbg h4:nth-of-type(9)')?.scrollIntoView());
+      await wait(50);
+      await page.screenshot({ path: path.join(outDir, `27_lipsync_${m}.png`) });
+      console.log('  ✓ 27_lipsync_' + m);
+    }
     await page.close();
   }
   // 2. адекватность размеров на 4 вьюпортах: спрайт и риг, на карте и «у стекла»
   if (!only || only === 'vp') {
     for (const vp of VPS) {
       const page = await openPage(vp);
+      await page.evaluate(() => localStorage.clear());
+      await page.reload({ waitUntil: 'networkidle0' });
+      await page.waitForFunction(() => window.__app?.director);
       await click(page, 'fast');
-      await wait(5200);
-      await page.evaluate(() => { window.__app.fx.clearStickers(); });
-      await wait(3500);
+      await wait(6000);
+      await page.evaluate(() => { window.__app.director.dialog.clear(); window.__app.fx.reset(); });
+      await wait(400);
       await shot(page, `vp_${vp.name}_sprite_card`);
       await click(page, 'mode:rig');
       await wait(600);

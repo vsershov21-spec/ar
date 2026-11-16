@@ -141,6 +141,7 @@ export class DebugPanel {
     for (const f of fxs) this.btn(s, f, () => void d.runFx(f), 'fx:' + f);
     this.btn(s, 'Заклеить экран', () => void app.fx.cover(d.persona.stickers, d.persona.palette, 1500), 'cover');
     this.btn(s, 'Сдуть наклейки', () => app.fx.blowStickers(), 'blow');
+    this.btn(s, 'Очистить эффекты', () => app.fx.reset(), 'fxreset');
     this.btn(s, 'Кот к стеклу', () => app.stage.setMode(app.stage.atGlass ? 'card' : 'glass'), 'glass');
 
     s = this.section('Кот на карте');
