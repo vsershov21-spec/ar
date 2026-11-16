@@ -61,6 +61,8 @@ const BITRATE = Number(process.env.VOICE_KBPS || 32);
 const limit = Number(opt('--limit', 0));
 const only = opt('--only', '');
 const compareN = Number(opt('--compare', 0));
+/** --budget N: синтезировать не дольше N секунд (остальное — следующим запуском; манифест пишется всегда) */
+const budgetSec = Number(opt('--budget', 0));
 const force = flag('--force');
 
 // ───────────── входные данные ─────────────
@@ -82,9 +84,13 @@ function parseCsv(s) {
   const [h, ...rest] = rows;
   return rest.filter((r) => r.length === h.length).map((r) => Object.fromEntries(h.map((k, i) => [k, r[i]])));
 }
-let lines = parseCsv(fs.readFileSync(path.join(root, 'gen/voice_lines.csv'), 'utf8'));
-if (only) lines = lines.filter((l) => l.id.includes(only));
-if (limit) lines = lines.slice(0, limit);
+const allLines = parseCsv(fs.readFileSync(path.join(root, 'gen/voice_lines.csv'), 'utf8'));
+// --only/--limit ограничивают только синтез; манифест всегда — по всем репликам, у которых есть файлы
+let pick = allLines;
+if (only) pick = pick.filter((l) => l.id.includes(only));
+if (limit) pick = pick.slice(0, limit);
+const picked = new Set(pick.map((l) => l.id));
+const lines = allLines;
 const names = flag('--no-names')
   ? []
   : fs.readFileSync(path.join(root, 'content/names.ru.txt'), 'utf8').split('\n').map((s) => s.trim()).filter((s) => s && !s.startsWith('#'));
@@ -94,17 +100,39 @@ for (const l of lines) presets[l.persona] ??= { voice: l.piper_voice, pitch: Num
 
 // ───────────── задания ─────────────
 const hash = (...a) => crypto.createHash('sha1').update(a.join('\u0001')).digest('hex').slice(0, 8);
-const jobs = []; // { persona, key, kind: line|part|name, text }
+const jobs = []; // { persona, key, kind: line|part|slot|template, text }
+const SLOT_RE = /\{(name|answer)\}/;
 for (const l of lines) {
-  if (l.has_name === '1' || l.text.includes('{name}')) {
-    const [a, b] = l.text.split('{name}');
+  const m = l.text.match(SLOT_RE);
+  if (m) {
+    const [a, b] = l.text.split(m[0]);
     if (a.trim()) jobs.push({ persona: l.persona, key: `${l.id}~a`, kind: 'part', line: l.id, slot: 'a', text: a.trim() });
-    if (b.replace(/^[\s,.!?]+$/, '').trim()) jobs.push({ persona: l.persona, key: `${l.id}~b`, kind: 'part', line: l.id, slot: 'b', text: b.trim(), lead: b.match(/^[,.!?…]*/)[0] });
-    jobs.push({ persona: l.persona, key: l.id, kind: 'template', text: l.text });
+    if ((b ?? '').replace(/^[\s,.!?…]+$/, '').trim()) jobs.push({ persona: l.persona, key: `${l.id}~b`, kind: 'part', line: l.id, slot: 'b', text: b.trim(), lead: b.match(/^[,.!?…]*/)[0] });
+    jobs.push({ persona: l.persona, key: l.id, kind: 'template', text: l.text, slotName: m[1] });
   } else jobs.push({ persona: l.persona, key: l.id, kind: 'line', text: l.text, event: l.event, emotion: l.emotion });
 }
-if (names.length) for (const p of Object.keys(presets)) for (const n of names) jobs.push({ persona: p, key: `name:${n}`, kind: 'name', text: n });
-const fname = (j) => j.key.replace(/^name:/, 'name_').replace(/[^a-zA-Zа-яА-ЯёЁ0-9._~-]/g, '_').replace(/~/g, '__');
+// загадки (content/dialogs.json): вопрос и подсказка — реплики с id как у director (<persona>.riddle.<id>.q|hint),
+// ответ — значение слота {answer}
+let riddles = {};
+try {
+  riddles = JSON.parse(fs.readFileSync(path.join(root, 'content/dialogs.json'), 'utf8')).riddles ?? {};
+} catch {
+  /* нет диалогов */
+}
+const slotValues = { name: names, answer: {} };
+for (const [p, list] of Object.entries(riddles)) {
+  if (!presets[p]) continue;
+  slotValues.answer[p] = [];
+  for (const r of list) {
+    for (const part of ['q', 'hint']) if (r[part]) jobs.push({ persona: p, key: `${p}.riddle.${r.id}.${part}`, kind: 'line', text: r[part], event: `riddle_${part}` });
+    if (r.answer) slotValues.answer[p].push(r.answer);
+  }
+}
+for (const p of Object.keys(presets)) {
+  for (const n of names) jobs.push({ persona: p, key: `name:${n}`, kind: 'slot', slotName: 'name', text: n });
+  for (const a of new Set(slotValues.answer[p] ?? [])) jobs.push({ persona: p, key: `answer:${a}`, kind: 'slot', slotName: 'answer', text: a });
+}
+const fname = (j) => j.key.replace(/^(name|answer):/, '$1_').replace(/[^a-zA-Zа-яА-ЯёЁ0-9._~-]/g, '_').replace(/~/g, '__');
 for (const j of jobs) {
   if (j.kind === 'template') continue;
   const pr = presets[j.persona];
@@ -118,14 +146,14 @@ function piperBatch(voice, rate, items, tmp) {
   if (!items.length) return;
   const model = path.join(VOICES, `${voice}.onnx`);
   if (!fs.existsSync(model)) throw new Error(`нет модели ${model} (PIPER_VOICES)`);
-  const input = items.map((j) => JSON.stringify({ text: synthText(j), output_file: path.join(tmp, `${j.hash}.wav`) })).join('\n') + '\n';
+  const input = items.map((j) => JSON.stringify({ text: synthText(j), output_file: path.join(tmp, `${j.tmpId}.wav`) })).join('\n') + '\n';
   const r = spawnSync(path.join(PIPER_DIR, 'piper'), ['-q', '-m', model, '--espeak_data', path.join(PIPER_DIR, 'espeak-ng-data'), '--json-input',
     '--length_scale', String(+(1 / rate).toFixed(3)), '--noise_scale', '0.6', '--noise_w', '0.75', '--sentence_silence', '0.15'],
   { input, cwd: PIPER_DIR, env: { ...process.env, LD_LIBRARY_PATH: PIPER_DIR }, maxBuffer: 1 << 26 });
   if (r.status !== 0) throw new Error(`piper: ${r.stderr}`);
 }
 /** текст для синтеза: имя — с восклицанием, так оно звучит как обращение */
-const synthText = (j) => (j.kind === 'name' ? `${j.text}!` : j.text);
+const synthText = (j) => (j.kind === 'slot' && j.slotName === 'name' ? `${j.text}!` : j.kind === 'slot' ? `${j.text}.` : j.text);
 
 function espeakBin() {
   const local = path.join(PIPER_DIR, 'espeak-ng');
@@ -168,9 +196,11 @@ const onset = (f) => {
 // ───────────── основной цикл ─────────────
 const enc = await createMp3Encoder();
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'voice-'));
-const todo = jobs.filter((j) => j.file && (force || !fs.existsSync(j.file) || !fs.existsSync(j.file + '.json')));
-console.log(`Реплик: ${lines.length}, заданий: ${jobs.filter((j) => j.file).length}, к синтезу: ${todo.length}. Вывод: ${OUT}`);
+const inPick = (j) => (j.kind === 'slot' ? (!only && !limit) || flag('--slots-too') : picked.has(j.line ?? j.key) || (!only && !limit));
+const todo = jobs.filter((j) => j.file && inPick(j) && (force || !fs.existsSync(j.file) || !fs.existsSync(j.file + '.json')));
+console.log(`Реплик: ${lines.length} (к синтезу отобрано ${pick.length}), заданий: ${jobs.filter((j) => j.file).length}, к синтезу: ${todo.length}. Вывод: ${OUT}`);
 console.log(`Фонемы: ${ESPEAK ? ESPEAK.bin : 'буквенные правила (espeak-ng не найден)'}`);
+todo.forEach((j, i) => (j.tmpId = `${i}-${j.hash}`));
 const t0 = Date.now();
 const groups = new Map();
 for (const j of todo) {
@@ -180,13 +210,18 @@ for (const j of todo) {
   groups.get(k).push(j);
 }
 const compare = [];
+let outOfBudget = false;
 for (const [k, items] of groups) {
   const [voice, rate] = k.split('|');
-  for (let i = 0; i < items.length; i += 60) {
-    const chunk = items.slice(i, i + 60);
+  for (let i = 0; i < items.length && !outOfBudget; i += 40) {
+    if (budgetSec && (Date.now() - t0) / 1000 > budgetSec) {
+      outOfBudget = true;
+      break;
+    }
+    const chunk = items.slice(i, i + 40);
     piperBatch(voice, Number(rate), chunk, tmp);
     for (const j of chunk) {
-      const wav = path.join(tmp, `${j.hash}.wav`);
+      const wav = path.join(tmp, `${j.tmpId}.wav`);
       const { sr, x } = readWav(wav);
       if (sr !== SR) throw new Error(`ожидалась частота ${SR}, у ${wav} ${sr}`);
       let y = dsp.trimSilence(x, sr, -45, 0.05);
@@ -207,20 +242,21 @@ for (const [k, items] of groups) {
       if (compare.length < compareN && j.kind === 'line') compare.push({ j, f, dur, phones, cues });
       fs.rmSync(wav);
     }
-    process.stdout.write(`  ${voice}: ${Math.min(i + 60, items.length)}/${items.length}\r`);
+    console.log(`  ${voice}: ${Math.min(i + 40, items.length)}/${items.length}  (${((Date.now() - t0) / 1000).toFixed(0)} с)`);
   }
-  process.stdout.write('\n');
 }
+if (outOfBudget) console.log(`Время вышло (--budget ${budgetSec}): остальное — следующим запуском.`);
 fs.rmSync(tmp, { recursive: true, force: true });
 
 // ───────────── манифест ─────────────
 const byPersona = {};
 let totalBytes = 0, totalDur = 0;
 for (const j of jobs) {
-  const m = (byPersona[j.persona] ??= { persona: j.persona, format: 'mp3', lines: {}, parts: {}, names: {} });
+  const m = (byPersona[j.persona] ??= { persona: j.persona, format: 'mp3', lines: {}, parts: {}, slots: { name: {}, answer: {} } });
   if (j.kind === 'template') {
     m.parts[j.key] ??= {};
     m.parts[j.key].t = j.text;
+    m.parts[j.key].slot = j.slotName;
     continue;
   }
   if (!fs.existsSync(j.file + '.json')) continue;
@@ -229,7 +265,7 @@ for (const j of jobs) {
   totalDur += meta.d;
   const e = { f: j.rel, d: meta.d, o: meta.o, c: meta.c };
   if (j.kind === 'line') m.lines[j.key] = { ...e, t: j.text };
-  else if (j.kind === 'name') m.names[j.text] = e;
+  else if (j.kind === 'slot') m.slots[j.slotName][j.text] = e;
   else (m.parts[j.line] ??= {})[j.slot] = j.lead ? { ...e, lead: j.lead } : e;
 }
 const top = { version: 1, generated: new Date().toISOString(), pipeline: PIPELINE, codec: `mp3 ${BITRATE}k mono ${SR}`, lipsync: ESPEAK ? 'ru-espeak-align' : 'ru-letters-align', personas: {} };
@@ -239,13 +275,13 @@ for (const [p, m] of Object.entries(byPersona)) {
   const rel = `${p}.${h}.json`;
   for (const f of fs.readdirSync(OUT).filter((f) => f.startsWith(`${p}.`) && f.endsWith('.json') && f !== rel)) fs.rmSync(path.join(OUT, f));
   fs.writeFileSync(path.join(OUT, rel), body);
-  top.personas[p] = { manifest: rel, lines: Object.keys(m.lines).length, names: Object.keys(m.names).length, templates: Object.keys(m.parts).length, voice: presets[p] };
+  top.personas[p] = { manifest: rel, lines: Object.keys(m.lines).length, names: Object.keys(m.slots.name).length, answers: Object.keys(m.slots.answer).length, templates: Object.keys(m.parts).length, voice: presets[p] };
 }
 fs.writeFileSync(path.join(OUT, 'manifest.json'), JSON.stringify(top, null, 1));
 // удалить устаревшие файлы (текст поменялся → новый хэш)
 const live = new Set(jobs.filter((j) => j.file).flatMap((j) => [j.file, j.file + '.json']));
 let removed = 0;
-if (!only && !limit) {
+if (!only && !limit && !outOfBudget && !todo.length) {
   for (const p of Object.keys(byPersona)) {
     const d = path.join(OUT, p);
     if (!fs.existsSync(d)) continue;

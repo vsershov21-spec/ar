@@ -38,14 +38,18 @@ export interface PersonaVoice {
   persona: string;
   format: string;
   lines: Record<string, ClipEntry>;
-  parts: Record<string, { t?: string; a?: ClipEntry; b?: ClipEntry }>;
-  names: Record<string, ClipEntry>;
+  /** реплики со слотом: префикс a + значение слота + суффикс b */
+  parts: Record<string, { t?: string; slot?: string; a?: ClipEntry; b?: ClipEntry }>;
+  /** значения слотов: name — имена (names.ru.txt), answer — ответы загадок */
+  slots?: Record<string, Record<string, ClipEntry>>;
+  /** старое поле (= slots.name) */
+  names?: Record<string, ClipEntry>;
 }
 export interface VoiceIndex {
   version: number;
   codec?: string;
   lipsync?: string;
-  personas: Record<string, { manifest: string; lines: number; names: number; templates: number }>;
+  personas: Record<string, { manifest: string; lines: number; names: number; answers?: number; templates: number }>;
 }
 /** Старый формат (public/sounds/voice/manifest.json, npm run voice:build) */
 export interface LegacyEntry { text: string; emotion: string; event: string; duration: number; src: string[]; cues?: string; lipsync?: string }
@@ -79,11 +83,12 @@ export function unpackCues(c: string, total: number): MouthCue[] {
   return out;
 }
 
-/** Найти имя внутри итогового текста по шаблону «префикс{name}суффикс» */
-export function extractName(template: string, text: string): string | null {
-  const i = template.indexOf('{name}');
+/** Найти значение слота внутри итогового текста по шаблону «префикс{slot}суффикс» */
+export function extractName(template: string, text: string, slot = 'name'): string | null {
+  const key = `{${slot}}`;
+  const i = template.indexOf(key);
   if (i < 0) return null;
-  const pre = template.slice(0, i), post = template.slice(i + 6);
+  const pre = template.slice(0, i), post = template.slice(i + key.length);
   if (!text.startsWith(pre) || !text.endsWith(post)) return null;
   const n = text.slice(pre.length, text.length - post.length).trim();
   return n || null;
@@ -192,13 +197,13 @@ export class VoicePlayer {
     return !!this.lookup(persona, template, lineId);
   }
 
-  private lookup(persona: string, template: string, lineId?: string): { kind: 'line'; e: ClipEntry; id: string } | { kind: 'parts'; id: string; a?: ClipEntry; b?: ClipEntry } | { kind: 'legacy'; e: LegacyEntry; id: string } | null {
+  private lookup(persona: string, template: string, lineId?: string): { kind: 'line'; e: ClipEntry; id: string } | { kind: 'parts'; id: string; slot: string; a?: ClipEntry; b?: ClipEntry } | { kind: 'legacy'; e: LegacyEntry; id: string } | null {
     const m = this.loaded.get(persona);
     let id = lineId;
     if (!id || !(m?.lines[id] || m?.parts[id] || this.legacy[persona]?.[id])) id = this.byText.get(`${persona}:${normText(template)}`)?.id;
     if (!id) return null;
     if (m?.lines[id]) return { kind: 'line', e: m.lines[id], id };
-    if (m?.parts[id]) return { kind: 'parts', id, a: m.parts[id].a, b: m.parts[id].b };
+    if (m?.parts[id]) return { kind: 'parts', id, slot: m.parts[id].slot ?? 'name', a: m.parts[id].a, b: m.parts[id].b };
     const le = this.legacy[persona]?.[id];
     return le ? { kind: 'legacy', e: le, id } : null;
   }
@@ -357,10 +362,11 @@ export class VoicePlayer {
       return buf ? { buf, cues: this.cuesFor(buf, f.e), offset: this.lipStrategy === 'amp' ? 0 : this.onsetShift(buf, f.e) } : null;
     }
     if (f.kind === 'parts') {
-      const nm = extractName(req.template, req.text);
+      const val = extractName(req.template, req.text, f.slot);
       const m = this.loaded.get(req.persona);
-      const ne = nm ? m?.names[Object.keys(m.names).find((k) => normName(k) === normName(nm)) ?? ''] : undefined;
-      if (!ne) return null; // имени нет в словаре — синтез
+      const dict = m?.slots?.[f.slot] ?? (f.slot === 'name' ? m?.names : undefined) ?? {};
+      const ne = val ? dict[Object.keys(dict).find((k) => normName(k) === normName(val)) ?? ''] : undefined;
+      if (!ne) return null; // значения нет в словаре — синтез всей фразы
       return this.splice(req.persona, f.a, ne, f.b);
     }
     // старый формат

@@ -16,8 +16,9 @@
 | Путь | Что | Кэш |
 |---|---|---|
 | `/targets/` | маркеры `.mind`, PNG карт | долгий |
-| `/models/` | GLB, (опц.) Vosk-модель | долгий |
-| `/sounds/` | `sfx.*`, `voice/**` | долгий |
+| `/models/` | GLB, Vosk-модель `models/vosk-ru-small-0.22/model.tar.gz` (с сервера сборки, см. ниже) | долгий |
+| `/sounds/` | `sfx.*` | долгий |
+| `/voice/` | озвучка Piper: `manifest.json` (индекс) + `<характер>.<хэш>.json` + `<характер>/*.<хэш>.mp3` (с сервера сборки) | обычный; файлы с хэшем в имени |
 | `/video/` | спрайты, позы, видео с альфой, формы рта | долгий |
 | `/assets/` | JS/CSS Vite (имена с хэшем) | долгий |
 | `/personas/` | JSON характеров | обычный |
@@ -49,10 +50,37 @@ git remote add origin git@github.com:<org-или-user>/<repo>.git
 git push -u origin main
 ```
 
+## Тяжёлые ассеты вне репозитория: `public-extra` на сервере сборки
+
+Озвучка (~10 МБ MP3) и офлайн-модель распознавания (~45 МБ) в git не хранятся (Git LFS не используем).
+Они лежат на swe в постоянной папке **`/var/lib/vershov-commander/ar/public-extra/`** (структура повторяет `public/`):
+
+```
+public-extra/
+  models/vosk-ru-small-0.22/model.tar.gz   ← vosk-model-small-ru-0.22 (alphacephei.com), перепакован в tar.gz
+  voice/manifest.json, voice/<характер>.<хэш>.json, voice/<характер>/*.mp3   ← npm run voice:piper
+```
+
+`npm run build` = `vite build && node scripts/voice/attach-extra.mjs`: после сборки скрипт копирует эту папку в `dist/`
+(путь меняется переменной `AR_EXTRA_PUBLIC`). Если папки нет (CI, ноутбук) — ничего не делает, сборка не падает,
+приложение работает без них: реплики — синтезом речи браузера, распознавание — сообщением «офлайн-модель не найдена»
+и чипами. Значит, **никаких ручных копирований в `/srv/ar` не нужно**: следующий релиз (любой push в `main`) подхватит
+файлы сам. Обновили озвучку — сделайте любой коммит (или подождите следующего), чтобы пересобрался релиз.
+
+Как обновить:
+- **озвучку** — на swe: `bash /var/lib/vershov-commander/ar/voice-run.sh` (клонирует `main` в
+  `/var/lib/vershov-commander/ar/voice-build`, ставит зависимости, копирует Piper в `/tmp` — домашняя папка noexec —
+  и запускает `npm run voice:piper`; готовые файлы не пересобираются, лог — `voice-run.log`). Подробно — docs/VOICE.md;
+- **модель Vosk** — `bash scripts/voice/fetch-vosk.sh /var/lib/vershov-commander/ar/public-extra` (скачивает zip,
+  перепаковывает в tar.gz). Новая версия модели — новая папка (`vosk-ru-small-0.23/`) и путь `VOSK_MODEL_URL`
+  в `src/voice/asr.ts`: `/models/*` кэшируется у телефонов навсегда (`immutable`).
+
+Если хочется отдавать модель напрямую Caddy, а не копировать в каждый релиз (5 релизов × 45 МБ), — добавить в блок
+`ar.vershov.com` (нужен root): `handle_path /models/vosk-ru-small-0.22/* { root * /var/lib/vershov-commander/ar/public-extra/models/vosk-ru-small-0.22; file_server }`
+и выдать группе `caddy` право чтения на эту папку. Пока копия в релиз проще и не требует root.
+
 ## Что не входит в репозиторий
 
 - `public/external/xr/` — 8th Wall engine binary (проприетарная лицензия, `npm run setup-8thwall` вручную);
-- `public/models/vosk-ru-small/` — офлайн-модель Vosk (~45 МБ). Сервер пересобирает `dist/` при каждом релизе, поэтому
-  ручная копия в релиз потеряется: либо закоммитить модель (лучше через Git LFS), либо отдать её в Caddy отдельным
-  `handle_path /models/vosk-ru-small/*` из постоянной папки вне `/srv/ar/releases`;
+- озвучка и модель Vosk — см. выше (`public-extra`);
 - `bench-out/` — артефакты стенда распознавания.
