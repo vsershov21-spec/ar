@@ -38,7 +38,7 @@ export function readParams(search = location.search): AppParams {
   const q = new URLSearchParams(search);
   const debug = q.has('debug');
   const t = (q.get('tracker') as TrackerKind) || (debug ? 'debug' : 'mindar');
-  const c = (q.get('char') as CharacterMode) || 'sprite';
+  const c = (q.get('char') as CharacterMode) || 'glb';
   return { debug, tracker: t, character: ['sprite', 'rig', 'glb'].includes(c) ? c : 'sprite', asr: q.get('asr'), mic: q.get('mic') };
 }
 
