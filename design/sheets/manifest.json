@@ -1,0 +1,119 @@
+[
+ {
+  "file": "base_turnaround.jpg",
+  "prefix": "base/turn",
+  "names": [
+   "front",
+   "three_quarter",
+   "side",
+   "back"
+  ]
+ },
+ {
+  "file": "hooligan_turnaround.jpg",
+  "prefix": "hooligan/turn",
+  "names": [
+   "front",
+   "three_quarter",
+   "side",
+   "back"
+  ]
+ },
+ {
+  "file": "kind_turnaround.jpg",
+  "prefix": "kind/turn",
+  "names": [
+   "front",
+   "three_quarter",
+   "side",
+   "back"
+  ]
+ },
+ {
+  "file": "glitter_turnaround.jpg",
+  "prefix": "glitter/turn",
+  "names": [
+   "front",
+   "three_quarter",
+   "side",
+   "back"
+  ]
+ },
+ {
+  "file": "poses_hooligan_2.jpg",
+  "prefix": "hooligan/pose",
+  "names": [
+   "gum_blow",
+   "jump",
+   "point_button",
+   "listen",
+   "sit",
+   "offended"
+  ],
+  "min_area": 0.01
+ },
+ {
+  "file": "poses_kind_2.jpg",
+  "prefix": "kind/pose",
+  "names": [
+   "kind_bubbles",
+   "cocoa",
+   "breath_draw",
+   "listen",
+   "sit",
+   "sleep"
+  ],
+  "min_area": 0.01
+ },
+ {
+  "file": "poses_glitter_2.jpg",
+  "prefix": "glitter/pose",
+  "names": [
+   "glitter_throw",
+   "twirl",
+   "mirror",
+   "idle",
+   "wave",
+   "sit",
+   "heart",
+   "heart_smile"
+  ],
+  "min_area": 0.01
+ },
+ {
+  "file": "expr_glitter.jpg",
+  "prefix": "glitter/face",
+  "names": [
+   "neutral",
+   "excited",
+   "laugh",
+   "proud",
+   "wink",
+   "surprised",
+   "offended",
+   "shy",
+   "sad",
+   "purr",
+   "dizzy",
+   "sleep"
+  ],
+  "grid": [
+   4,
+   3
+  ]
+ },
+ {
+  "file": "mouths.jpg",
+  "prefix": "base/mouth",
+  "names": [
+   "M",
+   "E",
+   "A",
+   "O",
+   "U",
+   "F",
+   "L",
+   "rest"
+  ]
+ }
+]

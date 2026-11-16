@@ -10,55 +10,52 @@
       "press": "listen",
       "poses": {
         "idle": {
-          "file": "tada.webp"
+          "file": "turn_front.webp"
         },
         "wave": {
-          "file": "wave.webp"
+          "file": "turn_three_quarter.webp"
         },
         "listen": {
-          "file": "listen.webp",
-          "mouth": [
-            0.667,
-            0.41,
-            0.11
-          ]
+          "file": "pose_listen.webp"
         },
         "point": {
-          "file": "point.webp"
+          "file": "pose_point_button.webp"
         },
         "laugh": {
-          "file": "laugh.webp"
+          "file": "pose_listen.webp"
         },
         "giggle": {
-          "file": "giggle.webp",
-          "h": 0.86
+          "file": "pose_gum_blow.webp"
         },
         "jump": {
-          "file": "jump.webp",
-          "h": 1.02
+          "file": "pose_jump.webp"
         },
         "flip": {
-          "file": "flip.webp",
-          "h": 0.9,
-          "anchorY": 0.6
+          "file": "pose_jump.webp"
         },
         "dance": {
-          "file": "dance.webp"
+          "file": "pose_jump.webp"
         },
         "run": {
-          "file": "run.webp",
-          "h": 0.9
+          "file": "turn_three_quarter.webp"
         },
         "card": {
-          "file": "card.webp",
-          "h": 1.1
+          "file": "pose_sit.webp"
         },
         "yawn": {
-          "file": "yawn.webp"
+          "file": "pose_offended.webp"
         },
         "sleep": {
-          "file": "sleep.webp",
-          "h": 0.62
+          "file": "pose_sit.webp"
+        },
+        "sit": {
+          "file": "pose_sit.webp"
+        },
+        "offended": {
+          "file": "pose_offended.webp"
+        },
+        "gum": {
+          "file": "pose_gum_blow.webp"
         }
       },
       "clips": {
@@ -143,8 +140,8 @@
         },
         "bubble_gum": {
           "poses": [
-            "giggle",
-            "laugh"
+            "gum",
+            "giggle"
           ],
           "fps": 0.6
         },
@@ -194,7 +191,7 @@
         },
         "sit": {
           "poses": [
-            "giggle"
+            "sit"
           ]
         },
         "wave": {
@@ -209,55 +206,55 @@
       "press": "listen",
       "poses": {
         "idle": {
-          "file": "tada.webp"
+          "file": "pose_idle.webp"
         },
         "wave": {
-          "file": "wave.webp"
+          "file": "pose_wave.webp"
         },
         "listen": {
-          "file": "listen.webp",
-          "mouth": [
-            0.667,
-            0.41,
-            0.11
-          ]
+          "file": "pose_heart_smile.webp"
         },
         "point": {
-          "file": "point.webp"
+          "file": "pose_glitter_throw.webp"
         },
         "laugh": {
-          "file": "laugh.webp"
+          "file": "pose_heart_smile.webp"
         },
         "giggle": {
-          "file": "giggle.webp",
-          "h": 0.86
+          "file": "pose_heart.webp"
         },
         "jump": {
-          "file": "jump.webp",
-          "h": 1.02
+          "file": "pose_twirl.webp"
         },
         "flip": {
-          "file": "flip.webp",
-          "h": 0.9,
-          "anchorY": 0.6
+          "file": "pose_twirl.webp"
         },
         "dance": {
-          "file": "dance.webp"
+          "file": "pose_twirl.webp"
         },
         "run": {
-          "file": "run.webp",
-          "h": 0.9
+          "file": "turn_three_quarter.webp"
         },
         "card": {
-          "file": "card.webp",
-          "h": 1.1
+          "file": "pose_sit.webp"
         },
         "yawn": {
-          "file": "yawn.webp"
+          "file": "pose_mirror.webp"
         },
         "sleep": {
-          "file": "sleep.webp",
-          "h": 0.62
+          "file": "pose_sit.webp"
+        },
+        "sit": {
+          "file": "pose_sit.webp"
+        },
+        "mirror": {
+          "file": "pose_mirror.webp"
+        },
+        "heart": {
+          "file": "pose_heart.webp"
+        },
+        "glitter_throw": {
+          "file": "pose_glitter_throw.webp"
         }
       },
       "clips": {
@@ -343,7 +340,7 @@
         },
         "glitter_burst": {
           "poses": [
-            "jump",
+            "glitter_throw",
             "idle"
           ],
           "fps": 1.5
@@ -389,7 +386,202 @@
         },
         "sit": {
           "poses": [
+            "sit"
+          ]
+        },
+        "wave": {
+          "poses": [
+            "wave"
+          ]
+        }
+      }
+    },
+    "kind": {
+      "dir": "video/sprites/kind/",
+      "press": "listen",
+      "poses": {
+        "idle": {
+          "file": "turn_front.webp"
+        },
+        "wave": {
+          "file": "pose_listen.webp"
+        },
+        "listen": {
+          "file": "pose_listen.webp"
+        },
+        "point": {
+          "file": "pose_breath_draw.webp"
+        },
+        "laugh": {
+          "file": "pose_cocoa.webp"
+        },
+        "giggle": {
+          "file": "pose_kind_bubbles.webp"
+        },
+        "jump": {
+          "file": "turn_three_quarter.webp"
+        },
+        "flip": {
+          "file": "turn_three_quarter.webp"
+        },
+        "dance": {
+          "file": "pose_kind_bubbles.webp"
+        },
+        "run": {
+          "file": "turn_three_quarter.webp"
+        },
+        "card": {
+          "file": "pose_sit.webp"
+        },
+        "yawn": {
+          "file": "pose_cocoa.webp"
+        },
+        "sleep": {
+          "file": "pose_sleep.webp"
+        },
+        "sit": {
+          "file": "pose_sit.webp"
+        },
+        "cocoa": {
+          "file": "pose_cocoa.webp"
+        },
+        "bubbles": {
+          "file": "pose_kind_bubbles.webp"
+        },
+        "breath_draw": {
+          "file": "pose_breath_draw.webp"
+        }
+      },
+      "clips": {
+        "idle": {
+          "poses": [
+            "idle",
+            "wave",
+            "idle",
+            "point"
+          ],
+          "fps": 0.35
+        },
+        "appear": {
+          "poses": [
+            "jump",
+            "idle"
+          ],
+          "fps": 1.2
+        },
+        "knock_glass": {
+          "poses": [
+            "point"
+          ]
+        },
+        "press_glass": {
+          "poses": [
+            "listen"
+          ]
+        },
+        "scratch": {
+          "poses": [
+            "run",
+            "point"
+          ],
+          "fps": 3
+        },
+        "tumble": {
+          "poses": [
+            "flip"
+          ]
+        },
+        "sticker": {
+          "poses": [
+            "card"
+          ]
+        },
+        "talk": {
+          "poses": [
+            "listen"
+          ]
+        },
+        "listen": {
+          "poses": [
+            "listen"
+          ]
+        },
+        "laugh": {
+          "poses": [
+            "laugh",
             "giggle"
+          ],
+          "fps": 3
+        },
+        "bored": {
+          "poses": [
+            "cocoa",
+            "sleep"
+          ],
+          "fps": 0.5
+        },
+        "run_home": {
+          "poses": [
+            "run"
+          ]
+        },
+        "dance": {
+          "poses": [
+            "dance",
+            "jump"
+          ],
+          "fps": 3
+        },
+        "bubble_gum": {
+          "poses": [
+            "bubbles"
+          ]
+        },
+        "glitter_burst": {
+          "poses": [
+            "jump"
+          ]
+        },
+        "heart_draw": {
+          "poses": [
+            "breath_draw"
+          ]
+        },
+        "walk": {
+          "poses": [
+            "run",
+            "idle"
+          ],
+          "fps": 4
+        },
+        "run": {
+          "poses": [
+            "run"
+          ]
+        },
+        "jump": {
+          "poses": [
+            "jump"
+          ]
+        },
+        "flip": {
+          "poses": [
+            "flip"
+          ]
+        },
+        "turn_left": {
+          "poses": [
+            "idle"
+          ]
+        },
+        "turn_right": {
+          "poses": [
+            "idle"
+          ]
+        },
+        "sit": {
+          "poses": [
+            "sit"
           ]
         },
         "wave": {
@@ -414,5 +606,6 @@
       "G": "G.webp",
       "H": "H.webp"
     }
-  }
+  },
+  "_source": "design/sheets (Nano Banana Pro, AI Studio), нарезка scripts/design/cut_sheets.py"
 }
