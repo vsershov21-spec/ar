@@ -11,6 +11,7 @@ import { asset } from '../core/util';
 
 export type Category = 'sfx' | 'voice' | 'ambience';
 const DUCK = Math.pow(10, -8 / 20); // −8 дБ ≈ 0.4
+const DUCK_MIC = Math.pow(10, -14 / 20); // −14 дБ ≈ 0.2
 
 export class Audio {
   private howl: Howl | null = null;
@@ -131,10 +132,30 @@ export class Audio {
     this.applyDuck();
   }
 
-  /** приглушить sfx/ambience на время реплики */
-  duck(on: boolean) {
-    this.duckK = on ? DUCK : 1;
+  private duckReasons = new Set<string>();
+  /**
+   * Приглушить sfx/ambience. Причины складываются: 'voice' — говорит кот (−8 дБ),
+   * 'mic' — слушаем ребёнка (−14 дБ: меньше своего звука в микрофоне и распознавании).
+   */
+  duck(on: boolean, reason: 'voice' | 'mic' = 'voice') {
+    if (on) this.duckReasons.add(reason);
+    else this.duckReasons.delete(reason);
+    this.duckK = this.duckReasons.has('mic') ? DUCK_MIC : this.duckReasons.size ? DUCK : 1;
     this.applyDuck();
+  }
+
+  /**
+   * iOS/Safari 17+: тип аудиосессии. 'playback' — обычный режим (звук и при переключателе «Без звука»);
+   * 'play-and-record' — пока открыт микрофон: без него iOS сама переводит сессию и может увести звук
+   * в разговорный динамик/сделать тише. Вызывать при открытии и закрытии микрофона.
+   */
+  setSession(type: 'playback' | 'play-and-record') {
+    try {
+      const nav = navigator as any;
+      if (nav.audioSession && nav.audioSession.type !== type) nav.audioSession.type = type;
+    } catch {
+      /* ignore */
+    }
   }
 
   private applyDuck() {
