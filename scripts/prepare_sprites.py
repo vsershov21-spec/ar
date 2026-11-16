@@ -3,12 +3,12 @@
 
 Вход:  assets-src/sprites/<поза>.png            — общий образ (сейчас заглушка: старый кот в голубом худи)
        assets-src/sprites/<персона>/<поза>.png  — если есть, берётся как готовый финальный арт персоны
-Выход: public/sprites/<персона>/<поза>.webp (высота до 512 px, прозрачность сохраняется)
+Выход: public/video/sprites/<персона>/<поза>.webp (высота до 512 px, прозрачность сохраняется)
 
 Пока финального арта нет, образы персон делаются перекраской худи/кепки заглушки:
 hooligan — чёрное худи с бирюзовым отливом, лаймовая кепка; glitter — лавандовое худи, мятная кепка.
 Когда придут финальные позы — положите их в assets-src/sprites/<персона>/ с теми же именами
-(или поправьте public/sprites/manifest.json) и запустите `npm run prepare-sprites`.
+(или поправьте public/video/sprites/manifest.json) и запустите `npm run prepare-sprites`.
 """
 import os, colorsys
 import numpy as np
@@ -16,7 +16,7 @@ from PIL import Image
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
 SRC = os.path.join(ROOT, 'assets-src', 'sprites')
-OUT = os.path.join(ROOT, 'public', 'sprites')
+OUT = os.path.join(ROOT, 'public', 'video', 'sprites')
 MAX_H = 512
 
 PERSONAS = {

@@ -2,7 +2,7 @@
 """Процедурные звуки-заглушки для прототипа.
 
 Генерирует отдельные WAV в assets-src/audio/<имя>.wav и общий аудиоспрайт
-public/audio/sfx.{webm,mp3} + public/audio/sfx.json (карта спрайта для Howler).
+public/sounds/sfx.{webm,mp3} + public/sounds/sfx.json (карта спрайта для Howler).
 Чтобы заменить звук записанным: положите файл с тем же именем в assets-src/audio/
 (WAV 44.1 кГц моно/стерео) и запустите `npm run gen-sounds -- --keep-existing` —
 скрипт пересоберёт спрайт, не перезаписывая ваши файлы.
@@ -11,7 +11,7 @@ import json, os, subprocess, sys, wave
 import numpy as np
 
 SR = 44100
-ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'public', 'audio')
+ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'public', 'sounds')
 SRC = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'assets-src', 'audio')
 rng = np.random.default_rng(7)
 
