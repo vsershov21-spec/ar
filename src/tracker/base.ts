@@ -36,22 +36,39 @@ export abstract class TrackerBase {
     this.lostCbs.add(cb);
     return () => this.lostCbs.delete(cb);
   }
+  /**
+   * Карта найдена/потеряна. Поза замирает сразу, а событие «потеряна» — только если карты нет дольше
+   * lostDebounceMs (0,5 с): MindAR моргает на бликах, кот не должен дёргаться. Вернулась раньше — ни
+   * «потеряна», ни «найдена» не шлём.
+   */
   protected setFound(v: boolean) {
     if (v === this.isTracking) return;
     this.isTracking = v;
     if (!v) {
       this.hold.freeze(this.anchor.matrix);
       this.holding = true;
+      this.lostAt = this.clock;
     } else {
       this.holding = false;
-    }
-    if (v) {
       // после потери — не «доезжаем» плавно из старой позы, а прыгаем сразу
       this.pos.reset();
       this.hasPose = false;
+      if (this.lostAt !== null) {
+        this.lostAt = null; // короткое моргание — событий нет
+        return;
+      }
     }
-    (v ? this.foundCbs : this.lostCbs).forEach((cb) => cb());
+    if (v) this.foundCbs.forEach((cb) => cb());
+    else if (this.lostDebounceMs <= 0) this.fireLost();
   }
+  private fireLost() {
+    this.lostAt = null;
+    this.lostCbs.forEach((cb) => cb());
+  }
+  /** сколько карта должна отсутствовать, чтобы считаться потерянной, мс */
+  lostDebounceMs = 500;
+  private lostAt: number | null = null;
+  private clock = 0;
 
   setSmoothing(minCutoff: number, beta: number) {
     this.pos.setParams(minCutoff, beta);
@@ -63,6 +80,8 @@ export abstract class TrackerBase {
   }
 
   update(dt: number, t: number) {
+    this.clock = t * 1000;
+    if (this.lostAt !== null && !this.isTracking && this.clock - this.lostAt >= this.lostDebounceMs) this.fireLost();
     if (this.holding) {
       // потеря: якорь замер в мире, компенсируем поворот телефона (если есть гироскоп)
       this.hold.apply(this.anchor.matrix);

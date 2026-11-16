@@ -105,6 +105,8 @@ export function registerBuiltinTabs() {
         ui.slider(t2, 'поворот', -1.5, 1.5, 0.01, () => tracker.yaw, (v) => (tracker.yaw = v));
         ui.btn(t2, 'Дрожание рук', () => (tracker.wobble = !tracker.wobble), 'wobble');
       }
+      const t3 = ui.section(el, 'Камера → события');
+      for (const e of ['card_far', 'card_close', 'low_light'] as const) ui.btn(t3, e, () => app.cardEvent(e), 'cam:' + e);
     },
   });
 

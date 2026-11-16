@@ -1,0 +1,4 @@
+{
+  "_comment": "Генерируется scripts/video-manifest.mjs. Видео-клип есть — играет он, иначе PNG-позы (video/sprites), иначе риг.",
+  "personas": {}
+}

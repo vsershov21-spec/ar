@@ -229,7 +229,20 @@ export class SpriteCharacter implements Character {
     const src = canHevc && v.hevc ? v.hevc : v.webm ?? v.hevc;
     if (!src) return;
     video.src = asset(src);
+    video.setAttribute('playsinline', '');
     video.play().catch(() => undefined);
+    // размер плоскости — по кадру видео (рост 1, лапы — anchor.y манифеста поз)
+    video.addEventListener('loadedmetadata', () => {
+      if (this.video !== video || !video.videoHeight) return;
+      const w = video.videoWidth / video.videoHeight;
+      const ay = this.manifest?.anchor.y ?? 0.985;
+      this.mesh.scale.set(w, 1, 1);
+      this.mesh.position.set(0, ay - 0.5, 0);
+      this.hitMesh.scale.copy(this.mesh.scale).multiplyScalar(0.8);
+      this.hitMesh.position.copy(this.mesh.position);
+    });
+    // клип кончился — вернуться к позам (ClipState сам переключит idle)
+    video.addEventListener('error', () => this.video === video && this.stopVideo());
     const t = new THREE.VideoTexture(video);
     t.colorSpace = THREE.SRGBColorSpace;
     this.video = video;
@@ -241,6 +254,7 @@ export class SpriteCharacter implements Character {
     if (!this.video) return;
     this.video.pause();
     this.video.removeAttribute('src');
+    this.poseKey = '';
     this.video = null;
   }
 

@@ -16,7 +16,8 @@
     "voice:build": "node scripts/voice/build.mjs",
     "setup-8thwall": "node scripts/setup-8thwall.mjs",
     "bench": "node scripts/bench/run_bench.mjs",
-    "voice:piper": "node scripts/voice/piper.mjs"
+    "voice:piper": "node scripts/voice/piper.mjs",
+    "video-manifest": "node scripts/video-manifest.mjs"
   },
   "keywords": [],
   "author": "",

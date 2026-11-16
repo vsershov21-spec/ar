@@ -21,6 +21,8 @@ export type { Sticker } from './stickerSheet';
 export type { FxArgs } from './core';
 
 const FACTORIES: Record<string, FxFactory> = { ...COMMON, ...KIND, ...GLITTER, ...HOOLIGAN };
+/** эффекты «от кота» (дыхание, поцелуй, лапка) — место берут у кота, а не в точке касания */
+const CAT_ANCHORED = new Set(['steam', 'kiss_print', 'paw_print', 'steam_heart']);
 /** эффекты, которые делает лист наклеек (не FxInstance) */
 const STICKER_FX = new Set(['sticker', 'sticker_peel', 'stickers_cover', 'stickers_blow']);
 
@@ -163,6 +165,8 @@ export class FxLayer {
     if (args.at && args.x === undefined) args = { ...args, x: args.at.x, y: args.at.y };
     const def = resolveFx(id, this.tuning, args.tuning ? { ...args.tuning, ...args.params } : args.params);
     if (args.durationMs !== undefined) def.durationMs = args.durationMs;
+    // мировой слой — всегда у кота (пузыри изо рта, Zzz над головой, искры из-под лап)
+    if ((def.layer === 'world' || CAT_ANCHORED.has(id)) && !args.params?.atPoint) args = { ...args, x: undefined, y: undefined, at: undefined };
     if (id === 'glitch') def.durationMs = Math.min(def.durationMs, 1000); // фотосенситивность: не дольше 1 с
     if (args.sound && def.sound && def.sound !== 'none') this.onSound(def.sound);
     if (STICKER_FX.has(id)) return this.playSticker(id, def.params, args, def.durationMs);

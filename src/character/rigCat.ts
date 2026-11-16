@@ -44,8 +44,8 @@ const ZONES: { zone: TouchZone; bone: string; r?: number; box?: V3; pos: V3 }[] 
   { zone: 'paw', bone: 'LeftFoot', r: 0.08, pos: [0, 0, 0.03] },
   { zone: 'paw', bone: 'RightFoot', r: 0.08, pos: [0, 0, 0.03] },
   { zone: 'belly', bone: 'Spine', box: [0.26, 0.22, 0.12], pos: [0, 0.03, 0.12] },
-  { zone: 'tail', bone: 'Tail1', r: 0.07, pos: [0, 0.03, 0] },
-  { zone: 'tail', bone: 'Tail3', r: 0.07, pos: [0, 0.03, 0] },
+  { zone: 'tail', bone: 'Tail1', r: 0.085, pos: [0, 0.03, 0] },
+  { zone: 'tail', bone: 'Tail3', r: 0.085, pos: [0, 0.03, 0] },
   { zone: 'body', bone: 'Spine', box: [0.4, 0.42, 0.34], pos: [0, 0.06, 0] },
   { zone: 'body', bone: 'Hips', box: [0.36, 0.22, 0.3], pos: [0, -0.05, 0] },
 ];

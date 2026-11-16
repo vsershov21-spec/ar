@@ -20,6 +20,7 @@ import { Input } from './input/input';
 import { UI, posterUrl } from './ui/ui';
 import { Director } from './director';
 import { personaMeta } from './character/personaMeta';
+import { CardMonitor, LumaSampler, cardScreenFrac, type CardEvent } from './tracker/cardMonitor';
 
 export type CharacterMode = 'sprite' | 'rig' | 'glb';
 export type TrackerKind = 'mindar' | 'debug' | '8thwall' | 'webxr';
@@ -179,8 +180,14 @@ export class App {
       }
       return null;
     };
+    // все наклейки отклеили пальцем: праздник; если экран был заклеен для смены образа — как встряска
+    fx.onAllStickersGone = () => {
+      const switching = this.director.state.phase === 'switching';
+      this.director.interaction('stickers_all_gone' as InteractionKind);
+      if (switching) this.director.interaction('shake');
+    };
     fx.onStickerSeries = () => {
-      if (!this.stage.walking) this.character.play('sticker');
+      if (!this.stage.walking) this.character.play('sticker_slap');
     };
   }
   private lastPersona = '';
@@ -290,6 +297,14 @@ export class App {
     }
   }
   private purrT = 0;
+  /** карта далеко/близко, темно → события режиссёру (card_far, card_close, low_light) */
+  readonly cardMonitor = new CardMonitor((e) => this.cardEvent(e));
+  private luma = new LumaSampler();
+  private lumaT = 0;
+  cardEvent(e: CardEvent) {
+    this.director.log(`камера: ${e}`);
+    this.director.interaction(e as unknown as InteractionKind);
+  }
 
   private bindInput() {
     const i = this.input, d = this.director;
@@ -370,6 +385,14 @@ export class App {
       this.fpsT = 0;
     }
     this.tracker.update(dt, this.elapsed);
+    if (this.director.state.appeared) {
+      this.cardMonitor.card(cardScreenFrac(this.tracker), dt * 1000);
+      if ((this.lumaT += dt) >= 0.5) {
+        const l = this.luma.sample((this.tracker as { video?: HTMLVideoElement | null }).video);
+        if (l !== null) this.cardMonitor.light(l, this.lumaT * 1000);
+        this.lumaT = 0;
+      }
+    }
     this.input.tick();
     // мурчание-петля, пока гладят
     if (this.input.touch.isStroking && (this.purrT -= dt) <= 0) {

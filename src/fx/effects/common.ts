@@ -345,19 +345,24 @@ class GlassCat extends Timed {
       g.restore();
       fy = env.h - H * 0.68 + (1 - inK) * H * 0.6;
     } else fy = env.anchor('mouth').y;
-    // пятна контакта (щёки, нос, лапы) — светлые, как прижатая к стеклу кожа
-    g.globalAlpha = 0.5 * outK * inK;
-    g.fillStyle = 'rgba(255,255,255,0.7)';
-    const sx = this.img ? env.w : env.anchor('head').s * 1.4;
-    for (const dx of [-0.22, 0.22]) {
+    // пятна контакта: нос и подушечки лап, прижатые к стеклу изнутри (светлые, с туманным краем)
+    const a = 0.55 * outK * inK;
+    if (a <= 0.01) return;
+    const s = this.img ? env.w * 0.7 : env.anchor('head').s;
+    const nose = this.img ? { x: cx, y: fy + 8 } : env.anchor('mouth');
+    const spot = (x: number, y: number, rx: number, ry: number) => {
+      const grd = g.createRadialGradient(x, y, 0, x, y, rx);
+      grd.addColorStop(0, `rgba(255,255,255,${a})`);
+      grd.addColorStop(0.6, `rgba(240,248,255,${a * 0.6})`);
+      grd.addColorStop(1, 'rgba(240,248,255,0)');
+      g.fillStyle = grd;
       g.beginPath();
-      g.ellipse(cx + dx * sx, fy + 30, sx * 0.09 * (1 + this.squash), sx * 0.05, 0, 0, Math.PI * 2);
+      g.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2);
       g.fill();
-    }
-    g.beginPath();
-    g.ellipse(cx, fy + 8, sx * 0.04, sx * 0.025, 0, 0, Math.PI * 2);
-    g.fill();
-    g.globalAlpha = 1;
+    };
+    const sq = 1 + this.squash;
+    spot(nose.x, nose.y - s * 0.02, s * 0.05 * sq, s * 0.035 * sq);
+    for (const dx of [-1, 1]) spot(nose.x + dx * s * 0.24, nose.y + s * 0.2, s * 0.06 * sq, s * 0.06 * sq);
   }
 }
 
