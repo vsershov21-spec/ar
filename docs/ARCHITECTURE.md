@@ -25,7 +25,7 @@ flowchart LR
   DIR --> AU[audio<br/>звуки]
   DIR --> DQ[voice/dialog<br/>очередь реплик] --> VP[voice/voicePlayer] --> LS[lipsync] --> CH
   DIR --> UI[ui<br/>кнопки, субтитры]
-  P[(public/personas/*.json<br/>характеры)] --> DIR
+  P[(content/personas/*.json + dialogs.json<br/>характеры и диалоги)] --> DIR
   MEM[(localStorage<br/>имя, характер, визиты)] <--> DIR
 ```
 
@@ -63,7 +63,7 @@ flowchart LR
 
 | Что | Где | Как поменять |
 |---|---|---|
-| Характеры: реплики, реакции, звуки, эффекты, палитры, голос, наклейки | `public/personas/<id>.json` | правка JSON, без кода |
+| Характеры: реплики, реакции, звуки, эффекты, палитры, голос, наклейки | `content/src/<id>.lines.txt` + `meta.json` → `python3 content/build.py` → `content/personas/<id>.json` (диалоги — `content/dialogs.json`, см. docs/DIALOGS.md) | правка текста, без кода |
 | Маркер карты | `public/targets/card.mind` (+ `card.png`) | `npm run compile-target -- новая_карта.png` |
 | 3D-модель | `public/models/character.glb` | заменить файл (требования — CHARACTER_SPEC.md) |
 | Позы/видео спрайт-режима | `public/video/sprites/` + `manifest.json` | заменить файлы / пути в манифесте |

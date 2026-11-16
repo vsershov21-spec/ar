@@ -279,7 +279,7 @@ with open(G / "fx_list.csv", "w", newline="", encoding="utf-8") as f:
 md = ["# Контент AR-кота: характеры, реплики, анимации, эффекты, звуки", "",
       "Файл собирается скриптом `python3 content/build.py` из `content/`. Править исходники в `content/src/` и каталоги, не этот файл.", ""]
 md += ["## Сводка", "", "| | Количество |", "|---|---|",
-       f"| События | {len(events)} |", f"| Реплики (всего) | {len(all_lines)} |",
+       f"| События | {len(events)} |", f"| Реплики (всего, со строками загадок) | {len(all_lines)} |",
        *[f"| — {metas[p]['name']} | {sum(1 for l in all_lines if l['persona']==p)} |" for p in PERSONAS],
        f"| Клипы тела | {len(clips)} (P0: {sum(c['priority']=='P0' for c in clips.values())}) |",
        f"| Пресеты лица | {len(faces)} |", f"| Экранные эффекты | {len(fxs)} |", f"| Звуки | {len(sounds)} |",
@@ -337,5 +337,6 @@ for wv in warns:
     print("ВНИМАНИЕ:", wv)
 for er in errors:
     print("ОШИБКА:", er)
-print(f"Реплик: {len(all_lines)}, событий: {len(events)}, клипов: {len(clips)}, эффектов: {len(fxs)}, звуков: {len(sounds)}. Ошибок: {len(errors)}, предупреждений: {len(warns)}.")
+n_riddle = sum(1 for l in all_lines if l["event"].startswith("riddle_") and ".riddle." in l["id"])
+print(f"Реплик: {len(all_lines) - n_riddle} (+{n_riddle} строк загадок), событий: {len(events)}, клипов: {len(clips)}, эффектов: {len(fxs)}, звуков: {len(sounds)}. Ошибок: {len(errors)}, предупреждений: {len(warns)}.")
 sys.exit(1 if errors else 0)
