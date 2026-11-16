@@ -412,7 +412,42 @@
       "clip": "idle_yawn"
     },
     "long_absence": {},
-    "first_time_today": {}
+    "first_time_today": {},
+    "ask_name_again": {
+      "clip": "listen"
+    },
+    "sberkids_ask": {
+      "clip": "point_button",
+      "fx": "spotlight_button"
+    },
+    "sberkids_yes": {
+      "clip": "celebrate",
+      "fx": "hearts_float"
+    },
+    "sberkids_no": {
+      "clip": "wave"
+    },
+    "bye_cancel": {
+      "clip": "celebrate",
+      "fx": "hearts_float"
+    },
+    "riddle_hint": {
+      "clip": "think"
+    },
+    "riddle_right": {
+      "clip": "celebrate",
+      "fx": "hearts_float",
+      "sound": "chime_soft"
+    },
+    "riddle_answer": {
+      "clip": "think"
+    },
+    "riddle_more": {
+      "clip": "listen"
+    },
+    "riddle_bye": {
+      "clip": "wave"
+    }
   },
   "lines": {
     "point_camera": [
@@ -493,6 +528,18 @@
         "text": "{name}! Ура, теперь у меня есть друг {name}.",
         "emotion": "excited",
         "face": "excited"
+      },
+      {
+        "id": "kind.nice_name.04",
+        "text": "Какое хорошее имя. Буду его беречь.",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "kind.nice_name.05",
+        "text": "Очень приятно познакомиться!",
+        "emotion": "caring",
+        "face": "caring"
       }
     ],
     "no_name": [
@@ -699,6 +746,18 @@
         "text": "Ой, {name}! Ты тут! Ура!",
         "emotion": "excited",
         "face": "excited"
+      },
+      {
+        "id": "kind.welcome_back.04",
+        "text": "О, снова ты! Как я рад.",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "kind.welcome_back.05",
+        "text": "Привет-привет! Я по тебе скучал.",
+        "emotion": "caring",
+        "face": "caring"
       }
     ],
     "goodbye": [
@@ -758,21 +817,21 @@
     "tap_cat_cheek": [
       {
         "id": "kind.tap_cat_cheek.01",
-        "text": "Щёчки мягкие, да? Мне все так говорят.",
+        "text": "Щёки мягкие, да? Мне все так говорят.",
         "emotion": "shy",
-        "face": "shy"
+        "face": "squished"
       },
       {
         "id": "kind.tap_cat_cheek.02",
         "text": "Пф-ф, щекотно!",
         "emotion": "happy",
-        "face": "happy"
+        "face": "squished"
       }
     ],
     "tap_cat_belly": [
       {
         "id": "kind.tap_cat_belly.01",
-        "text": "Ха-ха, животик! Щекотно-щекотно!",
+        "text": "Ха-ха, живот! Щекотно-щекотно!",
         "emotion": "happy",
         "face": "happy"
       },
@@ -800,7 +859,7 @@
     "tap_cat_tail": [
       {
         "id": "kind.tap_cat_tail.01",
-        "text": "Ой, хвостик! Аккуратнее, он нежный.",
+        "text": "Ой, хвост! Аккуратнее, он нежный.",
         "emotion": "surprised",
         "face": "surprised"
       },
@@ -836,7 +895,7 @@
         "id": "kind.poke_hard.02",
         "text": "Ничего, я не обижаюсь. Просто погладь медленно.",
         "emotion": "caring",
-        "face": "caring"
+        "face": "sad"
       }
     ],
     "stroke": [
@@ -844,19 +903,19 @@
         "id": "kind.stroke.01",
         "text": "Мр-р-р... как хорошо.",
         "emotion": "happy",
-        "face": "happy"
+        "face": "purr"
       },
       {
         "id": "kind.stroke.02",
         "text": "Вот так, ещё. Ты очень нежно гладишь.",
         "emotion": "happy",
-        "face": "happy"
+        "face": "purr"
       },
       {
         "id": "kind.stroke.03",
         "text": "Мур. Это значит «спасибо» по-кошачьи.",
         "emotion": "caring",
-        "face": "caring"
+        "face": "purr"
       }
     ],
     "stroke_long": [
@@ -864,19 +923,19 @@
         "id": "kind.stroke_long.01",
         "text": "Мр-р-р-р... я самый счастливый кот.",
         "emotion": "happy",
-        "face": "happy"
+        "face": "purr"
       },
       {
         "id": "kind.stroke_long.02",
         "text": "Спасибо тебе. Ты делаешь меня добрее.",
         "emotion": "caring",
-        "face": "caring"
+        "face": "purr"
       },
       {
         "id": "kind.stroke_long.03",
         "text": "Можно я тебя обниму? Вот так, через стекло.",
         "emotion": "shy",
-        "face": "shy"
+        "face": "purr"
       }
     ],
     "tap_screen": [
@@ -920,7 +979,7 @@
       },
       {
         "id": "kind.double_tap.03",
-        "text": "Каждый пузырик — маленькое желание.",
+        "text": "Каждый пузырь — маленькое желание.",
         "emotion": "caring",
         "face": "caring"
       }
@@ -960,7 +1019,7 @@
       },
       {
         "id": "kind.swipe.03",
-        "text": "Порисуем вместе? Проведи пальцем по туманчику.",
+        "text": "Порисуем вместе? Проведи пальцем по запотевшему стеклу.",
         "emotion": "neutral",
         "face": "neutral"
       }
@@ -974,7 +1033,7 @@
       },
       {
         "id": "kind.longpress.02",
-        "text": "Я прислоню лапку с той стороны. Вот так мы вместе.",
+        "text": "Я прислоню лапу с той стороны. Вот так мы вместе.",
         "emotion": "caring",
         "face": "caring"
       },
@@ -1221,6 +1280,12 @@
         "text": "Пора прощаться? Скажи «да», если пора.",
         "emotion": "neutral",
         "face": "neutral"
+      },
+      {
+        "id": "kind.bye.03",
+        "text": "Уходишь? Скажи «да» — и я помашу.",
+        "emotion": "neutral",
+        "face": "neutral"
       }
     ],
     "yes": [
@@ -1286,7 +1351,7 @@
       },
       {
         "id": "kind.unknown.02",
-        "text": "Ой, у меня ушки шевельнулись, но слова не поймал. Повторишь?",
+        "text": "Уши шевельнулись, а слова не поймал. Повторишь?",
         "emotion": "neutral",
         "face": "neutral"
       },
@@ -1334,7 +1399,7 @@
       },
       {
         "id": "kind.brother_ask.02",
-        "text": "Брат? Он лучший! Хочешь, познакомлю? Кнопка внизу.",
+        "text": "Брат? Он лучший! Умный и очень добрый.",
         "emotion": "happy",
         "face": "happy"
       }
@@ -1342,13 +1407,13 @@
     "money": [
       {
         "id": "kind.money.01",
-        "text": "Про деньги лучше всех знает мой брат. Он в СберKids, нажми на кнопку.",
+        "text": "Про деньги — это к брату. Он объясняет лучше всех.",
         "emotion": "neutral",
         "face": "neutral"
       },
       {
         "id": "kind.money.02",
-        "text": "Хочешь на что-то накопить? Брат подскажет, как. Пойдём к нему.",
+        "text": "Накопить на что-то? Это к брату — он подскажет как.",
         "emotion": "caring",
         "face": "caring"
       },
@@ -1362,13 +1427,19 @@
     "sberkids": [
       {
         "id": "kind.sberkids.01",
-        "text": "Пойдём! Нажми на кнопку внизу.",
+        "text": "К брату? Как здорово! Открыть СберKids?",
         "emotion": "happy",
         "face": "happy"
       },
       {
         "id": "kind.sberkids.02",
-        "text": "Брат будет очень рад. Кнопка внизу.",
+        "text": "Брат будет очень рад. Пойдём к нему?",
+        "emotion": "caring",
+        "face": "caring"
+      },
+      {
+        "id": "kind.sberkids.03",
+        "text": "В СберKids? Конечно. Идём прямо сейчас?",
         "emotion": "caring",
         "face": "caring"
       }
@@ -1408,7 +1479,7 @@
       },
       {
         "id": "kind.jump.03",
-        "text": "Ещё прыгнуть?",
+        "text": "Прыг-прыг! Как зайчик, только кот.",
         "emotion": "happy",
         "face": "happy"
       }
@@ -1456,7 +1527,7 @@
       },
       {
         "id": "kind.wave.02",
-        "text": "Вот моя лапка. Видишь?",
+        "text": "Вот моя лапа. Видишь?",
         "emotion": "caring",
         "face": "caring"
       }
@@ -1490,7 +1561,7 @@
       },
       {
         "id": "kind.gum.03",
-        "text": "Каждый пузырик — маленькое желание.",
+        "text": "Каждый пузырь — маленькое желание.",
         "emotion": "caring",
         "face": "caring"
       }
@@ -1564,7 +1635,7 @@
         "id": "kind.compliment.02",
         "text": "Мне очень приятно! Ты чудо.",
         "emotion": "happy",
-        "face": "happy"
+        "face": "shy"
       },
       {
         "id": "kind.compliment.03",
@@ -1584,13 +1655,13 @@
         "id": "kind.rude.02",
         "text": "Наверное, у тебя плохое настроение. Хочешь, погладь меня — станет лучше.",
         "emotion": "caring",
-        "face": "caring"
+        "face": "sad"
       },
       {
         "id": "kind.rude.03",
         "text": "Я всё равно с тобой. Давай лучше пузыри?",
         "emotion": "neutral",
-        "face": "neutral"
+        "face": "sad"
       }
     ],
     "sad": [
@@ -1608,7 +1679,7 @@
       },
       {
         "id": "kind.sad.03",
-        "text": "Обними экран, я обниму с той стороны. А потом позови кого-нибудь из взрослых, хорошо?",
+        "text": "Обними экран, я обниму с той стороны. А потом позови кого-нибудь из взрослых.",
         "emotion": "caring",
         "face": "caring"
       }
@@ -1623,6 +1694,12 @@
       {
         "id": "kind.scared.02",
         "text": "Давай вместе подышим. Вдох... и выдох. А теперь позови взрослого.",
+        "emotion": "caring",
+        "face": "caring"
+      },
+      {
+        "id": "kind.scared.03",
+        "text": "Я рядом и никуда не ухожу. Позови маму, папу или другого взрослого.",
         "emotion": "caring",
         "face": "caring"
       }
@@ -1650,21 +1727,21 @@
     "riddle": [
       {
         "id": "kind.riddle.01",
-        "text": "Загадка: мягкие лапки, а в лапках царапки. Кто это? Это я, кот!",
+        "text": "Загадку? С радостью. Слушай внимательно.",
         "emotion": "happy",
         "face": "happy"
       },
       {
         "id": "kind.riddle.02",
-        "text": "Что можно увидеть с закрытыми глазами? Сон! Мр-р.",
-        "emotion": "neutral",
-        "face": "neutral"
+        "text": "Люблю загадки. Вот одна.",
+        "emotion": "caring",
+        "face": "caring"
       },
       {
         "id": "kind.riddle.03",
-        "text": "Сидит дед, во сто шуб одет. Кто его раздевает, тот слёзы проливает. Лук!",
-        "emotion": "happy",
-        "face": "happy"
+        "text": "Сейчас загадаю. Не торопись, подумай.",
+        "emotion": "neutral",
+        "face": "neutral"
       }
     ],
     "joke": [
@@ -1676,7 +1753,7 @@
       },
       {
         "id": "kind.joke.02",
-        "text": "Почему котики любят клубки? Потому что они пушистые друзья! Ну, мне смешно.",
+        "text": "Почему коты любят клубки? Клубок никогда не спорит. Мр-р, мне смешно.",
         "emotion": "happy",
         "face": "happy"
       },
@@ -1699,6 +1776,12 @@
         "text": "Всегда пожалуйста. Обращайся.",
         "emotion": "caring",
         "face": "caring"
+      },
+      {
+        "id": "kind.thanks.03",
+        "text": "Мр-р, мне приятно помогать.",
+        "emotion": "happy",
+        "face": "happy"
       }
     ],
     "echo_start": [
@@ -1753,20 +1836,26 @@
         "text": "Было весело! Повторялка выключена.",
         "emotion": "happy",
         "face": "happy"
+      },
+      {
+        "id": "kind.echo_stop.03",
+        "text": "Всё, теперь снова говорю своим голосом.",
+        "emotion": "caring",
+        "face": "caring"
       }
     ],
     "loud": [
       {
         "id": "kind.loud.01",
-        "text": "Ой, громко! У меня ушки маленькие. Можно потише?",
+        "text": "Ой, громко! У меня уши чуткие. Можно потише?",
         "emotion": "sad",
-        "face": "sad"
+        "face": "pain_ears"
       },
       {
         "id": "kind.loud.02",
         "text": "Я тебя слышу, даже если говорить тихо.",
         "emotion": "caring",
-        "face": "caring"
+        "face": "pain_ears"
       }
     ],
     "whisper": [
@@ -1809,6 +1898,12 @@
         "text": "Утро! Не забудь позавтракать. Я уже — какао.",
         "emotion": "caring",
         "face": "caring"
+      },
+      {
+        "id": "kind.morning.03",
+        "text": "Утро — моё любимое время. Мр-р.",
+        "emotion": "neutral",
+        "face": "neutral"
       }
     ],
     "evening": [
@@ -1845,8 +1940,309 @@
         "text": "Первая встреча за сегодня! Привет!",
         "emotion": "happy",
         "face": "happy"
+      },
+      {
+        "id": "kind.first_time_today.02",
+        "text": "Сегодня мы ещё не виделись. Здравствуй!",
+        "emotion": "caring",
+        "face": "caring"
+      },
+      {
+        "id": "kind.first_time_today.03",
+        "text": "Новый день — новая встреча. Привет!",
+        "emotion": "neutral",
+        "face": "neutral"
+      }
+    ],
+    "ask_name_again": [
+      {
+        "id": "kind.ask_name_again.01",
+        "text": "Я не расслышал. Скажешь ещё раз? Или скажи «дальше».",
+        "emotion": "caring",
+        "face": "caring"
+      },
+      {
+        "id": "kind.ask_name_again.02",
+        "text": "Повтори, пожалуйста, своё имя. Можно и не говорить.",
+        "emotion": "neutral",
+        "face": "neutral"
+      },
+      {
+        "id": "kind.ask_name_again.03",
+        "text": "Я весь внимание. Как тебя зовут?",
+        "emotion": "happy",
+        "face": "happy"
+      }
+    ],
+    "sberkids_ask": [
+      {
+        "id": "kind.sberkids_ask.01",
+        "text": "Хочешь заглянуть к брату в СберKids?",
+        "emotion": "caring",
+        "face": "caring"
+      },
+      {
+        "id": "kind.sberkids_ask.02",
+        "text": "Пойдём к брату? Он будет рад.",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "kind.sberkids_ask.03",
+        "text": "Отвести тебя к брату? Скажи «да» или «нет».",
+        "emotion": "neutral",
+        "face": "neutral"
+      }
+    ],
+    "sberkids_yes": [
+      {
+        "id": "kind.sberkids_yes.01",
+        "text": "Ура! Открываю СберKids.",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "kind.sberkids_yes.02",
+        "text": "Хорошо, пойдём. Открываю.",
+        "emotion": "caring",
+        "face": "caring"
+      },
+      {
+        "id": "kind.sberkids_yes.03",
+        "text": "Как здорово! Сейчас откроется.",
+        "emotion": "excited",
+        "face": "excited"
+      }
+    ],
+    "sberkids_no": [
+      {
+        "id": "kind.sberkids_no.01",
+        "text": "Хорошо, останемся тут.",
+        "emotion": "caring",
+        "face": "caring"
+      },
+      {
+        "id": "kind.sberkids_no.02",
+        "text": "Ничего, брат подождёт. Играем дальше.",
+        "emotion": "neutral",
+        "face": "neutral"
+      },
+      {
+        "id": "kind.sberkids_no.03",
+        "text": "Тогда поиграем ещё. Мр-р.",
+        "emotion": "happy",
+        "face": "happy"
+      }
+    ],
+    "bye_cancel": [
+      {
+        "id": "kind.bye_cancel.01",
+        "text": "Ура, ещё посидим вместе!",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "kind.bye_cancel.02",
+        "text": "Как хорошо. Я рад.",
+        "emotion": "caring",
+        "face": "caring"
+      },
+      {
+        "id": "kind.bye_cancel.03",
+        "text": "Тогда продолжаем.",
+        "emotion": "neutral",
+        "face": "neutral"
+      }
+    ],
+    "riddle_hint": [
+      {
+        "id": "kind.riddle_hint.01",
+        "text": "Почти. Вот подсказка:",
+        "emotion": "caring",
+        "face": "caring"
+      },
+      {
+        "id": "kind.riddle_hint.02",
+        "text": "Подумай ещё. Подсказка:",
+        "emotion": "neutral",
+        "face": "neutral"
+      },
+      {
+        "id": "kind.riddle_hint.03",
+        "text": "Ничего, давай помогу:",
+        "emotion": "caring",
+        "face": "caring"
+      }
+    ],
+    "riddle_right": [
+      {
+        "id": "kind.riddle_right.01",
+        "text": "Правильно! Здорово получилось.",
+        "emotion": "excited",
+        "face": "excited"
+      },
+      {
+        "id": "kind.riddle_right.02",
+        "text": "Да! Угадано. Мр-р.",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "kind.riddle_right.03",
+        "text": "Верно! Ловко отгадано.",
+        "emotion": "proud",
+        "face": "proud"
+      }
+    ],
+    "riddle_answer": [
+      {
+        "id": "kind.riddle_answer.01",
+        "text": "Это {answer}. Хитрая была загадка.",
+        "emotion": "caring",
+        "face": "caring"
+      },
+      {
+        "id": "kind.riddle_answer.02",
+        "text": "Ответ — {answer}. В следующий раз точно получится.",
+        "emotion": "neutral",
+        "face": "neutral"
+      },
+      {
+        "id": "kind.riddle_answer.03",
+        "text": "Это {answer}! Теперь ты знаешь.",
+        "emotion": "happy",
+        "face": "happy"
+      }
+    ],
+    "riddle_more": [
+      {
+        "id": "kind.riddle_more.01",
+        "text": "Ещё загадку?",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "kind.riddle_more.02",
+        "text": "Загадать ещё одну?",
+        "emotion": "caring",
+        "face": "caring"
+      },
+      {
+        "id": "kind.riddle_more.03",
+        "text": "Хочешь ещё? Скажи «да».",
+        "emotion": "neutral",
+        "face": "neutral"
+      }
+    ],
+    "riddle_bye": [
+      {
+        "id": "kind.riddle_bye.01",
+        "text": "Хорошо, загадки отдохнут.",
+        "emotion": "caring",
+        "face": "caring"
+      },
+      {
+        "id": "kind.riddle_bye.02",
+        "text": "Ладно, потом ещё загадаю.",
+        "emotion": "neutral",
+        "face": "neutral"
+      },
+      {
+        "id": "kind.riddle_bye.03",
+        "text": "Было интересно. Играем дальше.",
+        "emotion": "happy",
+        "face": "happy"
       }
     ]
   },
+  "riddles": [
+    {
+      "id": "r01",
+      "q": "Мягкие лапки, а в лапках царапки. Кто это?",
+      "answer": "кошка",
+      "keywords": [
+        "кош*",
+        "кот",
+        "коты",
+        "котик*",
+        "котен*",
+        "котя*"
+      ],
+      "hint": "Он мурчит. Совсем как я."
+    },
+    {
+      "id": "r02",
+      "q": "Сидит дед, во сто шуб одет. Кто его раздевает, тот слёзы проливает.",
+      "answer": "лук",
+      "keywords": [
+        "лук",
+        "лучок",
+        "луковиц*"
+      ],
+      "hint": "Его режут — и щиплет глаза."
+    },
+    {
+      "id": "r03",
+      "q": "Течёт, течёт — не вытечет. Бежит, бежит — не выбежит. Что это?",
+      "answer": "река",
+      "keywords": [
+        "рек*",
+        "речк*",
+        "ручей",
+        "ручеек"
+      ],
+      "hint": "В ней плавают рыбы."
+    },
+    {
+      "id": "r04",
+      "q": "Без рук, без ног, а ворота открывает. Что это?",
+      "answer": "ветер",
+      "keywords": [
+        "ветер",
+        "ветр*",
+        "ветерок"
+      ],
+      "hint": "Он дует и качает деревья."
+    },
+    {
+      "id": "r05",
+      "q": "Что всегда идёт, но с места не сходит?",
+      "answer": "часы",
+      "keywords": [
+        "час*"
+      ],
+      "hint": "Они тикают: тик-так."
+    },
+    {
+      "id": "r06",
+      "q": "Пушистая вата плывёт куда-то. Чем вата ниже, тем дождик ближе.",
+      "answer": "облако",
+      "keywords": [
+        "облак*",
+        "облач*",
+        "туч*"
+      ],
+      "hint": "Оно плывёт по небу."
+    },
+    {
+      "id": "r07",
+      "q": "Под землёй живёт, землю роет, а солнца почти не видит. Кто это?",
+      "answer": "крот",
+      "keywords": [
+        "крот*"
+      ],
+      "hint": "Маленький, в бархатной шубке."
+    },
+    {
+      "id": "r08",
+      "q": "Одеяло белое не руками сделано, с неба на землю упало. Что это?",
+      "answer": "снег",
+      "keywords": [
+        "снег*",
+        "снеж*"
+      ],
+      "hint": "Зимой из него лепят снеговика."
+    }
+  ],
   "contentVersion": 1
 }

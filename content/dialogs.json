@@ -1,0 +1,126 @@
+{
+  "$comment": "Многоходовые диалоги. Формат и правила — docs/DIALOGS.md. say — событие из events.json (реплика активного характера) или $riddle.q / $riddle.hint. listen — окно ответа: микрофон открывается сам после реплики. on — переходы по интентам (intents.ru.json), name, right/wrong/giveup (загадки), timeout, * (всё остальное). Цель «@действие[:арг]» завершает диалог. Загадки — блок riddles: по 8 на характер, keywords — основы слов (звёздочка в конце — любое окончание).",
+  "version": 1,
+  "answerWindowMs": 5000,
+  "adultHint": "Позови взрослого — маму, папу или того, кому доверяешь. Расскажи, что случилось.",
+  "triggers": {
+    "sad": "support:sad",
+    "scared": "support:scared",
+    "money": "brother:money",
+    "sberkids": "brother:kids",
+    "brother_ask": "brother:about",
+    "bye": "bye",
+    "riddle": "riddle",
+    "echo_start": "echo"
+  },
+  "interrupts": ["sad", "scared"],
+  "dialogs": {
+    "intro": {
+      "title": "Знакомство",
+      "trigger": "После появления кота на первой встрече. Имя можно не говорить.",
+      "start": "ask",
+      "nodes": {
+        "ask": { "say": "ask_name", "listen": { "mode": "name" }, "on": { "name": "nice", "no": "noname", "skip": "noname", "timeout": "ask_again", "*": "ask_again" } },
+        "ask_again": { "say": "ask_name_again", "listen": { "mode": "name" }, "on": { "name": "nice", "timeout": "noname", "*": "noname" } },
+        "nice": { "say": "nice_name", "next": "choose" },
+        "noname": { "say": "no_name", "next": "choose" },
+        "choose": {
+          "say": "choose",
+          "do": ["offer_choice"],
+          "listen": { "mode": "intent" },
+          "on": { "choose_hooligan": "@choose:hooligan", "choose_kind": "@choose:kind", "choose_glitter": "@choose:glitter", "timeout": "@choose:default", "*": "choose_wait" }
+        },
+        "choose_wait": { "listen": { "mode": "intent" }, "on": { "choose_hooligan": "@choose:hooligan", "choose_kind": "@choose:kind", "choose_glitter": "@choose:glitter", "timeout": "@choose:default", "*": "@choose:default" } }
+      }
+    },
+    "bye": {
+      "title": "Пока?",
+      "trigger": "Ребёнок сказал «пока» / «мне пора».",
+      "start": "ask",
+      "nodes": {
+        "ask": { "say": "bye", "listen": { "mode": "intent" }, "on": { "yes": "go", "bye": "go", "no": "stay", "timeout": "@end", "*": "stay" } },
+        "go": { "say": "goodbye", "next": "@goodbye" },
+        "stay": { "say": "bye_cancel", "next": "@end" }
+      }
+    },
+    "brother": {
+      "title": "Хочешь к брату?",
+      "trigger": "Интент money (кот про деньги не рассказывает — «это к брату») или sberkids.",
+      "start": "money",
+      "nodes": {
+        "money": { "say": "money", "next": "ask" },
+        "about": { "say": "brother_ask", "next": "ask" },
+        "ask": { "say": "sberkids_ask", "listen": { "mode": "intent" }, "on": { "yes": "go", "sberkids": "go", "no": "stay", "timeout": "@show_kids", "*": "stay" } },
+        "kids": { "say": "sberkids", "listen": { "mode": "intent" }, "on": { "yes": "go", "sberkids": "go", "no": "stay", "timeout": "@show_kids", "*": "stay" } },
+        "go": { "say": "sberkids_yes", "next": "@open_sberkids" },
+        "stay": { "say": "sberkids_no", "next": "@end" }
+      }
+    },
+    "riddle": {
+      "title": "Загадка",
+      "trigger": "Интент riddle. Кот загадывает, ребёнок отвечает, кот проверяет по ключевым словам.",
+      "start": "intro",
+      "nodes": {
+        "intro": { "say": "riddle", "next": "ask" },
+        "ask": { "do": ["riddle_next"], "say": "$riddle.q", "listen": { "mode": "riddle", "ms": 8000 }, "on": { "right": "right", "giveup": "answer", "wrong": "hint", "timeout": "hint" } },
+        "hint": { "say": ["riddle_hint", "$riddle.hint"], "listen": { "mode": "riddle", "ms": 8000 }, "on": { "right": "right", "giveup": "answer", "wrong": "answer", "timeout": "answer" } },
+        "right": { "say": "riddle_right", "next": "more" },
+        "answer": { "say": "riddle_answer", "next": "more" },
+        "more": { "say": "riddle_more", "listen": { "mode": "intent" }, "on": { "yes": "ask", "riddle": "ask", "no": "bye", "timeout": "@end", "*": "@end" } },
+        "bye": { "say": "riddle_bye", "next": "@end" }
+      }
+    },
+    "echo": {
+      "title": "Повторяй за мной",
+      "trigger": "Интент echo_start или кнопка «Повторяй». Кот повторяет всё смешным голосом своего характера.",
+      "start": "on",
+      "nodes": {
+        "on": { "say": "echo_start", "next": "listen" },
+        "listen": { "listen": { "mode": "echo", "ms": 20000 }, "on": { "echo_stop": "off", "timeout": "off", "*": "repeat" } },
+        "repeat": { "do": ["echo"], "count": "echo", "say": "echo_done", "sayIf": { "counter": "echo", "first": true, "every": 4 }, "next": "listen" },
+        "off": { "say": "echo_stop", "next": "@end" }
+      }
+    },
+    "support": {
+      "title": "Грустно / страшно",
+      "trigger": "Интенты sad, scared — прерывают любой диалог. Кот поддерживает, ничего не спрашивает, предлагает взрослого; 10 с без игры.",
+      "start": "sad",
+      "nodes": {
+        "sad": { "do": ["pause_play:10000", "adult_hint"], "say": "sad", "next": "@end" },
+        "scared": { "do": ["pause_play:10000", "adult_hint"], "say": "scared", "next": "@end" }
+      }
+    }
+  },
+  "riddles": {
+    "hooligan": [
+      { "id": "r01", "q": "Без окон, без дверей, полна горница людей. Чё это?", "answer": "огурец", "keywords": ["огур*"], "hint": "Растёт на грядке, зелёный и в пупырышках." },
+      { "id": "r02", "q": "Висит груша — нельзя скушать. Ну?", "answer": "лампочка", "keywords": ["лампоч*", "лампа", "люстр*"], "hint": "Её включают, когда темно." },
+      { "id": "r03", "q": "Зимой и летом одним цветом. Чё такое?", "answer": "ёлка", "keywords": ["елк*", "ель", "елочк*", "сосн*"], "hint": "На Новый год её наряжают." },
+      { "id": "r04", "q": "Сто одёжек, и все без застёжек. Кто это?", "answer": "капуста", "keywords": ["капуст*"], "hint": "Из неё варят щи." },
+      { "id": "r05", "q": "Не лает, не кусает, а в дом не пускает.", "answer": "замок", "keywords": ["замок", "замк*", "замоч*"], "hint": "Его открывают ключом." },
+      { "id": "r06", "q": "Два кольца, два конца, посередине гвоздик.", "answer": "ножницы", "keywords": ["ножниц*"], "hint": "Ими режут бумагу. Осторожно, острые!" },
+      { "id": "r07", "q": "Кто приходит, кто уходит — все её за ручку водят.", "answer": "дверь", "keywords": ["двер*"], "hint": "Через неё заходят в комнату." },
+      { "id": "r08", "q": "Что можно увидеть с закрытыми глазами? Спорим, не знаешь?", "answer": "сон", "keywords": ["сон", "сны", "снов*", "сновид*"], "hint": "Это бывает ночью." }
+    ],
+    "kind": [
+      { "id": "r01", "q": "Мягкие лапки, а в лапках царапки. Кто это?", "answer": "кошка", "keywords": ["кош*", "кот", "коты", "котик*", "котен*", "котя*"], "hint": "Он мурчит. Совсем как я." },
+      { "id": "r02", "q": "Сидит дед, во сто шуб одет. Кто его раздевает, тот слёзы проливает.", "answer": "лук", "keywords": ["лук", "лучок", "луковиц*"], "hint": "Его режут — и щиплет глаза." },
+      { "id": "r03", "q": "Течёт, течёт — не вытечет. Бежит, бежит — не выбежит. Что это?", "answer": "река", "keywords": ["рек*", "речк*", "ручей", "ручеек"], "hint": "В ней плавают рыбы." },
+      { "id": "r04", "q": "Без рук, без ног, а ворота открывает. Что это?", "answer": "ветер", "keywords": ["ветер", "ветр*", "ветерок"], "hint": "Он дует и качает деревья." },
+      { "id": "r05", "q": "Что всегда идёт, но с места не сходит?", "answer": "часы", "keywords": ["час*"], "hint": "Они тикают: тик-так." },
+      { "id": "r06", "q": "Пушистая вата плывёт куда-то. Чем вата ниже, тем дождик ближе.", "answer": "облако", "keywords": ["облак*", "облач*", "туч*"], "hint": "Оно плывёт по небу." },
+      { "id": "r07", "q": "Под землёй живёт, землю роет, а солнца почти не видит. Кто это?", "answer": "крот", "keywords": ["крот*"], "hint": "Маленький, в бархатной шубке." },
+      { "id": "r08", "q": "Одеяло белое не руками сделано, с неба на землю упало. Что это?", "answer": "снег", "keywords": ["снег*", "снеж*"], "hint": "Зимой из него лепят снеговика." }
+    ],
+    "glitter": [
+      { "id": "r01", "q": "Красная девица сидит в темнице, а коса на улице. Кто это?", "answer": "морковка", "keywords": ["морков*"], "hint": "Её очень любят зайцы." },
+      { "id": "r02", "q": "Что блестит ночью на небе, совсем как мои блёстки?", "answer": "звёзды", "keywords": ["звезд*", "звездоч*"], "hint": "Их много-много, и они мигают." },
+      { "id": "r03", "q": "Разноцветное коромысло над рекой повисло. Что это?", "answer": "радуга", "keywords": ["радуг*"], "hint": "Бывает после дождя. Семь цветов!" },
+      { "id": "r04", "q": "Гладкое, а не стекло. Блестит, а не вода. Всё повторяет, а само молчит.", "answer": "зеркало", "keywords": ["зеркал*"], "hint": "В него я смотрюсь каждое утро." },
+      { "id": "r05", "q": "Не птица, а с крыльями. Над цветами порхает, красотой сверкает.", "answer": "бабочка", "keywords": ["бабоч*"], "hint": "Она бывает ярче моих блёсток." },
+      { "id": "r06", "q": "Круглое, румяное, я расту на ветке. Что это?", "answer": "яблоко", "keywords": ["яблок*", "яблоч*"], "hint": "Бывает красное, зелёное и жёлтое." },
+      { "id": "r07", "q": "Шёл долговяз, в сыру землю увяз. Что это?", "answer": "дождь", "keywords": ["дожд*", "дождь", "ливень", "ливн*"], "hint": "От него прячутся под зонтиком." },
+      { "id": "r08", "q": "Кругом вода, а пить нельзя. Что это?", "answer": "море", "keywords": ["море", "моря", "морем", "морю", "океан*"], "hint": "Там волны и солёная вода." }
+    ]
+  }
+}

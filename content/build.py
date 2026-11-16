@@ -2,7 +2,7 @@
 """Сборка контента AR-кота.
 
 Читает content/src/<persona>.meta.json + <persona>.lines.txt и каталоги
-(events, animations, face, fx, sounds, intents), проверяет ссылки и пишет:
+(events, animations, face, fx, sounds, intents, dialogs), проверяет ссылки и тексты и пишет:
   content/personas/<persona>.json   — то, что грузит приложение
   gen/voice_lines.csv               — все реплики для озвучки (Piper / ElevenLabs / актёр)
   gen/animations.csv                — список клипов для Tripo / Mixamo / Blender
@@ -19,10 +19,66 @@ C = ROOT / "content"
 PERSONAS = ["hooligan", "kind", "glitter"]
 EMOTIONS = {"neutral", "happy", "cheeky", "surprised", "annoyed", "shy", "proud", "sad", "excited", "caring", "sleepy", "whisper", "offended"}
 NAME_OK = {"nice_name", "welcome_back"}
+# переменные в репликах: {name} — только где разрешено, {answer} — только ответ загадки
+VAR_OK = {"name": NAME_OK, "answer": {"riddle_answer"}}
 MAX_CHARS = 150
+CHARS_PER_SEC = 14   # ≈ темп речи кота; реплика длиннее 8 с — предупреждение
+MAX_SEC = 8
+# на «грустно/страшно» кот поддерживает и ничего не спрашивает
+SAFETY_EVENTS = {"sad", "scared"}
+# кот не спрашивает личных данных (кроме имени)
+PERSONAL = re.compile(r"(сколько тебе лет|где ты живёшь|где живёшь|твой адрес|адрес|номер телефона|телефон мамы|в какой школе|в какой класс|в каком классе|фамили|как зовут (маму|папу)|пароль|пин-?код|код из смс|номер карты)", re.I)
+# про деньги — только «это к брату»
+MONEY_WORDS = re.compile(r"\b(деньг|денег|денежк|копи|накоп|потрат|купи|рубл|монет|кэшбэк|баланс)", re.I)
 BAD_WORDS = ["дурак", "дура", "тупой", "идиот", "заткнись", "дебил", "урод", "убью", "сдохни"]
-# обращение к ребёнку в прошедшем времени с родом: «ты пришёл», «ты вернулась»
-GENDERED = re.compile(r"\b[Тт]ы\s+(?:меня\s+|уже\s+|так\s+)?[а-яё]+(?:л|ла|лся|лась)\b")
+# обращение к ребёнку с родом: «ты пришёл», «ты вернулась», «ты сам», «ты готова», «ты такой», «Видал?»
+GENDERED = [
+    re.compile(r"\b[Тт]ы\s+(?:меня\s+|уже\s+|так\s+|же\s+|сегодня\s+|точно\s+|не\s+)?[а-яё]+(?:л|ла|лся|лась)\b"),
+    re.compile(r"\b[Тт]ы\s+(?:\S+\s+){0,2}?(?:сам|сама|готов|готова|рад|рада|один|одна|такой|такая|крутой|крутая|умный|умная|умница|молодец[а-я]*|хороший|хорошая|красивый|красивая|смелый|смелая|устал|устала|должен|должна|уверен|уверена|согласен|согласна)\b"),
+    re.compile(r"(?:^|[.!?…]\s+)(?:Ну\s+|А\s+|Ой,\s+)?(?:Видал|Видала|Слыхал|Слыхала|Понял|Поняла|Готов|Готова|Устал|Устала|Не ждал|Не ждала|Ждал|Ждала|Сам|Сама|Уверен|Уверена)\b[^.!]*\?"),
+    re.compile(r"\b(?:[Кк]уда|[Гг]де|[Зз]ачем|[Пп]очему|[Чч]то|[Чч]ё)\s+(?:ты\s+)?(?:\S+\s+)?[а-яё]+(?:ал|ял|ел|ил|ла)\?"),
+]
+# кот о себе — в своём роде: Хулиган/Добряк — «я рад», Блёстка — «я рада»
+SELF_WRONG = {
+    "m": re.compile(r"\b[Яя]\s+(?:не\s+|уже\s+|так\s+|аж\s+|сама\s+)?(?:[а-яё]+(?:ла|лась)|рада|готова|сама|одна)\b"),
+    "f": re.compile(r"\b[Яя]\s+(?:не\s+|уже\s+|так\s+|аж\s+|сам\s+)?(?:[а-яё]+(?:[^аеиоуыэюя\s]л|ал|ял|ел|ил|ул|ался|ился)|рад|готов|сам|один)\b"),
+}
+
+
+def text_checks(where, t, ev, self_gender):
+    """Общие проверки текста реплики: длина, слова, род, безопасность, личные данные."""
+    sec = len(t) / CHARS_PER_SEC
+    if sec > MAX_SEC:
+        warns.append(f"{where}: ≈{sec:.1f} с (>{MAX_SEC} с) — сократить")
+    if len(t) > MAX_CHARS:
+        warns.append(f"{where}: длинная реплика ({len(t)} симв.)")
+    for var in re.findall(r"\{(\w+)\}", t):
+        if var not in VAR_OK:
+            errors.append(f"{where}: неизвестная переменная {{{var}}}")
+        elif ev not in VAR_OK[var]:
+            errors.append(f"{where}: {{{var}}} разрешён только в {sorted(VAR_OK[var])}")
+    low = t.lower()
+    for w in BAD_WORDS:
+        if re.search(rf"\b{w}\b", low):
+            errors.append(f"{where}: запрещённое слово «{w}»")
+    for g in GENDERED:
+        m = g.search(t)
+        if m:
+            warns.append(f"{where}: обращение к ребёнку с родом? «{m.group(0).strip()}»")
+    m = SELF_WRONG[self_gender].search(t)
+    if m:
+        warns.append(f"{where}: кот о себе не в своём роде ({self_gender})? «{m.group(0)}»")
+    if PERSONAL.search(t):
+        errors.append(f"{where}: вопрос о личных данных «{PERSONAL.search(t).group(0)}» — можно спрашивать только имя")
+    if ev in SAFETY_EVENTS:
+        if "?" in t:
+            errors.append(f"{where}: на {ev} кот поддерживает и ничего не спрашивает — уберите вопрос")
+        if not re.search(r"взросл|мам|пап", low):
+            errors.append(f"{where}: на {ev} нужно предложить позвать взрослого")
+    if MONEY_WORDS.search(t) and "брат" not in low and "сберkids" not in low:
+        warns.append(f"{where}: про деньги — только «это к брату»")
+    if ev == "money" and "к брату" not in low:
+        errors.append(f"{where}: на money кот отвечает «это к брату»")
 
 errors, warns = [], []
 
@@ -37,6 +93,9 @@ faces = {p["id"] for p in face["presets"]}
 fxs = {f["id"]: f for f in load("fx.json")["fx"]}
 sounds = {s["id"]: s for s in load("sounds.json")["sounds"]}
 intents = load("intents.ru.json")["intents"]
+dialogs = load("dialogs.json")
+# события диалогов, где нужно 3+ варианта
+NEED3 = {e["id"] for e in events if e["group"] == "dialog"} | {"bye", "sberkids", "money", "riddle", "sad", "scared", "echo_start", "ask_name", "nice_name", "no_name", "welcome_back", "choose"}
 
 def check_ref(kind, val, where):
     if val in (None, "", "none"):
@@ -98,27 +157,23 @@ for pid in PERSONAS:
             for k in ("clip", "fx", "sound", "face"):
                 check_ref(k, it.get(k), where)
             t = it["text"]
-            if len(t) > MAX_CHARS:
-                warns.append(f"{where}: длинная реплика ({len(t)} симв.) — может не уложиться в 8 с")
-            if "{name}" in t and ev not in NAME_OK:
-                errors.append(f"{where}: {{name}} разрешён только в {sorted(NAME_OK)}")
-            low = t.lower()
-            for w in BAD_WORDS:
-                if re.search(rf"\b{w}\b", low):
-                    errors.append(f"{where}: запрещённое слово «{w}»")
-            if GENDERED.search(t):
-                warns.append(f"{where}: обращение к ребёнку с родом? «{GENDERED.search(t).group(0)}»")
+            text_checks(where, t, ev, meta.get("selfGender", "m"))
             v = {"id": lid, "text": t, "emotion": it["emotion"]}
             for k in ("clip", "fx", "sound", "face"):
                 if it.get(k):
                     v[k] = it[k]
             if "face" not in v:
-                v["face"] = face["emotionToFace"].get(it["emotion"], "neutral")
+                # лицо: из строки → из умолчаний события → по эмоции
+                v["face"] = d.get("face") or face["emotionToFace"].get(it["emotion"], "neutral")
             variants.append(v)
             all_lines.append({"id": lid, "persona": pid, "event": ev, **v})
         minv = 1 if ev in ("intro_once",) else 2
         if len(variants) < minv and ev not in ("first_time_today", "choose_hooligan", "choose_kind", "choose_glitter"):
             warns.append(f"{pid}.{ev}: всего {len(variants)} вариант(а) — будут повторы")
+        if ev in NAME_OK and variants and all("{name}" in v["text"] for v in variants):
+            errors.append(f"{pid}.{ev}: нужен хотя бы один вариант без {{name}} — имя знают не всегда")
+        if ev in NEED3 and len(variants) < 3:
+            errors.append(f"{pid}.{ev}: реплика диалога — нужно 3+ варианта (сейчас {len(variants)})")
         lines[ev] = variants
         reactions[ev] = {k: d[k] for k in ("clip", "fx", "sound", "face") if k in d}
     for c in [i["clip"] for i in meta["idles"]] + [meta["signature"]["clip"]]:
@@ -128,7 +183,21 @@ for pid in PERSONAS:
     for f in meta.get("fxTuning", {}):
         check_ref("fx", f, f"{pid}.meta.fxTuning")
     check_ref("sound", meta.get("ambience"), f"{pid}.meta.ambience")
-    persona = {**meta, "reactions": reactions, "lines": lines, "contentVersion": 1}
+    riddles = []
+    for r in dialogs.get("riddles", {}).get(pid, []):
+        for k in ("id", "q", "answer", "keywords", "hint"):
+            if not r.get(k):
+                errors.append(f"dialogs.riddles.{pid}: у загадки {r.get('id')} нет поля {k}")
+        for part in ("q", "hint"):
+            text_checks(f"dialogs.riddles.{pid}.{r.get('id')}.{part}", r.get(part, ""), f"riddle_{part}", meta.get("selfGender", "m"))
+        riddles.append(r)
+        for part in ("q", "hint"):
+            all_lines.append({"id": f"{pid}.riddle.{r['id']}.{part}", "persona": pid, "event": f"riddle_{part}", "text": r[part], "emotion": "neutral"})
+    if len(riddles) < 8:
+        errors.append(f"dialogs.riddles.{pid}: нужно 8 загадок, сейчас {len(riddles)}")
+    if len({r["id"] for r in riddles}) != len(riddles):
+        errors.append(f"dialogs.riddles.{pid}: повторяются id")
+    persona = {**meta, "reactions": reactions, "lines": lines, "riddles": riddles, "contentVersion": 1}
     (C / "personas").mkdir(exist_ok=True)
     (C / "personas" / f"{pid}.json").write_text(json.dumps(persona, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
@@ -145,8 +214,40 @@ for cid, c in clips.items():
 
 # интенты ↔ события
 for it in intents:
-    if it["intent"] not in event_ids:
+    if it["intent"] not in event_ids and not it.get("noEvent"):
         errors.append(f"intents: «{it['intent']}» нет в events.json")
+intent_ids = {it["intent"] for it in intents}
+
+# диалоги: ссылки на события, узлы, интенты
+SPECIAL_KEYS = {"name", "right", "wrong", "giveup", "timeout", "*"}
+for intent, t in dialogs["triggers"].items():
+    did, _, node = t.partition(":")
+    if intent not in intent_ids:
+        errors.append(f"dialogs.triggers: интента «{intent}» нет в intents.ru.json")
+    if did not in dialogs["dialogs"]:
+        errors.append(f"dialogs.triggers.{intent}: нет диалога {did}")
+    elif node and node not in dialogs["dialogs"][did]["nodes"]:
+        errors.append(f"dialogs.triggers.{intent}: нет узла {did}:{node}")
+for did, dd in dialogs["dialogs"].items():
+    nodes = dd["nodes"]
+    if dd["start"] not in nodes:
+        errors.append(f"dialogs.{did}: нет стартового узла {dd['start']}")
+    for nid, n in nodes.items():
+        says = n.get("say", [])
+        for sv in ([says] if isinstance(says, str) else says):
+            if not sv.startswith("$") and sv not in event_ids:
+                errors.append(f"dialogs.{did}.{nid}: события «{sv}» нет в events.json")
+        for key, target in n.get("on", {}).items():
+            if key not in SPECIAL_KEYS and key not in intent_ids:
+                errors.append(f"dialogs.{did}.{nid}: ответ «{key}» — нет такого интента")
+            if not target.startswith("@") and target not in nodes:
+                errors.append(f"dialogs.{did}.{nid}: переход в несуществующий узел «{target}»")
+        if n.get("next") and not n["next"].startswith("@") and n["next"] not in nodes:
+            errors.append(f"dialogs.{did}.{nid}: next в несуществующий узел «{n['next']}»")
+        if n.get("on") and not n.get("listen"):
+            errors.append(f"dialogs.{did}.{nid}: есть on, но нет listen")
+        if n.get("listen") and "timeout" not in n.get("on", {}):
+            warns.append(f"dialogs.{did}.{nid}: нет перехода по timeout — будет @end")
 
 # ---------- выходные файлы ----------
 G = ROOT / "gen"; G.mkdir(exist_ok=True)
@@ -156,7 +257,7 @@ with open(G / "voice_lines.csv", "w", newline="", encoding="utf-8") as f:
     w.writerow(["id", "persona", "event", "emotion", "text", "has_name", "piper_voice", "pitch_semitones", "rate", "direction"])
     for l in all_lines:
         v = metas[l["persona"]]["voice"]
-        w.writerow([l["id"], l["persona"], l["event"], l["emotion"], l["text"], int("{name}" in l["text"]),
+        w.writerow([l["id"], l["persona"], l["event"], l["emotion"], l["text"], int("{" in l["text"]),
                     v["piperVoice"], v["pitchSemitones"], v["rate"], v["actorDirection"]])
 with open(G / "animations.csv", "w", newline="", encoding="utf-8") as f:
     w = csv.writer(f)
@@ -182,7 +283,8 @@ md += ["## Сводка", "", "| | Количество |", "|---|---|",
        *[f"| — {metas[p]['name']} | {sum(1 for l in all_lines if l['persona']==p)} |" for p in PERSONAS],
        f"| Клипы тела | {len(clips)} (P0: {sum(c['priority']=='P0' for c in clips.values())}) |",
        f"| Пресеты лица | {len(faces)} |", f"| Экранные эффекты | {len(fxs)} |", f"| Звуки | {len(sounds)} |",
-       f"| Голосовые интенты | {len(intents)} |", ""]
+       f"| Голосовые интенты | {len(intents)} |", f"| Диалоги | {len(dialogs['dialogs'])} |",
+       f"| Загадки | {sum(len(v) for v in dialogs.get('riddles', {}).values())} |", ""]
 md += ["## Характеры", ""]
 for p in PERSONAS:
     m = metas[p]
@@ -193,7 +295,7 @@ for p in PERSONAS:
            f"- Фирменный трюк: клип `{m['signature']['clip']}`, эффекты {', '.join(m['signature']['fx'])}.",
            f"- Idle: {', '.join(i['clip'] + '×' + str(i['weight']) for i in m['idles'])}.",
            f"- Правила речи: {'; '.join(m['speechRules'])}.", ""]
-groups = {"scenario": "Сценарий", "input": "Касания и камера", "voice": "Голос ребёнка", "context": "Время и возвращения"}
+groups = {"scenario": "Сценарий", "input": "Касания и камера", "voice": "Голос ребёнка", "dialog": "Диалоги (ветки, docs/DIALOGS.md)", "context": "Время и возвращения"}
 md += ["## Реплики по событиям", ""]
 for g, gname in groups.items():
     md += [f"### {gname}", ""]
@@ -207,6 +309,12 @@ for g, gname in groups.items():
             for v in pj["lines"].get(e["id"], []):
                 md.append(f"- _{v['emotion']}_ — {v['text']}")
             md.append("")
+md += ["## Загадки", "", "Проверка ответа — по ключевым словам (основы, `*` — любое окончание). Схема диалога — docs/DIALOGS.md.", ""]
+for p in PERSONAS:
+    md += [f"### {metas[p]['name']}", "", "| # | Загадка | Ответ | Ключевые слова | Подсказка |", "|---|---|---|---|---|"]
+    for r in dialogs.get("riddles", {}).get(p, []):
+        md.append(f"| {r['id']} | {r['q']} | {r['answer']} | {', '.join(r['keywords'])} | {r['hint']} |")
+    md.append("")
 md += ["## Клипы тела", "", "| Клип | Приор. | Характер | Длит., с | Петля | Root motion | Где | Описание |", "|---|---|---|---|---|---|---|---|"]
 for c in sorted(clips.values(), key=lambda c: (c["priority"], c["id"])):
     md.append(f"| `{c['id']}` | {c['priority']} | {c['persona']} | {c['durationS']} | {'да' if c['loop'] else ''} | {'да' if c['rootMotion'] else ''} | {', '.join(c['usedBy'])} | {c['notes']} |")
