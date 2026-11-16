@@ -1,0 +1,20 @@
+# CI-проверка (без деплоя): деплой делает сервер swe сам — забирает main раз в 2 минуты.
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      # .npmrc: ignore-scripts=true — нативный пакет canvas (зависимость mind-ar) не собирается и не нужен
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build

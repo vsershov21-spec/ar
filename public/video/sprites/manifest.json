@@ -1,0 +1,418 @@
+{
+  "_comment": "Позы спрайт-режима. Чтобы подменить образ — положите файлы в dir с теми же именами или поменяйте пути. Для видео-клипа добавьте в clips.<имя>.video {hevc: '...mov', webm: '...webm'}. anchor.y — где в кадре стоят лапы (доля высоты от верха).",
+  "anchor": {
+    "x": 0.5,
+    "y": 0.985
+  },
+  "personas": {
+    "hooligan": {
+      "dir": "video/sprites/hooligan/",
+      "press": "listen",
+      "poses": {
+        "idle": {
+          "file": "tada.webp"
+        },
+        "wave": {
+          "file": "wave.webp"
+        },
+        "listen": {
+          "file": "listen.webp",
+          "mouth": [
+            0.667,
+            0.41,
+            0.11
+          ]
+        },
+        "point": {
+          "file": "point.webp"
+        },
+        "laugh": {
+          "file": "laugh.webp"
+        },
+        "giggle": {
+          "file": "giggle.webp",
+          "h": 0.86
+        },
+        "jump": {
+          "file": "jump.webp",
+          "h": 1.02
+        },
+        "flip": {
+          "file": "flip.webp",
+          "h": 0.9,
+          "anchorY": 0.6
+        },
+        "dance": {
+          "file": "dance.webp"
+        },
+        "run": {
+          "file": "run.webp",
+          "h": 0.9
+        },
+        "card": {
+          "file": "card.webp",
+          "h": 1.1
+        },
+        "yawn": {
+          "file": "yawn.webp"
+        },
+        "sleep": {
+          "file": "sleep.webp",
+          "h": 0.62
+        }
+      },
+      "clips": {
+        "idle": {
+          "poses": [
+            "idle",
+            "wave",
+            "idle",
+            "point"
+          ],
+          "fps": 0.35
+        },
+        "appear": {
+          "poses": [
+            "jump",
+            "idle"
+          ],
+          "fps": 1.2
+        },
+        "knock_glass": {
+          "poses": [
+            "point"
+          ]
+        },
+        "press_glass": {
+          "poses": [
+            "listen"
+          ]
+        },
+        "scratch": {
+          "poses": [
+            "run",
+            "point"
+          ],
+          "fps": 3
+        },
+        "tumble": {
+          "poses": [
+            "flip"
+          ]
+        },
+        "sticker": {
+          "poses": [
+            "card"
+          ]
+        },
+        "talk": {
+          "poses": [
+            "listen"
+          ]
+        },
+        "listen": {
+          "poses": [
+            "listen"
+          ]
+        },
+        "laugh": {
+          "poses": [
+            "laugh",
+            "giggle"
+          ],
+          "fps": 3
+        },
+        "bored": {
+          "poses": [
+            "yawn",
+            "sleep"
+          ],
+          "fps": 0.7
+        },
+        "run_home": {
+          "poses": [
+            "run"
+          ]
+        },
+        "dance": {
+          "poses": [
+            "dance",
+            "jump"
+          ],
+          "fps": 3
+        },
+        "bubble_gum": {
+          "poses": [
+            "giggle",
+            "laugh"
+          ],
+          "fps": 0.6
+        },
+        "glitter_burst": {
+          "poses": [
+            "jump"
+          ]
+        },
+        "heart_draw": {
+          "poses": [
+            "point",
+            "wave"
+          ],
+          "fps": 1.5
+        },
+        "walk": {
+          "poses": [
+            "run",
+            "idle"
+          ],
+          "fps": 4
+        },
+        "run": {
+          "poses": [
+            "run"
+          ]
+        },
+        "jump": {
+          "poses": [
+            "jump"
+          ]
+        },
+        "flip": {
+          "poses": [
+            "flip"
+          ]
+        },
+        "turn_left": {
+          "poses": [
+            "idle"
+          ]
+        },
+        "turn_right": {
+          "poses": [
+            "idle"
+          ]
+        },
+        "sit": {
+          "poses": [
+            "giggle"
+          ]
+        },
+        "wave": {
+          "poses": [
+            "wave"
+          ]
+        }
+      }
+    },
+    "glitter": {
+      "dir": "video/sprites/glitter/",
+      "press": "listen",
+      "poses": {
+        "idle": {
+          "file": "tada.webp"
+        },
+        "wave": {
+          "file": "wave.webp"
+        },
+        "listen": {
+          "file": "listen.webp",
+          "mouth": [
+            0.667,
+            0.41,
+            0.11
+          ]
+        },
+        "point": {
+          "file": "point.webp"
+        },
+        "laugh": {
+          "file": "laugh.webp"
+        },
+        "giggle": {
+          "file": "giggle.webp",
+          "h": 0.86
+        },
+        "jump": {
+          "file": "jump.webp",
+          "h": 1.02
+        },
+        "flip": {
+          "file": "flip.webp",
+          "h": 0.9,
+          "anchorY": 0.6
+        },
+        "dance": {
+          "file": "dance.webp"
+        },
+        "run": {
+          "file": "run.webp",
+          "h": 0.9
+        },
+        "card": {
+          "file": "card.webp",
+          "h": 1.1
+        },
+        "yawn": {
+          "file": "yawn.webp"
+        },
+        "sleep": {
+          "file": "sleep.webp",
+          "h": 0.62
+        }
+      },
+      "clips": {
+        "idle": {
+          "poses": [
+            "idle",
+            "wave",
+            "idle",
+            "listen"
+          ],
+          "fps": 0.35
+        },
+        "appear": {
+          "poses": [
+            "jump",
+            "idle"
+          ],
+          "fps": 1.2
+        },
+        "knock_glass": {
+          "poses": [
+            "point"
+          ]
+        },
+        "press_glass": {
+          "poses": [
+            "listen"
+          ]
+        },
+        "scratch": {
+          "poses": [
+            "run"
+          ]
+        },
+        "tumble": {
+          "poses": [
+            "flip"
+          ]
+        },
+        "sticker": {
+          "poses": [
+            "card"
+          ]
+        },
+        "talk": {
+          "poses": [
+            "listen"
+          ]
+        },
+        "listen": {
+          "poses": [
+            "listen"
+          ]
+        },
+        "laugh": {
+          "poses": [
+            "giggle",
+            "laugh"
+          ],
+          "fps": 3
+        },
+        "bored": {
+          "poses": [
+            "yawn"
+          ]
+        },
+        "run_home": {
+          "poses": [
+            "run"
+          ]
+        },
+        "dance": {
+          "poses": [
+            "dance",
+            "idle"
+          ],
+          "fps": 2.5
+        },
+        "bubble_gum": {
+          "poses": [
+            "giggle"
+          ]
+        },
+        "glitter_burst": {
+          "poses": [
+            "jump",
+            "idle"
+          ],
+          "fps": 1.5
+        },
+        "heart_draw": {
+          "poses": [
+            "point",
+            "wave"
+          ],
+          "fps": 1.2
+        },
+        "walk": {
+          "poses": [
+            "run",
+            "idle"
+          ],
+          "fps": 4
+        },
+        "run": {
+          "poses": [
+            "run"
+          ]
+        },
+        "jump": {
+          "poses": [
+            "jump"
+          ]
+        },
+        "flip": {
+          "poses": [
+            "flip"
+          ]
+        },
+        "turn_left": {
+          "poses": [
+            "idle"
+          ]
+        },
+        "turn_right": {
+          "poses": [
+            "idle"
+          ]
+        },
+        "sit": {
+          "poses": [
+            "giggle"
+          ]
+        },
+        "wave": {
+          "poses": [
+            "wave"
+          ]
+        }
+      }
+    }
+  },
+  "mouth": {
+    "_comment": "Оверлей рта поверх лица в спрайт-режиме: формы Rhubarb A–H, X. Позиция — в pose.mouth [x, y, ширина] долями кадра. Заглушки — замените PNG/WebP финальными формами.",
+    "dir": "video/sprites/mouth/",
+    "shapes": {
+      "X": "X.webp",
+      "A": "A.webp",
+      "B": "B.webp",
+      "C": "C.webp",
+      "D": "D.webp",
+      "E": "E.webp",
+      "F": "F.webp",
+      "G": "G.webp",
+      "H": "H.webp"
+    }
+  }
+}

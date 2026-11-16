@@ -1,0 +1,42 @@
+{
+  "name": "sber-ar-cat-proto",
+  "version": "1.0.0",
+  "description": "Веб-AR прототип: кот в детской карте",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview --port 4173 --strictPort",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "compile-target": "node scripts/compile-target.mjs",
+    "gen-sounds": "python3 scripts/gen_sounds.py",
+    "prepare-sprites": "python3 scripts/prepare_sprites.py",
+    "screens": "node scripts/screens.mjs",
+    "voice:lines": "node scripts/voice/extract-lines.mjs",
+    "voice:build": "node scripts/voice/build.mjs",
+    "setup-8thwall": "node scripts/setup-8thwall.mjs",
+    "bench": "node scripts/bench/run_bench.mjs"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/howler": "^2.2.13",
+    "@types/three": "0.187.0",
+    "jsdom": "^31.0.1",
+    "puppeteer-core": "^25.17.0",
+    "rhubarb-lip-sync-wasm": "^0.1.8",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.8",
+    "vitest": "^5.1.0"
+  },
+  "dependencies": {
+    "howler": "^2.2.4",
+    "mind-ar": "1.2.5",
+    "three": "0.187.0",
+    "vosk-browser": "^0.0.8",
+    "wawa-lipsync": "^0.0.2"
+  },
+  "private": true,
+  "type": "module"
+}

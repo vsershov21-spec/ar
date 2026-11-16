@@ -1,0 +1,66 @@
+{
+ "glitter": {
+  "intro_1": {
+   "text": "Ой, какая карта, красота! Как тебя зовут?",
+   "emotion": "curious",
+   "event": "intro",
+   "duration": 3.71,
+   "src": [
+    "sounds/voice/glitter/intro_1.m4a",
+    "sounds/voice/glitter/intro_1.ogg"
+   ],
+   "cues": "sounds/voice/glitter/intro_1.cues.json",
+   "lipsync": "rhubarb-wasm-pocketsphinx"
+  },
+  "tap_cat_2": {
+   "text": "Ты сегодня сияешь!",
+   "emotion": "playful",
+   "event": "tap_cat",
+   "duration": 1.58,
+   "src": [
+    "sounds/voice/glitter/tap_cat_2.m4a",
+    "sounds/voice/glitter/tap_cat_2.ogg"
+   ],
+   "cues": "sounds/voice/glitter/tap_cat_2.cues.json",
+   "lipsync": "rhubarb-wasm-pocketsphinx"
+  }
+ },
+ "hooligan": {
+  "intro_1": {
+   "text": "Ты чё, с картой, что ли? Ничего себе. Как тебя зовут?",
+   "emotion": "curious",
+   "event": "intro",
+   "duration": 4.091,
+   "src": [
+    "sounds/voice/hooligan/intro_1.m4a",
+    "sounds/voice/hooligan/intro_1.ogg"
+   ],
+   "cues": "sounds/voice/hooligan/intro_1.cues.json",
+   "lipsync": "rhubarb-wasm-pocketsphinx"
+  },
+  "tap_screen_1": {
+   "text": "Тук-тук, чё надо?",
+   "emotion": "cheeky",
+   "event": "tap_screen",
+   "duration": 1.426,
+   "src": [
+    "sounds/voice/hooligan/tap_screen_1.m4a",
+    "sounds/voice/hooligan/tap_screen_1.ogg"
+   ],
+   "cues": "sounds/voice/hooligan/tap_screen_1.cues.json",
+   "lipsync": "rhubarb-wasm-pocketsphinx"
+  },
+  "swipe_2": {
+   "text": "Хе-хе, когти — во!",
+   "emotion": "cheeky",
+   "event": "swipe",
+   "duration": 1.846,
+   "src": [
+    "sounds/voice/hooligan/swipe_2.m4a",
+    "sounds/voice/hooligan/swipe_2.ogg"
+   ],
+   "cues": "sounds/voice/hooligan/swipe_2.cues.json",
+   "lipsync": "rhubarb-wasm-pocketsphinx"
+  }
+ }
+}
