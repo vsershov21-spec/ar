@@ -37,7 +37,7 @@ canvas.gl.glitch { animation: glitch .12s steps(2) infinite; }
 .start .card { width: min(100%, 400px); text-align: center; color: #fff; }
 .start .cat { width: 170px; height: 170px; margin: 0 auto 8px; border-radius: 50%; display: grid; place-items: center; font-size: 96px;
   background: radial-gradient(circle, rgba(255,255,255,.14), transparent 70%); animation: breathe 2.4s ease-in-out infinite; }
-.start .cat img { width: 150px; height: auto; filter: drop-shadow(0 10px 20px rgba(0,0,0,.4)); }
+.start .cat img { width: auto; height: 165px; object-fit: contain; filter: drop-shadow(0 10px 20px rgba(0,0,0,.4)); }
 @keyframes breathe { 50% { transform: scale(1.05) translateY(-4px); } }
 .start h1 { font-size: 30px; margin: 8px 0 8px; line-height: 1.1; }
 .start p { margin: 0 0 24px; color: rgba(255,255,255,.75); font-size: 16px; line-height: 1.4; }
@@ -53,7 +53,7 @@ canvas.gl.glitch { animation: glitch .12s steps(2) infinite; }
 @keyframes scanpulse { 50% { transform: translate(-50%, -55%) scale(1.03); border-color: var(--lime); } }
 
 /* субтитры реплик кота */
-.bubble { position: absolute; left: calc(16px + var(--safe-l)); right: calc(16px + var(--safe-r)); top: calc(14px + var(--safe-t)); margin: 0 auto; max-width: 440px;
+.bubble { position: absolute; left: calc(12px + var(--safe-l)); right: calc(58px + var(--safe-r)); top: calc(14px + var(--safe-t)); margin: 0 auto; max-width: 440px;
   padding: 14px 18px; border-radius: 20px; background: rgba(255,255,255,.95); color: #111; font-size: 18px; font-weight: 700; line-height: 1.3;
   box-shadow: 0 8px 26px rgba(0,0,0,.25); opacity: 0; transform: translateY(-10px); transition: opacity .2s, transform .2s; pointer-events: none; }
 .bubble.show { opacity: 1; transform: none; }

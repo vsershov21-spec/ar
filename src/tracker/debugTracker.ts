@@ -15,7 +15,7 @@ export class DebugTracker extends TrackerBase implements Tracker {
   wobble = false;
   /** наклон карты: 0 — лицом к камере, ~1.05 рад — лежит на столе, камера под углом ~30° */
   tilt = 1.0;
-  distance = 2.1;
+  distance = 3.2;
   yaw = 0.0;
 
   constructor(cardImageUrl: string) {
@@ -41,7 +41,7 @@ export class DebugTracker extends TrackerBase implements Tracker {
     const q = new THREE.Quaternion().setFromEuler(
       new THREE.Euler(-this.tilt + w * 0.05 * Math.sin(t * 0.9), this.yaw + w * 0.25 * Math.sin(t * 0.4), w * 0.04 * Math.sin(t * 1.3)),
     );
-    const p = new THREE.Vector3(w * 0.06 * Math.sin(t * 0.7), -0.35, -this.distance);
+    const p = new THREE.Vector3(w * 0.06 * Math.sin(t * 0.7), -0.62, -this.distance);
     this.target!.compose(p, q, new THREE.Vector3(1, 1, 1));
   }
 

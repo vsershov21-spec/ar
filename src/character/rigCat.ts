@@ -275,7 +275,8 @@ export class RigCat implements Character {
     // корпус: грушевидный, уже головы
     const spine = this.bone('Spine', hips, [0, 0.05, 0]);
     this.blob(spine, fur, [0.34, 0.26, 0.28], [0, 0.04, 0]);
-    this.blob(spine, white, [0.2, 0.2, 0.08], [0, 0.06, 0.11]); // белая грудка
+    const chest = this.blob(spine, white, [0.2, 0.2, 0.08], [0, 0.06, 0.11]); // белая грудка (прячется под худи)
+    chest.name = 'chest';
     const spine1 = this.bone('Spine1', spine, [0, 0.14, 0]);
     this.blob(spine1, fur, [0.3, 0.2, 0.25], [0, 0.03, 0]);
     // хвост: короткий, 4 кости
@@ -314,8 +315,8 @@ export class RigCat implements Character {
     for (const side of [1, -1]) {
       const L = side > 0 ? 'Left' : 'Right';
       this.blob(head, eye, [0.1, 0.11, 0.05], [0.085 * side, hc + 0.03, 0.175]);
-      this.blob(head, black, [0.045, 0.075, 0.03], [0.085 * side, hc + 0.03, 0.195]);
-      this.blob(head, shine as unknown as THREE.Material, [0.02, 0.02, 0.01], [0.075 * side + 0.012, hc + 0.06, 0.205], 8);
+      this.blob(head, black, [0.045, 0.07, 0.02], [0.085 * side, hc + 0.03, 0.203]);
+      this.blob(head, shine as unknown as THREE.Material, [0.022, 0.022, 0.01], [0.075 * side + 0.012, hc + 0.055, 0.212], 8);
       const lidBone = this.bone(`${L}Eyelid`, head, [0.085 * side, hc + 0.03, 0.17]);
       const lid = this.blob(lidBone, fur, [0.115, 0.12, 0.06], [0, 0.0, 0.012]);
       lid.scale.y = 0.001;
@@ -336,8 +337,8 @@ export class RigCat implements Character {
     }
     // челюсть / рот
     const jaw = this.bone('Jaw', head, [0, hc - 0.08, 0.16]);
-    this.blob(jaw, this.mat('mouth', 0x7a2a3a), [0.07, 0.04, 0.03], [0, -0.01, 0.02]);
-    this.blob(jaw, white, [0.09, 0.04, 0.06], [0, -0.03, 0.0]);
+    this.blob(jaw, this.mat('mouth', 0x7a2a3a), [0.05, 0.03, 0.02], [0, -0.012, 0.012]);
+    this.blob(jaw, white, [0.09, 0.035, 0.06], [0, -0.03, 0.0]);
 
     this.root.add(this.outfit);
   }
@@ -367,10 +368,12 @@ export class RigCat implements Character {
     const trimColor = p.id === 'glitter' ? 0x8ff0d0 : 0x1ee3cf;
     const hoodie = new THREE.MeshStandardMaterial({ color: hoodieColor, roughness: 0.9 });
     const trim = new THREE.MeshStandardMaterial({ color: trimColor, roughness: 0.6 });
-    add('Spine', ell(hoodie, [0.37, 0.28, 0.31], [0, 0.04, 0]));
-    add('Spine1', ell(hoodie, [0.33, 0.22, 0.28], [0, 0.03, 0]));
-    add('Spine', ring(trim, 0.16, 0.012, [0, -0.07, 0], 1.12, 0.95));
-    add('Spine1', ring(trim, 0.11, 0.025, [0, 0.12, -0.01])); // капюшон-воротник
+    this.object.getObjectByName('chest')!.visible = false;
+    add('Spine', ell(hoodie, [0.37, 0.28, 0.33], [0, 0.04, 0]));
+    add('Spine1', ell(hoodie, [0.33, 0.22, 0.29], [0, 0.03, 0]));
+    add('Spine', ring(trim, 0.165, 0.01, [0, -0.08, 0], 1.08, 0.95)); // кант по низу
+    add('Spine1', ell(hoodie, [0.26, 0.1, 0.12], [0, 0.11, -0.1])); // капюшон за шеей
+    add('Spine1', ring(trim, 0.08, 0.008, [0, 0.12, 0.0], 1.2, 0.8)); // кант горловины
     for (const L of ['Left', 'Right']) {
       add(`${L}Arm`, ell(hoodie, [0.095, 0.14, 0.095], [0, -0.05, 0]));
       add(`${L}ForeArm`, ell(hoodie, [0.083, 0.1, 0.083], [0, -0.04, 0]));
@@ -378,7 +381,7 @@ export class RigCat implements Character {
     }
     // нашивка Сбера — левая грудь (у кота левая сторона = +X)
     const patch = new THREE.Mesh(new THREE.CircleGeometry(0.03, 20), new THREE.MeshStandardMaterial({ color: 0x21a038, roughness: 0.5 }));
-    patch.position.set(0.075, 0.06, 0.15);
+    patch.position.set(0.075, 0.07, 0.163);
     add('Spine', patch);
     if (p.id === 'glitter') {
       const gold = new THREE.MeshStandardMaterial({ color: 0xffd36e, metalness: 0.6, roughness: 0.3 });
@@ -392,10 +395,10 @@ export class RigCat implements Character {
       // кепка козырьком назад (лайм)
       const cap = new THREE.MeshStandardMaterial({ color: 0xb6ff3b, roughness: 0.7 });
       const dome = new THREE.Mesh(new THREE.SphereGeometry(0.5, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2), cap);
-      dome.scale.set(0.42, 0.22, 0.38);
-      dome.position.set(0, 0.3, -0.01);
+      dome.scale.set(0.36, 0.17, 0.33);
+      dome.position.set(0, 0.32, -0.01);
       add('Head', dome);
-      const brim = ell(cap, [0.26, 0.02, 0.2], [0, 0.31, -0.2]);
+      const brim = ell(cap, [0.22, 0.02, 0.16], [0, 0.325, -0.17]);
       add('Head', brim);
     }
   }
@@ -473,7 +476,7 @@ export class RigCat implements Character {
     const jaw = this.bones.get('Jaw')!;
     const open = clamp(acc.jaw + this.mouth * 0.9, 0, 1);
     jaw.position.y = 0.11 - open * 0.03;
-    jaw.scale.y = 1 + open * 1.4;
+    jaw.scale.y = 1 + open * 0.8;
     // моргание
     this.blinkT += dt;
     if (this.blinkT > 3 + Math.random() * 2) this.blinkT = 0;

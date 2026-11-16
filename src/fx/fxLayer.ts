@@ -198,7 +198,7 @@ export class FxLayer {
     for (let i = 0; i < 6; i++) {
       const x = rand(0, W), y = rand(H * 0.1, H * 0.95), r = rand(W * 0.2, W * 0.5);
       const grd = g.createRadialGradient(x, y, 0, x, y, r);
-      grd.addColorStop(0, 'rgba(235,242,248,0.20)');
+      grd.addColorStop(0, 'rgba(235,242,248,0.34)');
       grd.addColorStop(1, 'rgba(235,242,248,0)');
       g.fillStyle = grd;
       g.fillRect(0, 0, W, H);
@@ -400,7 +400,7 @@ export class FxLayer {
           const a = h.pts[h.drawn], c = h.pts[h.drawn + 1];
           this.fg.globalCompositeOperation = 'destination-out';
           this.fg.lineCap = 'round';
-          this.fg.lineWidth = 9;
+          this.fg.lineWidth = 13;
           this.fg.beginPath();
           this.fg.moveTo(a.x, a.y);
           this.fg.lineTo(c.x, c.y);

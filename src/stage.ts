@@ -154,7 +154,8 @@ export class Stage {
     const D = Math.max(cam.near * 4, anchorPos.length() * 0.5);
     const halfH = D * Math.tan(THREE.MathUtils.degToRad(cam.fov / 2));
     const H = 2 * halfH * this.cfg.glassHeightFrac;
-    const pos = new THREE.Vector3(0, -halfH * 0.98, -D).applyMatrix4(cam.matrixWorld);
+    // лапы на ~76% высоты экрана — над нижней панелью интерфейса (микрофон, чипы)
+    const pos = new THREE.Vector3(0, -halfH * 0.52, -D).applyMatrix4(cam.matrixWorld);
     const q = cam.getWorldQuaternion(new THREE.Quaternion());
     out.compose(pos, q, new THREE.Vector3(H, H, H));
   }
