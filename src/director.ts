@@ -222,6 +222,7 @@ export class Director extends Emitter<DirectorEvents> {
     const d = this.d;
     // ждём, пока договорит вопрос «Хочешь, я буду…»
     for (let i = 0; i < 80 && this.dialog.busy; i++) await wait(100);
+    if (this.state.phase !== 'choose') return; // выбор уже сделан (голосом/таймером) — наклейки не нужны
     this.character.play('sticker');
     const { w, h } = d.size();
     const ids: number[] = [];
@@ -234,6 +235,7 @@ export class Director extends Emitter<DirectorEvents> {
       ids.push(s.id);
       i++;
       await wait(450);
+      if (this.state.phase !== 'choose') return;
     }
     void ids;
     this.dispatch({ type: 'choice_shown' });

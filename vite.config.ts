@@ -6,7 +6,7 @@ export default defineConfig({
   base: process.env.BASE_PATH ?? './',
   build: {
     target: 'es2020',
-    chunkSizeWarningLimit: 2600,
+    chunkSizeWarningLimit: 6000,
   },
   server: { host: true },
   test: {
