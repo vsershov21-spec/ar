@@ -108,6 +108,9 @@ export class VoicePlayer {
   private byText = new Map<string, { persona: string; id: string }>();
   private buffers = new Map<string, Promise<AudioBuffer | null>>();
   private legacy: Record<string, Record<string, LegacyEntry>> = {};
+  /** озвучка ElevenLabs (самые частые реплики): id → файл; приоритет выше Piper */
+  private el: Record<string, ClipEntry & { t?: string }> = {};
+  private elByText = new Map<string, string>();
   private src: AudioBufferSourceNode | null = null;
   private gain: GainNode | null = null;
   private synthVoice: SpeechSynthesisVoice | null = null;
@@ -120,6 +123,7 @@ export class VoicePlayer {
   lipStrategy: LipStrategy = 'phon';
   /** колбэк начала/конца любой речи кота (VoiceEngine глушит микрофон) */
   onSpeaking: (on: boolean) => void = () => {};
+  private lastSource = 'piper';
   /** последняя реплика: откуда звук (для debug) */
   last: { id?: string; source: string; text: string } | null = null;
 
@@ -146,6 +150,15 @@ export class VoicePlayer {
       if (r.ok && (r.headers.get('content-type') ?? '').includes('json')) this.index = await r.json();
     } catch {
       /* нет озвучки — синтез */
+    }
+    try {
+      const r = await fetch(asset('voice/el/manifest.json'), { cache: 'no-cache' });
+      if (r.ok && (r.headers.get('content-type') ?? '').includes('json')) {
+        this.el = (await r.json()).lines ?? {};
+        for (const [id, e] of Object.entries(this.el)) if (e.t) this.elByText.set(`${id.split('.')[0]}:${normText(e.t)}`, id);
+      }
+    } catch {
+      /* нет — только Piper */
     }
     if (!this.index && legacyUrl) {
       try {
@@ -353,7 +366,22 @@ export class VoicePlayer {
     return { buf: out, cues, offset: 0 };
   }
 
+  /** приоритет: ElevenLabs → Piper → speechSynthesis */
+  private elFor(req: SpeakRequest): ClipEntry | null {
+    const id = req.lineId && this.el[req.lineId] ? req.lineId : this.elByText.get(`${req.persona}:${normText(req.template)}`);
+    return id ? this.el[id] : null;
+  }
+
   private async prepare(req: SpeakRequest): Promise<Prepared | null> {
+    const el = this.elFor(req);
+    if (el) {
+      const buf = await this.clip(el);
+      if (buf) {
+        this.lastSource = 'elevenlabs';
+        return { buf, cues: this.cuesFor(buf, el), offset: this.lipStrategy === 'amp' ? 0 : this.onsetShift(buf, el) };
+      }
+    }
+    this.lastSource = 'piper';
     await this.usePersona(req.persona);
     const f = this.lookup(req.persona, req.template, req.lineId);
     if (!f) return null;
@@ -385,6 +413,8 @@ export class VoicePlayer {
   preload(persona: string, template: string, lineId?: string) {
     void this.usePersona(persona).then(() => {
       const f = this.lookup(persona, template, lineId);
+      const el = this.elFor({ persona, template, text: template, pitch: 1, rate: 1, lineId });
+      if (el) return void this.clip(el);
       if (f?.kind === 'line') void this.clip(f.e);
       if (f?.kind === 'parts') [f.a, f.b].forEach((e) => e && void this.clip(e));
     });
@@ -396,7 +426,7 @@ export class VoicePlayer {
       if (!m) return;
       for (const ev of events) {
         const ids = Object.keys(m.lines).filter((id) => id.split('.')[1] === ev).slice(0, max);
-        ids.forEach((id) => void this.clip(m.lines[id]));
+        ids.forEach((id) => void this.clip(this.el[id] ?? m.lines[id]));
       }
     });
   }
@@ -453,7 +483,7 @@ export class VoicePlayer {
     const ctx = this.audio.ctx;
     const out = this.audio.voiceOut();
     if (prep && ctx && out) {
-      this.last = { id: req.lineId, source: this.lipStrategy === 'amp' ? 'file+amp' : 'file', text: req.text };
+      this.last = { id: req.lineId, source: `${this.lastSource}${this.lipStrategy === 'amp' ? '+amp' : ''}`, text: req.text };
       return this.playPrepared(ctx, out, prep, gen, 'file');
     }
     this.last = { id: req.lineId, source: 'synth', text: req.text };

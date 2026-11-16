@@ -6,3 +6,4 @@ bench-out/
 public/external/
 public/models/vosk-ru-small/
 scripts/voice/.tmp/
+public/voice/el/
