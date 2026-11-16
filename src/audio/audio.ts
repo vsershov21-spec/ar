@@ -24,6 +24,18 @@ export class Audio {
   private voiceGain: GainNode | null = null;
   muted = false;
 
+  constructor() {
+    // Howler сам усыпляет AudioContext через 30 с тишины — микрофон (повтор, «слушаю сам») на том же
+    // контексте тогда замолкает. Не усыплять.
+    Howler.autoSuspend = false;
+    // iOS: после звонка/сворачивания контекст «interrupted» — будим при возврате
+    if (typeof document !== 'undefined')
+      document.addEventListener('visibilitychange', () => {
+        const ctx = this.ctx;
+        if (document.visibilityState === 'visible' && ctx && ctx.state !== 'running') void ctx.resume().catch(() => undefined);
+      });
+  }
+
   async load(url: string) {
     const r = await fetch(asset(url));
     const j = (await r.json()) as { src: string[]; sprite: Record<string, [number, number]> };
