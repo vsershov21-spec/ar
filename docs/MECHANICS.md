@@ -146,7 +146,7 @@ MindAR ищет **характерные точки в градациях сер
 | глажка > 4 с без перерыва | `stroke_long` | `hug_screen` / `purr_stroke` + `hearts_float` |
 | отпустили / увели палец с кота > 0,4 с | `stroke_end` | обратно в idle, лицо `neutral` |
 | тап по карте | `walk_to` | кот идёт в точку (`walk`, Stage) |
-| тап мимо кота и мимо карты | `tap_screen` | `knock_glass` + `knock` / `glitter_burst` в точке тапа |
+| тап мимо кота и мимо карты | `tap_screen` | `knock_glass` + `knock` / `glitter_burst` в точке тапа; лапа тянется к точке (риг: лапа со стороны точки, подъём по высоте; спрайт — наклон позы) |
 | двойной тап мимо кота (≤ 300 мс, ≤ 40 px) | `double_tap` | фирменный трюк: `gum_blow`+`gum_bubble`+`gum_splat` / `kind_bubbles`+`soap_bubbles` / `glitter_throw`+`glitter_burst` |
 | свайп мимо кота | `swipe` | `claws` / `steam_heart` / `glitter_trail` |
 | долгое нажатие 0,6 с | `longpress` | `press_glass` + `glass_cat` / `steam` / `kiss_print` |
