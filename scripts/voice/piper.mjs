@@ -52,7 +52,7 @@ const ru = await importTs('src/lipsync/ru.ts');
 const argv = process.argv.slice(2);
 const flag = (n) => argv.includes(n);
 const opt = (n, d) => (argv.includes(n) ? argv[argv.indexOf(n) + 1] : d);
-const PIPELINE = 'v1'; // поменять, если меняется обработка — пересоберёт всё
+const PIPELINE = 'v2'; // поменять, если меняется обработка — пересоберёт всё
 const PIPER_DIR = process.env.PIPER_DIR || '/tmp/piper';
 const VOICES = process.env.PIPER_VOICES || path.join(PIPER_DIR, '..', 'voices');
 const OUT = path.resolve(process.env.VOICE_OUT || path.join(root, 'public/voice'));
