@@ -234,12 +234,13 @@ for (const [k, items] of groups) {
       const f = dsp.frames(y, sr);
       const ipaText = ipa(j.text);
       const phones = ipaText ? ru.phonesFromIpa(ipaText) : ru.phonesFromText(j.text);
-      const cues = ru.cuesFromAlignment(phones, ru.alignPhones(phones, f), dur);
+      const times = ru.alignPhones(phones, f);
+      const cues = ru.cuesFromAlignment(phones, times, dur);
       fs.mkdirSync(path.dirname(j.file), { recursive: true });
       fs.writeFileSync(j.file, mp3);
       const meta = { d: +dur.toFixed(3), o: onset(f), c: packCues(cues), lips: ipaText ? 'ru-espeak-align' : 'ru-letters-align', bytes: mp3.length };
       fs.writeFileSync(j.file + '.json', JSON.stringify(meta));
-      if (compare.length < compareN && j.kind === 'line') compare.push({ j, f, dur, phones, cues });
+      if (compare.length < compareN && j.kind === 'line') compare.push({ j, f, dur, phones, cues, times });
       fs.rmSync(wav);
     }
     console.log(`  ${voice}: ${Math.min(i + 40, items.length)}/${items.length}  (${((Date.now() - t0) / 1000).toFixed(0)} с)`);
@@ -294,8 +295,8 @@ console.log(`Готово за ${((Date.now() - t0) / 1000).toFixed(0)} с: ${Ob
 // ───────────── сравнение стратегий липсинка ─────────────
 if (compare.length) {
   console.log('\nСравнение липсинка (корреляция раскрытия рта с огибающей сигнала; смыкания М/Б/П на провалах громкости):');
-  console.log('id | фонемы: corr, формы, смыкания | амплитуда: corr, формы');
-  let sp = 0, sa = 0;
+  console.log('id | фонемы: corr, формы, смыкания, гласные на громком | амплитуда: corr, формы');
+  let sp = 0, sa = 0, sv = 0;
   for (const c of compare) {
     const n = c.f.rms.length;
     const env = Array.from(c.f.rms, (r) => Math.max(0, 20 * Math.log10(Math.max(r, 1e-5)) + 60));
@@ -311,9 +312,19 @@ if (compare.length) {
       return inside < around - 3;
     }).length;
     const shapes = (q) => new Set(q.map((x) => x.value)).size;
+    // гласные легли на громкие кадры (выше медианы речи) — проверка тайминга фонемного пути
+    const sorted = [...env].sort((a, b) => a - b), med = sorted[Math.floor(sorted.length * 0.5)];
+    const vow = c.phones.map((p, i) => ({ p, t: c.times[i] })).filter((x) => x.p.c === 'V' && x.t.end > x.t.start);
+    const onLoud = vow.filter((x) => {
+      const a = Math.floor(x.t.start / c.f.step), b = Math.max(a + 1, Math.ceil(x.t.end / c.f.step));
+      const seg = env.slice(a, b);
+      return seg.reduce((s2, v) => s2 + v, 0) / seg.length > med;
+    }).length;
+    const vr = vow.length ? onLoud / vow.length : 0;
     sp += cp;
     sa += ca;
-    console.log(`${c.j.key} | ${cp.toFixed(2)}, ${shapes(c.cues)}, ${dip}/${As.length} | ${ca.toFixed(2)}, ${shapes(amp)}`);
+    sv += vr;
+    console.log(`${c.j.key} | ${cp.toFixed(2)}, ${shapes(c.cues)}, ${dip}/${As.length}, ${(vr * 100).toFixed(0)}% | ${ca.toFixed(2)}, ${shapes(amp)}`);
   }
-  console.log(`среднее corr: фонемы ${(sp / compare.length).toFixed(2)}, амплитуда ${(sa / compare.length).toFixed(2)}`);
+  console.log(`среднее: corr фонемы ${(sp / compare.length).toFixed(2)}, амплитуда ${(sa / compare.length).toFixed(2)}; гласные на громком ${((sv / compare.length) * 100).toFixed(0)}%`);
 }
