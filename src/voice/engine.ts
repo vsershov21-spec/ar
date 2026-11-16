@@ -87,6 +87,8 @@ export class VoiceEngine extends Emitter<EngineEvents> {
   private listenReason: EngineState['listenReason'] = null;
   private windowTimer = 0;
   private echoStopTimer = 0;
+  /** окно повтора открыто сценарием (между фразами сценарий его закрывает — тогда не пишем) */
+  private echoWindow = false;
   private bargeMs = 0;
   private ring: Float32Array[] = [];
   private ringLen = 0;
@@ -103,7 +105,7 @@ export class VoiceEngine extends Emitter<EngineEvents> {
     this.sound = new SoundEvents(this.mic.floor);
     this.vad = new Vad(this.mic.floor);
     this.echo = new EchoMode(this.mic, voice, () => this.echoPreset());
-    this.echo.gated = () => this.selfMuted;
+    this.echo.gated = () => this.selfMuted || (this.echo.delivery === 'deferred' && !this.echoWindow);
     if (this.asr instanceof VoskAsr) {
       const a = this.asr;
       this.echo.checkStop = (pcm, sr, g) => (a.ready ? a.recognizeOnce(pcm, sr, g) : Promise.resolve(null));
@@ -114,7 +116,9 @@ export class VoiceEngine extends Emitter<EngineEvents> {
           this.emit('clip', { name: e.clip });
           return;
         case 'echo_ready':
+          if (!this.echoWindow) return this.echo.discard();
           // запись готова → сценарию «ребёнок сказал» (распознавания нет — это повтор)
+          this.echoWindow = false;
           this.emit('text', { text: ECHO_HEARD, match: { intent: 'unknown', confidence: 1, text: ECHO_HEARD }, source: 'echo' });
           return;
         case 'echo_stopword':
@@ -202,6 +206,7 @@ export class VoiceEngine extends Emitter<EngineEvents> {
     clearTimeout(this.windowTimer);
     if (o.mode === 'echo') {
       clearTimeout(this.echoStopTimer);
+      this.echoWindow = true;
       if (this.listening) this.asr.abort();
       void this.echo.start('deferred');
       void this.asr.preload?.(); // для стоп-слов «хватит»
@@ -226,6 +231,7 @@ export class VoiceEngine extends Emitter<EngineEvents> {
   /** DirectorDeps.stopListen */
   stopListen() {
     clearTimeout(this.windowTimer);
+    this.echoWindow = false;
     if (this.listenReason === 'window' || this.listenReason === 'barge') this.asr.stop();
     // повтор: между фразами диалог закрывает и снова открывает окно — останавливаемся, только если за 6 с не открыл снова
     if (this.echo.active) {
@@ -294,11 +300,12 @@ export class VoiceEngine extends Emitter<EngineEvents> {
       const ev = this.vad.push(f);
       if (ev?.type === 'end') {
         const w = this.sound.phraseEnded(ev.durMs, this.vad.stats);
-        if (w) this.fire('whisper', { meanDb: +(this.vad.stats.sumDb / Math.max(1, this.vad.stats.n)).toFixed(1) });
+        if (w && !this.echo.active) this.fire('whisper', { meanDb: +(this.vad.stats.sumDb / Math.max(1, this.vad.stats.n)).toFixed(1) });
         if (this.listenReason === 'window' || this.listenReason === 'barge') this.asr.stop(); // ответ кончился — не ждём таймаута
       }
       const s = this.sound.push(f);
-      if (s) this.fire(s, { db: +db(f.rms).toFixed(1) });
+      // в повторе громкость — часть игры (кот повторит и крик), хлопки/шёпот не отвлекают; в окне ответа — без хлопков
+      if (s && !this.echo.active && !(this.listening && s === 'clap')) this.fire(s, { db: +db(f.rms).toFixed(1) });
     }
   }
 

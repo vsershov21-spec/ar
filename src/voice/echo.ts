@@ -120,6 +120,15 @@ export class EchoMode {
     this.lastSpeech = performance.now();
   }
 
+  /** готовая запись не нужна (окно закрыто) — выбросить и слушать дальше */
+  discard() {
+    this.dropReady();
+    if (this.active) {
+      this.phase = 'waiting';
+      this.vad.reset();
+    }
+  }
+
   private dropReady() {
     clearTimeout(this.readyTimer);
     this.ready?.getChannelData(0).fill(0);
@@ -138,6 +147,11 @@ export class EchoMode {
   private onAudio(buf: Float32Array, frames: Frame[], sr: number) {
     if (!this.active) return;
     if (this.phase === 'processing' || this.phase === 'ready' || this.phase === 'speaking' || this.gated()) {
+      if (this.phase === 'recording') {
+        // заговорил кот / окно закрылось посреди фразы — запись выбрасываем
+        this.wipe();
+        this.phase = 'waiting';
+      }
       this.vad.reset();
       return;
     }
