@@ -130,6 +130,10 @@ export class VoicePlayer {
     if (typeof location !== 'undefined' && new URLSearchParams(location.search).get('lips') === 'amp') this.lipStrategy = 'amp';
   }
 
+  get ctx(): AudioContext | null {
+    return this.audio.ctx;
+  }
+
   /** Индекс озвучки (маленький). legacyUrl — старый манифест voice:build, если нового нет. */
   async load(legacyUrl?: string) {
     try {
@@ -391,10 +395,53 @@ export class VoicePlayer {
     });
   }
 
+  // ───────────── перебивание: пауза перед следующей репликой ─────────────
+  private holdUntil = 0;
+  private holdWaiters: (() => void)[] = [];
+  /** ребёнок говорит: новые реплики ждут release() (но не дольше ms). Очередь (её приоритеты) не трогаем. */
+  hold(ms = 8000) {
+    this.holdUntil = performance.now() + ms;
+    setTimeout(() => performance.now() >= this.holdUntil - 5 && this.release(), ms);
+  }
+  release() {
+    this.holdUntil = 0;
+    const w = this.holdWaiters;
+    this.holdWaiters = [];
+    w.forEach((f) => f());
+  }
+  get held() {
+    return performance.now() < this.holdUntil;
+  }
+
+  // ───────────── повтор ─────────────
+  /** источник готовой записи для повтора (VoiceEngine): забирает буфер, повторно не отдаёт */
+  echoSource: (() => AudioBuffer | null) | null = null;
+  /** конец проигрыша повтора (VoiceEngine снова слушает) */
+  onEchoDone: () => void = () => {};
+  /**
+   * Повтор фразы ребёнка (director.echo): если есть запись — играем её (тон/темп уже сдвинуты),
+   * иначе (чип/текст без записи) — синтез текста выше тоном.
+   */
+  async echo(text: string, o: { persona: string; pitchSemitones: number; rate: number }): Promise<void> {
+    const buf = this.echoSource?.() ?? null;
+    if (buf) {
+      try {
+        await this.playBuffer(buf);
+      } finally {
+        buf.getChannelData(0).fill(0); // запись не храним
+        this.onEchoDone();
+      }
+      return;
+    }
+    if (!text || text === '…') return;
+    await this.speak({ persona: o.persona, template: `echo:${text}`, text, pitch: Math.min(2, Math.max(0.5, Math.pow(2, o.pitchSemitones / 12))), rate: o.rate });
+  }
+
   async speak(req: SpeakRequest): Promise<void> {
     this.cancel();
     const gen = this.gen;
-    if (this.muted) return;
+    if (this.held) await new Promise<void>((r) => this.holdWaiters.push(r));
+    if (gen !== this.gen || this.muted) return;
     const prep = await this.prepare(req).catch(() => null);
     if (gen !== this.gen) return;
     const ctx = this.audio.ctx;

@@ -1,25 +1,37 @@
 /**
  * Распознавание речи — интерфейс Asr и два движка:
- *  - WebSpeechAsr (по умолчанию): webkitSpeechRecognition ru-RU. Аудио обрабатывает браузер/ОС
- *    (Chrome — серверы Google, Safari — Apple/на устройстве). Приложение ничего не сохраняет и не отправляет само.
- *  - VoskAsr (?asr=vosk): vosk-browser (Kaldi в WebAssembly), маленькая русская модель — полностью офлайн.
- *    Модель грузится лениво из /models/vosk-ru-small/model.tar.gz (в репозиторий не входит, см. docs/VOICE.md).
- * Режим «держи и говори»: start() на нажатие, stop() на отпускание, авто-стоп по таймауту.
+ *  - VoskAsr (ПО УМОЛЧАНИЮ): vosk-browser (Kaldi в WebAssembly), маленькая русская модель — полностью офлайн,
+ *    звук не покидает телефон. Словарь ограничен грамматикой (фразы intents.ru.json + имена) — точнее
+ *    на детской речи и не «додумывает» лишнего. ?grammar=0 — свободный словарь (для отладки).
+ *    Модель (~45 МБ) грузится лениво при первом нажатии микрофона, с прогрессом; кладётся в Cache Storage.
+ *  - WebSpeechAsr (только ?asr=web): webkitSpeechRecognition. В Chrome звук уходит на серверы Google —
+ *    на пилоте с детьми нельзя, поэтому только по флагу.
+ * Звук для Vosk берётся из общего MicInput (тот же поток, что VAD/громкость/повтор).
  */
 import { asset } from '../core/util';
+import type { MicInput } from './mic';
 
 export type AsrState = 'idle' | 'loading' | 'listening' | 'error';
 
 export interface Asr {
   readonly name: string;
   readonly supported: boolean;
-  start(): void;
+  start(preroll?: Float32Array[]): void;
   stop(): void;
+  /** прервать без результата */
+  abort(): void;
+  /** не кормить распознаватель (кот говорит) — звук игнорируется */
+  paused: boolean;
   onResult: (text: string) => void;
   onInterim: (text: string) => void;
   onState: (s: AsrState, msg?: string) => void;
   /** уровень сигнала 0..1 (если движок даёт доступ к звуку) */
   onLevel: (v: number) => void;
+  /** прогресс загрузки модели 0..1 */
+  onProgress: (p: number) => void;
+  /** заранее загрузить модель (без микрофона) */
+  preload?(): Promise<boolean>;
+  setGrammar?(phrases: string[] | null): void;
 }
 
 const MAX_HOLD_MS = 8000;
@@ -31,10 +43,13 @@ export class WebSpeechAsr implements Asr {
   private finalText = '';
   private lastInterim = '';
   private timer = 0;
+  private aborted = false;
+  paused = false;
   onResult = (_: string) => {};
   onInterim = (_: string) => {};
   onState = (_: AsrState, _m?: string) => {};
   onLevel = (_: number) => {};
+  onProgress = (_: number) => {};
 
   get supported() {
     return typeof window !== 'undefined' && !!((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
@@ -50,6 +65,7 @@ export class WebSpeechAsr implements Asr {
     rec.maxAlternatives = 1;
     this.finalText = '';
     this.lastInterim = '';
+    this.aborted = false;
     rec.onresult = (e: any) => {
       let interim = '';
       for (let i = e.resultIndex; i < e.results.length; i++) {
@@ -69,7 +85,7 @@ export class WebSpeechAsr implements Asr {
       this.active = false;
       this.onLevel(0);
       this.onState('idle');
-      if (text) this.onResult(text);
+      if (text && !this.aborted && !this.paused) this.onResult(text);
     };
     this.rec = rec;
     this.active = true;
@@ -90,82 +106,143 @@ export class WebSpeechAsr implements Asr {
       /* ignore */
     }
   }
+
+  abort() {
+    this.aborted = true;
+    this.stop();
+  }
+}
+
+export const VOSK_MODEL_URL = 'models/vosk-ru-small-0.22/model.tar.gz';
+const CACHE = 'ar-cat-vosk-v1';
+
+/** Скачать модель с прогрессом и положить в Cache Storage (повторно — из кэша, без сети) */
+export async function fetchModelWithProgress(url: string, onProgress: (p: number) => void): Promise<boolean> {
+  const full = new URL(asset(url), location.href).href;
+  let cache: Cache | null = null;
+  try {
+    cache = await caches.open(CACHE);
+    const hit = await cache.match(full);
+    if (hit) {
+      onProgress(1);
+      return true;
+    }
+  } catch {
+    cache = null; // Cache Storage недоступен (http, приватный режим) — просто качаем
+  }
+  const r = await fetch(full);
+  if (!r.ok) throw new Error(`no-model ${r.status}`);
+  const total = Number(r.headers.get('content-length') || 0) || 46_000_000;
+  if (!r.body) {
+    const b = await r.blob();
+    await cache?.put(full, new Response(b, { headers: r.headers })).catch(() => undefined);
+    onProgress(1);
+    return true;
+  }
+  const reader = r.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let got = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+    got += value.length;
+    onProgress(Math.min(0.99, got / total));
+  }
+  const blob = new Blob(chunks as BlobPart[], { type: r.headers.get('content-type') ?? 'application/gzip' });
+  await cache?.put(full, new Response(blob, { headers: { 'content-type': blob.type, 'content-length': String(blob.size) } })).catch(() => undefined);
+  onProgress(1);
+  return true;
 }
 
 export class VoskAsr implements Asr {
   readonly name = 'vosk';
-  readonly supported = typeof window !== 'undefined' && !!navigator.mediaDevices?.getUserMedia && typeof WebAssembly !== 'undefined';
   private model: any = null;
-  private loading: Promise<any> | null = null;
+  private loading: Promise<boolean> | null = null;
   private rec: any = null;
-  private ctx: AudioContext | null = null;
-  private stream: MediaStream | null = null;
-  private node: ScriptProcessorNode | null = null;
+  private off: (() => void) | null = null;
   private partial = '';
   private final = '';
   private timer = 0;
   private listening = false;
+  private aborted = false;
+  private grammar: string[] | null = null;
+  paused = false;
   onResult = (_: string) => {};
   onInterim = (_: string) => {};
   onState = (_: AsrState, _m?: string) => {};
   onLevel = (_: number) => {};
+  onProgress = (_: number) => {};
 
-  constructor(private modelUrl = 'models/vosk-ru-small/model.tar.gz', private getCtx: () => AudioContext | null = () => null) {}
+  constructor(private mic: MicInput, private modelUrl = VOSK_MODEL_URL) {}
 
-  private loadModel() {
+  get supported() {
+    return this.mic.supported && typeof WebAssembly !== 'undefined';
+  }
+
+  setGrammar(phrases: string[] | null) {
+    this.grammar = phrases;
+  }
+
+  preload(): Promise<boolean> {
     this.loading ??= (async () => {
-      this.onState('loading');
-      const { createModel } = await import('vosk-browser');
-      this.model = await createModel(asset(this.modelUrl));
-      return this.model;
+      try {
+        this.onState('loading');
+        // модель (сеть или Cache Storage) и сам движок (≈2.4 МБ gzip) — параллельно
+        const [, vosk] = await Promise.all([fetchModelWithProgress(this.modelUrl, (p) => this.onProgress(p)), import('vosk-browser')]);
+        this.model = await vosk.createModel(new URL(asset(this.modelUrl), location.href).href);
+        this.onState('idle');
+        return true;
+      } catch (e) {
+        this.loading = null;
+        this.onState('error', /no-model|404|fetch|load/i.test(String(e)) ? 'no-model' : String(e));
+        return false;
+      }
     })();
     return this.loading;
   }
 
-  async start() {
+  async start(preroll?: Float32Array[]) {
     if (this.listening) return;
     this.listening = true;
-    try {
-      await this.loadModel();
-      this.ctx = this.getCtx() ?? new AudioContext();
-      this.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, channelCount: 1 } });
-      if (!this.listening) return this.cleanup();
-      const rec = new this.model.KaldiRecognizer(this.ctx.sampleRate);
-      rec.on('result', (m: any) => {
-        const t = m.result?.text ?? '';
-        if (t) this.final += t + ' ';
-      });
-      rec.on('partialresult', (m: any) => {
-        this.partial = m.result?.partial ?? '';
-        this.onInterim((this.final + this.partial).trim());
-      });
-      this.rec = rec;
-      const src = this.ctx.createMediaStreamSource(this.stream);
-      // ScriptProcessor устарел, но работает везде, включая iOS Safari; AudioWorklet — улучшение на потом
-      const node = this.ctx.createScriptProcessor(4096, 1, 1);
-      node.onaudioprocess = (e) => {
-        const data = e.inputBuffer.getChannelData(0);
-        let sum = 0;
-        for (let i = 0; i < data.length; i += 16) sum += data[i] * data[i];
-        this.onLevel(Math.min(1, Math.sqrt(sum / (data.length / 16)) * 8));
-        try {
-          rec.acceptWaveform(e.inputBuffer);
-        } catch {
-          /* ignore */
-        }
-      };
-      src.connect(node);
-      node.connect(this.ctx.destination);
-      this.node = node;
-      this.final = '';
-      this.partial = '';
-      this.onState('listening');
-      this.timer = window.setTimeout(() => this.stop(), MAX_HOLD_MS);
-    } catch (e) {
+    this.aborted = false;
+    this.final = '';
+    this.partial = '';
+    const micOk = this.mic.acquire();
+    const ok = await this.preload();
+    if (!(await micOk) || !ok) {
       this.listening = false;
-      this.onState('error', /404|fetch|load/i.test(String(e)) ? 'no-model' : String(e));
-      this.cleanup();
+      this.mic.release();
+      if (ok) this.onState('error', this.mic.error ?? 'mic');
+      return;
     }
+    if (!this.listening) {
+      this.mic.release();
+      return;
+    }
+    const sr = this.mic.sampleRate;
+    const rec = this.grammar ? new this.model.KaldiRecognizer(sr, JSON.stringify(this.grammar)) : new this.model.KaldiRecognizer(sr);
+    rec.on('result', (m: any) => {
+      const t = m.result?.text ?? '';
+      if (t && t !== '[unk]') this.final += t.replace(/\[unk\]/g, '').trim() + ' ';
+    });
+    rec.on('partialresult', (m: any) => {
+      this.partial = (m.result?.partial ?? '').replace(/\[unk\]/g, '').trim();
+      this.onInterim((this.final + this.partial).trim());
+    });
+    this.rec = rec;
+    for (const b of preroll ?? []) rec.acceptWaveformFloat(b, sr);
+    this.off = this.mic.on((buf) => {
+      this.onLevel(this.mic.level);
+      if (this.paused) return;
+      try {
+        rec.acceptWaveformFloat(buf, sr);
+      } catch {
+        /* ignore */
+      }
+    });
+    this.onState('listening');
+    this.timer = window.setTimeout(() => this.stop(), MAX_HOLD_MS);
   }
 
   stop() {
@@ -180,20 +257,54 @@ export class VoskAsr implements Asr {
         /* ignore */
       }
       setTimeout(() => {
-        const text = (this.final + this.partial).trim();
+        const text = (this.final + this.partial).replace(/\s+/g, ' ').trim();
         this.cleanup();
         this.onLevel(0);
         this.onState('idle');
-        if (text) this.onResult(text);
+        if (text && !this.aborted) this.onResult(text);
       }, 250);
     }, 300);
   }
 
+  abort() {
+    this.aborted = true;
+    this.stop();
+  }
+
+  /** модель уже в памяти (тогда recognizeOnce работает быстро) */
+  get ready() {
+    return !!this.model;
+  }
+
+  /** Разовое распознавание записи с маленькой грамматикой (стоп-слова в режиме повтора). null — модели нет. */
+  recognizeOnce(pcm: Float32Array, sr: number, grammar: string[]): Promise<string | null> {
+    if (!this.model) return Promise.resolve(null);
+    return new Promise((resolve) => {
+      const rec = new this.model.KaldiRecognizer(sr, JSON.stringify(grammar));
+      let text = '';
+      const done = () => {
+        clearTimeout(t);
+        try {
+          rec.remove();
+        } catch {
+          /* ignore */
+        }
+        resolve(text.replace(/\[unk\]/g, '').trim() || null);
+      };
+      const t = setTimeout(done, 1500);
+      rec.on('result', (m: any) => {
+        text += ' ' + (m.result?.text ?? '');
+        done();
+      });
+      for (let i = 0; i < pcm.length; i += 4096) rec.acceptWaveformFloat(pcm.subarray(i, i + 4096), sr);
+      rec.retrieveFinalResult();
+    });
+  }
+
   private cleanup() {
-    this.node?.disconnect();
-    this.node = null;
-    this.stream?.getTracks().forEach((t) => t.stop());
-    this.stream = null;
+    this.off?.();
+    this.off = null;
+    if (this.rec) this.mic.release();
     try {
       this.rec?.remove();
     } catch {
@@ -203,7 +314,8 @@ export class VoskAsr implements Asr {
   }
 }
 
-export function makeAsr(kind: string | null, getCtx: () => AudioContext | null): Asr {
-  if (kind === 'vosk') return new VoskAsr('models/vosk-ru-small/model.tar.gz', getCtx);
-  return new WebSpeechAsr();
+/** ?asr=web — Web Speech (только по флагу), иначе Vosk */
+export function makeAsr(kind: string | null, mic: MicInput): Asr {
+  if (kind === 'web' || kind === 'webspeech') return new WebSpeechAsr();
+  return new VoskAsr(mic);
 }

@@ -10,10 +10,11 @@ import type { Character, TouchZone } from './character/types';
 import type { InteractionKind } from './scenario/machine';
 import { SpriteCharacter } from './character/spriteCharacter';
 import { RigCat } from './character/rigCat';
+import { isClip } from './character/types';
 import { FxLayer } from './fx/fxLayer';
 import { Audio } from './audio/audio';
 import { VoicePlayer } from './voice/voicePlayer';
-import { makeAsr, type Asr } from './voice/asr';
+import { VoiceEngine } from './voice/engine';
 import { loadContent } from './persona/content';
 import { Input } from './input/input';
 import { UI, posterUrl } from './ui/ui';
@@ -28,6 +29,8 @@ export interface AppParams {
   tracker: TrackerKind;
   character: CharacterMode;
   asr: string | null;
+  /** ?mic=auto — «слушаю сам» (по умолчанию push-to-talk) */
+  mic: string | null;
 }
 
 export function readParams(search = location.search): AppParams {
@@ -35,7 +38,7 @@ export function readParams(search = location.search): AppParams {
   const debug = q.has('debug');
   const t = (q.get('tracker') as TrackerKind) || (debug ? 'debug' : 'mindar');
   const c = (q.get('char') as CharacterMode) || 'sprite';
-  return { debug, tracker: t, character: ['sprite', 'rig', 'glb'].includes(c) ? c : 'sprite', asr: q.get('asr') };
+  return { debug, tracker: t, character: ['sprite', 'rig', 'glb'].includes(c) ? c : 'sprite', asr: q.get('asr'), mic: q.get('mic') };
 }
 
 /** GLB-режим грузится лениво: GLTFLoader (и Draco, если модель сжата) не попадают в основной бандл */
@@ -64,7 +67,8 @@ export class App {
   fx!: FxLayer;
   audio = new Audio();
   voice!: VoicePlayer;
-  speech!: Asr;
+  /** голосовой вход: микрофон, Vosk, повтор, громкость (src/voice/engine.ts) */
+  engine!: VoiceEngine;
   input!: Input;
   ui!: UI;
   director!: Director;
@@ -75,7 +79,6 @@ export class App {
   private frames = 0;
   private fpsT = 0;
   onFrame: (dt: number) => void = () => {};
-  private listenStop = 0;
 
   constructor(root: HTMLElement, readonly params: AppParams) {
     this.root = root;
@@ -106,16 +109,16 @@ export class App {
     this.fx = new FxLayer(this.root);
     this.fx.attachScene(this.renderer.domElement);
     this.voice = new VoicePlayer(this.audio);
-    this.speech = makeAsr(p.asr, () => this.audio.ctx);
+    this.engine = new VoiceEngine(this.audio, this.voice, { asr: p.asr, mode: p.mic, grammar: new URLSearchParams(location.search).get('grammar') !== '0' });
     const [content] = await Promise.all([loadContent(), this.audio.load(ASSETS.sfx), this.voice.load(ASSETS.voice)]);
 
     this.ui = new UI(this.root, {
       onWake: () => void this.wake(),
-      onMicDown: () => this.speech.start(),
-      onMicUp: () => this.speech.stop(),
+      onMicDown: () => this.engine.pttDown(),
+      onMicUp: () => this.engine.pttUp(),
       onChip: (t) => {
         this.input.activity();
-        this.director.text(t);
+        this.engine.handleText(t, 'chip');
       },
       onName: (n) => this.director.dispatch({ type: 'name', name: n }),
       onSkipName: () => this.director.dispatch({ type: 'skip_name' }),
@@ -124,39 +127,23 @@ export class App {
       onMute: (m) => {
         this.audio.setMuted(m);
         this.voice.muted = m;
+        if (m) this.voice.cancel();
       },
-    }, { micSupported: this.speech.supported, posterUrl: posterUrl() });
+    }, { micSupported: this.engine.asr.supported, posterUrl: posterUrl() });
 
-    this.speech.onInterim = (t) => this.ui.micHintText(t);
-    this.speech.onState = (s, msg) => {
-      if (s === 'listening') this.ui.micHintText('Слушаю…');
-      if (s === 'loading') this.ui.micHintText('Загружаю распознавание…');
-      if (s === 'error')
-        this.ui.micHintText(msg === 'not-allowed' ? 'Нет доступа к микрофону — жми подсказки' : msg === 'no-model' ? 'Офлайн-модель не найдена — жми подсказки' : 'Не расслышал, попробуй ещё');
-      if (s === 'idle') this.ui.micLevel(0);
-    };
-    this.speech.onLevel = (v) => this.ui.micLevel(v);
-    this.speech.onResult = (t) => {
-      this.ui.micHintText(`«${t}»`);
-      this.director.text(t);
-    };
+    this.bindVoice();
 
     this.director = new Director({
       tracker: this.tracker, stage: this.stage, fx: this.fx, audio: this.audio, voice: this.voice, ui: this.ui,
       content, glCanvas: this.renderer.domElement, size: () => ({ w: this.root.clientWidth, h: this.root.clientHeight }),
-      // окно ответа: кот спросил — микрофон слушает сам ms
-      listen: (ms) => {
-        clearTimeout(this.listenStop);
-        this.speech.start();
-        this.listenStop = window.setTimeout(() => this.speech.stop(), ms);
-      },
-      stopListen: () => {
-        clearTimeout(this.listenStop);
-        this.speech.stop();
-      },
+      // окно ответа: кот спросил — микрофон слушает сам ms (mode 'echo' — повтор: запись без распознавания)
+      listen: (ms, mode) => this.engine.listenFor(ms, mode),
+      stopListen: () => this.engine.stopListen(),
     });
     await this.setCharacterMode(p.character);
     this.wireFx();
+    // озвучка: манифест текущего характера и первые реплики сценария — заранее
+    this.voice.preloadEvents(this.director.persona.id, ['point_camera', 'intro', 'ask_name', 'nice_name', 'no_name']);
 
     this.input = new Input(this.fx.canvas, {
       zoneAt: (x, y) => this.zoneAt(x, y),
@@ -204,6 +191,47 @@ export class App {
     this.lastPersona = p.id;
     const meta = personaMeta(p.id);
     this.fx.setPersona({ palette: p.palette ?? meta.palette, fxTuning: meta.fxTuning, stickers: p.stickers?.length ? p.stickers : meta.stickers });
+  }
+
+  /** голосовой вход ↔ интерфейс и режиссёр (только события) */
+  private bindVoice() {
+    const e = this.engine;
+    let lastState = '';
+    e.on('interim', (t) => this.ui.micHintText(t));
+    e.on('state', (s) => {
+      const k = `${s.asrState}|${s.listening}|${Math.round(s.modelProgress * 20)}|${s.echo}`;
+      if (k === lastState) return;
+      lastState = k;
+      if (s.asrState === 'loading') this.ui.micHintText(`Загружаю распознавание… ${Math.round(s.modelProgress * 100)}%`);
+      else if (s.asrState === 'listening') this.ui.micHintText(s.echo !== 'off' ? 'Говори — повторю!' : 'Слушаю…');
+      else if (s.asrState === 'error')
+        this.ui.micHintText(s.micError === 'not-allowed' ? 'Нет доступа к микрофону — жми подсказки' : /no-model/.test(s.lastEvent) ? 'Офлайн-модель не найдена — жми подсказки' : 'Не расслышал, попробуй ещё');
+      else if (s.echo === 'waiting') this.ui.micHintText('Говори — повторю!');
+      if (s.asrState === 'idle' && !s.listening && s.echo === 'off') this.ui.micLevel(0);
+    });
+    // уровень микрофона — плавно, по кадрам
+    const lvl = () => {
+      requestAnimationFrame(lvl);
+      if (e.mic.isOpen) this.ui.micLevel(e.mic.level);
+    };
+    lvl();
+    e.on('text', ({ text, source }) => {
+      if (source === 'asr') this.ui.micHintText(`«${text}»`);
+      this.input?.activity();
+      this.director.text(text);
+    });
+    e.on('event', ({ id, data }) => {
+      this.director.log(`🎙 ${id}${data ? ' ' + JSON.stringify(data) : ''}`);
+      // громкость без распознавания → реакции кота (events.json: loud, whisper, clap)
+      if ((id === 'loud' || id === 'whisper' || id === 'clap') && this.director.state.appeared) this.director.interaction(id);
+    });
+    e.on('clip', ({ name }) => {
+      if (isClip(name) && !this.stage.walking) this.character.play(name);
+    });
+    e.echoPreset = () => {
+      const v = this.director.persona.voice;
+      return { echoPitchSemitones: v.echoPitchSemitones ?? 5, echoRate: v.echoRate ?? 1 };
+    };
   }
 
   private async makeTracker(kind: TrackerKind): Promise<Tracker> {
@@ -304,6 +332,9 @@ export class App {
   async wake() {
     this.audio.unlock();
     this.voice.unlock();
+    // офлайн-распознавание (~45 МБ + 2.4 МБ движок) — заранее, чтобы первое «нажми и скажи» не ждало;
+    // не на «экономии трафика»
+    if (!(navigator as any).connection?.saveData) setTimeout(() => void this.engine.asr.preload?.(), 3000);
     if (this.audio.maybeSilentSwitch) setTimeout(() => this.ui.toast('Не слышно кота? Проверь переключатель «Без звука» сбоку iPhone и громкость.', 5000), 2500);
     const sensors = this.input.requestSensors();
     this.ui.setStartBusy('Просыпается…');

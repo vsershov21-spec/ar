@@ -11,8 +11,8 @@ import { registerDebugTab, type DebugUi } from './tabs';
 import { DebugTracker } from '../tracker/debugTracker';
 import { saveStage, defaultStage, type StageConfig } from '../config';
 import { clearMemory } from '../scenario/memory';
-import { VISEMES } from '../lipsync/visemes';
 import { registerFxTab } from './fxTab';
+import { registerVoiceTab } from '../voice/debugTab';
 
 let done = false;
 export function registerBuiltinTabs() {
@@ -108,58 +108,8 @@ export function registerBuiltinTabs() {
     },
   });
 
-  registerDebugTab({
-    id: 'voice', title: 'Голос', order: 40,
-    build(el, ui) {
-      const app = ui.app, d = app.director;
-      const s = ui.section(el, 'Реплики и липсинк');
-      const viz = document.createElement('canvas');
-      viz.width = 280;
-      viz.height = 90;
-      viz.style.cssText = 'width:100%;background:#0008;border-radius:6px';
-      s.appendChild(viz);
-      const vg = viz.getContext('2d')!;
-      const drawViz = () => {
-        requestAnimationFrame(drawViz);
-        if (!el.classList.contains('on')) return;
-        const lip = app.voice.lip;
-        vg.clearRect(0, 0, 280, 90);
-        VISEMES.forEach((v, i) => {
-          const w = lip.weights[v];
-          vg.fillStyle = v === lip.dominant ? '#b6ff3b' : '#5a7';
-          vg.fillRect(8 + i * 22, 70 - w * 55, 16, w * 55);
-          vg.fillStyle = '#dfe';
-          vg.font = '11px monospace';
-          vg.fillText(v, 12 + i * 22, 84);
-        });
-        const sh = lip.shape;
-        vg.fillStyle = '#7a2a3a';
-        vg.beginPath();
-        vg.ellipse(240, 40, 14 + sh.wide * 14 - sh.round * 8, 2 + sh.open * 22, 0, 0, Math.PI * 2);
-        vg.fill();
-        vg.fillStyle = '#dfe';
-        vg.fillText(app.voice.mode ?? '—', 214, 84);
-      };
-      drawViz();
-      const m = app.voice.manifest;
-      for (const [pid, lines] of Object.entries(m)) {
-        for (const [id, e] of Object.entries(lines)) ui.btn(s, `▶ ${pid}/${id}`, () => d.speakText(pid, e.text), `voice:${pid}/${id}`).title = e.text;
-      }
-      const opts: [string, string][] = [];
-      for (const [pid, per] of (d as any).d.personas as Map<string, any>) {
-        const txt = (l: any) => (typeof l === 'string' ? l : l?.text ?? '');
-        for (const [k, arr] of Object.entries((per.lines ?? {}) as Record<string, any[]>)) arr.forEach((t) => opts.push([`${pid}|${txt(t)}`, `${pid}:${k} — ${txt(t)}`]));
-        for (const [k, r] of Object.entries((per.reactions ?? {}) as Record<string, any>)) (r.lines ?? []).forEach((t: any) => opts.push([`${pid}|${txt(t)}`, `${pid}:${k} — ${txt(t)}`]));
-      }
-      const sel = ui.select(s, opts.slice(0, 800), () => undefined);
-      ui.btn(s, '▶ синтез выбранной', () => {
-        const [pid, t] = sel.value.split('|');
-        d.speakText(pid, t);
-      }, 'voice:synth');
-      for (const cat of ['sfx', 'voice', 'ambience'] as const)
-        ui.slider(s, `громк. ${cat}`, 0, 1, 0.05, () => app.audio.volume[cat], (v) => app.audio.setVolume(cat, v));
-    },
-  });
+  // «Голос» — вкладка голосового движка (src/voice/debugTab.ts)
+  registerVoiceTab();
 
   registerDebugTab({
     id: 'log', title: 'Лог', order: 90,

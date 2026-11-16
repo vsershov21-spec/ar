@@ -41,7 +41,8 @@ export interface DirectorDeps {
   glCanvas: HTMLCanvasElement;
   size: () => { w: number; h: number };
   /** открыть микрофон на ms (окно ответа после вопроса кота) */
-  listen?: (ms: number) => void;
+  /** mode — какой ответ ждём ('echo' — режим повтора: VoiceEngine пишет звук без распознавания) */
+  listen?: (ms: number, mode?: string) => void;
   stopListen?: () => void;
   /** заполняется сам: для старых вкладок debug, читающих d.personas */
   personas?: ContentBundle['personas'];
@@ -278,7 +279,7 @@ export class Director extends Emitter<DirectorEvents> {
     await this.queue.whenIdle();
     if (this.state.listenToken !== token || this.state.dialog?.listening !== mode) return;
     this.d.ui.show('mic', true);
-    this.d.listen?.(ms);
+    this.d.listen?.(ms, mode);
     this.log(`🎤 слушаю ${ms / 1000} с (${mode})`);
     clearTimeout(this.listenTimer);
     this.listenTimer = window.setTimeout(() => {
