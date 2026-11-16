@@ -1,8 +1,8 @@
 id,layer,persona,duration_ms,sound,params,notes
 knock,glass,all,700,glass_knock,"{""rings"": 2, ""ringMaxPx"": 90, ""dentDepth"": 0.35, ""shakePx"": 3}",Круги от стука в точке тапа + лёгкая вмятина (искажение) и дрожание экрана. Без трещин.
 claws,glass,hooligan,1800,claws_glass,"{""lines"": 3, ""spacingPx"": 14, ""followSwipe"": true, ""fadeMs"": 1200, ""sparkles"": false}","Три белые царапины по траектории свайпа, медленно гаснут."
-gum_bubble,world,hooligan,2600,gum_blow,"{""maxScale"": 1.4, ""color"": ""#FF6FB5"", ""popAt"": 0.8}",Пузырь растёт у рта и лопается.
-gum_splat,glass,hooligan,3500,gum_pop,"{""blobs"": 5, ""spreadPx"": 220, ""drip"": true, ""wipeByFinger"": true}",Жвачка прилипает к стеклу пятнами; ребёнок может стереть пальцем.
+gum_bubble,world,hooligan,2600,gum_blow,"{""maxScale"": 1.0, ""color"": ""#FF6FB5"", ""popAt"": 0.8}",Пузырь растёт у рта и лопается.
+gum_splat,glass,hooligan,3500,gum_pop,"{""blobs"": 4, ""spreadPx"": 170, ""drip"": true, ""wipeByFinger"": true}",Жвачка прилипает к стеклу пятнами; ребёнок может стереть пальцем.
 glitch,glass,all,900,glitch,"{""slices"": 8, ""rgbShiftPx"": 10, ""intensity"": 0.8}","Полосы-сдвиги и RGB-раздвоение, как сбой картинки. Не дольше 1 с, без мигания чаще 3 раз в секунду."
 skate_sparks,world,hooligan,1200,skate_grind,"{""count"": 24, ""color"": ""#B6FF3B""}",Искры из-под лап при приземлении после трюка.
 tag_spray,glass,hooligan,2500,spray,"{""text"": ""КОТ"", ""fadeMs"": 2000}","Надпись-граффити баллончиком на стекле, исчезает."

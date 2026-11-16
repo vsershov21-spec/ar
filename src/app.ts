@@ -23,7 +23,7 @@ import { personaMeta } from './character/personaMeta';
 import { CardMonitor, LumaSampler, cardScreenFrac, type CardEvent } from './tracker/cardMonitor';
 
 export type CharacterMode = 'sprite' | 'rig' | 'glb';
-export type TrackerKind = 'mindar' | 'debug' | '8thwall' | 'webxr';
+export type TrackerKind = 'card' | 'mindar' | 'debug' | '8thwall' | 'webxr';
 
 export interface AppParams {
   debug: boolean;
@@ -37,7 +37,7 @@ export interface AppParams {
 export function readParams(search = location.search): AppParams {
   const q = new URLSearchParams(search);
   const debug = q.has('debug');
-  const t = (q.get('tracker') as TrackerKind) || (debug ? 'debug' : 'mindar');
+  const t = (q.get('tracker') as TrackerKind) || (debug ? 'debug' : 'card');
   const c = (q.get('char') as CharacterMode) || 'glb';
   return { debug, tracker: t, character: ['sprite', 'rig', 'glb'].includes(c) ? c : 'sprite', asr: q.get('asr'), mic: q.get('mic') };
 }
@@ -286,7 +286,13 @@ export class App {
       this.scene.add(t.reticle);
       return t;
     }
-    return new MindARTracker(this.root, asset(ASSETS.target));
+    if (kind === 'mindar') return new MindARTracker(this.root, asset(ASSETS.target));
+    // по умолчанию — любая банковская карта (без маркера); рамка прилипает к карте, когда она найдена
+    const { CardTracker } = await import('./tracker/cardTracker');
+    document.querySelector('.scan')?.classList.add('free');
+    const scanText = document.querySelector('.scan span');
+    if (scanText) scanText.textContent = 'Положи карту на стол и наведи камеру';
+    return new CardTracker(this.root);
   }
 
   private charMode: CharacterMode = 'sprite';
@@ -392,7 +398,8 @@ export class App {
     const sensors = this.input.requestSensors();
     this.ui.setStartBusy('Просыпается…');
     try {
-      if (this.tracker instanceof MindARTracker) await this.tracker.startVideo();
+      const tv = this.tracker as unknown as { startVideo?: () => Promise<void> };
+      if (typeof tv.startVideo === 'function') await tv.startVideo();
       void sensors.then((ok) => this.director.log(`датчики: ${ok ? 'да' : 'нет'}`));
       this.ui.hideStart();
       this.director.dispatch({ type: 'wake' });

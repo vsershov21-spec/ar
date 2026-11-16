@@ -160,6 +160,11 @@ canvas.gl.glitch { --gshift: 8px; animation: glitch .68s steps(1) infinite;
   padding: 10px var(--s-4); border-radius: var(--r-pill); background: var(--glass); backdrop-filter: var(--blur); -webkit-backdrop-filter: var(--blur);
   border: 1px solid var(--glass-line); color: var(--white); font-size: var(--fs-m); font-weight: 600; }
 @keyframes scanpulse { 50% { transform: translate(-50%, -50%) scale(1.025); --c: var(--lime); } }
+/* автопоиск любой карты: статичной рамки нет — контур сам прилипает к карте, когда она найдена (card/overlay.ts) */
+.scan.free { top: auto; bottom: calc(150px + env(safe-area-inset-bottom)); width: auto; aspect-ratio: auto; background: none; box-shadow: none; animation: none; }
+.scan.free span { position: static; transform: none; display: inline-flex; gap: 8px; align-items: center; }
+.scan.free span::before { content: ''; width: 10px; height: 10px; border-radius: 50%; background: var(--lime); animation: scandot 1.2s ease-in-out infinite; }
+@keyframes scandot { 50% { opacity: .25; transform: scale(.7); } }
 
 /* ───────────────────────── пузырь реплики ─────────────────────────
    Позицию (над котом или сбоку от головы) и хвостик считает ui.ts по прямоугольнику кота. */
