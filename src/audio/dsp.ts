@@ -77,7 +77,7 @@ export function timeStretch(x: Float32Array, sampleRate: number, factor: number,
   const re = new Float64Array(N), im = new Float64Array(N);
   const mag = new Float64Array(bins), ph = new Float64Array(bins);
   const prevPh = new Float64Array(bins), synPh = new Float64Array(bins);
-  const peakOf = new Int32Array(bins);
+  const peaks = new Int32Array(bins), peakPh = new Float64Array(bins);
   const frames = Math.ceil(outLen / Hs) + 1;
   let prevPos = -1;
   for (let t = 0; t < frames; t++) {
@@ -98,27 +98,23 @@ export function timeStretch(x: Float32Array, sampleRate: number, factor: number,
       const da = pos - prevPos; // фактический шаг анализа (целые отсчёты)
       // пики спектра
       let nPeaks = 0;
-      const peaks: number[] = [];
       for (let k = 2; k < bins - 2; k++) {
         const m = mag[k];
-        if (m > mag[k - 1] && m >= mag[k + 1] && m > mag[k - 2] && m >= mag[k + 2]) peaks.push(k), nPeaks++;
+        if (m > mag[k - 1] && m >= mag[k + 1] && m > mag[k - 2] && m >= mag[k + 2]) peaks[nPeaks++] = k;
       }
-      if (!nPeaks) peaks.push(1);
-      // каждой полосе — ближайший пик (граница — посередине между пиками)
-      let pi = 0;
-      for (let k = 0; k < bins; k++) {
-        while (pi < peaks.length - 1 && Math.abs(peaks[pi + 1] - k) < Math.abs(peaks[pi] - k)) pi++;
-        peakOf[k] = peaks[pi];
-      }
-      const newPeakPh = new Map<number, number>();
-      for (const p of peaks) {
+      if (!nPeaks) peaks[nPeaks++] = 1;
+      // фаза пиков: накопление по мгновенной частоте
+      for (let q = 0; q < nPeaks; q++) {
+        const p = peaks[q];
         const omega = (2 * Math.PI * p) / N;
         const inst = omega + wrap(ph[p] - prevPh[p] - omega * da) / da;
-        newPeakPh.set(p, synPh[p] + inst * Hs);
+        peakPh[q] = synPh[p] + inst * Hs;
       }
+      // остальные полосы — относительно ближайшего пика (граница — посередине между пиками)
+      let q = 0;
       for (let k = 0; k < bins; k++) {
-        const p = peakOf[k];
-        synPh[k] = newPeakPh.get(p)! + (ph[k] - ph[p]);
+        while (q < nPeaks - 1 && Math.abs(peaks[q + 1] - k) < Math.abs(peaks[q] - k)) q++;
+        synPh[k] = peakPh[q] + (ph[k] - ph[peaks[q]]);
       }
     }
     prevPh.set(ph);

@@ -25,8 +25,26 @@ import { fileURLToPath } from 'node:url';
 import { createMp3Encoder } from 'wasm-media-encoders';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-const dsp = await import(path.join(root, 'src/audio/dsp.ts'));
-const ru = await import(path.join(root, 'src/lipsync/ru.ts'));
+/** Импорт .ts из src/: Node 22.18+ снимает типы сам; иначе (сборка Node без TypeScript) — через oxc из vite */
+async function importTs(rel) {
+  const file = path.join(root, rel);
+  try {
+    return await import(file);
+  } catch (e) {
+    if (!/ERR_UNKNOWN_FILE_EXTENSION|ERR_NO_TYPESCRIPT/.test(e.code ?? '')) throw e;
+    const { transformWithOxc } = await import('vite');
+    const r = await transformWithOxc(fs.readFileSync(file, 'utf8'), file, { lang: 'ts' });
+    const out = path.join(os.tmpdir(), `voice-${path.basename(rel, '.ts')}-${process.pid}.mjs`);
+    fs.writeFileSync(out, r.code);
+    try {
+      return await import(out);
+    } finally {
+      fs.rmSync(out, { force: true });
+    }
+  }
+}
+const dsp = await importTs('src/audio/dsp.ts');
+const ru = await importTs('src/lipsync/ru.ts');
 
 const argv = process.argv.slice(2);
 const flag = (n) => argv.includes(n);
