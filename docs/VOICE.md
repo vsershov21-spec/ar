@@ -13,7 +13,7 @@ flowchart LR
     CSV --> ES[espeak-ng ru → фонемы]
     ES --> AL[выравнивание по сигналу<br/>→ cues A–H, X]
     DSP --> AL
-    DSP --> OUT[(public-extra/voice:<br/>manifest.json, характер.хэш.json, *.mp3)]
+    DSP --> OUT[(/srv/ar-extra/voice:<br/>manifest.json, характер.хэш.json, *.mp3)]
     AL --> OUT
   end
   OUT -- attach-extra при сборке --> VP
@@ -108,7 +108,8 @@ tail -f /var/lib/vershov-commander/ar/voice-run.log
 ```
 
 Скрипт клонирует `main`, ставит две зависимости (`wasm-media-encoders`, `amaro`), копирует Piper в `/tmp`
-(домашняя папка смонтирована `noexec`) и запускает `npm run voice:piper` → `public-extra/voice/`. Готовые файлы не
+(домашняя папка смонтирована `noexec`) и запускает `npm run voice:piper` → `/srv/ar-extra/voice/` (если root уже создал папку, см. DEPLOY.md; иначе —
+`/var/lib/vershov-commander/ar/public-extra/voice/`). Готовые файлы не
 пересобираются; `--budget N` — остановиться через N секунд (процессы удалённого терминала живут недолго), манифест
 пишется всегда. Новые файлы попадут на сайт со следующей сборкой (любой push в `main`).
 
@@ -170,7 +171,7 @@ PIPER_DIR=~/piper PIPER_VOICES=~/piper/voices VOICE_OUT=public/voice npm run voi
 | Web Speech API | `?asr=web` | Chrome отправляет звук в Google, Safari — Apple. На пилоте с детьми — **нельзя** |
 
 - Модель `vosk-model-small-ru-0.22` (~45 МБ, Apache-2.0) → `/models/vosk-ru-small-0.22/model.tar.gz`
-  (на сервере: `public-extra/models/…`, см. DEPLOY.md). Движок vosk-browser — отдельный чанк ~5.8 МБ (2.4 МБ gzip).
+  (на сервере: `/srv/ar-extra/models/…`, исходный zip — `/var/lib/vershov-commander/ar/vosk/`; см. DEPLOY.md). Движок vosk-browser — отдельный чанк ~5.8 МБ (2.4 МБ gzip).
 - Загрузка **лениво**: через 3 с после «Разбудить» (не при «экономии трафика») или при первом нажатии микрофона;
   прогресс — в подсказке под кнопкой («Загружаю распознавание… 42%»). Файл кладётся в **Cache Storage**
   (`ar-cat-vosk-v1`) — повторный визит без сети. Сам воркер Vosk качает модель по тому же адресу (из HTTP-кэша:
