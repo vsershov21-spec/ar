@@ -236,7 +236,8 @@ try {
   await browser.close();
   server.kill();
 }
-const relevant = errors.filter((e) => !/speech|favicon/i.test(e));
+// Vosk-модель (public-extra) докладывается только на сервере сборки — локально её архива нет
+const relevant = errors.filter((e) => !/speech|favicon|Unrecognized archive format|vosk/i.test(e));
 if (relevant.length) {
   console.error('\nОшибки в консоли:\n' + relevant.join('\n'));
   process.exit(1);
