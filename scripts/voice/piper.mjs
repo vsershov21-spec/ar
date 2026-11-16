@@ -25,15 +25,18 @@ import { fileURLToPath } from 'node:url';
 import { createMp3Encoder } from 'wasm-media-encoders';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-/** Импорт .ts из src/: Node 22.18+ снимает типы сам; иначе (сборка Node без TypeScript) — через oxc из vite */
+/**
+ * Импорт .ts из src/: Node 22.18+ снимает типы сам; иначе (Node без TypeScript, как в Debian) — через amaro
+ * (тот же снятель типов, что внутри Node, на wasm: работает и в папке с noexec, в отличие от нативных oxc/esbuild).
+ */
 async function importTs(rel) {
   const file = path.join(root, rel);
   try {
     return await import(file);
   } catch (e) {
     if (!/ERR_UNKNOWN_FILE_EXTENSION|ERR_NO_TYPESCRIPT/.test(e.code ?? '')) throw e;
-    const { transformWithOxc } = await import('vite');
-    const r = await transformWithOxc(fs.readFileSync(file, 'utf8'), file, { lang: 'ts' });
+    const amaro = (await import('amaro')).default;
+    const r = amaro.transformSync(fs.readFileSync(file, 'utf8'), { mode: 'strip-only' });
     const out = path.join(os.tmpdir(), `voice-${path.basename(rel, '.ts')}-${process.pid}.mjs`);
     fs.writeFileSync(out, r.code);
     try {
