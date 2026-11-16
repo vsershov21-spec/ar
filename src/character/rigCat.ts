@@ -307,6 +307,11 @@ export class RigCat implements Character {
     this.clips.play(clip, opts);
   }
 
+  /** то же, что face() — так зовёт director (эмоция реплики → пресет) */
+  setFace(preset: string) {
+    this.face(preset);
+  }
+
   face(preset: string, ms = 0) {
     this.faceMix.set(preset, ms);
   }

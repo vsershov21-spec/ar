@@ -13,6 +13,12 @@ export type AnchorName = 'head' | 'mouth' | 'feet' | 'body' | 'earL' | 'earR' | 
 export interface FxArgs {
   x?: number;
   y?: number;
+  /** то же, что x/y (так зовёт director) */
+  at?: Pt;
+  /** палитра на время создания эффекта (по умолчанию — характера) */
+  palette?: Palette;
+  /** fxTuning этого эффекта (поверх fx.json; params — ещё поверх) */
+  tuning?: FxParams;
   /** траектория свайпа (claws, glitter_trail) */
   path?: Pt[];
   from?: Pt;

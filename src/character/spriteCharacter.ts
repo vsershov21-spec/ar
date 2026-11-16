@@ -290,6 +290,11 @@ export class SpriteCharacter implements Character {
     if (e !== 'blink') this.tween('nudge', 0.25);
   }
 
+  /** то же, что face() — так зовёт director (эмоция реплики → пресет) */
+  setFace(preset: string) {
+    this.face(preset);
+  }
+
   face(preset: string, ms = 0) {
     if (this.usingRig) return this.rig?.face(preset, ms);
     // лица в позах/видео; пресет даёт только мимический «вздрог»

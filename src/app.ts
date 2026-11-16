@@ -178,6 +178,20 @@ export class App {
     fx.onSound = (id, v) => this.audio.play(id, v ?? 1);
     fx.onLog = (m) => this.director.log(m);
     fx.anchorFn = (n) => this.stage.anchorScreen(n, this.root.clientWidth, this.root.clientHeight);
+    fx.glassCatHook = (ms) => {
+      const poster = this.character.posterImage();
+      if (poster) {
+        this.stage.hideFor(ms);
+        return poster;
+      }
+      if (!this.stage.atGlass) {
+        this.stage.setMode('glass');
+        setTimeout(() => {
+          if (this.tracker.isTracking || this.tracker.capabilities.worldTracking) this.stage.setMode('card');
+        }, ms);
+      }
+      return null;
+    };
     fx.onStickerSeries = () => {
       if (!this.stage.walking) this.character.play('sticker');
     };

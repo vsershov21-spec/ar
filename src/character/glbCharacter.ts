@@ -164,6 +164,11 @@ export class GlbCharacter implements Character {
     this.faces.forEach((o, k) => (o.visible = k === target));
   }
 
+  /** то же, что face() — так зовёт director (эмоция реплики → пресет) */
+  setFace(preset: string) {
+    this.face(preset);
+  }
+
   face(preset: string, ms = 0) {
     this.faceMix.set(preset, ms);
     // старая модель-заглушка: три объекта-эмоции

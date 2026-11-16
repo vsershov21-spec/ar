@@ -63,6 +63,11 @@ export class FxLayer {
   stickerSpecs: StickerSpec[] = [{ kind: 'star' }];
   /** экранная точка части кота (задаёт app по Stage); по умолчанию — центр экрана */
   anchorFn: (name: AnchorName) => Pt & { s: number } = () => ({ x: this.w / 2, y: this.h * 0.45, s: this.h * 0.4 });
+  /**
+   * «Кот у стекла» (glass_cat): app отдаёт картинку позы (спрайт-режим, кот на карте прячется)
+   * или сам переносит 3D-кота к стеклу на ms и возвращает null.
+   */
+  glassCatHook: (ms: number) => HTMLImageElement | null = () => null;
   /** уровень микрофона 0..1 */
   levelFn: () => number = () => 0;
   onGlitch: (on: boolean) => void = () => {};
@@ -155,11 +160,13 @@ export class FxLayer {
    */
   play(id: string, args: FxArgs = {}): FxHandle {
     if (!id || id === 'none') return doneHandle(id);
-    const def = resolveFx(id, this.tuning, args.params);
+    if (args.at && args.x === undefined) args = { ...args, x: args.at.x, y: args.at.y };
+    const def = resolveFx(id, this.tuning, args.tuning ? { ...args.tuning, ...args.params } : args.params);
     if (args.durationMs !== undefined) def.durationMs = args.durationMs;
     if (id === 'glitch') def.durationMs = Math.min(def.durationMs, 1000); // фотосенситивность: не дольше 1 с
     if (args.sound && def.sound && def.sound !== 'none') this.onSound(def.sound);
     if (STICKER_FX.has(id)) return this.playSticker(id, def.params, args, def.durationMs);
+    if (id === 'glass_cat' && args.image === undefined) args = { ...args, image: this.glassCatHook(def.durationMs) };
     // пузырь жвачки и реакция могут оба попросить пятна — второй раз не нужен
     if (id === 'gum_splat') {
       const dup = this.live.find((l) => l.inst.id === 'gum_splat' && (l.inst as unknown as { t: number }).t < 0.6);
@@ -170,18 +177,23 @@ export class FxLayer {
       if (!def.stub) this.onLog(`[fx] «${id}» есть в каталоге, но не реализован — заглушка`);
       return doneHandle(id);
     }
-    let inst: FxInstance;
-    try {
-      inst = f(def, args, this.env);
-    } catch (e) {
-      this.onLog(`[fx] ошибка «${id}»: ${String(e)}`);
-      return doneHandle(id);
-    }
+    let inst: FxInstance | null = null;
+    const make = () => {
+      try {
+        inst = f(def, args, this.env);
+      } catch (e) {
+        this.onLog(`[fx] ошибка «${id}»: ${String(e)}`);
+      }
+    };
+    if (args.palette) this.withPalette(args.palette.fx, make);
+    else make();
+    if (!inst) return doneHandle(id);
+    const live: FxInstance = inst;
     let resolve!: () => void;
     const done = new Promise<void>((r) => (resolve = r));
-    this.live.push({ inst, resolve });
+    this.live.push({ inst: live, resolve });
     this.live.sort((a, b) => a.inst.z - b.inst.z);
-    return { id, done, stop: () => inst.stop?.() };
+    return { id, done, stop: () => live.stop?.() };
   }
 
   /** остановить все экземпляры эффекта (петли: zzz, echo_wave, listen_ears) */
