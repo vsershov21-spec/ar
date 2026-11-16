@@ -67,6 +67,10 @@ export const ASSETS = {
   cardImage: 'targets/card.png',
   /** 3D-модель: Хулиган из Tripo (скелет Mixamo). Свою модель можно подставить через ?glb=путь */
   glb: 'models/hooligan_v1.glb',
+  /** библиотека движений Mixamo (пресеты Tripo) — подмешивается к любой модели с тем же скелетом */
+  glbAnims: 'models/anims_v1.glb',
+  /** своя 3D-модель у каждого характера (Tripo → retopo → Mixamo-скелет) */
+  glbByPersona: { hooligan: 'models/hooligan_v1.glb', kind: 'models/kind_v1.glb', glitter: 'models/glitter_v1.glb' },
   spriteManifest: 'video/sprites/manifest.json',
   sfx: 'sounds/sfx.json',
   voice: 'sounds/voice/manifest.json',

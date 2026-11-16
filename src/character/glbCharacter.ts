@@ -26,6 +26,60 @@ const BONE_ZONE: Record<string, TouchZone> = {
   Spine: 'belly', Spine1: 'body', Spine2: 'body', Hips: 'body', Tail1: 'tail', Tail2: 'tail', Tail3: 'tail', Tail4: 'tail',
 };
 
+
+/**
+ * Пресеты Tripo (скелет Mixamo) → id каталога content/animations.json. Клип из GLB с таким именем
+ * регистрируется под нашим id (если под этим id ещё ничего нет). Первый подходящий выигрывает.
+ */
+export const TRIPO_ALIAS: Record<string, string[]> = {
+  idle: ['idle_breathe'],
+  standing_relax: ['sit_idle'],
+  look_around: ['idle_look_around'],
+  stretch: ['idle_stretch'],
+  warm_up: ['idle_hooligan_skate'],
+  walk: ['walk'],
+  run: ['run'],
+  jump: ['jump', 'celebrate'],
+  jump_down: ['appear_jump_in'],
+  flip: ['flip'],
+  turn: ['turn_left', 'turn_right'],
+  sit: ['sit_down'],
+  fall: ['fall_off_card', 'tumble'],
+  dive: ['dive_out'],
+  greet_01: ['wave'],
+  greet_02: ['point_button'],
+  wave_goodbye_01: ['wave_goodbye'],
+  laugh_01: ['laugh'],
+  laugh_02: ['talk_excited'],
+  cheer: ['celebrate', 'proud'],
+  clap: ['clap'],
+  scared_01: ['surprised', 'wake_startle'],
+  frightened: ['flinch', 'cover_ears'],
+  cry: ['cry'],
+  depressed: ['sad'],
+  hug: ['comfort', 'idle_kind_hug_self', 'hug_screen'],
+  fold_arms: ['offended'],
+  swagger: ['idle_hooligan_headphones'],
+  complain_01: ['talk_casual'],
+  agree: ['listen'],
+  bow: ['bow'],
+  heart_pose: ['idle_glitter_mirror'],
+  sing_01: ['sing'],
+  dance_01: ['dance_hooligan'],
+  dance_02: ['dance_kind'],
+  dance_03: ['dance_glitter', 'idle_glitter_twirl'],
+  dance_04: ['dance_04'],
+  dance_05: ['dance_05'],
+  dance_06: ['dance_06'],
+  play_mobile_game: ['card'],
+  wait: ['think'],
+  frustrated_01: ['dizzy'],
+  defeat_02: ['tumble'],
+  scratch: ['shy'],
+  afraid: ['shy'],
+  'knock on glass': ['knock_glass'],
+};
+
 export class GlbCharacter implements Character {
   readonly kind = 'glb' as const;
   readonly object = new THREE.Group();
@@ -33,6 +87,7 @@ export class GlbCharacter implements Character {
   private inner = new THREE.Group();
   private mixer: THREE.AnimationMixer | null = null;
   private actions = new Map<string, THREE.AnimationAction>();
+  private aliased = new Set<string>();
   private bones = new Map<string, THREE.Bone>();
   private rest = new Map<string, THREE.Quaternion>();
   readonly clips = new ClipState();
@@ -48,7 +103,7 @@ export class GlbCharacter implements Character {
   private e = new THREE.Euler();
   private visemeW: Record<string, number> = {};
 
-  constructor(private url = 'models/character.glb') {
+  constructor(private url = 'models/character.glb', private animsUrl?: string) {
     this.object.name = 'character-glb';
     this.hitBox.position.y = 0.5;
     this.object.add(this.inner, this.hitBox);
@@ -91,9 +146,22 @@ export class GlbCharacter implements Character {
       }
     });
 
-    if (gltf.animations.length) {
+    let anims = gltf.animations;
+    // общая библиотека движений (тот же скелет Mixamo): Добряк и Блёстка берут клипы Хулигана
+    if (this.animsUrl && this.animsUrl !== this.url) {
+      try {
+        const libLoader = new GLTFLoader();
+        const { MeshoptDecoder } = await import('three/examples/jsm/libs/meshopt_decoder.module.js');
+        libLoader.setMeshoptDecoder(MeshoptDecoder);
+        const lib = await libLoader.loadAsync(asset(this.animsUrl));
+        anims = [...anims, ...lib.animations];
+      } catch (e) {
+        console.warn('[glb] библиотека анимаций не загрузилась', e);
+      }
+    }
+    if (anims.length) {
       this.mixer = new THREE.AnimationMixer(model);
-      for (const clip of gltf.animations) this.actions.set(clip.name.toLowerCase(), this.mixer.clipAction(clip));
+      for (const clip of anims) this.addClip(clip);
     }
     this.setFaceObj('usual');
   }
@@ -125,6 +193,34 @@ export class GlbCharacter implements Character {
         m.material = c;
       } else m.material = m.userData.origMat;
     });
+  }
+
+  /** клип под своим именем + под нашими id по TRIPO_ALIAS; корневое смещение по X/Z убираем — место кота держит сцена */
+  private addClip(clip: THREE.AnimationClip) {
+    if (!this.mixer) return;
+    clip.tracks = clip.tracks.filter((t) => !/hips\.position$/i.test(t.name) || this.keepY(t));
+    const key = clip.name.toLowerCase().replace(/^.*\|/, '');
+    const action = this.mixer.clipAction(clip);
+    // своё имя (уже id каталога) важнее псевдонима; псевдонимы заполняют только пустые места
+    this.actions.set(key, action);
+    this.aliased.delete(key);
+    for (const n of TRIPO_ALIAS[key] ?? []) {
+      if (!this.actions.has(n) || this.aliased.has(n)) {
+        if (this.aliased.has(n)) continue; // первый псевдоним выигрывает
+        this.actions.set(n, action);
+        this.aliased.add(n);
+      }
+    }
+  }
+
+  /** у Hips оставляем только вертикаль (прыжки, приседания) */
+  private keepY(t: THREE.KeyframeTrack) {
+    const v = t.values;
+    for (let i = 0; i < v.length; i += 3) {
+      v[i] = v[0];
+      v[i + 2] = v[2];
+    }
+    return true;
   }
 
   play(clip: ClipName, opts: PlayOptions = {}) {

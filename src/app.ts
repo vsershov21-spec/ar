@@ -43,12 +43,13 @@ export function readParams(search = location.search): AppParams {
 }
 
 /** GLB-режим грузится лениво: GLTFLoader (и Draco, если модель сжата) не попадают в основной бандл */
-export async function makeCharacter(mode: CharacterMode): Promise<Character> {
+export async function makeCharacter(mode: CharacterMode, personaId = ''): Promise<Character> {
   if (mode === 'rig') return new RigCat();
   if (mode === 'glb') {
     const { GlbCharacter } = await import('./character/glbCharacter');
     const custom = new URLSearchParams(location.search).get('glb');
-    return new GlbCharacter(custom && /^[\w./-]+\.glb$/.test(custom) ? custom : ASSETS.glb);
+    const own = (ASSETS.glbByPersona as Record<string, string>)[personaId] ?? ASSETS.glb;
+    return new GlbCharacter(custom && /^[\w./-]+\.glb$/.test(custom) ? custom : own, ASSETS.glbAnims);
   }
   return new SpriteCharacter(ASSETS.spriteManifest);
 }
@@ -212,7 +213,10 @@ export class App {
   private syncPersona() {
     const p = this.director.persona;
     if (p.id === this.lastPersona) return;
+    const changed = !!this.lastPersona;
     this.lastPersona = p.id;
+    // в 3D у каждого характера своя модель: подменяем, движения общие (anims_v1.glb)
+    if (changed && this.charMode === 'glb' && !new URLSearchParams(location.search).get('glb')) void this.setCharacterMode('glb');
     const meta = personaMeta(p.id);
     this.fx.setPersona({ palette: p.palette ?? meta.palette, fxTuning: meta.fxTuning, stickers: p.stickers?.length ? p.stickers : meta.stickers });
   }
@@ -277,8 +281,10 @@ export class App {
     return new MindARTracker(this.root, asset(ASSETS.target));
   }
 
+  private charMode: CharacterMode = 'sprite';
   async setCharacterMode(mode: CharacterMode) {
-    const ch = await makeCharacter(mode);
+    this.charMode = mode;
+    const ch = await makeCharacter(mode, this.director.persona.id);
     try {
       await ch.load();
     } catch (e) {
