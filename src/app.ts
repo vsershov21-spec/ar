@@ -47,7 +47,8 @@ export async function makeCharacter(mode: CharacterMode): Promise<Character> {
   if (mode === 'rig') return new RigCat();
   if (mode === 'glb') {
     const { GlbCharacter } = await import('./character/glbCharacter');
-    return new GlbCharacter(ASSETS.glb);
+    const custom = new URLSearchParams(location.search).get('glb');
+    return new GlbCharacter(custom && /^[\w./-]+\.glb$/.test(custom) ? custom : ASSETS.glb);
   }
   return new SpriteCharacter(ASSETS.spriteManifest);
 }

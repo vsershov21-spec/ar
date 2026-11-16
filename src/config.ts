@@ -65,7 +65,8 @@ export function saveStage(s: StageConfig) {
 export const ASSETS = {
   target: 'targets/card.mind',
   cardImage: 'targets/card.png',
-  glb: 'models/character.glb',
+  /** 3D-модель: Хулиган из Tripo (скелет Mixamo). Свою модель можно подставить через ?glb=путь */
+  glb: 'models/hooligan_v1.glb',
   spriteManifest: 'video/sprites/manifest.json',
   sfx: 'sounds/sfx.json',
   voice: 'sounds/voice/manifest.json',
