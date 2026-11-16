@@ -109,9 +109,10 @@ export function phonesFromText(text: string): Phone[] {
 const MIN_FRAMES: Record<PhoneClass, number> = { V: 4, S: 3, F: 3, P: 3, X: 1 };
 
 /** оценка «насколько кадр похож на класс»; e — громкость 0..1, z — шумность 0..1 */
-function emit(c: PhoneClass, e: number, z: number) {
+function emit(c: PhoneClass, e: number, z: number, weak = false) {
   switch (c) {
-    case 'V': return -4 * (1 - e) ** 2 - 2 * z * z;
+    // безударные (редуцированные) гласные заметно тише ударных — ждём от них средней громкости
+    case 'V': return weak ? -4 * Math.max(0, 0.7 - e) ** 2 - 1.5 * (e - 0.7) ** 2 - 2 * z * z : -4 * (1 - e) ** 2 - 2 * z * z;
     case 'S': return -4 * (e - 0.62) ** 2 - 1.5 * z * z;
     case 'F': return -3 * (e - 0.45) ** 2 - 3 * (1 - z) ** 2;
     case 'P': return -4 * (e - 0.25) ** 2 - 0.5 * (z - 0.4) ** 2;
@@ -138,11 +139,13 @@ export function alignPhones(phones: Phone[], f: AlignInput): { start: number; en
   const zhi = Math.max(zs[Math.floor(zs.length * 0.95)], 0.05);
   const Z = Array.from(f.zcr, (z) => Math.min(1, z / zhi));
   // состояния: [тишина начала] + фонемы, развёрнутые в цепочки minDur + [тишина конца]
-  type St = { ph: number; c: PhoneClass; first: boolean; last: boolean; optional: boolean };
+  type St = { ph: number; c: PhoneClass; first: boolean; last: boolean; optional: boolean; weak?: boolean };
   const st: St[] = [{ ph: -1, c: 'X', first: true, last: true, optional: true }];
+  const hasStress = phones.some((p) => p.stress);
   phones.forEach((p, i) => {
     const n = Math.max(1, Math.min(MIN_FRAMES[p.c], Math.floor(T / (phones.length + 2))));
-    for (let k = 0; k < n; k++) st.push({ ph: i, c: p.c, first: k === 0, last: k === n - 1, optional: p.p === '_' || p.p === '|' });
+    const weak = p.c === 'V' && p.stress === false && hasStress;
+    for (let k = 0; k < n; k++) st.push({ ph: i, c: p.c, first: k === 0, last: k === n - 1, optional: p.p === '_' || p.p === '|', weak });
   });
   st.push({ ph: -2, c: 'X', first: true, last: true, optional: true });
   const S = st.length;
@@ -168,7 +171,7 @@ export function alignPhones(phones: Phone[], f: AlignInput): { start: number; en
   };
   const succ: number[][] = st.map((_, s) => nextFrom(s));
   for (const s of entry) {
-    prev[s] = emit(st[s].c, E[0], Z[0]);
+    prev[s] = emit(st[s].c, E[0], Z[0], st[s].weak);
   }
   for (let t = 1; t < T; t++) {
     cur.fill(NEG);
@@ -186,7 +189,7 @@ export function alignPhones(phones: Phone[], f: AlignInput): { start: number; en
         }
       }
     }
-    for (let s = 0; s < S; s++) if (cur[s] > NEG / 2) cur[s] += emit(st[s].c, E[t], Z[t]);
+    for (let s = 0; s < S; s++) if (cur[s] > NEG / 2) cur[s] += emit(st[s].c, E[t], Z[t], st[s].weak);
     [prev, cur] = [cur, prev];
   }
   // выход: из конечной тишины или последнего состояния последней фонемы
