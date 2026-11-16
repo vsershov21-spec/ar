@@ -1,0 +1,518 @@
+[
+ {
+  "id": "intro_1",
+  "text": "Ой, какая карта, красота! Как тебя зовут?",
+  "emotion": "curious",
+  "event": "intro"
+ },
+ {
+  "id": "nice_name_1",
+  "text": "{name}! Какое красивое имя!",
+  "emotion": "happy",
+  "event": "nice_name"
+ },
+ {
+  "id": "nice_name_2",
+  "text": "{name}... Звучит как песенка.",
+  "emotion": "happy",
+  "event": "nice_name"
+ },
+ {
+  "id": "nice_name_3",
+  "text": "Привет, {name}! Ты сегодня сияешь.",
+  "emotion": "happy",
+  "event": "nice_name"
+ },
+ {
+  "id": "no_name_1",
+  "text": "Ну и ладно! ...Шучу, придумаем потом.",
+  "emotion": "playful",
+  "event": "no_name"
+ },
+ {
+  "id": "no_name_2",
+  "text": "Секрет? Обожаю секреты!",
+  "emotion": "playful",
+  "event": "no_name"
+ },
+ {
+  "id": "no_name_3",
+  "text": "Хорошо, будешь Звёздочкой.",
+  "emotion": "playful",
+  "event": "no_name"
+ },
+ {
+  "id": "choose_1",
+  "text": "Хочешь, я буду блёсткой? Или выбери другого меня.",
+  "emotion": "curious",
+  "event": "choose"
+ },
+ {
+  "id": "invite_1",
+  "text": "Тыкни в меня. Или по экрану. Или тряхни — будет красиво!",
+  "emotion": "cheeky",
+  "event": "invite"
+ },
+ {
+  "id": "outro_1",
+  "text": "Ладно, дальше — у меня дома. Там брат, он про деньги всё знает.",
+  "emotion": "warm",
+  "event": "outro"
+ },
+ {
+  "id": "welcome_back_1",
+  "text": "{name}! Ура, ты пришёл! Давай украсим!",
+  "emotion": "happy",
+  "event": "welcome_back"
+ },
+ {
+  "id": "welcome_back_2",
+  "text": "О, {name}! Я скучала.",
+  "emotion": "happy",
+  "event": "welcome_back"
+ },
+ {
+  "id": "welcome_back_3",
+  "text": "{name}, ты сегодня сияешь!",
+  "emotion": "happy",
+  "event": "welcome_back"
+ },
+ {
+  "id": "switch_start_1",
+  "text": "Минутку, переодеваюсь!",
+  "emotion": "secretive",
+  "event": "switch_start"
+ },
+ {
+  "id": "switch_start_2",
+  "text": "Не смотри, это сюрприз!",
+  "emotion": "secretive",
+  "event": "switch_start"
+ },
+ {
+  "id": "switch_start_3",
+  "text": "Чуть-чуть украшу экран...",
+  "emotion": "secretive",
+  "event": "switch_start"
+ },
+ {
+  "id": "shake_prompt_1",
+  "text": "Встряхни — увидишь меня другим.",
+  "emotion": "excited",
+  "event": "shake_prompt"
+ },
+ {
+  "id": "hello_new_1",
+  "text": "Та-дам! Нравится?",
+  "emotion": "proud",
+  "event": "hello_new"
+ },
+ {
+  "id": "hello_new_2",
+  "text": "А вот и я — сверкаю!",
+  "emotion": "proud",
+  "event": "hello_new"
+ },
+ {
+  "id": "hello_new_3",
+  "text": "Новый образ — новые блёстки!",
+  "emotion": "proud",
+  "event": "hello_new"
+ },
+ {
+  "id": "filler_1",
+  "text": "Мур-мур-мур...",
+  "emotion": "calm",
+  "event": "filler"
+ },
+ {
+  "id": "filler_2",
+  "text": "Ла-ла-ла, блестяшки...",
+  "emotion": "calm",
+  "event": "filler"
+ },
+ {
+  "id": "filler_3",
+  "text": "Хи-хи. Ой, я задумалась.",
+  "emotion": "calm",
+  "event": "filler"
+ },
+ {
+  "id": "tap_screen_1",
+  "text": "Ой, блестяшки!",
+  "emotion": "cheeky",
+  "event": "tap_screen"
+ },
+ {
+  "id": "tap_screen_2",
+  "text": "Давай украсим!",
+  "emotion": "cheeky",
+  "event": "tap_screen"
+ },
+ {
+  "id": "tap_screen_3",
+  "text": "Ещё-ещё, красиво!",
+  "emotion": "cheeky",
+  "event": "tap_screen"
+ },
+ {
+  "id": "tap_cat_1",
+  "text": "Хи-хи, щекотно!",
+  "emotion": "playful",
+  "event": "tap_cat"
+ },
+ {
+  "id": "tap_cat_2",
+  "text": "Ты сегодня сияешь!",
+  "emotion": "playful",
+  "event": "tap_cat"
+ },
+ {
+  "id": "tap_cat_3",
+  "text": "Мур! Ещё разочек.",
+  "emotion": "playful",
+  "event": "tap_cat"
+ },
+ {
+  "id": "swipe_1",
+  "text": "Ух, искорки!",
+  "emotion": "cheeky",
+  "event": "swipe"
+ },
+ {
+  "id": "swipe_2",
+  "text": "Красиво получилось!",
+  "emotion": "cheeky",
+  "event": "swipe"
+ },
+ {
+  "id": "swipe_3",
+  "text": "Рисуем вместе!",
+  "emotion": "cheeky",
+  "event": "swipe"
+ },
+ {
+  "id": "longpress_1",
+  "text": "Мурррр...",
+  "emotion": "tender",
+  "event": "longpress"
+ },
+ {
+  "id": "longpress_2",
+  "text": "Тёплое стекло... мур.",
+  "emotion": "tender",
+  "event": "longpress"
+ },
+ {
+  "id": "longpress_3",
+  "text": "Посижу так немножко.",
+  "emotion": "tender",
+  "event": "longpress"
+ },
+ {
+  "id": "shake_1",
+  "text": "Ой, снег из блёсток!",
+  "emotion": "surprised",
+  "event": "shake"
+ },
+ {
+  "id": "shake_2",
+  "text": "Как в снежном шаре!",
+  "emotion": "surprised",
+  "event": "shake"
+ },
+ {
+  "id": "shake_3",
+  "text": "Вжух — и всё сверкает!",
+  "emotion": "surprised",
+  "event": "shake"
+ },
+ {
+  "id": "spam_1",
+  "text": "Ну и ладно! ...Шучу, не обиделась.",
+  "emotion": "annoyed",
+  "event": "spam"
+ },
+ {
+  "id": "spam_2",
+  "text": "Ой-ой, не так быстро!",
+  "emotion": "annoyed",
+  "event": "spam"
+ },
+ {
+  "id": "spam_3",
+  "text": "Ну и ладно! ...Ладно, мир.",
+  "emotion": "annoyed",
+  "event": "spam"
+ },
+ {
+  "id": "silence_1",
+  "text": "Ну и ладно! ...Ой, ты тут? Давай играть!",
+  "emotion": "bored",
+  "event": "silence"
+ },
+ {
+  "id": "silence_2",
+  "text": "Эй, а давай украсим тут всё?",
+  "emotion": "bored",
+  "event": "silence"
+ },
+ {
+  "id": "silence_3",
+  "text": "Скучно-о-о. Может, другого меня позвать?",
+  "emotion": "bored",
+  "event": "silence"
+ },
+ {
+  "id": "sticker_peel_1",
+  "text": "Ой, моя звёздочка!",
+  "emotion": "playful",
+  "event": "sticker_peel"
+ },
+ {
+  "id": "sticker_peel_2",
+  "text": "Ничего, наклею новую.",
+  "emotion": "playful",
+  "event": "sticker_peel"
+ },
+ {
+  "id": "sticker_peel_3",
+  "text": "Аккуратненько!",
+  "emotion": "playful",
+  "event": "sticker_peel"
+ },
+ {
+  "id": "card_lost_1",
+  "text": "Эй, куда карту дел?",
+  "emotion": "worried",
+  "event": "card_lost"
+ },
+ {
+  "id": "card_lost_2",
+  "text": "Ой, а где карта?",
+  "emotion": "worried",
+  "event": "card_lost"
+ },
+ {
+  "id": "card_lost_3",
+  "text": "Карточка, вернись!",
+  "emotion": "worried",
+  "event": "card_lost"
+ },
+ {
+  "id": "card_found_1",
+  "text": "Ура, карта вернулась!",
+  "emotion": "happy",
+  "event": "card_found"
+ },
+ {
+  "id": "card_found_2",
+  "text": "Вот она, красавица!",
+  "emotion": "happy",
+  "event": "card_found"
+ },
+ {
+  "id": "card_found_3",
+  "text": "Снова вместе!",
+  "emotion": "happy",
+  "event": "card_found"
+ },
+ {
+  "id": "money_1",
+  "text": "Это к брату! Он про деньги всё-всё знает.",
+  "emotion": "confident",
+  "event": "money"
+ },
+ {
+  "id": "money_2",
+  "text": "Деньги? Это к брату! Нажми кнопку.",
+  "emotion": "confident",
+  "event": "money"
+ },
+ {
+  "id": "money_3",
+  "text": "Я про блёстки, а про деньги — к брату!",
+  "emotion": "confident",
+  "event": "money"
+ },
+ {
+  "id": "flip_1",
+  "text": "Оп-ля!",
+  "emotion": "excited",
+  "event": "flip"
+ },
+ {
+  "id": "flip_2",
+  "text": "Смотри, как я умею!",
+  "emotion": "excited",
+  "event": "flip"
+ },
+ {
+  "id": "flip_3",
+  "text": "Вжух!",
+  "emotion": "excited",
+  "event": "flip"
+ },
+ {
+  "id": "dance_1",
+  "text": "Танцуем!",
+  "emotion": "excited",
+  "event": "dance"
+ },
+ {
+  "id": "dance_2",
+  "text": "Ла-ла-ла!",
+  "emotion": "excited",
+  "event": "dance"
+ },
+ {
+  "id": "dance_3",
+  "text": "Кружусь-кружусь!",
+  "emotion": "excited",
+  "event": "dance"
+ },
+ {
+  "id": "riddle_1",
+  "text": "Загадка: висит груша — нельзя скушать. Лампочка!",
+  "emotion": "playful",
+  "event": "riddle"
+ },
+ {
+  "id": "riddle_2",
+  "text": "Что можно увидеть с закрытыми глазами? Сон!",
+  "emotion": "playful",
+  "event": "riddle"
+ },
+ {
+  "id": "riddle_3",
+  "text": "Сидит дед, во сто шуб одет. Лук! Угадал?",
+  "emotion": "playful",
+  "event": "riddle"
+ },
+ {
+  "id": "hello_1",
+  "text": "Приветик!",
+  "emotion": "happy",
+  "event": "hello"
+ },
+ {
+  "id": "hello_2",
+  "text": "Привет-привет!",
+  "emotion": "happy",
+  "event": "hello"
+ },
+ {
+  "id": "hello_3",
+  "text": "Ой, привет! Ты сияешь!",
+  "emotion": "happy",
+  "event": "hello"
+ },
+ {
+  "id": "joke_1",
+  "text": "Почему звёзды не ссорятся? Им некогда — они сияют!",
+  "emotion": "playful",
+  "event": "joke"
+ },
+ {
+  "id": "joke_2",
+  "text": "Я такая блестящая, что даже солнце щурится. Хи-хи.",
+  "emotion": "playful",
+  "event": "joke"
+ },
+ {
+  "id": "joke_3",
+  "text": "Шутка: я не блёстка, я — целый салют!",
+  "emotion": "playful",
+  "event": "joke"
+ },
+ {
+  "id": "yes_1",
+  "text": "Ура!",
+  "emotion": "happy",
+  "event": "yes"
+ },
+ {
+  "id": "yes_2",
+  "text": "Договорились!",
+  "emotion": "happy",
+  "event": "yes"
+ },
+ {
+  "id": "yes_3",
+  "text": "Отлично!",
+  "emotion": "happy",
+  "event": "yes"
+ },
+ {
+  "id": "no_1",
+  "text": "Ну и ладно! ...Шучу.",
+  "emotion": "calm",
+  "event": "no"
+ },
+ {
+  "id": "no_2",
+  "text": "Хорошо-хорошо.",
+  "emotion": "calm",
+  "event": "no"
+ },
+ {
+  "id": "no_3",
+  "text": "Как скажешь!",
+  "emotion": "calm",
+  "event": "no"
+ },
+ {
+  "id": "skip_1",
+  "text": "Дальше так дальше!",
+  "emotion": "calm",
+  "event": "skip"
+ },
+ {
+  "id": "skip_2",
+  "text": "Окей!",
+  "emotion": "calm",
+  "event": "skip"
+ },
+ {
+  "id": "skip_3",
+  "text": "Поехали!",
+  "emotion": "calm",
+  "event": "skip"
+ },
+ {
+  "id": "unknown_1",
+  "text": "Ой, не расслышала.",
+  "emotion": "confused",
+  "event": "unknown"
+ },
+ {
+  "id": "unknown_2",
+  "text": "Повтори, пожалуйста?",
+  "emotion": "confused",
+  "event": "unknown"
+ },
+ {
+  "id": "unknown_3",
+  "text": "Это что-то волшебное? Не поняла.",
+  "emotion": "confused",
+  "event": "unknown"
+ },
+ {
+  "id": "signature_1",
+  "text": "Сейчас нарисую...",
+  "emotion": "proud",
+  "event": "signature"
+ },
+ {
+  "id": "signature_2",
+  "text": "Это тебе!",
+  "emotion": "proud",
+  "event": "signature"
+ },
+ {
+  "id": "signature_3",
+  "text": "Смотри, сердечко!",
+  "emotion": "proud",
+  "event": "signature"
+ }
+]

@@ -225,14 +225,27 @@ def read_wav(path):
         return raw
 
 
+# звуки с вариантами: <имя>_1.._N — рантайм выбирает случайный и меняет pitch ±5%
+VARIANTS = {'glass_knock': 3, 'claws': 2, 'glitter': 3, 'sticker_slap': 3, 'gum_pop': 2, 'bleep': 2, 'shake': 2}
+
+
+def stretch(x, k):
+    n = int(len(x) / k)
+    return np.interp(np.linspace(0, len(x) - 1, n), np.arange(len(x)), x)
+
+
 def main():
     keep = '--keep-existing' in sys.argv
     os.makedirs(SRC, exist_ok=True)
     for name, fn in SOUNDS.items():
-        p = os.path.join(SRC, name + '.wav')
-        if keep and os.path.exists(p):
-            continue
-        write_wav(p, fn())
+        n = VARIANTS.get(name, 1)
+        for k in range(1, n + 1):
+            p = os.path.join(SRC, (f'{name}_{k}' if n > 1 else name) + '.wav')
+            if keep and os.path.exists(p):
+                continue
+            write_wav(p, stretch(fn(), 1 + 0.07 * (k - 1) * (-1) ** k))
+        if n > 1 and os.path.exists(os.path.join(SRC, name + '.wav')) and not keep:
+            os.remove(os.path.join(SRC, name + '.wav'))
     # спрайт: все wav из src (включая добавленные вручную) с паузой 0.25 с
     names = sorted(f[:-4] for f in os.listdir(SRC) if f.endswith('.wav'))
     pad = np.zeros(int(SR * 0.25))

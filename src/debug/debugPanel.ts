@@ -5,6 +5,7 @@ import { saveStage, defaultStage, type StageConfig } from '../config';
 import { clearMemory } from '../scenario/memory';
 import { CLIPS, type ClipName } from '../character/types';
 import type { FxName } from '../persona/types';
+import { VISEMES, VISEME_SHAPE } from '../lipsync/visemes';
 
 const css = `
 .dbg { position: fixed; z-index: 50; right: 0; top: 0; bottom: 0; width: min(300px, 78vw); background: rgba(10,14,18,.86); color: #dfe; font: 12px/1.3 ui-monospace, Menlo, monospace;
@@ -189,6 +190,62 @@ export class DebugPanel {
       this.btn(s, 'Дрожание рук', (() => {
         return () => (tracker.wobble = !tracker.wobble);
       })(), 'wobble');
+    }
+
+    s = this.section('Реплики и липсинк');
+    const viz = document.createElement('canvas');
+    viz.width = 280;
+    viz.height = 90;
+    viz.style.cssText = 'width:100%;background:#0008;border-radius:6px';
+    s.appendChild(viz);
+    const vg = viz.getContext('2d')!;
+    const drawViz = () => {
+      requestAnimationFrame(drawViz);
+      const lip = app.voice.lip;
+      vg.clearRect(0, 0, 280, 90);
+      VISEMES.forEach((v, i) => {
+        const w = lip.weights[v];
+        vg.fillStyle = v === lip.dominant ? '#b6ff3b' : '#5a7';
+        vg.fillRect(8 + i * 22, 70 - w * 55, 16, w * 55);
+        vg.fillStyle = '#dfe';
+        vg.font = '11px monospace';
+        vg.fillText(v, 12 + i * 22, 84);
+      });
+      // схематичный рот
+      const sh = lip.shape;
+      vg.fillStyle = '#7a2a3a';
+      vg.beginPath();
+      vg.ellipse(240, 40, 14 + sh.wide * 14 - sh.round * 8, 2 + sh.open * 22, 0, 0, Math.PI * 2);
+      vg.fill();
+      vg.fillStyle = '#dfe';
+      vg.fillText(app.voice.mode ?? '—', 214, 84);
+      void VISEME_SHAPE;
+    };
+    drawViz();
+    const m = app.voice.manifest;
+    for (const [pid, lines] of Object.entries(m)) {
+      for (const [id, e] of Object.entries(lines)) this.btn(s, `▶ ${pid}/${id}`, () => d.speakText(pid, e.text), `voice:${pid}/${id}`).title = e.text;
+    }
+    const sel = document.createElement('select');
+    sel.style.cssText = 'width:100%;margin-top:4px';
+    for (const [pid, per] of (d as any).d.personas as Map<string, any>) {
+      for (const [k, arr] of Object.entries(per.lines as Record<string, string[]>)) arr.forEach((t: string) => sel.add(new Option(`${pid}:${k} — ${t}`, `${pid}|${t}`)));
+      for (const [k, r] of Object.entries(per.reactions as Record<string, any>)) (r.lines ?? []).forEach((t: string) => sel.add(new Option(`${pid}:${k} — ${t}`, `${pid}|${t}`)));
+    }
+    s.appendChild(sel);
+    this.btn(s, '▶ синтез выбранной', () => {
+      const [pid, t] = sel.value.split('|');
+      d.speakText(pid, t);
+    }, 'voice:synth');
+    for (const cat of ['sfx', 'voice', 'ambience'] as const) {
+      const l = document.createElement('label');
+      l.innerHTML = `<span>громк. ${cat}</span><input type=range min=0 max=1 step=0.05 value=${app.audio.volume[cat]}><output>${app.audio.volume[cat]}</output>`;
+      const r = l.querySelector('input')!;
+      r.oninput = () => {
+        app.audio.setVolume(cat, Number(r.value));
+        l.querySelector('output')!.textContent = r.value;
+      };
+      s.appendChild(l);
     }
 
     s = this.section('Лог');

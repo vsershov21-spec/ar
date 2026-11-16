@@ -10,6 +10,7 @@ import { CLIPS, type Character, type ClipName, type Emote, type PlayOptions } fr
 import { PROC, type ProcPose } from './procedural';
 import type { Persona } from '../persona/types';
 import { asset, clamp } from '../core/util';
+import { VISEME_TO_BLENDSHAPES, type MouthShape, type Viseme } from '../lipsync/visemes';
 
 const BONES = ['Hips', 'Spine', 'Spine1', 'Neck', 'Head', 'LeftArm', 'RightArm', 'LeftForeArm', 'RightForeArm', 'LeftUpLeg', 'RightUpLeg', 'LeftShoulder', 'RightShoulder', 'Jaw', 'Tail1', 'Tail2', 'Tail3', 'Tail4'];
 
@@ -155,12 +156,16 @@ export class GlbCharacter implements Character {
     this.look = world ? world.clone() : null;
   }
 
-  setMouth(open: number) {
-    this.mouth = clamp(open, 0, 1);
+  setMouth(v: Viseme, w: number, shape: MouthShape) {
+    this.mouth = clamp(shape.open, 0, 1);
+    // блендшейпы финальной модели: mouth_A/E/O/U/M (см. CHARACTER_SPEC.md)
+    const bs = VISEME_TO_BLENDSHAPES[v];
     for (const m of this.morphMeshes) {
       const d = m.morphTargetDictionary!;
-      const i = d['mouth_A'] ?? d['mouthOpen'] ?? d['jawOpen'];
-      if (i !== undefined) m.morphTargetInfluences![i] = this.mouth;
+      for (const key of ['mouth_A', 'mouth_E', 'mouth_O', 'mouth_U', 'mouth_M']) {
+        const i = d[key];
+        if (i !== undefined) m.morphTargetInfluences![i] = (bs[key] ?? 0) * w;
+      }
     }
   }
 

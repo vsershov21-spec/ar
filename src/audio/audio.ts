@@ -1,19 +1,40 @@
 /**
- * Звук: Howler.js, один аудиоспрайт (sfx.json) — минимальная задержка (Web Audio, всё в памяти).
- * iOS: звук разблокируется только из жеста — unlock() вызывается в обработчике «Разбудить кота».
+ * Звук: Howler.js.
+ *  - категории: sfx (аудиоспрайт), voice (реплики, Web Audio), ambience (петли) — у каждой своя громкость;
+ *  - ducking: пока звучит реплика, sfx и ambience приглушаются на −8 дБ;
+ *  - вариации: play('glass_knock') выбирает случайный из glass_knock_1..N и меняет pitch ±5%;
+ *  - iOS: unlock() в первом жесте; audioSession='playback' (Safari 17+) — звук и при беззвучном режиме;
+ *    на старых iOS Web Audio молчит при включённом переключателе «Без звука» — UI показывает подсказку.
  */
 import { Howl, Howler } from 'howler';
 import { asset } from '../core/util';
 
+export type Category = 'sfx' | 'voice' | 'ambience';
+const DUCK = Math.pow(10, -8 / 20); // −8 дБ ≈ 0.4
+
 export class Audio {
   private howl: Howl | null = null;
+  private ambience: Howl | null = null;
   private sprite: Record<string, [number, number]> = {};
+  private variants = new Map<string, string[]>();
+  private lastVariant = new Map<string, string>();
+  readonly volume: Record<Category, number> = { sfx: 0.9, voice: 1, ambience: 0.35 };
+  private duckK = 1;
+  private voiceGain: GainNode | null = null;
   muted = false;
 
   async load(url: string) {
     const r = await fetch(asset(url));
     const j = (await r.json()) as { src: string[]; sprite: Record<string, [number, number]> };
     this.sprite = j.sprite;
+    for (const key of Object.keys(j.sprite)) {
+      const base = key.replace(/_\d+$/, '');
+      if (!this.variants.has(base)) this.variants.set(base, []);
+      this.variants.get(base)!.push(key);
+      if (base !== key) {
+        if (!this.variants.has(key)) this.variants.set(key, [key]);
+      }
+    }
     const dir = url.replace(/[^/]+$/, '');
     await new Promise<void>((resolve) => {
       this.howl = new Howl({
@@ -33,9 +54,15 @@ export class Audio {
   /** вызывать синхронно внутри обработчика жеста */
   unlock() {
     try {
+      // Safari 17+: играть как медиа, а не как «звуки интерфейса» — не глушится переключателем Без звука
+      const nav = navigator as any;
+      if (nav.audioSession) nav.audioSession.type = 'playback';
+    } catch {
+      /* ignore */
+    }
+    try {
       const ctx = Howler.ctx;
       if (ctx && ctx.state !== 'running') void ctx.resume();
-      // короткий беззвучный буфер — классический способ «разбудить» аудио в iOS Safari
       if (ctx) {
         const b = ctx.createBuffer(1, 1, 22050);
         const s = ctx.createBufferSource();
@@ -48,23 +75,73 @@ export class Audio {
     }
   }
 
+  /** true — iOS без audioSession API: возможно, мешает беззвучный режим (показываем подсказку) */
+  get maybeSilentSwitch() {
+    const ios = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    return ios && !(navigator as any).audioSession;
+  }
+
   get ctx(): AudioContext | null {
     return (Howler.ctx as AudioContext) ?? null;
   }
 
-  has(name: string) {
-    return name in this.sprite;
+  /** узел, куда подключать голос (громкость категории voice) */
+  voiceOut(): AudioNode | null {
+    const ctx = this.ctx;
+    if (!ctx) return null;
+    if (!this.voiceGain) {
+      this.voiceGain = ctx.createGain();
+      this.voiceGain.gain.value = this.volume.voice;
+      this.voiceGain.connect((Howler as any).masterGain ?? ctx.destination);
+    }
+    return this.voiceGain;
   }
 
-  play(name: string | string[] | undefined, volume = 1) {
-    if (!name || this.muted || !this.howl) return;
-    const n = Array.isArray(name) ? name[Math.floor(Math.random() * name.length)] : name;
-    if (!this.has(n)) {
-      console.warn('[audio] нет звука', n);
+  has(name: string) {
+    return this.variants.has(name) || name in this.sprite;
+  }
+
+  play(name: string | string[] | undefined, volume = 1, opts: { pitchJitter?: number } = {}) {
+    if (!name || !this.howl) return;
+    const base = Array.isArray(name) ? name[Math.floor(Math.random() * name.length)] : name;
+    const vars = this.variants.get(base);
+    if (!vars?.length) {
+      console.warn('[audio] нет звука', base);
       return;
     }
-    const id = this.howl.play(n);
-    this.howl.volume(volume, id);
+    // случайный вариант, не повторяя предыдущий
+    let key = vars[Math.floor(Math.random() * vars.length)];
+    if (vars.length > 1 && key === this.lastVariant.get(base)) key = vars[(vars.indexOf(key) + 1) % vars.length];
+    this.lastVariant.set(base, key);
+    const id = this.howl.play(key);
+    this.howl.volume(volume * this.volume.sfx * this.duckK, id);
+    const j = opts.pitchJitter ?? 0.05;
+    this.howl.rate(1 + (Math.random() * 2 - 1) * j, id);
+  }
+
+  playAmbience(url: string) {
+    this.ambience?.unload();
+    this.ambience = new Howl({ src: [asset(url)], loop: true, volume: this.volume.ambience * this.duckK });
+    this.ambience.play();
+  }
+
+  setVolume(cat: Category, v: number) {
+    this.volume[cat] = v;
+    if (cat === 'voice' && this.voiceGain) this.voiceGain.gain.value = v;
+    this.applyDuck();
+  }
+
+  /** приглушить sfx/ambience на время реплики */
+  duck(on: boolean) {
+    this.duckK = on ? DUCK : 1;
+    this.applyDuck();
+  }
+
+  private applyDuck() {
+    const h = this.howl as any;
+    // уже играющие звуки — плавно
+    if (h?._sounds) for (const s of h._sounds) if (!s._paused && !s._ended) this.howl!.fade(s._volume, this.volume.sfx * this.duckK, 120, s._id);
+    this.ambience?.fade(this.ambience.volume(), this.volume.ambience * this.duckK, 200);
   }
 
   setMuted(m: boolean) {

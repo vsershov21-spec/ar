@@ -11,6 +11,7 @@ import * as THREE from 'three';
 import { CLIPS, type Character, type ClipName, type Emote, type PlayOptions } from './types';
 import type { Persona } from '../persona/types';
 import { clamp } from '../core/util';
+import type { MouthShape, Viseme } from '../lipsync/visemes';
 
 const FUR = 0xa9b6cc;
 const FUR_DARK = 0x8593ad;
@@ -422,8 +423,10 @@ export class RigCat implements Character {
     if (e === 'blink') this.blinkT = 0;
   }
 
-  setMouth(open: number) {
-    this.mouth = clamp(open, 0, 1);
+  private mouthShape: MouthShape = { open: 0, wide: 0, round: 0 };
+  setMouth(_v: Viseme, _w: number, shape: MouthShape) {
+    this.mouth = clamp(shape.open, 0, 1);
+    this.mouthShape = shape;
   }
 
   private apply(p: Pose, w: number, acc: { root: Record<string, number>; jaw: number; lids: number }) {
@@ -472,11 +475,16 @@ export class RigCat implements Character {
       this.root.position.z += -0.5 * Math.sin(r.rx);
     }
 
+    const head0 = this.bones.get('Head')!;
     // челюсть (липсинк + клипы)
     const jaw = this.bones.get('Jaw')!;
     const open = clamp(acc.jaw + this.mouth * 0.9, 0, 1);
     jaw.position.y = 0.11 - open * 0.03;
     jaw.scale.y = 1 + open * 0.8;
+    // ширина/округлость губ: «и/э» шире, «о/у» уже
+    jaw.scale.x = 1 + this.mouthShape.wide * 0.35 - this.mouthShape.round * 0.35;
+    // микродвижения головы во время речи
+    if (this.mouth > 0.05) head0.quaternion.multiply(this.q.setFromEuler(this.e.set(-0.06 * this.mouth, 0.03 * Math.sin(this.time * 5), 0)));
     // моргание
     this.blinkT += dt;
     if (this.blinkT > 3 + Math.random() * 2) this.blinkT = 0;

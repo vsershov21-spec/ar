@@ -12,7 +12,8 @@ import { RigCat } from './character/rigCat';
 import { GlbCharacter } from './character/glbCharacter';
 import { FxLayer } from './fx/fxLayer';
 import { Audio } from './audio/audio';
-import { SpeechInput, VoiceOut } from './voice/speech';
+import { VoicePlayer } from './voice/voicePlayer';
+import { makeAsr, type Asr } from './voice/asr';
 import { loadPersonas } from './persona/loader';
 import { Input } from './input/input';
 import { UI, posterUrl } from './ui/ui';
@@ -25,6 +26,7 @@ export interface AppParams {
   debug: boolean;
   tracker: TrackerKind;
   character: CharacterMode;
+  asr: string | null;
 }
 
 export function readParams(search = location.search): AppParams {
@@ -32,7 +34,7 @@ export function readParams(search = location.search): AppParams {
   const debug = q.has('debug');
   const t = (q.get('tracker') as TrackerKind) || (debug ? 'debug' : 'mindar');
   const c = (q.get('char') as CharacterMode) || 'sprite';
-  return { debug, tracker: t, character: ['sprite', 'rig', 'glb'].includes(c) ? c : 'sprite' };
+  return { debug, tracker: t, character: ['sprite', 'rig', 'glb'].includes(c) ? c : 'sprite', asr: q.get('asr') };
 }
 
 export function makeCharacter(mode: CharacterMode): Character {
@@ -49,8 +51,8 @@ export class App {
   stage!: Stage;
   fx!: FxLayer;
   audio = new Audio();
-  voice!: VoiceOut;
-  speech = new SpeechInput();
+  voice!: VoicePlayer;
+  speech!: Asr;
   input!: Input;
   ui!: UI;
   director!: Director;
@@ -89,8 +91,9 @@ export class App {
     this.stage = new Stage(this.scene, this.tracker, loadStage());
     this.stage.constrainToCard = !this.tracker.capabilities.worldTracking;
     this.fx = new FxLayer(this.root);
-    this.voice = new VoiceOut(() => this.audio.ctx);
-    const [personas] = await Promise.all([loadPersonas(ASSETS.personas), this.audio.load(ASSETS.sfx)]);
+    this.voice = new VoicePlayer(this.audio);
+    this.speech = makeAsr(p.asr, () => this.audio.ctx);
+    const [personas] = await Promise.all([loadPersonas(ASSETS.personas), this.audio.load(ASSETS.sfx), this.voice.load(ASSETS.voice)]);
 
     this.ui = new UI(this.root, {
       onWake: () => void this.wake(),
@@ -113,8 +116,12 @@ export class App {
     this.speech.onInterim = (t) => this.ui.micHintText(t);
     this.speech.onState = (s, msg) => {
       if (s === 'listening') this.ui.micHintText('Слушаю…');
-      if (s === 'error') this.ui.micHintText(msg === 'not-allowed' ? 'Нет доступа к микрофону — пиши или жми подсказки' : 'Не расслышал, попробуй ещё');
+      if (s === 'loading') this.ui.micHintText('Загружаю распознавание…');
+      if (s === 'error')
+        this.ui.micHintText(msg === 'not-allowed' ? 'Нет доступа к микрофону — жми подсказки' : msg === 'no-model' ? 'Офлайн-модель не найдена — жми подсказки' : 'Не расслышал, попробуй ещё');
+      if (s === 'idle') this.ui.micLevel(0);
     };
+    this.speech.onLevel = (v) => this.ui.micLevel(v);
     this.speech.onResult = (t) => {
       this.ui.micHintText(`«${t}»`);
       this.director.text(t);
@@ -186,6 +193,7 @@ export class App {
     i.on('shake', () => d.interaction('shake'));
     i.on('spam', () => d.interaction('spam'));
     i.on('silence', () => d.dispatch({ type: 'silence' }));
+    i.on('activity', () => d.activity());
     i.on('sticker_tap', (p) => d.chooseSticker(p.x, p.y));
     i.on('drag', (p) => this.fx.wipeFog(p.x, p.y, p.px, p.py));
     i.on('peel_move', (p) => this.fx.dragPeel(p.x, p.y));
@@ -201,6 +209,7 @@ export class App {
   async wake() {
     this.audio.unlock();
     this.voice.unlock();
+    if (this.audio.maybeSilentSwitch) setTimeout(() => this.ui.toast('Не слышно кота? Проверь переключатель «Без звука» сбоку iPhone и громкость.', 5000), 2500);
     const sensors = this.input.requestSensors();
     this.ui.setStartBusy('Просыпается…');
     try {
@@ -237,7 +246,7 @@ export class App {
     this.tracker.update(dt, this.elapsed);
     this.input.tick();
     this.stage.update(dt);
-    this.director.update();
+    this.director.update(dt);
     this.character.update(dt, this.tracker.camera);
     this.fx.update(dt);
     this.fx.draw();

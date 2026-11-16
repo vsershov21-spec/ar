@@ -14,7 +14,8 @@ import { isClip, type Character, type ClipName } from './character/types';
 import type { Stage } from './stage';
 import type { FxLayer } from './fx/fxLayer';
 import type { Audio } from './audio/audio';
-import type { Speaker } from './voice/speech';
+import type { VoicePlayer } from './voice/voicePlayer';
+import { DialogQueue, type Priority } from './voice/dialog';
 import type { UI } from './ui/ui';
 import type { Tracker } from './tracker/types';
 import { parseIntent, type Intent } from './voice/intents';
@@ -28,7 +29,7 @@ export interface DirectorDeps {
   stage: Stage;
   fx: FxLayer;
   audio: Audio;
-  voice: Speaker;
+  voice: VoicePlayer;
   ui: UI;
   personas: Map<string, Persona>;
   glCanvas: HTMLCanvasElement;
@@ -41,8 +42,9 @@ export class Director extends Emitter<DirectorEvents> {
   persona: Persona;
   private picker = new NoRepeatPicker(2);
   private timers = new Map<string, number>();
-  private speechChain: Promise<void> = Promise.resolve();
-  private speechGen = 0;
+  readonly dialog: DialogQueue;
+  private quietT = 0;
+  private blinkT = 0;
   private lostTimer = 0;
   private lastSwipe: { x: number; y: number } | null = null;
   private busyUntil = 0;
@@ -53,6 +55,7 @@ export class Director extends Emitter<DirectorEvents> {
     this.state = initialState(mem);
     this.persona = d.personas.get(mem.persona ?? 'hooligan') ?? [...d.personas.values()][0];
     d.fx.palette = this.persona.palette;
+    this.dialog = new DialogQueue(d.voice);
     d.fx.onGlitch = (on) => d.glCanvas.classList.toggle('glitch', on);
     d.fx.onSlap = () => d.audio.play('sticker_slap', 0.7);
     d.tracker.onFound(() => this.dispatch({ type: 'card_found' }));
@@ -217,7 +220,8 @@ export class Director extends Emitter<DirectorEvents> {
 
   private async offerChoice() {
     const d = this.d;
-    await this.speechChain;
+    // ждём, пока договорит вопрос «Хочешь, я буду…»
+    for (let i = 0; i < 80 && this.dialog.busy; i++) await wait(100);
     this.character.play('sticker');
     const { w, h } = d.size();
     const ids: number[] = [];
@@ -268,7 +272,7 @@ export class Director extends Emitter<DirectorEvents> {
     if (r.clip && isClip(r.clip) && !d.stage.walking) this.character.play(r.clip as ClipName);
     const fxs = (Array.isArray(r.fx) ? r.fx : r.fx ? [r.fx] : []) as FxName[];
     for (const f of fxs) void this.runFx(f);
-    if (r.lines?.length) this.speakLine(key, r.lines, {}, true);
+    if (r.lines?.length) this.speakLine(key, r.lines, {}, key === 'signature' ? 'scenario' : 'reaction');
   }
 
   async runFx(f: FxName) {
@@ -333,31 +337,58 @@ export class Director extends Emitter<DirectorEvents> {
   private say(key: string, vars?: Record<string, string>) {
     const lines = this.persona.lines[key];
     if (!lines?.length) return;
-    this.speakLine(key, lines, vars ?? { name: this.state.name ?? '' }, false);
+    this.speakLine(key, lines, vars ?? { name: this.state.name ?? '' }, key === 'filler' ? 'chatter' : 'scenario');
   }
 
-  /** interrupt=true — реакция перебивает текущую реплику (отклик важнее), иначе — в очередь */
-  private speakLine(key: string, lines: Reaction['lines'] & {}, vars: Record<string, string>, interrupt: boolean) {
+  /** реплика через очередь диалога (приоритеты: scenario > reaction > chatter) */
+  private speakLine(key: string, lines: Reaction['lines'] & {}, vars: Record<string, string>, prio: Priority) {
     const p = this.persona;
     const line = normLine(this.picker.pick(`${p.id}:${key}`, lines)!);
     const text = fill(line.text, { name: this.state.name ?? '', ...vars });
-    const gen = interrupt ? ++this.speechGen : this.speechGen;
-    if (interrupt) this.d.voice.cancel();
-    const run = async () => {
-      if (gen !== this.speechGen) return;
+    const accepted = this.dialog.say(prio, async () => {
       this.d.ui.say(text, p.name, p.id);
       const prevClip = this.character.currentClip;
       const talk = prevClip === 'idle' && !this.d.stage.walking;
       if (talk) this.character.play('talk', { loop: true });
-      await this.d.voice.speak(text, { pitch: p.voice.pitch, rate: p.voice.rate, audio: line.audio });
+      await this.d.voice.speak({ persona: p.id, template: line.text, text, pitch: p.voice.pitch, rate: p.voice.rate });
       if (talk && this.character.currentClip === 'talk') this.character.play('idle');
-    };
-    this.speechChain = interrupt ? run() : this.speechChain.then(run);
+    });
+    if (!accepted) this.log(`реплика «${key}» пропущена: говорит сценарий`);
+  }
+
+  /** проиграть конкретную реплику (debug: проверка липсинка) */
+  speakText(personaId: string, template: string) {
+    const p = this.d.personas.get(personaId) ?? this.persona;
+    const text = fill(template, { name: this.state.name ?? 'Маша' });
+    this.d.ui.say(text, p.name, p.id);
+    this.dialog.clear();
+    this.dialog.say('reaction', () => this.d.voice.speak({ persona: p.id, template, text, pitch: p.voice.pitch, rate: p.voice.rate }));
   }
 
   /** каждый кадр */
-  update() {
-    this.character?.setMouth(this.d.voice.mouth());
+  update(dt: number) {
+    const v = this.d.voice;
+    v.update(dt);
+    const lip = v.lip;
+    this.character?.setMouth(lip.dominant, lip.weights[lip.dominant], lip.shape);
+    // моргание чаще во время речи
+    if (v.speaking && (this.blinkT += dt) > 2.2 + Math.random() * 2) {
+      this.blinkT = 0;
+      this.character?.emote('blink', 150);
+    }
+    // «заполнитель» паузы: в свободной игре, если давно тихо
+    if ((this.state.phase === 'play' || this.state.phase === 'free') && !this.dialog.busy && !this.d.stage.walking) {
+      this.quietT += dt;
+      if (this.quietT > 7 + Math.random() * 3) {
+        this.quietT = -6;
+        this.say('filler');
+      }
+    } else this.quietT = 0;
+  }
+
+  /** любая активность пользователя сбрасывает таймер «заполнителя» */
+  activity() {
+    this.quietT = 0;
   }
 
   static readonly kidsUrl = ASSETS.sberKidsUrl;

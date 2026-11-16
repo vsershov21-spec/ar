@@ -7,13 +7,16 @@ import * as THREE from 'three';
 import { CLIPS, type Character, type ClipName, type Emote, type PlayOptions } from './types';
 import type { Persona } from '../persona/types';
 import { asset, clamp, easeOutBack } from '../core/util';
+import type { MouthShape, Viseme } from '../lipsync/visemes';
 
 export interface SpriteManifest {
   /** точка опоры ног в кадре (0..1 от левого верхнего угла) */
   anchor: { x: number; y: number };
+  /** PNG-формы рта (Rhubarb A–H, X) для оверлея на лицо */
+  mouth?: { dir: string; shapes: Record<string, string> };
   personas: Record<string, {
     dir: string;
-    poses: Record<string, { file: string; h?: number; anchorY?: number }>;
+    poses: Record<string, { file: string; h?: number; anchorY?: number; mouth?: [number, number, number] }>;
     /** клип → поза(ы) (несколько = смена кадров) или видео */
     clips: Record<string, { poses?: string[]; fps?: number; video?: { hevc?: string; webm?: string; loop?: boolean }; atlas?: { file: string; cols: number; rows: number; frames: number; fps: number } }>;
     press?: string;
@@ -38,6 +41,11 @@ export class SpriteCharacter implements Character {
   private opts: PlayOptions = {};
   private poseKey = '';
   private mouth = 0;
+  private viseme: Viseme = 'X';
+  private mouthW = 0;
+  private mouthMesh: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>;
+  private mouthTex = new Map<string, THREE.Texture>();
+  private pose = '';
   private tweens: Tween[] = [];
   private video: HTMLVideoElement | null = null;
   private time = 0;
@@ -50,7 +58,10 @@ export class SpriteCharacter implements Character {
     );
     this.mesh.name = 'sprite-plane';
     this.hitMesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ visible: false, side: THREE.DoubleSide }));
-    this.pivot.add(this.mesh, this.hitMesh);
+    this.mouthMesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 0.75), new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false, depthTest: false }));
+    this.mouthMesh.visible = false;
+    this.mouthMesh.renderOrder = 5;
+    this.pivot.add(this.mesh, this.hitMesh, this.mouthMesh);
     this.object.add(this.pivot);
     this.object.name = 'character-sprite';
   }
@@ -66,6 +77,17 @@ export class SpriteCharacter implements Character {
     const jobs: Promise<void>[] = [];
     for (const [pid, p] of Object.entries(this.manifest.personas)) {
       for (const [k, pose] of Object.entries(p.poses)) jobs.push(this.loadPose(`${pid}/${k}`, asset(p.dir + pose.file)));
+    }
+    if (this.manifest.mouth) {
+      const md = this.manifest.mouth;
+      for (const [v, f] of Object.entries(md.shapes))
+        jobs.push(new Promise<void>((res) => {
+          new THREE.TextureLoader().load(asset(md.dir + f), (t) => {
+            t.colorSpace = THREE.SRGBColorSpace;
+            this.mouthTex.set(v, t);
+            res();
+          }, undefined, () => res());
+        }));
     }
     await Promise.all(jobs);
     this.applyPose();
@@ -157,7 +179,7 @@ export class SpriteCharacter implements Character {
     const fps = c?.fps ?? 2;
     let i = Math.floor(this.clipT * fps) % poses.length;
     // липсинк в спрайт-режиме: при громком звуке — поза с открытым ртом (если задана 2-й в talk)
-    if (this.clip === 'talk' && poses.length > 1) i = this.mouth > 0.35 ? 1 : 0;
+    if (this.clip === 'talk' && poses.length > 1 && !this.manifest.mouth) i = this.mouth > 0.35 ? 1 : 0;
     return poses[i];
   }
 
@@ -170,6 +192,7 @@ export class SpriteCharacter implements Character {
     const img = this.imgs.get(key);
     if (!tex || !img) return;
     this.poseKey = key;
+    this.pose = pose;
     this.mesh.material.map = tex;
     this.mesh.material.needsUpdate = true;
     const pd = this.def().poses[pose];
@@ -192,8 +215,28 @@ export class SpriteCharacter implements Character {
     this.tween('nudge', 0.25);
   }
 
-  setMouth(open: number) {
-    this.mouth = clamp(open, 0, 1);
+  setMouth(v: Viseme, w: number, shape: MouthShape) {
+    this.mouth = clamp(shape.open, 0, 1);
+    this.viseme = v;
+    this.mouthW = w;
+  }
+
+  /** оверлей рта: PNG формы поверх лица, если у позы задана точка рта */
+  private updateMouthOverlay() {
+    const pd = this.def()?.poses[this.pose];
+    const tex = this.mouthTex.get(this.viseme);
+    const speaking = this.viseme !== 'X' || this.mouthW < 0.9;
+    if (!pd?.mouth || !tex || !speaking || this.video) {
+      this.mouthMesh.visible = false;
+      return;
+    }
+    const [mx, my, mw] = pd.mouth;
+    const sw = this.mesh.scale.x, sh = this.mesh.scale.y;
+    this.mouthMesh.visible = true;
+    this.mouthMesh.material.map = tex;
+    this.mouthMesh.material.needsUpdate = true;
+    this.mouthMesh.scale.set(mw * sw, mw * sw, 1);
+    this.mouthMesh.position.set(this.mesh.position.x + (mx - 0.5) * sw, this.mesh.position.y + (0.5 - my) * sh, 0.002);
   }
 
   update(dt: number, camera: THREE.Camera) {
@@ -207,6 +250,7 @@ export class SpriteCharacter implements Character {
       cb?.();
     }
     this.applyPose();
+    this.updateMouthOverlay();
 
     // базовая жизнь: дыхание и лёгкое покачивание
     let sx = 1 + 0.012 * Math.sin(this.time * 2.4);

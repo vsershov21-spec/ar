@@ -16,7 +16,12 @@
           "file": "wave.webp"
         },
         "listen": {
-          "file": "listen.webp"
+          "file": "listen.webp",
+          "mouth": [
+            0.667,
+            0.41,
+            0.11
+          ]
         },
         "point": {
           "file": "point.webp"
@@ -102,8 +107,7 @@
         },
         "talk": {
           "poses": [
-            "idle",
-            "laugh"
+            "listen"
           ]
         },
         "listen": {
@@ -211,7 +215,12 @@
           "file": "wave.webp"
         },
         "listen": {
-          "file": "listen.webp"
+          "file": "listen.webp",
+          "mouth": [
+            0.667,
+            0.41,
+            0.11
+          ]
         },
         "point": {
           "file": "point.webp"
@@ -295,8 +304,7 @@
         },
         "talk": {
           "poses": [
-            "idle",
-            "laugh"
+            "listen"
           ]
         },
         "listen": {
@@ -390,6 +398,21 @@
           ]
         }
       }
+    }
+  },
+  "mouth": {
+    "_comment": "Оверлей рта поверх лица в спрайт-режиме: формы Rhubarb A–H, X. Позиция — в pose.mouth [x, y, ширина] долями кадра. Заглушки — замените PNG/WebP финальными формами.",
+    "dir": "video/sprites/mouth/",
+    "shapes": {
+      "X": "X.webp",
+      "A": "A.webp",
+      "B": "B.webp",
+      "C": "C.webp",
+      "D": "D.webp",
+      "E": "E.webp",
+      "F": "F.webp",
+      "G": "G.webp",
+      "H": "H.webp"
     }
   }
 }

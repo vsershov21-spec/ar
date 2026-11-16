@@ -71,7 +71,7 @@ canvas.gl.glitch { animation: glitch .12s steps(2) infinite; }
   backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,.2); }
 .row { display: flex; align-items: center; gap: 12px; }
 .mic { width: 76px; height: 76px; border-radius: 50%; border: 0; background: #fff; color: #111; font-size: 32px; box-shadow: 0 6px 20px rgba(0,0,0,.35); touch-action: none; }
-.mic.on { background: var(--lime); transform: scale(1.1); box-shadow: 0 0 0 10px rgba(182,255,59,.3); }
+.mic.on { background: var(--lime); transform: scale(1.1); box-shadow: 0 0 0 calc(6px + var(--lvl, 0) * 18px) rgba(182,255,59,.35); transition: box-shadow .08s; }
 .mic-hint { color: #fff; font-size: 12px; text-shadow: 0 1px 4px rgba(0,0,0,.7); min-height: 16px; text-align: center; max-width: 80vw; }
 .kids { background: var(--green); color: #fff; min-height: 56px; border-radius: 18px; padding: 0 22px; font-weight: 800; font-size: 17px; border: 0; box-shadow: 0 8px 24px rgba(33,160,56,.45); animation: pop .4s ease-out; }
 @keyframes pop { 0% { transform: scale(.6); opacity: 0; } 70% { transform: scale(1.05); } }

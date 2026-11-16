@@ -11,7 +11,11 @@
     "compile-target": "node scripts/compile-target.mjs",
     "gen-sounds": "python3 scripts/gen_sounds.py",
     "prepare-sprites": "python3 scripts/prepare_sprites.py",
-    "screens": "node scripts/screens.mjs"
+    "screens": "node scripts/screens.mjs",
+    "voice:lines": "node scripts/voice/extract-lines.mjs",
+    "voice:build": "node scripts/voice/build.mjs",
+    "setup-8thwall": "node scripts/setup-8thwall.mjs",
+    "bench": "node scripts/bench/run_bench.mjs"
   },
   "keywords": [],
   "author": "",

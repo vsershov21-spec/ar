@@ -1,0 +1,518 @@
+[
+ {
+  "id": "intro_1",
+  "text": "Ты чё, с картой, что ли? Ничего себе. Как тебя зовут?",
+  "emotion": "curious",
+  "event": "intro"
+ },
+ {
+  "id": "nice_name_1",
+  "text": "{name}? Норм имя. Запомню.",
+  "emotion": "happy",
+  "event": "nice_name"
+ },
+ {
+  "id": "nice_name_2",
+  "text": "{name}! Звучит круто. Почти как я.",
+  "emotion": "happy",
+  "event": "nice_name"
+ },
+ {
+  "id": "nice_name_3",
+  "text": "О, {name}. Будем знакомы.",
+  "emotion": "happy",
+  "event": "nice_name"
+ },
+ {
+  "id": "no_name_1",
+  "text": "Ладно, тайный агент. Уважаю.",
+  "emotion": "playful",
+  "event": "no_name"
+ },
+ {
+  "id": "no_name_2",
+  "text": "Не хочешь — не говори. Сам угадаю потом.",
+  "emotion": "playful",
+  "event": "no_name"
+ },
+ {
+  "id": "no_name_3",
+  "text": "Окей, без имён. Так даже загадочнее.",
+  "emotion": "playful",
+  "event": "no_name"
+ },
+ {
+  "id": "choose_1",
+  "text": "Хочешь, я буду хулиганом? Или выбери другого меня.",
+  "emotion": "curious",
+  "event": "choose"
+ },
+ {
+  "id": "invite_1",
+  "text": "Тыкни в меня. Или по экрану. Или тряхни, если смелый.",
+  "emotion": "cheeky",
+  "event": "invite"
+ },
+ {
+  "id": "outro_1",
+  "text": "Ладно, дальше — у меня дома. Там брат, он про деньги всё знает.",
+  "emotion": "warm",
+  "event": "outro"
+ },
+ {
+  "id": "welcome_back_1",
+  "text": "О, {name}! Снова ты. Соскучился, да?",
+  "emotion": "happy",
+  "event": "welcome_back"
+ },
+ {
+  "id": "welcome_back_2",
+  "text": "{name}, здорово! Я знал, что ты вернёшься.",
+  "emotion": "happy",
+  "event": "welcome_back"
+ },
+ {
+  "id": "welcome_back_3",
+  "text": "Йо, {name}! Погнали дальше.",
+  "emotion": "happy",
+  "event": "welcome_back"
+ },
+ {
+  "id": "switch_start_1",
+  "text": "Ща переоденусь, не подглядывай!",
+  "emotion": "secretive",
+  "event": "switch_start"
+ },
+ {
+  "id": "switch_start_2",
+  "text": "Секунду, меняю образ...",
+  "emotion": "secretive",
+  "event": "switch_start"
+ },
+ {
+  "id": "switch_start_3",
+  "text": "Отвернись! Шучу. Клею наклейки.",
+  "emotion": "secretive",
+  "event": "switch_start"
+ },
+ {
+  "id": "shake_prompt_1",
+  "text": "Встряхни — увидишь меня другим.",
+  "emotion": "excited",
+  "event": "shake_prompt"
+ },
+ {
+  "id": "hello_new_1",
+  "text": "Ну как тебе? Новый я!",
+  "emotion": "proud",
+  "event": "hello_new"
+ },
+ {
+  "id": "hello_new_2",
+  "text": "Та-да! Узнаёшь?",
+  "emotion": "proud",
+  "event": "hello_new"
+ },
+ {
+  "id": "hello_new_3",
+  "text": "Вот это я понимаю — стиль!",
+  "emotion": "proud",
+  "event": "hello_new"
+ },
+ {
+  "id": "filler_1",
+  "text": "Мр-р... скейт бы сейчас.",
+  "emotion": "calm",
+  "event": "filler"
+ },
+ {
+  "id": "filler_2",
+  "text": "Хм. Чем бы заняться?",
+  "emotion": "calm",
+  "event": "filler"
+ },
+ {
+  "id": "filler_3",
+  "text": "Ла-ла-ла... чего молчишь?",
+  "emotion": "calm",
+  "event": "filler"
+ },
+ {
+  "id": "tap_screen_1",
+  "text": "Тук-тук, чё надо?",
+  "emotion": "cheeky",
+  "event": "tap_screen"
+ },
+ {
+  "id": "tap_screen_2",
+  "text": "Ну ты даёшь.",
+  "emotion": "cheeky",
+  "event": "tap_screen"
+ },
+ {
+  "id": "tap_screen_3",
+  "text": "Стучишь? Я дома, заходи.",
+  "emotion": "cheeky",
+  "event": "tap_screen"
+ },
+ {
+  "id": "tap_cat_1",
+  "text": "Эй, щекотно!",
+  "emotion": "playful",
+  "event": "tap_cat"
+ },
+ {
+  "id": "tap_cat_2",
+  "text": "Спорим, не поймаешь?",
+  "emotion": "playful",
+  "event": "tap_cat"
+ },
+ {
+  "id": "tap_cat_3",
+  "text": "Ладно, ты крутой. Немножко.",
+  "emotion": "playful",
+  "event": "tap_cat"
+ },
+ {
+  "id": "swipe_1",
+  "text": "Хе-хе.",
+  "emotion": "cheeky",
+  "event": "swipe"
+ },
+ {
+  "id": "swipe_2",
+  "text": "Хе-хе, когти — во!",
+  "emotion": "cheeky",
+  "event": "swipe"
+ },
+ {
+  "id": "swipe_3",
+  "text": "Царап-царап. Стекло целое, не бойся.",
+  "emotion": "cheeky",
+  "event": "swipe"
+ },
+ {
+  "id": "longpress_1",
+  "text": "Ты чё, держишь меня?",
+  "emotion": "tender",
+  "event": "longpress"
+ },
+ {
+  "id": "longpress_2",
+  "text": "Ладно, постою у стекла.",
+  "emotion": "tender",
+  "event": "longpress"
+ },
+ {
+  "id": "longpress_3",
+  "text": "Нос к носу, ха!",
+  "emotion": "tender",
+  "event": "longpress"
+ },
+ {
+  "id": "shake_1",
+  "text": "Эй, полегче!",
+  "emotion": "surprised",
+  "event": "shake"
+ },
+ {
+  "id": "shake_2",
+  "text": "Э! Я чуть не улетел!",
+  "emotion": "surprised",
+  "event": "shake"
+ },
+ {
+  "id": "shake_3",
+  "text": "Полегче, тут не миксер.",
+  "emotion": "surprised",
+  "event": "shake"
+ },
+ {
+  "id": "spam_1",
+  "text": "Стоп-стоп-стоп! Пальцы не устали?",
+  "emotion": "annoyed",
+  "event": "spam"
+ },
+ {
+  "id": "spam_2",
+  "text": "Тыц-тыц-тыц... Голова кругом!",
+  "emotion": "annoyed",
+  "event": "spam"
+ },
+ {
+  "id": "spam_3",
+  "text": "Ты чё, на рекорд идёшь?",
+  "emotion": "annoyed",
+  "event": "spam"
+ },
+ {
+  "id": "silence_1",
+  "text": "Скукота... Спорим, ты не тыкнешь в меня?",
+  "emotion": "bored",
+  "event": "silence"
+ },
+ {
+  "id": "silence_2",
+  "text": "Эй, ты тут? Я жду.",
+  "emotion": "bored",
+  "event": "silence"
+ },
+ {
+  "id": "silence_3",
+  "text": "Тишина... Может, другого меня позвать?",
+  "emotion": "bored",
+  "event": "silence"
+ },
+ {
+  "id": "sticker_peel_1",
+  "text": "Эй, это моя наклейка!",
+  "emotion": "playful",
+  "event": "sticker_peel"
+ },
+ {
+  "id": "sticker_peel_2",
+  "text": "Отклеивай, у меня ещё есть.",
+  "emotion": "playful",
+  "event": "sticker_peel"
+ },
+ {
+  "id": "sticker_peel_3",
+  "text": "Хе, ловко.",
+  "emotion": "playful",
+  "event": "sticker_peel"
+ },
+ {
+  "id": "card_lost_1",
+  "text": "Эй, куда карту дел?",
+  "emotion": "worried",
+  "event": "card_lost"
+ },
+ {
+  "id": "card_lost_2",
+  "text": "Карта где? Я тут вообще-то стою!",
+  "emotion": "worried",
+  "event": "card_lost"
+ },
+ {
+  "id": "card_lost_3",
+  "text": "Верни карту, мне стоять не на чем!",
+  "emotion": "worried",
+  "event": "card_lost"
+ },
+ {
+  "id": "card_found_1",
+  "text": "О, вернулась!",
+  "emotion": "happy",
+  "event": "card_found"
+ },
+ {
+  "id": "card_found_2",
+  "text": "Вот, другое дело.",
+  "emotion": "happy",
+  "event": "card_found"
+ },
+ {
+  "id": "card_found_3",
+  "text": "Карта на месте — я на месте.",
+  "emotion": "happy",
+  "event": "card_found"
+ },
+ {
+  "id": "money_1",
+  "text": "Это к брату! Он про деньги всё знает.",
+  "emotion": "confident",
+  "event": "money"
+ },
+ {
+  "id": "money_2",
+  "text": "Деньги? Это к брату! Жми кнопку.",
+  "emotion": "confident",
+  "event": "money"
+ },
+ {
+  "id": "money_3",
+  "text": "Я по трюкам, а про деньги — это к брату!",
+  "emotion": "confident",
+  "event": "money"
+ },
+ {
+  "id": "flip_1",
+  "text": "Смотри!",
+  "emotion": "excited",
+  "event": "flip"
+ },
+ {
+  "id": "flip_2",
+  "text": "Сальто? Легко!",
+  "emotion": "excited",
+  "event": "flip"
+ },
+ {
+  "id": "flip_3",
+  "text": "Хоп! Видал?",
+  "emotion": "excited",
+  "event": "flip"
+ },
+ {
+  "id": "dance_1",
+  "text": "Музыку давай!",
+  "emotion": "excited",
+  "event": "dance"
+ },
+ {
+  "id": "dance_2",
+  "text": "Танцую как умею. А умею круто.",
+  "emotion": "excited",
+  "event": "dance"
+ },
+ {
+  "id": "dance_3",
+  "text": "Оп-оп, смотри движ!",
+  "emotion": "excited",
+  "event": "dance"
+ },
+ {
+  "id": "riddle_1",
+  "text": "Загадка: без окон, без дверей, полна горница людей. Огурец! Хе-хе.",
+  "emotion": "playful",
+  "event": "riddle"
+ },
+ {
+  "id": "riddle_2",
+  "text": "Висит груша — нельзя скушать. Лампочка! Слишком легко?",
+  "emotion": "playful",
+  "event": "riddle"
+ },
+ {
+  "id": "riddle_3",
+  "text": "Зимой и летом одним цветом. Ёлка! Я и не такое знаю.",
+  "emotion": "playful",
+  "event": "riddle"
+ },
+ {
+  "id": "hello_1",
+  "text": "Здоро́во!",
+  "emotion": "happy",
+  "event": "hello"
+ },
+ {
+  "id": "hello_2",
+  "text": "Привет-привет!",
+  "emotion": "happy",
+  "event": "hello"
+ },
+ {
+  "id": "hello_3",
+  "text": "Йо! Рад видеть.",
+  "emotion": "happy",
+  "event": "hello"
+ },
+ {
+  "id": "joke_1",
+  "text": "Почему кот сидит у компьютера? Следит за мышкой! Хе-хе.",
+  "emotion": "playful",
+  "event": "joke"
+ },
+ {
+  "id": "joke_2",
+  "text": "Я бы рассказал шутку про скейт, но ты не догонишь.",
+  "emotion": "playful",
+  "event": "joke"
+ },
+ {
+  "id": "joke_3",
+  "text": "Шутка дня: я. Шучу, я — звезда дня.",
+  "emotion": "playful",
+  "event": "joke"
+ },
+ {
+  "id": "yes_1",
+  "text": "Вот и я говорю!",
+  "emotion": "happy",
+  "event": "yes"
+ },
+ {
+  "id": "yes_2",
+  "text": "Ага, договорились.",
+  "emotion": "happy",
+  "event": "yes"
+ },
+ {
+  "id": "yes_3",
+  "text": "Чётко.",
+  "emotion": "happy",
+  "event": "yes"
+ },
+ {
+  "id": "no_1",
+  "text": "Не хочешь — как хочешь.",
+  "emotion": "calm",
+  "event": "no"
+ },
+ {
+  "id": "no_2",
+  "text": "Ладно-ладно.",
+  "emotion": "calm",
+  "event": "no"
+ },
+ {
+  "id": "no_3",
+  "text": "Ну и не надо. Спорим, передумаешь?",
+  "emotion": "calm",
+  "event": "no"
+ },
+ {
+  "id": "skip_1",
+  "text": "Ладно, дальше.",
+  "emotion": "calm",
+  "event": "skip"
+ },
+ {
+  "id": "skip_2",
+  "text": "Проехали.",
+  "emotion": "calm",
+  "event": "skip"
+ },
+ {
+  "id": "skip_3",
+  "text": "Окей, едем дальше.",
+  "emotion": "calm",
+  "event": "skip"
+ },
+ {
+  "id": "unknown_1",
+  "text": "Чё? Не расслышал.",
+  "emotion": "confused",
+  "event": "unknown"
+ },
+ {
+  "id": "unknown_2",
+  "text": "Не понял, но звучит дерзко.",
+  "emotion": "confused",
+  "event": "unknown"
+ },
+ {
+  "id": "unknown_3",
+  "text": "Скажи по-другому, а?",
+  "emotion": "confused",
+  "event": "unknown"
+ },
+ {
+  "id": "signature_1",
+  "text": "Смотри, чё умею!",
+  "emotion": "proud",
+  "event": "signature"
+ },
+ {
+  "id": "signature_2",
+  "text": "Пузырь-рекордсмен!",
+  "emotion": "proud",
+  "event": "signature"
+ },
+ {
+  "id": "signature_3",
+  "text": "Хоп — и пузырь на весь экран!",
+  "emotion": "proud",
+  "event": "signature"
+ }
+]

@@ -138,6 +138,9 @@ export class UI {
     clearTimeout(this.bubbleTimer);
     this.bubbleTimer = window.setTimeout(() => this.bubble.classList.remove('show'), ms || 2200 + text.length * 55);
   }
+  micLevel(v: number) {
+    this.mic.style.setProperty('--lvl', String(v));
+  }
   micHintText(t: string) {
     this.micHint.textContent = t;
   }

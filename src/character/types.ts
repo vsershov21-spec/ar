@@ -1,5 +1,6 @@
 import type * as THREE from 'three';
 import type { Persona } from '../persona/types';
+import type { MouthShape, Viseme } from '../lipsync/visemes';
 
 /** Клипы из спецификации (docs/CHARACTER_SPEC.md). Длительность в секундах. */
 export const CLIPS = {
@@ -53,8 +54,11 @@ export interface Character {
   /** повернуть голову/взгляд на точку в мировых координатах (null — вперёд) */
   lookAt(world: THREE.Vector3 | null): void;
   emote(e: Emote, ms?: number): void;
-  /** липсинк 0..1 */
-  setMouth(open: number): void;
+  /**
+   * Липсинк: доминирующая визема (Rhubarb A–H, X), её вес 0..1 и сглаженные параметры рта.
+   * 3D — блендшейпы mouth_A/E/O/U/M (или челюсть), спрайт — PNG-оверлей рта.
+   */
+  setMouth(viseme: Viseme, weight: number, shape: MouthShape): void;
   update(dt: number, camera: THREE.Camera): void;
   /** попадание луча в кота */
   hitTest(ray: THREE.Raycaster): boolean;
