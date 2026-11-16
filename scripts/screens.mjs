@@ -149,7 +149,7 @@ try {
       await page.evaluate((t) => window.__app.director.speakText('hooligan', t), intro);
       await wait(1300);
       await page.evaluate(() => document.querySelector('.dbg')?.classList.remove('closed'));
-      await page.evaluate(() => document.querySelector('.dbg h4:nth-of-type(9)')?.scrollIntoView());
+      await page.evaluate(() => window.__debugPanel?.show('voice'));
       await wait(50);
       await page.screenshot({ path: path.join(outDir, `27_lipsync_${m}.png`) });
       console.log('  ✓ 27_lipsync_' + m);
