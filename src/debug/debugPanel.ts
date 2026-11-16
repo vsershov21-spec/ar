@@ -8,23 +8,30 @@ import { registerBuiltinTabs } from './builtinTabs';
 
 const css = `
 .dbg { position: fixed; z-index: 50; right: 0; top: 0; bottom: 0; width: min(320px, 82vw); background: rgba(10,14,18,.88); color: #dfe; font: 12px/1.3 ui-monospace, Menlo, monospace;
-  display: flex; flex-direction: column; transform: translateX(0); transition: transform .2s; backdrop-filter: blur(6px); }
+  display: flex; flex-direction: column; transform: translateX(0); transition: transform .2s; backdrop-filter: blur(6px); padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
 .dbg.closed { transform: translateX(100%); }
 .dbg-tabs { display: flex; flex-wrap: wrap; gap: 2px; padding: 6px 6px 4px; border-bottom: 1px solid #2a3a45; flex: none; }
 .dbg-tabs button { font: inherit; padding: 5px 7px; border-radius: 6px 6px 0 0; border: 1px solid #3a4a55; border-bottom: 0; background: #141c22; color: #9ab; }
-.dbg-tabs button.on { background: #b6ff3b; color: #111; }
+.dbg-tabs button.on { background: #b5e36a; color: #111; }
 .dbg-body { overflow-y: auto; padding: 4px 8px 60px; flex: 1; }
 .dbg-pane { display: none; }
 .dbg-pane.on { display: block; }
-.dbg h4 { margin: 10px 0 4px; color: #b6ff3b; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; }
+.dbg h4 { margin: 10px 0 4px; color: #b5e36a; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; }
 .dbg button { font: inherit; margin: 2px; padding: 5px 7px; border-radius: 6px; border: 1px solid #3a4a55; background: #1b252d; color: #eef; }
-.dbg button.on { background: #b6ff3b; color: #111; }
+.dbg button.on { background: #b5e36a; color: #111; }
 .dbg label { display: grid; grid-template-columns: 90px 1fr 44px; gap: 6px; align-items: center; margin: 2px 0; }
 .dbg input[type=range] { width: 100%; }
 .dbg select { width: 100%; margin: 3px 0; font: inherit; background: #1b252d; color: #eef; border: 1px solid #3a4a55; border-radius: 6px; padding: 4px; }
 .dbg .log { white-space: pre-wrap; max-height: 60vh; overflow-y: auto; background: #0007; padding: 4px; border-radius: 6px; }
-.dbg-toggle { position: fixed; z-index: 51; right: 8px; bottom: calc(8px + env(safe-area-inset-bottom)); width: 40px; height: 40px; border-radius: 50%; border: 0; background: #b6ff3b; font-weight: 900; }
-.dbg-fps { position: fixed; z-index: 51; left: 8px; bottom: calc(8px + env(safe-area-inset-bottom)); color: #b6ff3b; font: 11px ui-monospace, monospace; background: #0008; padding: 3px 6px; border-radius: 6px; pointer-events: none; white-space: pre; }
+.dbg-toggle { position: fixed; z-index: 51; left: 0; top: 50%; transform: translateY(-50%); min-width: 44px; height: 44px; padding: 0 8px 0 calc(6px + env(safe-area-inset-left));
+  border-radius: 0 12px 12px 0; border: 1px solid rgba(255,255,255,.14); border-left: 0; background: rgba(10,34,40,.55); color: #b5e36a;
+  font: 600 11px/1.1 ui-monospace, Menlo, monospace; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); opacity: .7; }
+@media (orientation: landscape) and (max-height: 520px) {
+  .dbg-toggle { left: auto; right: 0; top: calc(4px + env(safe-area-inset-top)); transform: none; border-radius: 12px 0 0 12px; border: 1px solid rgba(255,255,255,.14); border-right: 0;
+    padding: 0 calc(6px + env(safe-area-inset-right)) 0 8px; }
+}
+.dbg-toggle b { display: block; font-size: 12px; color: #fff; }
+.dbg-fps { flex: none; color: #b5e36a; font: 11px ui-monospace, monospace; padding: 6px 8px; border-bottom: 1px solid #2a3a45; white-space: pre; }
 `;
 
 export class DebugPanel {
@@ -42,7 +49,7 @@ export class DebugPanel {
     st.textContent = css;
     document.head.appendChild(st);
     const el = document.createElement('div');
-    el.className = 'dbg' + (window.innerWidth < 700 ? ' closed' : '');
+    el.className = 'dbg closed'; // свёрнута по умолчанию: открыть — язычок «DBG» слева
     this.el = el;
     this.bar = document.createElement('div');
     this.bar.className = 'dbg-tabs';
@@ -52,14 +59,16 @@ export class DebugPanel {
     document.body.appendChild(el);
     const tog = document.createElement('button');
     tog.className = 'dbg-toggle';
-    tog.textContent = 'D';
+    tog.innerHTML = '<b>DBG</b><span>—</span>';
+    tog.setAttribute('aria-label', 'Отладка');
     tog.onclick = () => el.classList.toggle('closed');
     document.body.appendChild(tog);
 
     // FPS: среднее за 0,5 с + худший кадр + время слоя эффектов
     const fps = document.createElement('div');
     fps.className = 'dbg-fps';
-    document.body.appendChild(fps);
+    el.prepend(fps);
+    const togFps = tog.querySelector('span')!;
     let acc = 0, worst = 0, tickAcc = 0;
     const prevFrame = app.onFrame;
     app.onFrame = (dt) => {
@@ -72,6 +81,7 @@ export class DebugPanel {
         fps.textContent =
           `${app.fps.toFixed(0)} fps · max ${(worst * 1000).toFixed(0)} мс · fx ${fxMs?.toFixed(2) ?? '—'} мс\n` +
           `${app.director.state.phase} · ${app.director.persona.id} · ${app.character.kind}${app.tracker.isTracking ? '' : ' · карта потеряна'}`;
+        togFps.textContent = app.fps.toFixed(0);
         acc = 0;
         worst = 0;
       }

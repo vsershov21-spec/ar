@@ -66,7 +66,7 @@ export function registerBuiltinTabs() {
       s = ui.section(el, 'Характер');
       for (const id of (d as any).d.personas.keys() as Iterable<string>) ui.btn(s, id, () => d.setPersona(id), 'persona:' + id);
       ui.btn(s, 'Фирменный трюк', () => (d as any).signature(), 'signature');
-      ui.btn(s, 'Выбор (стикеры)', () => (d as any).offerChoice(), 'choice');
+      ui.btn(s, 'Выбор характера', () => (d as any).offerChoice(), 'choice');
     },
   });
 

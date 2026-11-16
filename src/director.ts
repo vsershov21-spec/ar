@@ -208,6 +208,7 @@ export class Director extends Emitter<DirectorEvents> {
         void this.offerChoice();
         break;
       case 'hide_choice':
+        d.ui.hideChoice();
         d.fx.stickers.filter((s) => s.choice).forEach((s) => {
           s.flying = true;
           s.vx = rand(-500, 500);
@@ -310,18 +311,14 @@ export class Director extends Emitter<DirectorEvents> {
     for (let i = 0; i < 80 && this.queue.busy; i++) await wait(100);
     if (this.state.phase !== 'choose') return; // выбор уже сделан (голосом/таймером) — наклейки не нужны
     this.character.play('sticker');
-    const { w, h } = d.size();
-    const xs = [0.2, 0.5, 0.8];
-    const rots = [-0.14, 0.04, 0.14];
-    const spec = { hooligan: { kind: 'tag' as const, text: 'ЙО!' }, kind: { kind: 'heart' as const }, glitter: { kind: 'holo' as const } };
-    for (let i = 0; i < PERSONA_IDS.length; i++) {
-      const p = this.personas.get(PERSONA_IDS[i])!;
-      d.fx.addSticker(spec[p.id], w * xs[i], h * (i === 1 ? 0.6 : 0.55), {
-        size: Math.min(w * 0.28, 160), rot: rots[i], mirrored: false, choice: p.id, label: p.title, palette: p.palette,
-      });
-      await wait(380);
-      if (this.state.phase !== 'choose') return;
-    }
+    // выбор — лист внизу экрана (превью и цвет каждого характера), кот остаётся открытым
+    const opts = PERSONA_IDS.map((id) => {
+      const p = this.personas.get(id)!;
+      return { id: p.id, title: p.title, palette: p.palette };
+    });
+    d.ui.showChoice(opts, (id) => {
+      if (this.state.phase === 'choose' && isPersonaId(id)) this.dispatch({ type: 'choose', persona: id });
+    });
     this.dispatch({ type: 'choice_shown' });
   }
 

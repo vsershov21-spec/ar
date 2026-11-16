@@ -134,6 +134,13 @@ export class App {
       },
     }, { micSupported: this.engine.asr.supported, posterUrl: posterUrl() });
 
+    // пузырь реплик держится над котом / сбоку от головы, не закрывая морду
+    this.ui.catRect = () => {
+      if (!this.stage?.root.visible) return null;
+      const w = this.root.clientWidth, h = this.root.clientHeight;
+      const top = this.stage.headScreen(w, h, 1.02), feet = this.stage.headScreen(w, h, 0), head = this.stage.anchorScreen('head', w, h);
+      return { top: top.y, bottom: feet.y, cx: head.x, headY: head.y, half: Math.max(40, Math.abs(feet.y - top.y) * 0.32) };
+    };
     this.bindVoice();
 
     this.director = new Director({
@@ -230,10 +237,11 @@ export class App {
       const k = `${s.asrState}|${s.listening}|${Math.round(s.modelProgress * 20)}|${s.echo}`;
       if (k === lastState) return;
       lastState = k;
+      this.ui.setListening(s.asrState === 'listening');
       if (s.asrState === 'loading') this.ui.micHintText(`Загружаю распознавание… ${Math.round(s.modelProgress * 100)}%`);
       else if (s.asrState === 'listening') this.ui.micHintText(s.echo !== 'off' ? 'Говори — повторю!' : 'Слушаю…');
       else if (s.asrState === 'error')
-        this.ui.micHintText(s.micError === 'not-allowed' ? 'Нет доступа к микрофону — жми подсказки' : /no-model/.test(s.lastEvent) ? 'Офлайн-модель не найдена — жми подсказки' : 'Не расслышал, попробуй ещё');
+        this.ui.micHintText(s.micError === 'not-allowed' ? 'Нет доступа к микрофону — жми подсказки' : /no-model/.test(s.lastEvent) ? 'Офлайн-модель не найдена — жми подсказки' : 'Не расслышал, попробуй ещё', s.micError === 'not-allowed' || /no-model/.test(s.lastEvent) ? 'warn' : 'info');
       else if (s.echo === 'waiting') this.ui.micHintText('Говори — повторю!');
       if (s.asrState === 'idle' && !s.listening && s.echo === 'off') this.ui.micLevel(0);
     });
@@ -393,7 +401,7 @@ export class App {
     } catch (e) {
       console.error(e);
       this.ui.hideStart();
-      this.ui.toast('Камера не включилась. Разреши доступ к камере в настройках браузера и обнови страницу.', 8000);
+      this.ui.error('Камера не включилась', 'Разреши доступ к камере в настройках браузера и попробуй ещё раз.');
     }
   }
 
