@@ -1,28 +1,37 @@
 /**
  * 2D-слой эффектов поверх камеры («стекло» телефона). Canvas 2D, без зависимостей:
  * PixiJS добавил бы ~450 КБ и второй WebGL-контекст рядом с three.js и tfjs (MindAR),
- * а на iPhone число/память WebGL-контекстов — узкое место. Наши эффекты — сотни частиц
- * и несколько градиентов: Canvas 2D на A13+ держит это в 60 fps. DPR ограничен 2.
+ * а на iPhone число/память WebGL-контекстов — узкое место. DPR ограничен 2.
+ *
+ * Эффекты — по каталогу content/fx.json (src/fx/catalog.ts): fx.play(id, { x, y, path, … }).
+ * Параметры = fx.json → fxTuning характера → args.params. Неизвестный id — заглушка + строка в лог.
+ * Бюджет кадра на эффекты ~4 мс: при превышении слой сам снижает число частиц (lod).
  */
 import type { StickerSpec } from '../persona/types';
-import { renderSticker } from './stickers';
-import { clamp, easeOutBack, rand } from '../core/util';
+import { resolveFx, setFxCatalogLogger, num, range, bool, type FxTuning, type FxParams } from './catalog';
+import { Particles, Surface, breathFog, type AnchorName, type FxArgs, type FxEnv, type FxFactory, type FxInstance, type Palette, type Pt } from './core';
+import { StickerSheet, type AddOpts, type Sticker } from './stickerSheet';
+import { COMMON } from './effects/common';
+import { KIND } from './effects/kind';
+import { GLITTER } from './effects/glitter';
+import { HOOLIGAN } from './effects/hooligan';
+import { clamp, rand } from '../core/util';
 
-type Palette = { primary: string; secondary: string; accent: string; fx: string[] };
+export type { Sticker } from './stickerSheet';
+export type { FxArgs } from './core';
 
-interface Particle {
-  x: number; y: number; vx: number; vy: number; age: number; life: number; size: number;
-  color: string; kind: 'spark' | 'dot' | 'flake' | 'shred' | 'ring'; rot: number; vr: number; g: number; drag: number;
+const FACTORIES: Record<string, FxFactory> = { ...COMMON, ...KIND, ...GLITTER, ...HOOLIGAN };
+/** эффекты, которые делает лист наклеек (не FxInstance) */
+const STICKER_FX = new Set(['sticker', 'sticker_peel', 'stickers_cover', 'stickers_blow']);
+
+export interface FxHandle {
+  id: string;
+  /** закончился (или сразу, если заглушка) */
+  done: Promise<void>;
+  stop(): void;
 }
-interface Scratch { pts: { x: number; y: number }[]; age: number; life: number }
-interface Splat { x: number; y: number; r: number; blobs: { a: number; d: number; r: number }[]; drips: { x: number; len: number; speed: number }[]; age: number; life: number; color: string }
-export interface Sticker {
-  id: number; x: number; y: number; size: number; rot: number; spec: StickerSpec;
-  face: HTMLCanvasElement; back: HTMLCanvasElement;
-  age: number; peel: number; peelCorner: { x: number; y: number } | null;
-  flying: boolean; vx: number; vy: number; vr: number; alpha: number;
-  choice?: string; label?: string; slapT: number;
-}
+
+interface Live { inst: FxInstance; resolve: () => void }
 
 export class FxLayer {
   readonly canvas: HTMLCanvasElement;
@@ -30,35 +39,90 @@ export class FxLayer {
   w = 0;
   h = 0;
   private dpr = 1;
-  private parts: Particle[] = [];
-  private scratches: Scratch[] = [];
-  private splats: Splat[] = [];
-  stickers: Sticker[] = [];
-  private stickerId = 0;
-  private bubble: { x: number; y: number; r: number; R: number; t: number; phase: 'grow' | 'hold' | 'pop'; color: string; resolve: () => void } | null = null;
-  private glitchT = 0;
-  private glitchDur = 0;
-  private fog: HTMLCanvasElement;
-  private fg: CanvasRenderingContext2D;
-  private fogAlpha = 0;
-  private fogState: 'off' | 'in' | 'draw' | 'hold' | 'out' = 'off';
-  private fogT = 0;
-  private heart: { pts: { x: number; y: number }[]; drawn: number; resolve: () => void } | null = null;
-  private glassCat: { img: HTMLImageElement; t: number; dur: number } | null = null;
-  private trails: { pts: { x: number; y: number }[]; age: number; color: string }[] = [];
-  private peeling: Sticker | null = null;
-  private peelStart = { x: 0, y: 0 };
-  onGlitch: (on: boolean) => void = () => {};
-  onSlap: () => void = () => {};
+  private live: Live[] = [];
+  private capture: FxInstance | null = null;
+  private time = 0;
+  readonly parts = new Particles();
+  readonly fog = new Surface();
+  readonly gum = new Surface();
+  readonly sheet = new StickerSheet();
+  private scene: HTMLElement | null = null;
+  private shakeT = 0;
+  private shakeDur = 0;
+  private shakePx = 0;
+  private tilt = { x: 0, y: 0 };
+  private tiltRaw = { x: 0, y: 0 };
+  private grav = { x: 0, y: 1 };
+  private sensors = false;
+  /** среднее время кадра слоя, мс (debug) */
+  frameMs = 0;
+  /** качество 0.35..1 */
+  lod = 1;
   palette: Palette = { primary: '#111', secondary: '#B6FF3B', accent: '#FF6FB5', fx: ['#fff'] };
+  tuning: FxTuning = {};
+  stickerSpecs: StickerSpec[] = [{ kind: 'star' }];
+  /** экранная точка части кота (задаёт app по Stage); по умолчанию — центр экрана */
+  anchorFn: (name: AnchorName) => Pt & { s: number } = () => ({ x: this.w / 2, y: this.h * 0.45, s: this.h * 0.4 });
+  /** уровень микрофона 0..1 */
+  levelFn: () => number = () => 0;
+  onGlitch: (on: boolean) => void = () => {};
+  onSound: (id: string, vol?: number) => void = () => {};
+  onLog: (s: string) => void = (s) => console.warn(s);
+  private env: FxEnv;
 
   constructor(parent: HTMLElement) {
     this.canvas = document.createElement('canvas');
     this.canvas.className = 'fx-layer';
     parent.appendChild(this.canvas);
     this.g = this.canvas.getContext('2d')!;
-    this.fog = document.createElement('canvas');
-    this.fg = this.fog.getContext('2d')!;
+    setFxCatalogLogger((m) => this.onLog(m));
+    const self = this;
+    this.env = {
+      get w() { return self.w; },
+      get h() { return self.h; },
+      get dpr() { return self.dpr; },
+      get t() { return self.time; },
+      get palette() { return self.palette; },
+      get tilt() { return self.tilt; },
+      get gravity() { return self.grav; },
+      get lod() { return self.lod; },
+      anchor: (n) => this.anchorFn(n),
+      parts: this.parts,
+      fog: this.fog,
+      gum: this.gum,
+      sound: (id, v) => this.onSound(id, v),
+      shake: (px, ms) => this.shake(px, ms),
+      sceneGlitch: (on, px) => this.sceneGlitch(on, px),
+      level: () => this.levelFn(),
+      active: (id) => this.live.some((l) => l.inst.id === id),
+    };
+    this.sheet.onAllGone = () => this.onAllStickersGone();
+  }
+
+  // ───────────── совместимость со старым API ─────────────
+  set onSlap(fn: () => void) {
+    this.sheet.onSlap = fn;
+  }
+  get onSlap() {
+    return this.sheet.onSlap;
+  }
+  /** серия шлепков при заклеивании — кот хлопает лапой (app → character.play('sticker_slap')) */
+  set onStickerSeries(fn: () => void) {
+    this.sheet.onSeries = fn;
+  }
+  /** все наклейки отклеены пальцем → событие stickers_all_gone */
+  onAllStickersGone: () => void = () => {};
+
+  /** 3D-слой (canvas three.js): дрожание и глитч применяются и к нему */
+  attachScene(el: HTMLElement) {
+    this.scene = el;
+  }
+
+  /** характер: палитра, fxTuning, наклейки */
+  setPersona(p: { palette?: Palette; fxTuning?: FxTuning; stickers?: StickerSpec[] }) {
+    if (p.palette) this.palette = p.palette;
+    this.tuning = p.fxTuning ?? {};
+    if (p.stickers?.length) this.stickerSpecs = p.stickers;
   }
 
   resize(w: number, h: number) {
@@ -69,715 +133,330 @@ export class FxLayer {
     this.canvas.height = Math.round(h * this.dpr);
     this.canvas.style.width = w + 'px';
     this.canvas.style.height = h + 'px';
-    // туман считаем в половинном разрешении — он мягкий
-    this.fog.width = Math.max(1, Math.round(w / 2));
-    this.fog.height = Math.max(1, Math.round(h / 2));
+    this.fog.resize(w, h);
+    this.gum.resize(w, h);
+    Object.assign(this.sheet, { w, h, dpr: this.dpr });
+    this.listenSensors();
   }
 
   get busy() {
-    return !!this.bubble || this.fogState !== 'off' || !!this.glassCat;
+    return this.live.some((l) => l.inst.id === 'gum_bubble' || l.inst.id === 'glass_cat') || this.fog.visible;
   }
 
-  // ───────────── частицы ─────────────
-  private add(p: Partial<Particle> & { x: number; y: number }) {
-    if (this.parts.length > 700) this.parts.shift();
-    this.parts.push({ vx: 0, vy: 0, age: 0, life: 1, size: 6, color: '#fff', kind: 'spark', rot: rand(0, 6), vr: rand(-4, 4), g: 0, drag: 0.98, ...p });
+  /** живые эффекты (debug) */
+  get activeIds(): string[] {
+    return this.live.map((l) => l.inst.id);
   }
 
-  burst(x: number, y: number, colors = this.palette.fx, n = 36) {
-    for (let i = 0; i < n; i++) {
-      const a = rand(0, Math.PI * 2), sp = rand(80, 520);
-      this.add({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 120, life: rand(0.6, 1.3), size: rand(4, 11), color: colors[i % colors.length], kind: i % 3 ? 'spark' : 'dot', g: 500, drag: 0.94 });
+  // ───────────── главный вход ─────────────
+  /**
+   * Проиграть эффект по id из content/fx.json. Параметры: fx.json → fxTuning характера → args.params.
+   * Неизвестный id — заглушка (handle.done сразу), предупреждение в лог.
+   */
+  play(id: string, args: FxArgs = {}): FxHandle {
+    if (!id || id === 'none') return doneHandle(id);
+    const def = resolveFx(id, this.tuning, args.params);
+    if (args.durationMs !== undefined) def.durationMs = args.durationMs;
+    if (id === 'glitch') def.durationMs = Math.min(def.durationMs, 1000); // фотосенситивность: не дольше 1 с
+    if (args.sound && def.sound && def.sound !== 'none') this.onSound(def.sound);
+    if (STICKER_FX.has(id)) return this.playSticker(id, def.params, args, def.durationMs);
+    // пузырь жвачки и реакция могут оба попросить пятна — второй раз не нужен
+    if (id === 'gum_splat') {
+      const dup = this.live.find((l) => l.inst.id === 'gum_splat' && (l.inst as unknown as { t: number }).t < 0.6);
+      if (dup) return { id, done: Promise.resolve(), stop: () => dup.inst.stop?.() };
     }
-  }
-
-  trail(path: { x: number; y: number }[], colors = this.palette.fx) {
-    this.trails.push({ pts: path.map((p) => ({ x: p.x, y: p.y })), age: 0, color: colors[0] });
-    path.forEach((p, i) => {
-      for (let k = 0; k < 3; k++)
-        this.add({ x: p.x + rand(-8, 8), y: p.y + rand(-8, 8), vx: rand(-40, 40), vy: rand(-60, 20), life: rand(0.5, 1.2) + i * 0.01, size: rand(3, 9), color: colors[(i + k) % colors.length], kind: 'spark', g: 60, drag: 0.97 });
-    });
-  }
-
-  snowGlobe(colors = this.palette.fx) {
-    for (let i = 0; i < 240; i++)
-      this.add({ x: rand(0, this.w), y: rand(-this.h * 0.3, this.h), vx: rand(-90, 90), vy: rand(-200, 60), life: rand(2.2, 4), size: rand(3, 9), color: colors[i % colors.length], kind: i % 2 ? 'flake' : 'spark', g: 70, drag: 0.985 });
-  }
-
-  knock(x: number, y: number) {
-    for (let i = 0; i < 2; i++) this.add({ x, y, life: 0.5 + i * 0.15, size: 18 + i * 10, color: 'rgba(255,255,255,0.9)', kind: 'ring', vr: 0 });
-    for (let i = 0; i < 6; i++) {
-      const a = (i / 6) * Math.PI * 2;
-      this.add({ x, y, vx: Math.cos(a) * 160, vy: Math.sin(a) * 160, life: 0.35, size: 4, color: '#fff', kind: 'dot', drag: 0.9 });
+    const f = FACTORIES[id];
+    if (!f) {
+      if (!def.stub) this.onLog(`[fx] «${id}» есть в каталоге, но не реализован — заглушка`);
+      return doneHandle(id);
     }
+    let inst: FxInstance;
+    try {
+      inst = f(def, args, this.env);
+    } catch (e) {
+      this.onLog(`[fx] ошибка «${id}»: ${String(e)}`);
+      return doneHandle(id);
+    }
+    let resolve!: () => void;
+    const done = new Promise<void>((r) => (resolve = r));
+    this.live.push({ inst, resolve });
+    this.live.sort((a, b) => a.inst.z - b.inst.z);
+    return { id, done, stop: () => inst.stop?.() };
   }
 
-  // ───────────── когти ─────────────
-  claws(from: { x: number; y: number }, to: { x: number; y: number }) {
-    const dx = to.x - from.x, dy = to.y - from.y;
-    const len = Math.hypot(dx, dy) || 1;
-    const nx = -dy / len, ny = dx / len;
-    const L = Math.max(len, Math.min(this.w, this.h) * 0.45);
-    const ux = dx / len, uy = dy / len;
-    const cx = (from.x + to.x) / 2, cy = (from.y + to.y) / 2;
-    for (let k = -1.5; k <= 1.5; k++) {
-      const off = k * 26;
-      const pts: { x: number; y: number }[] = [];
-      const steps = 14;
-      for (let i = 0; i <= steps; i++) {
-        const t = i / steps - 0.5;
-        const j = i === 0 || i === steps ? 0 : rand(-3, 3);
-        pts.push({ x: cx + ux * L * t + nx * (off + j) + nx * Math.sin(t * 3) * 10, y: cy + uy * L * t + ny * (off + j) + ny * Math.sin(t * 3) * 10 });
+  /** остановить все экземпляры эффекта (петли: zzz, echo_wave, listen_ears) */
+  stop(id: string) {
+    for (const l of this.live) if (l.inst.id === id) l.inst.stop?.();
+  }
+
+  private playSticker(id: string, p: FxParams, args: FxArgs, durMs: number): FxHandle {
+    const s = this.stickerSpecs;
+    switch (id) {
+      case 'sticker': {
+        const x = args.x ?? rand(this.w * 0.25, this.w * 0.75), y = args.y ?? rand(this.h * 0.25, this.h * 0.7);
+        const [r0, r1] = range(p, 'rotateDeg', [-18, 18]);
+        const [s0, s1] = range(p, 'scale', [0.8, 1.2]);
+        this.sheet.add(s[Math.floor(Math.random() * s.length)], x, y, this.palette, { mirrored: bool(p, 'mirrored', true), rot: (rand(r0, r1) * Math.PI) / 180, scale: rand(s0, s1) });
+        return doneHandle(id, 400);
       }
-      this.scratches.push({ pts, age: -Math.abs(k) * 0.03, life: 2 });
-    }
-  }
-
-  // ───────────── пузырь жвачки ─────────────
-  gumBubble(x: number, y: number, color = '#FF6FB5'): Promise<void> {
-    return new Promise((resolve) => {
-      this.bubble = { x, y, r: 6, R: Math.hypot(this.w, this.h) * 0.62, t: 0, phase: 'grow', color, resolve };
-    });
-  }
-
-  private popBubble() {
-    const b = this.bubble!;
-    // ошмётки + «заляпывание» стекла
-    for (let i = 0; i < 40; i++) {
-      const a = rand(0, Math.PI * 2), sp = rand(300, 1100);
-      this.add({ x: b.x + Math.cos(a) * b.r * 0.4, y: b.y + Math.sin(a) * b.r * 0.4, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: rand(0.4, 0.9), size: rand(10, 26), color: b.color, kind: 'shred', g: 300, drag: 0.9 });
-    }
-    const n = 9;
-    for (let i = 0; i < n; i++) {
-      const edge = i < 6;
-      const a = (i / 6) * Math.PI * 2 + rand(-0.3, 0.3);
-      const x = edge ? this.w / 2 + Math.cos(a) * this.w * rand(0.42, 0.55) : rand(this.w * 0.2, this.w * 0.8);
-      const y = edge ? this.h / 2 + Math.sin(a) * this.h * rand(0.38, 0.5) : rand(this.h * 0.2, this.h * 0.8);
-      const r = edge ? rand(55, 110) : rand(25, 55);
-      this.splats.push({
-        x, y, r, age: 0, life: rand(3.2, 4.2), color: b.color,
-        blobs: Array.from({ length: 7 }, () => ({ a: rand(0, Math.PI * 2), d: rand(0.4, 1.0), r: rand(0.25, 0.55) })),
-        drips: Array.from({ length: 2 + Math.floor(rand(0, 3)) }, () => ({ x: rand(-0.6, 0.6), len: 0, speed: rand(8, 26) })),
-      });
-    }
-    this.onGlitch(false);
-  }
-
-  // ───────────── глитч ─────────────
-  glitch(ms = 500) {
-    this.glitchT = 0;
-    this.glitchDur = ms / 1000;
-    this.onGlitch(true);
-  }
-
-  // ───────────── пар на стекле + сердечко ─────────────
-  steamHeart(): Promise<void> {
-    return new Promise((resolve) => {
-      const W = this.fog.width, H = this.fog.height;
-      this.fg.clearRect(0, 0, W, H);
-      this.fogAlpha = 0;
-      this.fogState = 'in';
-      this.fogT = 0;
-      const cx = W / 2, cy = H * 0.5, s = Math.min(W, H) * 0.28;
-      const pts: { x: number; y: number }[] = [];
-      for (let i = 0; i <= 80; i++) {
-        const t = (i / 80) * Math.PI * 2;
-        // параметрическое сердце
-        const x = 16 * Math.pow(Math.sin(t), 3);
-        const y = -(13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t));
-        pts.push({ x: cx + (x / 17) * s, y: cy + (y / 17) * s });
+      case 'sticker_peel':
+        this.sheet.autoPeel(durMs || 600);
+        return doneHandle(id, durMs || 600);
+      case 'stickers_cover': {
+        const done = this.sheet.cover(s, this.palette, Math.round(num(p, 'count', 14)), num(p, 'intervalMs', 180), range(p, 'rotateDeg', [-18, 18]), range(p, 'scale', [0.9, 1.15]));
+        return { id, done, stop: () => this.sheet.blow() };
       }
-      this.heart = { pts, drawn: 0, resolve };
-    });
-  }
-
-  private paintFog() {
-    const W = this.fog.width, H = this.fog.height;
-    const g = this.fg;
-    g.globalCompositeOperation = 'source-over';
-    for (let i = 0; i < 6; i++) {
-      const x = rand(0, W), y = rand(H * 0.1, H * 0.95), r = rand(W * 0.2, W * 0.5);
-      const grd = g.createRadialGradient(x, y, 0, x, y, r);
-      grd.addColorStop(0, 'rgba(235,242,248,0.34)');
-      grd.addColorStop(1, 'rgba(235,242,248,0)');
-      g.fillStyle = grd;
-      g.fillRect(0, 0, W, H);
+      case 'stickers_blow':
+        this.sheet.blow(bool(p, 'spin', true));
+        return doneHandle(id, 1000);
     }
+    return doneHandle(id);
   }
 
-  /** стереть туман пальцем (screen px) */
+  // ───────────── касания: эффекты могут забрать жест ─────────────
+  /** true — касание забрал эффект (пузырь лопнул, рисуем по туману, стираем жвачку) */
+  pointerDown(x: number, y: number): boolean {
+    this.capture = null;
+    for (let i = this.live.length - 1; i >= 0; i--) {
+      const inst = this.live[i].inst;
+      if (inst.pointer?.('down', x, y, x, y, this.env)) {
+        this.capture = inst;
+        return true;
+      }
+    }
+    return false;
+  }
+  pointerMove(x: number, y: number, px: number, py: number): boolean {
+    if (!this.capture) return false;
+    this.capture.pointer?.('move', x, y, px, py, this.env);
+    return true;
+  }
+  pointerUp(x: number, y: number): boolean {
+    const c = this.capture;
+    this.capture = null;
+    c?.pointer?.('up', x, y, x, y, this.env);
+    return !!c;
+  }
+
+  /** стереть туман/жвачку пальцем (любой drag) */
   wipeFog(x: number, y: number, px?: number, py?: number) {
-    if (this.fogState === 'off') return false;
-    const g = this.fg;
-    g.globalCompositeOperation = 'destination-out';
-    g.lineCap = 'round';
-    g.lineWidth = 16;
-    g.strokeStyle = 'rgba(0,0,0,0.9)';
-    g.beginPath();
-    g.moveTo((px ?? x) / 2, (py ?? y) / 2);
-    g.lineTo(x / 2 + 0.01, y / 2);
-    g.stroke();
-    g.globalCompositeOperation = 'source-over';
-    if (this.fogState === 'hold') this.fogT = Math.min(this.fogT, 1); // пока рисуют — не тает
+    if (!this.fog.visible) return false;
+    this.fog.wipe(x, y, px ?? x, py ?? y, 16);
     return true;
   }
 
   get fogActive() {
-    return this.fogState !== 'off';
+    return this.fog.visible;
   }
 
-  // ───────────── кот у стекла ─────────────
+  // ───────────── старые методы (director) — теперь через каталог ─────────────
+  burst(x: number, y: number, colors?: string[], n?: number) {
+    this.withPalette(colors, () => this.play('glitter_burst', { x, y, params: n ? { count: n } : undefined }));
+  }
+  trail(path: Pt[], colors?: string[]) {
+    this.withPalette(colors, () => this.play('glitter_trail', { path }));
+  }
+  snowGlobe(colors?: string[]) {
+    this.withPalette(colors, () => this.play('snow_globe'));
+  }
+  knock(x: number, y: number) {
+    this.play('knock', { x, y });
+  }
+  claws(from: Pt, to: Pt) {
+    this.play('claws', { x: to.x, y: to.y, from });
+  }
+  glitch(ms = 500) {
+    this.play('glitch', { durationMs: ms });
+  }
+  gumBubble(x: number, y: number, color?: string): Promise<void> {
+    const h = this.play('gum_bubble', { x, y, params: color ? { color } : undefined });
+    this.play('gum_splat');
+    return h.done;
+  }
+  steamHeart(): Promise<void> {
+    return this.play('steam_heart').done;
+  }
   glassCatShow(img: HTMLImageElement, ms = 2600) {
-    this.glassCat = { img, t: 0, dur: ms / 1000 };
+    this.play('glass_cat', { image: img, durationMs: ms });
+  }
+  private withPalette(colors: string[] | undefined, fn: () => void) {
+    if (!colors) return fn();
+    const p = this.palette;
+    this.palette = { ...p, fx: colors };
+    fn();
+    this.palette = p;
   }
 
   // ───────────── наклейки ─────────────
-  addSticker(spec: StickerSpec, x: number, y: number, opts: { size?: number; rot?: number; mirrored?: boolean; choice?: string; label?: string; palette?: Palette } = {}): Sticker {
-    const size = opts.size ?? Math.min(this.w, this.h) * rand(0.22, 0.3);
-    const px = Math.round(size * this.dpr);
-    const { face, back } = renderSticker(spec, px, opts.palette ?? this.palette, opts.mirrored ?? true);
-    const st: Sticker = {
-      id: ++this.stickerId, x, y, size, rot: opts.rot ?? rand(-0.35, 0.35), spec, face, back, age: 0, peel: 0, peelCorner: null,
-      flying: false, vx: 0, vy: 0, vr: 0, alpha: 1, choice: opts.choice, label: opts.label, slapT: 0,
-    };
-    this.stickers.push(st);
-    this.onSlap();
-    return st;
+  get stickers(): Sticker[] {
+    return this.sheet.list;
   }
-
-  /** заклеить экран наклейками за ms */
-  async cover(specs: StickerSpec[], palette: Palette, ms = 3200): Promise<void> {
-    const n = 15;
-    const cols = 3, rows = 5;
-    const cells = Array.from({ length: cols * rows }, (_, i) => i).sort(() => Math.random() - 0.5);
-    for (let i = 0; i < n; i++) {
-      const c = cells[i % cells.length];
-      const cx = ((c % cols) + 0.5) / cols, cy = (Math.floor(c / cols) + 0.5) / rows;
-      this.addSticker(specs[i % specs.length], cx * this.w + rand(-30, 30), cy * this.h + rand(-30, 30), { size: Math.max(this.w, this.h) * rand(0.24, 0.32), palette });
-      await new Promise((r) => setTimeout(r, ms / n));
-    }
+  addSticker(spec: StickerSpec, x: number, y: number, opts: AddOpts = {}): Sticker {
+    return this.sheet.add(spec, x, y, this.palette, opts);
   }
-
+  /** заклеить экран (параметры — fx.json stickers_cover; ms игнорируется, оставлен для совместимости) */
+  cover(specs: StickerSpec[], palette: Palette, _ms?: number): Promise<void> {
+    const p = resolveFx('stickers_cover', this.tuning).params;
+    return this.sheet.cover(specs, palette, Math.round(num(p, 'count', 14)), num(p, 'intervalMs', 180), range(p, 'rotateDeg', [-18, 18]), range(p, 'scale', [0.9, 1.15]));
+  }
   blowStickers() {
-    for (const s of this.stickers) {
-      const dx = s.x - this.w / 2, dy = s.y - this.h / 2;
-      const d = Math.hypot(dx, dy) || 1;
-      s.flying = true;
-      s.vx = (dx / d) * rand(900, 1600);
-      s.vy = (dy / d) * rand(900, 1600) - 300;
-      s.vr = rand(-8, 8);
-    }
+    this.sheet.blow(bool(resolveFx('stickers_blow', this.tuning).params, 'spin', true));
   }
-
   clearStickers() {
-    this.stickers = [];
+    this.sheet.clear();
+  }
+  stickerAt(x: number, y: number) {
+    return this.sheet.at(x, y);
+  }
+  beginPeel(x: number, y: number) {
+    return this.sheet.beginPeel(x, y);
+  }
+  dragPeel(x: number, y: number) {
+    this.sheet.dragPeel(x, y);
+  }
+  endPeel(vx = 0, vy = 0) {
+    return this.sheet.endPeel(vx, vy);
+  }
+  get isPeeling() {
+    return this.sheet.isPeeling;
   }
 
   /** убрать все эффекты (debug, смена сцены) */
   reset() {
-    this.parts = [];
-    this.scratches = [];
-    this.splats = [];
-    this.trails = [];
-    this.stickers = [];
-    this.bubble = null;
-    this.glassCat = null;
-    this.fogState = 'off';
-    this.fogAlpha = 0;
-    this.heart = null;
-    this.glitchDur = 0;
-    this.onGlitch(false);
-  }
-
-  stickerAt(x: number, y: number): Sticker | null {
-    for (let i = this.stickers.length - 1; i >= 0; i--) {
-      const s = this.stickers[i];
-      if (s.flying) continue;
-      const c = Math.cos(-s.rot), sn = Math.sin(-s.rot);
-      const lx = (x - s.x) * c - (y - s.y) * sn, ly = (x - s.x) * sn + (y - s.y) * c;
-      if (Math.abs(lx) < s.size * 0.48 && Math.abs(ly) < s.size * 0.48) return s;
+    for (const l of this.live) {
+      l.inst.end?.(this.env);
+      l.resolve();
     }
-    return null;
+    this.live = [];
+    this.capture = null;
+    this.parts.clear();
+    this.fog.clear();
+    this.gum.clear();
+    this.sheet.clear();
+    this.sceneGlitch(false);
   }
 
-  /** начать отклеивание: палец у угла наклейки (в пределах 35% от угла) */
-  beginPeel(x: number, y: number): boolean {
-    const s = this.stickerAt(x, y);
-    if (!s || s.choice) return false;
-    const c = Math.cos(-s.rot), sn = Math.sin(-s.rot);
-    const lx = (x - s.x) * c - (y - s.y) * sn, ly = (x - s.x) * sn + (y - s.y) * c;
-    const h = s.size / 2;
-    if (Math.abs(lx) < h * 0.3 || Math.abs(ly) < h * 0.3) return false; // не угол
-    s.peelCorner = { x: Math.sign(lx) * h, y: Math.sign(ly) * h };
-    this.peeling = s;
-    this.peelStart = { x, y };
-    return true;
+  // ───────────── дрожание, глитч, датчики ─────────────
+  private shake(px: number, ms: number) {
+    if (px <= 0) return;
+    this.shakePx = Math.max(this.shakePx * (1 - this.shakeT / (this.shakeDur || 1)), px);
+    this.shakeDur = ms / 1000;
+    this.shakeT = 0;
   }
 
-  dragPeel(x: number, y: number) {
-    const s = this.peeling;
-    if (!s || !s.peelCorner) return;
-    const c = Math.cos(-s.rot), sn = Math.sin(-s.rot);
-    const dx = x - this.peelStart.x, dy = y - this.peelStart.y;
-    const lx = dx * c - dy * sn, ly = dx * sn + dy * c;
-    const d = norm(-s.peelCorner.x, -s.peelCorner.y);
-    const along = lx * d.x + ly * d.y;
-    s.peel = clamp(along / (s.size * 1.2), 0, 1);
+  private sceneGlitch(on: boolean, px = 8) {
+    this.onGlitch(on);
+    if (!this.scene) return;
+    this.scene.classList.toggle('glitch', on);
+    this.scene.style.setProperty('--gshift', `${Math.round(px)}px`);
   }
 
-  /** true — наклейку сорвали */
-  endPeel(vx = 0, vy = 0): boolean {
-    const s = this.peeling;
-    this.peeling = null;
-    if (!s) return false;
-    if (s.peel > 0.35) {
-      s.flying = true;
-      s.vx = vx || rand(-600, 600);
-      s.vy = vy || -800;
-      s.vr = rand(-6, 6);
-      return true;
-    }
-    s.peel = 0;
-    s.peelCorner = null;
-    return false;
-  }
-
-  get isPeeling() {
-    return !!this.peeling;
+  private listenSensors() {
+    if (this.sensors || typeof window === 'undefined') return;
+    this.sensors = true;
+    // наклон: для блика наклеек, голограммы. Разрешение (iOS) запрашивает Input.requestSensors()
+    window.addEventListener('deviceorientation', (e) => {
+      if (e.beta == null || e.gamma == null) return;
+      const ang = screenAngle();
+      let gx = clamp(e.gamma / 45, -1, 1), gy = clamp((e.beta - 45) / 45, -1, 1);
+      if (ang === 90) [gx, gy] = [gy, -gx];
+      else if (ang === 270 || ang === -90) [gx, gy] = [-gy, gx];
+      this.tiltRaw = { x: gx, y: gy };
+    });
+    // «низ» для снежного шара — по акселерометру с гравитацией
+    window.addEventListener('devicemotion', (e) => {
+      const a = e.accelerationIncludingGravity;
+      if (!a || a.x == null || a.y == null) return;
+      // экран: x вправо, y вниз; у устройства y вверх
+      let x = -a.x, y = a.y;
+      const ang = screenAngle();
+      if (ang === 90) [x, y] = [y, -x];
+      else if (ang === 270 || ang === -90) [x, y] = [-y, x];
+      const l = Math.hypot(x, y);
+      // телефон лежит плашмя — «вниз» к нижнему краю
+      if (l > 2) this.grav = { x: x / l, y: y / l };
+    });
   }
 
   // ───────────── цикл ─────────────
   update(dt: number) {
+    const t0 = performance.now();
     dt = Math.min(dt, 0.05);
-    for (const p of this.parts) {
-      p.age += dt;
-      p.vx *= Math.pow(p.drag, dt * 60);
-      p.vy = p.vy * Math.pow(p.drag, dt * 60) + p.g * dt;
-      p.x += p.vx * dt;
-      p.y += p.vy * dt;
-      p.rot += p.vr * dt;
-      if (p.kind === 'flake') p.vx += Math.sin(p.age * 3 + p.rot) * 30 * dt;
-    }
-    this.parts = this.parts.filter((p) => p.age < p.life);
-    this.scratches.forEach((s) => (s.age += dt));
-    this.scratches = this.scratches.filter((s) => s.age < s.life);
-    this.trails.forEach((t) => (t.age += dt));
-    this.trails = this.trails.filter((t) => t.age < 1);
-    for (const s of this.splats) {
-      s.age += dt;
-      s.drips.forEach((d) => (d.len = Math.min(2.2, d.len + (d.speed * dt) / s.r)));
-    }
-    this.splats = this.splats.filter((s) => s.age < s.life);
-
-    const b = this.bubble;
-    if (b) {
-      b.t += dt;
-      if (b.phase === 'grow') {
-        const k = clamp(b.t / 1.5, 0, 1);
-        b.r = 6 + (b.R - 6) * (k * k * (3 - 2 * k));
-        // центр пузыря уходит к центру экрана
-        b.x += (this.w / 2 - b.x) * dt * 1.5;
-        b.y += (this.h / 2 - b.y) * dt * 1.5;
-        if (k >= 1) {
-          b.phase = 'hold';
-          b.t = 0;
-        }
-      } else if (b.phase === 'hold' && b.t > 0.35) {
-        b.phase = 'pop';
-        this.popBubble();
-        const r = b.resolve;
-        this.bubble = null;
-        r();
+    this.time += dt;
+    this.tilt.x += (this.tiltRaw.x - this.tilt.x) * Math.min(1, dt * 8);
+    this.tilt.y += (this.tiltRaw.y - this.tilt.y) * Math.min(1, dt * 8);
+    const keep: Live[] = [];
+    for (const l of this.live) {
+      let alive = false;
+      try {
+        alive = l.inst.update(dt, this.env);
+      } catch (e) {
+        this.onLog(`[fx] ошибка «${l.inst.id}»: ${String(e)}`);
+      }
+      if (alive) keep.push(l);
+      else {
+        l.inst.end?.(this.env);
+        if (this.capture === l.inst) this.capture = null;
+        l.resolve();
       }
     }
-
-    if (this.glitchDur > 0) {
-      this.glitchT += dt;
-      if (this.glitchT >= this.glitchDur) {
-        this.glitchDur = 0;
-        this.onGlitch(false);
-      }
+    this.live = keep;
+    this.parts.update(dt, this.env);
+    this.fog.update(dt);
+    this.gum.update(dt);
+    this.sheet.update(dt);
+    // дрожание стекла (и кота за ним)
+    if (this.shakeDur > 0) {
+      this.shakeT += dt;
+      const k = 1 - this.shakeT / this.shakeDur;
+      const tr = k > 0 ? `translate(${(rand(-1, 1) * this.shakePx * k).toFixed(1)}px,${(rand(-1, 1) * this.shakePx * k).toFixed(1)}px)` : '';
+      this.canvas.style.transform = tr;
+      if (this.scene) this.scene.style.transform = tr;
+      if (k <= 0) this.shakeDur = 0;
     }
-
-    // туман
-    if (this.fogState !== 'off') {
-      this.fogT += dt;
-      if (this.fogState === 'in') {
-        if (Math.random() < 0.6) this.paintFog();
-        this.fogAlpha = clamp(this.fogT / 0.8, 0, 1);
-        if (this.fogT > 0.9) {
-          this.fogState = 'draw';
-          this.fogT = 0;
-        }
-      } else if (this.fogState === 'draw' && this.heart) {
-        const h = this.heart;
-        const target = Math.floor(clamp(this.fogT / 1.6, 0, 1) * (h.pts.length - 1));
-        while (h.drawn < target) {
-          const a = h.pts[h.drawn], c = h.pts[h.drawn + 1];
-          this.fg.globalCompositeOperation = 'destination-out';
-          this.fg.lineCap = 'round';
-          this.fg.lineWidth = 13;
-          this.fg.beginPath();
-          this.fg.moveTo(a.x, a.y);
-          this.fg.lineTo(c.x, c.y);
-          this.fg.stroke();
-          this.fg.globalCompositeOperation = 'source-over';
-          h.drawn++;
-        }
-        if (target >= h.pts.length - 1) {
-          this.fogState = 'hold';
-          this.fogT = 0;
-          const r = h.resolve;
-          this.heart = null;
-          r();
-        }
-      } else if (this.fogState === 'hold' && this.fogT > 3.5) {
-        this.fogState = 'out';
-        this.fogT = 0;
-      } else if (this.fogState === 'out') {
-        this.fogAlpha = clamp(1 - this.fogT / 2.5, 0, 1);
-        if (this.fogAlpha <= 0) this.fogState = 'off';
-      }
-    }
-
-    if (this.glassCat) {
-      this.glassCat.t += dt;
-      if (this.glassCat.t > this.glassCat.dur) this.glassCat = null;
-    }
-
-    for (const s of this.stickers) {
-      s.age += dt;
-      if (s.flying) {
-        s.x += s.vx * dt;
-        s.y += s.vy * dt;
-        s.vy += 1400 * dt;
-        s.rot += s.vr * dt;
-        s.alpha -= dt * 1.2;
-      }
-    }
-    this.stickers = this.stickers.filter((s) => s.alpha > 0 && s.y < this.h + s.size * 2);
+    this.cost += performance.now() - t0;
   }
+  private cost = 0;
 
   draw() {
+    const t0 = performance.now();
     const g = this.g;
     g.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     g.clearRect(0, 0, this.w, this.h);
-
-    // туман на стекле (под остальным)
-    if (this.fogState !== 'off' && this.fogAlpha > 0) {
-      g.globalAlpha = this.fogAlpha;
-      g.drawImage(this.fog, 0, 0, this.w, this.h);
-      g.globalAlpha = 1;
-    }
-
-    // «кот у стекла»: прижатый спрайт, щека расплющена
-    if (this.glassCat) this.drawGlassCat();
-
-    // царапины
-    for (const s of this.scratches) {
-      if (s.age < 0) continue;
-      const k = s.age / s.life;
-      const a = k < 0.6 ? 1 : 1 - (k - 0.6) / 0.4;
-      const grow = clamp(s.age / 0.12, 0, 1);
-      const n = Math.max(2, Math.floor(s.pts.length * grow));
-      g.lineCap = 'round';
-      g.lineJoin = 'round';
-      g.beginPath();
-      for (let i = 0; i < n; i++) (i ? g.lineTo : g.moveTo).call(g, s.pts[i].x + 2, s.pts[i].y + 3);
-      g.strokeStyle = `rgba(0,0,0,${0.35 * a})`;
-      g.lineWidth = 7;
-      g.stroke();
-      g.beginPath();
-      for (let i = 0; i < n; i++) (i ? g.lineTo : g.moveTo).call(g, s.pts[i].x, s.pts[i].y);
-      g.strokeStyle = `rgba(255,255,255,${0.95 * a})`;
-      g.lineWidth = 4;
-      g.stroke();
-      g.strokeStyle = `rgba(200,230,255,${0.6 * a})`;
-      g.lineWidth = 1.2;
-      g.stroke();
-    }
-
-    // шлейфы
-    for (const t of this.trails) {
-      const a = 1 - t.age;
-      g.beginPath();
-      t.pts.forEach((p, i) => (i ? g.lineTo(p.x, p.y) : g.moveTo(p.x, p.y)));
-      g.strokeStyle = t.color;
-      g.globalAlpha = 0.6 * a;
-      g.lineWidth = 10 * a + 2;
-      g.lineCap = 'round';
-      g.shadowColor = t.color;
-      g.shadowBlur = 18;
-      g.stroke();
-      g.shadowBlur = 0;
-      g.globalAlpha = 1;
-    }
-
-    // наклейки
-    for (const s of this.stickers) this.drawSticker(s);
-
-    // пятна жвачки на стекле
-    for (const s of this.splats) {
-      const a = clamp((s.life - s.age) / 1.0, 0, 1);
-      const pop = easeOutBack(clamp(s.age / 0.18, 0, 1));
-      g.save();
-      g.translate(s.x, s.y);
-      g.globalAlpha = 0.88 * a;
-      g.fillStyle = s.color;
-      g.beginPath();
-      g.arc(0, 0, s.r * pop * 0.7, 0, Math.PI * 2);
-      for (const b of s.blobs) {
-        g.moveTo(Math.cos(b.a) * s.r * b.d * pop + s.r * b.r * pop, Math.sin(b.a) * s.r * b.d * pop);
-        g.arc(Math.cos(b.a) * s.r * b.d * pop, Math.sin(b.a) * s.r * b.d * pop, s.r * b.r * pop, 0, Math.PI * 2);
-      }
-      g.fill();
-      for (const d of s.drips) {
-        g.beginPath();
-        g.roundRect(d.x * s.r - 6, 0, 12, s.r * 0.5 + d.len * s.r, 6);
-        g.fill();
-      }
-      // блик
-      g.globalAlpha = 0.5 * a;
-      g.fillStyle = '#fff';
-      g.beginPath();
-      g.ellipse(-s.r * 0.25, -s.r * 0.25, s.r * 0.18, s.r * 0.09, -0.6, 0, Math.PI * 2);
-      g.fill();
-      g.restore();
-    }
-
-    // пузырь жвачки
-    const b = this.bubble;
-    if (b) {
-      const wob = b.phase === 'hold' ? 1 + 0.02 * Math.sin(b.t * 60) : 1;
-      const r = b.r * wob;
-      g.save();
-      const grd = g.createRadialGradient(b.x - r * 0.3, b.y - r * 0.35, r * 0.05, b.x, b.y, r);
-      grd.addColorStop(0, 'rgba(255,220,240,0.55)');
-      grd.addColorStop(0.7, hexA(b.color, 0.5));
-      grd.addColorStop(0.97, hexA(b.color, 0.85));
-      grd.addColorStop(1, hexA(b.color, 0.95));
-      g.fillStyle = grd;
-      g.beginPath();
-      g.arc(b.x, b.y, r, 0, Math.PI * 2);
-      g.fill();
-      g.fillStyle = 'rgba(255,255,255,0.65)';
-      g.beginPath();
-      g.ellipse(b.x - r * 0.42, b.y - r * 0.45, r * 0.16, r * 0.07, -0.7, 0, Math.PI * 2);
-      g.fill();
-      g.beginPath();
-      g.arc(b.x - r * 0.22, b.y - r * 0.58, r * 0.03, 0, Math.PI * 2);
-      g.fill();
-      g.restore();
-    }
-
-    // частицы
-    for (const p of this.parts) {
-      const a = 1 - p.age / p.life;
-      g.globalAlpha = clamp(a * 1.4, 0, 1);
-      g.fillStyle = p.color;
-      g.strokeStyle = p.color;
-      if (p.kind === 'spark' || p.kind === 'flake') {
-        const tw = p.kind === 'spark' ? 0.6 + 0.4 * Math.sin(p.age * 25 + p.rot * 10) : 1;
-        drawSparkle(g, p.x, p.y, p.size * tw, p.rot);
-      } else if (p.kind === 'ring') {
-        const k = p.age / p.life;
-        g.lineWidth = 3 * (1 - k) + 0.5;
-        g.beginPath();
-        g.arc(p.x, p.y, p.size * (0.6 + k * 1.8), 0, Math.PI * 2);
-        g.stroke();
-      } else if (p.kind === 'shred') {
-        g.save();
-        g.translate(p.x, p.y);
-        g.rotate(p.rot);
-        g.beginPath();
-        g.ellipse(0, 0, p.size, p.size * 0.45, 0, 0, Math.PI * 2);
-        g.fill();
-        g.restore();
-      } else {
-        g.beginPath();
-        g.arc(p.x, p.y, p.size / 2, 0, Math.PI * 2);
-        g.fill();
-      }
-    }
+    const env = this.env;
+    // туман и жвачка — прямо на стекле, под остальным
+    let i = 0;
+    const L = this.live;
+    for (; i < L.length && L[i].inst.z < 1; i++) L[i].inst.draw(g, env);
+    this.fog.draw(g, this.w, this.h);
+    this.gum.draw(g, this.w, this.h);
+    for (; i < L.length && L[i].inst.z < 1.5; i++) L[i].inst.draw(g, env);
+    this.sheet.draw(g, this.tilt);
+    for (; i < L.length && L[i].inst.z < 3; i++) L[i].inst.draw(g, env);
+    this.parts.draw(g, env);
+    for (; i < L.length; i++) L[i].inst.draw(g, env);
     g.globalAlpha = 1;
-
-    if (this.glitchDur > 0) this.drawGlitch();
+    g.globalCompositeOperation = 'source-over';
+    // бюджет: EMA времени кадра слоя → качество
+    const ms = this.cost + (performance.now() - t0);
+    this.cost = 0;
+    this.frameMs += (ms - this.frameMs) * 0.1;
+    if (this.frameMs > 4 && this.lod > 0.35) this.lod = Math.max(0.35, this.lod - 0.02);
+    else if (this.frameMs < 2.5 && this.lod < 1) this.lod = Math.min(1, this.lod + 0.005);
+    this.parts.cap = Math.round(900 * this.lod);
   }
 
-  private drawGlitch() {
-    const g = this.g;
-    const k = this.glitchT / this.glitchDur;
-    const cols = ['rgba(0,255,230,0.35)', 'rgba(255,0,170,0.35)', 'rgba(182,255,59,0.35)'];
-    for (let i = 0; i < 9; i++) {
-      const y = Math.random() * this.h;
-      const hh = rand(4, 40);
-      g.fillStyle = cols[i % 3];
-      g.fillRect(rand(-40, 40), y, this.w, hh);
-    }
-    g.fillStyle = 'rgba(0,0,0,0.12)';
-    for (let y = 0; y < this.h; y += 4) g.fillRect(0, y, this.w, 1);
-    if (k < 0.7) {
-      for (let i = 0; i < 14; i++) {
-        g.fillStyle = Math.random() < 0.5 ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.5)';
-        g.fillRect(rand(0, this.w), rand(0, this.h), rand(8, 60), rand(3, 12));
-      }
-    }
-  }
-
-  private drawGlassCat() {
-    const gc = this.glassCat!;
-    const g = this.g;
-    const k = gc.t / gc.dur;
-    const inK = easeOutBack(clamp(gc.t / 0.35, 0, 1));
-    const outK = clamp((gc.dur - gc.t) / 0.3, 0, 1);
-    const img = gc.img;
-    const H = this.h * 0.95;
-    const W = (H * img.naturalWidth) / img.naturalHeight;
-    const squash = 1 + 0.06 * Math.sin(Math.min(1, k * 3) * Math.PI * 0.5);
-    g.save();
-    g.globalAlpha = outK;
-    g.translate(this.w / 2, this.h + H * 0.12 + (1 - inK) * H * 0.6);
-    g.scale(squash * 1.04, 1 / squash);
-    g.drawImage(img, -W / 2, -H, W, H);
-    g.restore();
-    // прижатые щёки/нос: светлые «пятна контакта» + запотевание вокруг
-    const fy = this.h - H * 0.68 + (1 - inK) * H * 0.6;
-    g.globalAlpha = 0.45 * outK;
-    const grd = g.createRadialGradient(this.w / 2, fy, 10, this.w / 2, fy, this.w * 0.55);
-    grd.addColorStop(0, 'rgba(255,255,255,0.0)');
-    grd.addColorStop(0.55, 'rgba(240,248,255,0.0)');
-    grd.addColorStop(0.75, 'rgba(240,248,255,0.55)');
-    grd.addColorStop(1, 'rgba(240,248,255,0)');
-    g.fillStyle = grd;
-    g.fillRect(0, 0, this.w, this.h);
-    g.fillStyle = 'rgba(255,255,255,0.6)';
-    for (const dx of [-0.22, 0.22]) {
-      g.beginPath();
-      g.ellipse(this.w / 2 + dx * this.w, fy + 30, this.w * 0.09, this.w * 0.05, 0, 0, Math.PI * 2);
-      g.fill();
-    }
-    g.globalAlpha = 1;
-  }
-
-  private drawSticker(s: Sticker) {
-    const g = this.g;
-    const slap = s.age < 0.25 ? easeOutBack(s.age / 0.25) : 1;
-    const sc = (1.6 - 0.6 * slap) * (s.flying ? 1 : 1);
-    g.save();
-    g.globalAlpha = clamp(s.alpha, 0, 1) * clamp(s.age / 0.08, 0, 1);
-    g.translate(s.x, s.y);
-    g.rotate(s.rot);
-    g.scale(sc, sc);
-    const h = s.size / 2;
-    if (s.peel > 0 && s.peelCorner) {
-      const d = norm(-s.peelCorner.x, -s.peelCorner.y);
-      const L = s.peel * s.size * 1.4;
-      const k = (s.peelCorner.x * d.x + s.peelCorner.y * d.y) + L / 2; // проекция линии сгиба
-      // приклеенная часть
-      g.save();
-      g.beginPath();
-      halfPlane(g, d, k, s.size * 2, false);
-      g.clip();
-      g.drawImage(s.face, -h, -h, s.size, s.size);
-      g.restore();
-      // загнутый уголок: отражение отклеенной части относительно линии сгиба
-      g.save();
-      g.transform(1 - 2 * d.x * d.x, -2 * d.x * d.y, -2 * d.x * d.y, 1 - 2 * d.y * d.y, 2 * k * d.x, 2 * k * d.y);
-      g.beginPath();
-      halfPlane(g, d, k, s.size * 2, true);
-      g.clip();
-      g.shadowColor = 'rgba(0,0,0,0.3)';
-      g.shadowBlur = 8;
-      g.drawImage(s.back, -h, -h, s.size, s.size);
-      g.restore();
-    } else {
-      g.drawImage(s.face, -h, -h, s.size, s.size);
-      // блик: диагональная полоса пробегает по наклейке
-      const ph = ((s.age * 0.6 + s.id * 0.37) % 2.2) - 0.6;
-      g.save();
-      g.globalCompositeOperation = 'source-atop';
-      g.restore();
-      g.save();
-      g.beginPath();
-      g.rect(-h, -h, s.size, s.size);
-      g.clip();
-      const grd = g.createLinearGradient(-h + ph * s.size, -h, -h + ph * s.size + s.size * 0.5, h);
-      grd.addColorStop(0, 'rgba(255,255,255,0)');
-      grd.addColorStop(0.5, 'rgba(255,255,255,0.45)');
-      grd.addColorStop(1, 'rgba(255,255,255,0)');
-      g.globalCompositeOperation = 'lighter';
-      g.globalAlpha *= 0.55;
-      // маска блика — сама наклейка (через временный канвас дорого; используем форму-силуэт)
-      g.drawImage(maskedGloss(s, grd), -h, -h, s.size, s.size);
-      g.restore();
-    }
-    if (s.label) {
-      g.font = `800 ${Math.round(s.size * 0.13)}px -apple-system, system-ui, sans-serif`;
-      g.textAlign = 'center';
-      g.fillStyle = '#fff';
-      g.strokeStyle = 'rgba(0,0,0,0.6)';
-      g.lineWidth = 4;
-      g.strokeText(s.label, 0, h + s.size * 0.12);
-      g.fillText(s.label, 0, h + s.size * 0.12);
-    }
-    g.restore();
+  /** «дыхнуть» на стекло (используется glass_cat / steam) */
+  breathe(x: number, y: number, r: number, opacity = 0.3) {
+    breathFog(this.fog, x, y, r, opacity);
+    this.fog.keep(1500, 2000);
   }
 }
 
-const glossCanvas = document.createElement('canvas');
-/** блик, обрезанный по форме наклейки */
-function maskedGloss(s: Sticker, grd: CanvasGradient) {
-  const c = glossCanvas;
-  if (c.width !== s.face.width) {
-    c.width = s.face.width;
-    c.height = s.face.height;
-  }
-  const g = c.getContext('2d')!;
-  g.setTransform(1, 0, 0, 1, 0, 0);
-  g.clearRect(0, 0, c.width, c.height);
-  g.drawImage(s.face, 0, 0);
-  g.globalCompositeOperation = 'source-in';
-  // переносим градиент из координат наклейки в пиксели канваса
-  const k = c.width / s.size;
-  g.setTransform(k, 0, 0, k, (s.size / 2) * k, (s.size / 2) * k);
-  g.fillStyle = grd;
-  g.fillRect(-s.size, -s.size, s.size * 2, s.size * 2);
-  g.globalCompositeOperation = 'source-over';
-  return c;
+function doneHandle(id: string, ms = 0): FxHandle {
+  return { id, done: ms ? new Promise((r) => setTimeout(r, ms)) : Promise.resolve(), stop: () => undefined };
 }
 
-function halfPlane(g: CanvasRenderingContext2D, d: { x: number; y: number }, k: number, R: number, negative: boolean) {
-  // полуплоскость {p: p·d > k} (или < k) как большой прямоугольник
-  const px = -d.y, py = d.x;
-  const sx = d.x * k, sy = d.y * k;
-  const dir = negative ? -1 : 1;
-  g.moveTo(sx + px * R, sy + py * R);
-  g.lineTo(sx - px * R, sy - py * R);
-  g.lineTo(sx - px * R + d.x * R * dir, sy - py * R + d.y * R * dir);
-  g.lineTo(sx + px * R + d.x * R * dir, sy + py * R + d.y * R * dir);
-  g.closePath();
-}
-
-function norm(x: number, y: number) {
-  const l = Math.hypot(x, y) || 1;
-  return { x: x / l, y: y / l };
-}
-
-function drawSparkle(g: CanvasRenderingContext2D, x: number, y: number, s: number, rot: number) {
-  g.save();
-  g.translate(x, y);
-  g.rotate(rot);
-  g.beginPath();
-  g.moveTo(0, -s);
-  g.quadraticCurveTo(0, 0, s, 0);
-  g.quadraticCurveTo(0, 0, 0, s);
-  g.quadraticCurveTo(0, 0, -s, 0);
-  g.quadraticCurveTo(0, 0, 0, -s);
-  g.fill();
-  g.restore();
-}
-
-function hexA(hex: string, a: number) {
-  const n = parseInt(hex.replace('#', ''), 16);
-  return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${a})`;
+function screenAngle(): number {
+  return (screen.orientation?.angle ?? (window as any).orientation ?? 0) as number;
 }

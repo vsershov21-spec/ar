@@ -5,7 +5,6 @@
  * Когда придёт модель с настоящими клипами (docs/CHARACTER_SPEC.md), GlbCharacter
  * автоматически переключится на AnimationMixer, а этот файл останется как fallback.
  */
-import type { ClipName } from './types';
 
 export type BoneOffsets = Record<string, [number, number, number]>;
 export interface ProcPose { bones: BoneOffsets; root: { x?: number; y?: number; z?: number; rx?: number; ry?: number; rz?: number; s?: number } }
@@ -14,7 +13,7 @@ const S = Math.sin;
 const tri = (k: number) => S(Math.min(1, Math.max(0, k)) * Math.PI);
 
 /** k — нормированное время клипа 0..1 (для петель — фаза), t — секунды с начала клипа. */
-const BASE: Partial<Record<ClipName, (k: number, t: number) => ProcPose>> = {
+const BASE: Record<string, (k: number, t: number) => ProcPose> = {
   idle: (_k, t) => ({
     bones: {
       Spine1: [0.03 * S(t * 1.8), 0, 0.025 * S(t * 0.9)],
@@ -87,15 +86,25 @@ const BASE: Partial<Record<ClipName, (k: number, t: number) => ProcPose>> = {
   }),
 };
 
-/** недостающие клипы для внешней GLB-заглушки — ближайшие аналоги */
-export const PROC = {
-  ...BASE,
-  walk: BASE.run_home!,
-  run: BASE.run_home!,
-  jump: BASE.glitter_burst!,
-  flip: BASE.tumble!,
-  turn_left: BASE.idle!,
-  turn_right: BASE.idle!,
-  sit: BASE.bored!,
-  wave: BASE.knock_glass!,
-} as Record<ClipName, (k: number, t: number) => ProcPose>;
+/**
+ * Клипы каталога (content/animations.json) → ближайшая процедурная поза GLB-заглушки.
+ * Финальная модель приносит свои клипы с теми же id — тогда играет AnimationMixer, это не используется.
+ */
+export const NEAREST: Record<string, string> = {
+  idle_breathe: 'idle', idle_look_around: 'idle', idle_stretch: 'glitter_burst', idle_yawn: 'bored', idle_tail_play: 'dance',
+  idle_hooligan_skate: 'dance', idle_hooligan_headphones: 'talk', idle_kind_hug_self: 'bored', idle_kind_cocoa: 'bubble_gum',
+  idle_glitter_mirror: 'listen', idle_glitter_twirl: 'dance', appear_jump_in: 'appear', dive_out: 'run_home', fall_off_card: 'tumble',
+  peek_from_edge: 'listen', walk: 'run_home', run: 'run_home', turn_left: 'idle', turn_right: 'idle', jump: 'glitter_burst', flip: 'tumble',
+  dizzy: 'dance', sit_down: 'bored', sit_idle: 'bored', stand_up: 'idle', sleep_loop: 'bored', wake_startle: 'glitter_burst',
+  wave: 'knock_glass', point_button: 'knock_glass', talk_casual: 'talk', talk_excited: 'talk', think: 'listen', shy: 'bored',
+  surprised: 'glitter_burst', offended: 'bored', proud: 'glitter_burst', comfort: 'press_glass', cover_ears: 'glitter_burst',
+  lean_in: 'press_glass', celebrate: 'glitter_burst', sing: 'talk', scratch_glass: 'scratch', slide_down_glass: 'press_glass',
+  breath_draw: 'heart_draw', hug_screen: 'press_glass', sticker_slap: 'sticker', sticker_react: 'listen', gum_blow: 'bubble_gum',
+  kind_bubbles: 'bubble_gum', glitter_throw: 'glitter_burst', snowglobe_shake: 'dance', purr_stroke: 'listen', poke_head: 'laugh',
+  poke_cheek: 'laugh', poke_belly: 'laugh', poke_paw: 'knock_glass', poke_tail: 'glitter_burst', flinch: 'tumble',
+  dance_hooligan: 'dance', dance_kind: 'dance', dance_glitter: 'dance', echo_speak: 'talk',
+};
+
+export function procFor(id: string): (k: number, t: number) => ProcPose {
+  return BASE[id] ?? BASE[NEAREST[id] ?? ''] ?? BASE.idle!;
+}

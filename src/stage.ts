@@ -7,6 +7,14 @@ import type { Tracker } from './tracker/types';
 import type { Character } from './character/types';
 import type { StageConfig } from './config';
 import { clamp, easeInOut } from './core/util';
+import type { AnchorName } from './fx/core';
+
+/** точки частей кота в долях роста (ноги в 0, рост 1, лицом в +Z) — если персонаж не дал свои */
+const ANCHOR_FRAC: Record<AnchorName, [number, number, number]> = {
+  head: [0, 0.8, 0.05], mouth: [0, 0.66, 0.2], feet: [0, 0.02, 0.05], body: [0, 0.45, 0.1],
+  earL: [-0.17, 0.93, 0], earR: [0.17, 0.93, 0], pawR: [0.2, 0.42, 0.18],
+};
+const defaultAnchor = (n: AnchorName, out: THREE.Vector3) => out.set(...(ANCHOR_FRAC[n] ?? ANCHOR_FRAC.body));
 
 export type StageMode = 'card' | 'glass';
 
@@ -209,6 +217,24 @@ export class Stage {
     (this.shadow.material as THREE.MeshBasicMaterial).opacity = (1 - this.t) * this.visibleK * 0.9;
     this.shadow.visible = this.visibleK > 0.001;
   }
+
+  /**
+   * Экранная точка части кота (px) и рост кота на экране s (px) — для «мировых» эффектов
+   * (пузырь у рта, Zzz над головой, искры из-под лап). Точку даёт персонаж (кости рига), иначе — доли роста.
+   */
+  anchorScreen(name: AnchorName, w: number, h: number): { x: number; y: number; s: number } {
+    this.root.updateMatrixWorld(true);
+    const cam = this.tracker.camera;
+    const local = this.character?.anchorLocal?.(name) ?? defaultAnchor(name, this.tmpA);
+    const p = this.tmpA.copy(local).applyMatrix4(this.root.matrixWorld).project(cam);
+    const f = this.tmpB.set(0, 0, 0).applyMatrix4(this.root.matrixWorld).project(cam);
+    const top = this.tmpC.set(0, 1, 0).applyMatrix4(this.root.matrixWorld).project(cam);
+    const s = Math.hypot(((top.x - f.x) / 2) * w, ((top.y - f.y) / 2) * h);
+    return { x: ((p.x + 1) / 2) * w, y: ((1 - p.y) / 2) * h, s: Math.max(40, s) };
+  }
+  private tmpA = new THREE.Vector3();
+  private tmpB = new THREE.Vector3();
+  private tmpC = new THREE.Vector3();
 
   /** экранная точка (px) центра «головы» кота — для эффектов (пузырь жвачки, блёстки) */
   headScreen(w: number, h: number, frac = 0.78): { x: number; y: number } {

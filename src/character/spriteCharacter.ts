@@ -1,10 +1,20 @@
 /**
- * Спрайт/видео-режим: плоскость-billboard на карте.
- * Источник кадров (по manifest.json): PNG/WebP-позы со сменой и твинами (сейчас),
- * прозрачное видео (.mov HEVC alpha для Safari, .webm VP9 alpha для Chrome) или атлас-секвенция.
+ * Спрайт/видео-режим: плоскость-billboard на карте. Порядок источников для клипа:
+ *  1) видео с альфой public/video/<persona>/<clip>.{mov,webm} — по public/video/manifest.json
+ *     (HEVC .mov для Safari, VP9 .webm для Chrome/Android; манифест: npm run video-manifest);
+ *  2) PNG/WebP-позы из video/sprites/manifest.json (смена кадров + твины);
+ *  3) нет ни видео, ни поз для характера (например, Добряк) — риг-заглушка (RigCat) вместо плоскости.
+ * Клипы — id каталога content/animations.json; для поз есть сопоставление со старыми именами.
  */
 import * as THREE from 'three';
-import { CLIPS, type Character, type ClipName, type Emote, type PlayOptions } from './types';
+import type { Character, ClipName, Emote, PlayOptions, TouchZone } from './types';
+import { ClipState } from './clipState';
+import { LEGACY_CLIP } from './clips';
+import { NEAREST } from './procedural';
+import { RigCat } from './rigCat';
+import { personaMeta } from './personaMeta';
+import { DEFAULT_ZONES, zoneFromUv, type ZoneRects } from './zones';
+import type { AnchorName } from '../fx/core';
 import type { Persona } from '../persona/types';
 import { asset, clamp, easeOutBack } from '../core/util';
 import type { MouthShape, Viseme } from '../lipsync/visemes';
@@ -25,6 +35,26 @@ export interface SpriteManifest {
 
 interface Tween { name: string; t: number; dur: number }
 
+/** public/video/manifest.json: какие видео-клипы с альфой есть у характера */
+export interface VideoManifest {
+  personas: Record<string, Record<string, { hevc?: string; webm?: string }>>;
+}
+
+/** id каталога → старое имя клипа спрайт-манифеста */
+const LEGACY_BY_ID: Record<string, string> = Object.fromEntries(Object.entries(LEGACY_CLIP).map(([k, v]) => [v, k]));
+/** твины (оживляют статичную позу) по старому имени клипа */
+const TWEEN: Record<string, string> = {
+  appear: 'pop', tumble: 'flip', laugh: 'shake', knock_glass: 'lunge', scratch: 'lunge', glitter_burst: 'jump',
+  bubble_gum: 'inflate', heart_draw: 'sway', run_home: 'run', dance: 'dance', bored: 'droop', sticker: 'lunge', press_glass: 'lunge',
+  flip: 'flip', jump: 'jump', walk: 'walk', run: 'walk', wave: 'sway', sit: 'droop',
+};
+/** твины для клипов каталога, у которых нет близкого старого */
+const TWEEN_ID: Record<string, string> = {
+  poke_head: 'nudge', poke_cheek: 'nudge', poke_belly: 'shake', poke_paw: 'nudge', poke_tail: 'jump', flinch: 'nudge', dizzy: 'sway',
+  celebrate: 'jump', surprised: 'nudge', purr_stroke: 'sway', offended: 'droop', shy: 'droop', dive_out: 'hide', fall_off_card: 'shake',
+  hug_screen: 'lunge', comfort: 'lunge', lean_in: 'lunge', snowglobe_shake: 'shake', idle_glitter_twirl: 'sway', sticker_slap: 'lunge',
+};
+
 export class SpriteCharacter implements Character {
   readonly kind = 'sprite' as const;
   readonly object = new THREE.Group();
@@ -36,10 +66,13 @@ export class SpriteCharacter implements Character {
   private tex = new Map<string, THREE.Texture>();
   private imgs = new Map<string, HTMLImageElement>();
   private alphaCache = new Map<string, ImageData>();
-  private clip: ClipName = 'idle';
-  private clipT = 0;
-  private opts: PlayOptions = {};
+  readonly clips = new ClipState();
+  private shownId = '';
   private poseKey = '';
+  private videos: VideoManifest = { personas: {} };
+  /** характер без поз и видео → риг-заглушка */
+  private rig: RigCat | null = null;
+  private usingRig = false;
   private mouth = 0;
   private viseme: Viseme = 'X';
   private mouthW = 0;
@@ -66,13 +99,19 @@ export class SpriteCharacter implements Character {
     this.object.name = 'character-sprite';
   }
 
-  get currentClip() {
-    return this.clip;
+  get currentClip(): ClipName {
+    return this.usingRig && this.rig ? this.rig.currentClip : this.clips.requested;
   }
 
   async load() {
     const r = await fetch(asset(this.manifestUrl));
     this.manifest = await r.json();
+    try {
+      const v = await fetch(asset('video/manifest.json'));
+      if (v.ok) this.videos = await v.json();
+    } catch {
+      /* видео-клипов нет */
+    }
     // предзагрузка всех поз (небольшие webp) — смена позы без задержки
     const jobs: Promise<void>[] = [];
     for (const [pid, p] of Object.entries(this.manifest.personas)) {
@@ -113,8 +152,22 @@ export class SpriteCharacter implements Character {
   }
 
   setPersona(p: Persona) {
-    if (this.manifest?.personas[p.id]) this.persona = p.id;
+    this.clips.setIdles(personaMeta(p.id).idles, p.id);
+    const hasPoses = !!this.manifest?.personas[p.id];
+    const hasVideo = Object.keys(this.videos.personas[p.id] ?? {}).length > 0;
+    this.usingRig = !hasPoses && !hasVideo;
+    if (this.usingRig) {
+      if (!this.rig) {
+        this.rig = new RigCat();
+        this.object.add(this.rig.object);
+      }
+      this.rig.setPersona(p);
+      this.rig.play(this.clips.requested);
+    } else this.persona = p.id;
+    if (this.rig) this.rig.object.visible = this.usingRig;
+    this.pivot.visible = !this.usingRig;
     this.poseKey = '';
+    this.shownId = '';
     this.applyPose();
   }
 
@@ -123,19 +176,39 @@ export class SpriteCharacter implements Character {
   }
 
   play(clip: ClipName, opts: PlayOptions = {}) {
-    this.clip = clip;
-    this.clipT = 0;
-    this.opts = opts;
+    if (this.usingRig && this.rig) {
+      this.rig.play(clip, opts);
+      this.clips.requested = this.rig.clips.requested;
+      return;
+    }
+    this.clips.play(clip, opts);
+  }
+
+  /** клип каталога → имя клипа в спрайт-манифесте (тот же id, старое имя, ближайший) */
+  private spriteClip(id: string): string {
+    const clips = this.def()?.clips ?? {};
+    if (clips[id]) return id;
+    const legacy = LEGACY_BY_ID[id];
+    if (legacy && clips[legacy]) return legacy;
+    if (id.startsWith('idle')) return 'idle';
+    if (id.startsWith('dance')) return 'dance';
+    const near = NEAREST[id];
+    return near && clips[near] ? near : 'idle';
+  }
+
+  /** смена клипа тела (из ClipState) → видео или позы + твин */
+  private onClipChanged() {
+    const tr = this.clips.cur;
+    this.shownId = tr.id;
     this.stopVideo();
-    const c = this.def()?.clips[clip];
-    if (c?.video) this.startVideo(c.video, opts.loop ?? CLIPS[clip].loop);
-    // твины по клипам — оживляют статичные позы
-    const tw: Record<string, string> = {
-      appear: 'pop', tumble: 'flip', laugh: 'shake', knock_glass: 'lunge', scratch: 'lunge', glitter_burst: 'jump',
-      bubble_gum: 'inflate', heart_draw: 'sway', run_home: 'run', dance: 'dance', bored: 'droop', sticker: 'lunge', press_glass: 'lunge',
-      flip: 'flip', jump: 'jump', walk: 'walk', run: 'walk', wave: 'sway', sit: 'droop',
-    };
-    if (tw[clip]) this.tween(tw[clip], CLIPS[clip].dur);
+    const vid = this.videos.personas[this.persona]?.[tr.id];
+    const name = this.spriteClip(tr.id);
+    const c = this.def()?.clips[name];
+    if (vid) this.startVideo(vid, tr.loop);
+    else if (c?.video && name === tr.id) this.startVideo(c.video, tr.loop);
+    const tw = TWEEN_ID[tr.id] ?? TWEEN[name] ?? TWEEN[LEGACY_BY_ID[tr.id] ?? ''];
+    if (tw && !this.video) this.tween(tw, tr.def.durationS);
+    this.poseKey = '';
     this.applyPose();
   }
 
@@ -174,12 +247,13 @@ export class SpriteCharacter implements Character {
   private poseForTime(): string {
     const d = this.def();
     if (!d) return '';
-    const c = d.clips[this.clip] ?? d.clips.idle;
+    const name = this.spriteClip(this.clips.cur.id);
+    const c = d.clips[name] ?? d.clips.idle;
     const poses = c?.poses ?? ['idle'];
     const fps = c?.fps ?? 2;
-    let i = Math.floor(this.clipT * fps) % poses.length;
+    let i = Math.floor(this.clips.cur.t * fps) % poses.length;
     // липсинк в спрайт-режиме: при громком звуке — поза с открытым ртом (если задана 2-й в talk)
-    if (this.clip === 'talk' && poses.length > 1 && !this.manifest.mouth) i = this.mouth > 0.35 ? 1 : 0;
+    if (name === 'talk' && poses.length > 1 && !this.manifest.mouth) i = this.mouth > 0.35 ? 1 : 0;
     return poses[i];
   }
 
@@ -210,12 +284,20 @@ export class SpriteCharacter implements Character {
     this.lookTarget = world;
   }
 
-  emote(_e: Emote) {
+  emote(e: Emote, ms?: number) {
+    if (this.usingRig) return this.rig?.emote(e, ms);
     // в спрайт-режиме эмоции заложены в позах; короткий «вздрог» как обратная связь
-    this.tween('nudge', 0.25);
+    if (e !== 'blink') this.tween('nudge', 0.25);
+  }
+
+  face(preset: string, ms = 0) {
+    if (this.usingRig) return this.rig?.face(preset, ms);
+    // лица в позах/видео; пресет даёт только мимический «вздрог»
+    if (preset !== 'neutral') this.tween('nudge', 0.2);
   }
 
   setMouth(v: Viseme, w: number, shape: MouthShape) {
+    this.rig?.setMouth(v, w, shape);
     this.mouth = clamp(shape.open, 0, 1);
     this.viseme = v;
     this.mouthW = w;
@@ -241,14 +323,14 @@ export class SpriteCharacter implements Character {
 
   update(dt: number, camera: THREE.Camera) {
     this.time += dt;
-    this.clipT += dt;
-    const spec = CLIPS[this.clip];
-    const loop = this.opts.loop ?? spec.loop;
-    if (!loop && this.clipT >= spec.dur) {
-      const cb = this.opts.onEnd;
-      this.play('idle');
-      cb?.();
+    if (this.usingRig && this.rig) {
+      this.rig.object.userData.tilt = this.object.userData.tilt;
+      this.rig.update(dt, camera);
+      this.clips.requested = this.rig.clips.requested;
+      return;
     }
+    this.clips.update(dt);
+    if (this.clips.cur.id !== this.shownId) this.onClipChanged();
     this.applyPose();
     this.updateMouthOverlay();
 
@@ -343,12 +425,35 @@ export class SpriteCharacter implements Character {
   }
 
   hitTest(ray: THREE.Raycaster): boolean {
+    if (this.usingRig && this.rig) return this.rig.hitTest(ray);
+    return this.hitUv(ray) !== null;
+  }
+
+  /** зона касания: по прямоугольникам позы (manifest poses.<pose>.zones) или по умолчанию */
+  hitZone(ray: THREE.Raycaster): TouchZone | null {
+    if (this.usingRig && this.rig) return this.rig.hitZone(ray);
+    const uv = this.hitUv(ray);
+    if (!uv) return null;
+    const pd = this.def()?.poses[this.pose] as { zones?: ZoneRects } | undefined;
+    return zoneFromUv(uv.x, 1 - uv.y, pd?.zones ?? DEFAULT_ZONES);
+  }
+
+  anchorLocal(name: AnchorName): THREE.Vector3 | null {
+    if (this.usingRig && this.rig) {
+      const p = this.rig.anchorLocal(name);
+      return p ? this.object.worldToLocal(this.rig.object.localToWorld(p)) : null;
+    }
+    return null;
+  }
+
+  /** точка попадания на плоскость (uv), если там непрозрачный кот */
+  private hitUv(ray: THREE.Raycaster): THREE.Vector2 | null {
     const hits = ray.intersectObject(this.mesh, false);
-    if (!hits.length) return false;
+    if (!hits.length) return null;
     // проверка альфы в точке попадания: прозрачные поля спрайта — не кот
     const uv = hits[0].uv;
     const img = this.imgs.get(this.poseKey);
-    if (!uv || !img) return true;
+    if (!uv || !img) return uv ?? new THREE.Vector2(0.5, 0.5);
     let data = this.alphaCache.get(this.poseKey);
     if (!data) {
       const c = document.createElement('canvas');
@@ -364,12 +469,13 @@ export class SpriteCharacter implements Character {
     for (let dy = -2; dy <= 2; dy++)
       for (let dx = -2; dx <= 2; dx++) {
         const xx = clamp(px + dx, 0, 63), yy = clamp(py + dy, 0, 63);
-        if (data.data[(yy * 64 + xx) * 4 + 3] > 40) return true;
+        if (data.data[(yy * 64 + xx) * 4 + 3] > 40) return uv;
       }
-    return false;
+    return null;
   }
 
   posterImage() {
+    if (this.usingRig) return null;
     const d = this.def();
     const key = `${this.persona}/${d?.press ?? 'listen'}`;
     return this.imgs.get(key) ?? this.imgs.get(this.poseKey) ?? null;
@@ -377,6 +483,7 @@ export class SpriteCharacter implements Character {
 
   dispose() {
     this.stopVideo();
+    this.rig?.dispose();
     this.tex.forEach((t) => t.dispose());
     this.mesh.geometry.dispose();
     this.mesh.material.dispose();

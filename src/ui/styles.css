@@ -21,11 +21,13 @@ body { position: fixed; inset: 0; touch-action: none; -webkit-user-select: none;
 .debug-bg::after { content: ''; position: absolute; inset: 0; opacity: .18; background:
   repeating-linear-gradient(95deg, rgba(0,0,0,.25) 0 2px, transparent 2px 22px); }
 canvas.gl { position: absolute; inset: 0; z-index: 1; width: 100%; height: 100%; transition: filter .1s; }
-canvas.gl.glitch { animation: glitch .12s steps(2) infinite; }
+/* глитч 3D-слоя: RGB-раздвоение кота (drop-shadow по альфе) + сдвиги. Фотосенситивность: смена картинки
+   не чаще 3 раз в секунду (период 0,7 с на 2 шага), без скачков контраста/яркости. */
+canvas.gl.glitch { --gshift: 8px; animation: glitch .68s steps(1) infinite;
+  filter: drop-shadow(var(--gshift) 0 0 rgba(255,0,170,.55)) drop-shadow(calc(var(--gshift) * -1) 0 0 rgba(0,255,230,.55)); }
 @keyframes glitch {
-  0% { transform: translate(4px, -2px); filter: hue-rotate(40deg) saturate(2); }
-  50% { transform: translate(-5px, 3px); filter: hue-rotate(-60deg) contrast(1.4); }
-  100% { transform: translate(2px, 1px); }
+  0% { translate: 4px -2px; }
+  50% { translate: -5px 3px; }
 }
 .fx-layer { position: absolute; inset: 0; z-index: 2; touch-action: none; }
 .ui { position: absolute; inset: 0; z-index: 3; pointer-events: none; }

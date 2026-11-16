@@ -6,10 +6,10 @@ import type { Tracker } from './tracker/types';
 import { DebugTracker } from './tracker/debugTracker';
 import { MindARTracker } from './tracker/mindarTracker';
 import { Stage } from './stage';
-import type { Character } from './character/types';
+import type { Character, TouchZone } from './character/types';
+import type { InteractionKind } from './scenario/machine';
 import { SpriteCharacter } from './character/spriteCharacter';
 import { RigCat } from './character/rigCat';
-import { GlbCharacter } from './character/glbCharacter';
 import { FxLayer } from './fx/fxLayer';
 import { Audio } from './audio/audio';
 import { VoicePlayer } from './voice/voicePlayer';
@@ -18,6 +18,7 @@ import { loadContent } from './persona/content';
 import { Input } from './input/input';
 import { UI, posterUrl } from './ui/ui';
 import { Director } from './director';
+import { personaMeta } from './character/personaMeta';
 
 export type CharacterMode = 'sprite' | 'rig' | 'glb';
 export type TrackerKind = 'mindar' | 'debug' | '8thwall' | 'webxr';
@@ -37,11 +38,22 @@ export function readParams(search = location.search): AppParams {
   return { debug, tracker: t, character: ['sprite', 'rig', 'glb'].includes(c) ? c : 'sprite', asr: q.get('asr') };
 }
 
-export function makeCharacter(mode: CharacterMode): Character {
+/** GLB-режим грузится лениво: GLTFLoader (и Draco, если модель сжата) не попадают в основной бандл */
+export async function makeCharacter(mode: CharacterMode): Promise<Character> {
   if (mode === 'rig') return new RigCat();
-  if (mode === 'glb') return new GlbCharacter(ASSETS.glb);
+  if (mode === 'glb') {
+    const { GlbCharacter } = await import('./character/glbCharacter');
+    return new GlbCharacter(ASSETS.glb);
+  }
   return new SpriteCharacter(ASSETS.spriteManifest);
 }
+
+/** зона → клип тычка (если у характера нет реакции на эту зону) */
+const POKE_CLIP: Record<string, string> = {
+  tap_cat_head: 'poke_head', tap_cat_cheek: 'poke_cheek', tap_cat_belly: 'poke_belly', tap_cat_paw: 'poke_paw', tap_cat_tail: 'poke_tail',
+  poke_combo: 'offended', poke_hard: 'flinch', stroke: 'purr_stroke', stroke_long: 'hug_screen',
+};
+const POKE_FACE: Record<string, string> = { tap_cat_cheek: 'squished', poke_hard: 'offended', poke_combo: 'annoyed', stroke: 'purr', stroke_long: 'purr' };
 
 export class App {
   readonly root: HTMLElement;
@@ -92,6 +104,7 @@ export class App {
     this.stage = new Stage(this.scene, this.tracker, loadStage());
     this.stage.constrainToCard = !this.tracker.capabilities.worldTracking;
     this.fx = new FxLayer(this.root);
+    this.fx.attachScene(this.renderer.domElement);
     this.voice = new VoicePlayer(this.audio);
     this.speech = makeAsr(p.asr, () => this.audio.ctx);
     const [content] = await Promise.all([loadContent(), this.audio.load(ASSETS.sfx), this.voice.load(ASSETS.voice)]);
@@ -143,16 +156,40 @@ export class App {
       },
     });
     await this.setCharacterMode(p.character);
+    this.wireFx();
 
     this.input = new Input(this.fx.canvas, {
-      isOnCat: (x, y) => this.hitCat(x, y),
+      zoneAt: (x, y) => this.zoneAt(x, y),
       tryPeel: (x, y) => this.fx.beginPeel(x, y),
+      fxDown: (x, y) => this.fx.pointerDown(x, y),
+      fxMove: (x, y, px, py) => this.fx.pointerMove(x, y, px, py),
+      fxUp: (x, y) => this.fx.pointerUp(x, y),
       isChoiceSticker: (x, y) => !!this.fx.stickerAt(x, y)?.choice,
     });
     this.bindInput();
     window.addEventListener('resize', () => this.resize());
     this.resize();
     this.renderer.setAnimationLoop(() => this.frame());
+  }
+
+  /** слой эффектов: звук, точки кота, лог, характер (палитра, fxTuning, наклейки из content/src/*.meta.json) */
+  private wireFx() {
+    const fx = this.fx;
+    fx.onSound = (id, v) => this.audio.play(id, v ?? 1);
+    fx.onLog = (m) => this.director.log(m);
+    fx.anchorFn = (n) => this.stage.anchorScreen(n, this.root.clientWidth, this.root.clientHeight);
+    fx.onStickerSeries = () => {
+      if (!this.stage.walking) this.character.play('sticker');
+    };
+  }
+  private lastPersona = '';
+  /** смена характера (её делает director) → графика: эффекты и скин */
+  private syncPersona() {
+    const p = this.director.persona;
+    if (p.id === this.lastPersona) return;
+    this.lastPersona = p.id;
+    const meta = personaMeta(p.id);
+    this.fx.setPersona({ palette: p.palette ?? meta.palette, fxTuning: meta.fxTuning, stickers: p.stickers?.length ? p.stickers : meta.stickers });
   }
 
   private async makeTracker(kind: TrackerKind): Promise<Tracker> {
@@ -175,7 +212,7 @@ export class App {
   }
 
   async setCharacterMode(mode: CharacterMode) {
-    const ch = makeCharacter(mode);
+    const ch = await makeCharacter(mode);
     try {
       await ch.load();
     } catch (e) {
@@ -186,18 +223,51 @@ export class App {
     this.director.setCharacter(ch);
   }
 
-  private hitCat(x: number, y: number) {
-    if (!this.stage.root.visible) return false;
+  /** зона кота под пальцем (head, cheek, belly, paw, tail, body) или null — мимо кота */
+  zoneAt(x: number, y: number): TouchZone | null {
+    if (!this.stage.root.visible) return null;
     const ray = new THREE.Raycaster();
     const w = this.root.clientWidth, h = this.root.clientHeight;
     ray.setFromCamera(new THREE.Vector2((x / w) * 2 - 1, -(y / h) * 2 + 1), this.tracker.camera);
     this.stage.root.updateMatrixWorld(true);
-    return this.character.hitTest(ray);
+    if (this.character.hitZone) return this.character.hitZone(ray);
+    return this.character.hitTest(ray) ? 'body' : null;
   }
+
+  /**
+   * Событие касания кота → режиссёр. Если у характера нет реакции на это событие (старые persona-файлы),
+   * — ближайшая общая реакция + клип/лицо из таблицы, чтобы тычки по зонам были видны всегда.
+   */
+  private touchCat(event: string, p: { x?: number; y?: number } = {}, fallback = 'tap_cat') {
+    const d = this.director;
+    const has = !!d.persona.reactions?.[event];
+    d.interaction((has ? event : fallback) as InteractionKind, p);
+    if (!has) {
+      if (POKE_CLIP[event] && !this.stage.walking) this.character.play(POKE_CLIP[event], { loop: event === 'stroke' });
+      if (POKE_FACE[event]) this.character.face(POKE_FACE[event], event === 'stroke' ? 0 : 2000);
+    }
+  }
+  private purrT = 0;
 
   private bindInput() {
     const i = this.input, d = this.director;
-    i.on('tap_cat', (p) => d.interaction('tap_cat', p));
+    i.on('tap_cat', (p) => this.touchCat(p.event, p));
+    i.on('poke_combo', (p) => this.touchCat('poke_combo', p));
+    i.on('poke_hard', (p) => this.touchCat('poke_hard', p));
+    i.on('stroke', (p) => {
+      this.purrT = 1.7; // первое «мрр» — звук реакции stroke
+      this.touchCat('stroke', p);
+    });
+    i.on('stroke_long', (p) => this.touchCat('stroke_long', p));
+    i.on('stroke_end', () => {
+      // перестали гладить: мурчание и прищур уходят
+      if (/purr_stroke|hug_screen/.test(this.character.currentClip)) this.character.play('idle');
+      this.character.face('neutral');
+    });
+    i.on('double_tap', (p) => {
+      if (d.persona.reactions?.double_tap) d.interaction('double_tap' as InteractionKind, p);
+      else (d as unknown as { signature(): void }).signature();
+    });
     i.on('tap_screen', (p) => d.interaction('tap_screen', p));
     i.on('longpress', (p) => d.interaction('longpress', p));
     i.on('swipe', (s) => d.interaction('swipe', { x: s.x, y: s.y, from: s.path[0], path: s.path }));
@@ -256,7 +326,13 @@ export class App {
     }
     this.tracker.update(dt, this.elapsed);
     this.input.tick();
+    // мурчание-петля, пока гладят
+    if (this.input.touch.isStroking && (this.purrT -= dt) <= 0) {
+      this.purrT = 1.7;
+      this.audio.play('purr', 0.8);
+    }
     this.stage.update(dt);
+    this.syncPersona();
     this.director.update(dt);
     this.character.update(dt, this.tracker.camera);
     this.fx.update(dt);
