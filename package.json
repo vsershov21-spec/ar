@@ -4,7 +4,7 @@
   "description": "Веб-AR прототип: кот в детской карте",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && node scripts/voice/attach-extra.mjs",
     "preview": "vite preview --port 4173 --strictPort",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
@@ -15,7 +15,8 @@
     "voice:lines": "node scripts/voice/extract-lines.mjs",
     "voice:build": "node scripts/voice/build.mjs",
     "setup-8thwall": "node scripts/setup-8thwall.mjs",
-    "bench": "node scripts/bench/run_bench.mjs"
+    "bench": "node scripts/bench/run_bench.mjs",
+    "voice:piper": "node scripts/voice/piper.mjs"
   },
   "keywords": [],
   "author": "",
@@ -28,7 +29,8 @@
     "rhubarb-lip-sync-wasm": "^0.1.8",
     "typescript": "^7.0.2",
     "vite": "^8.3.8",
-    "vitest": "^5.1.0"
+    "vitest": "^5.1.0",
+    "wasm-media-encoders": "^0.7.0"
   },
   "dependencies": {
     "howler": "^2.2.4",
