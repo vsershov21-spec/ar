@@ -23,6 +23,7 @@ import crypto from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { createMp3Encoder } from 'wasm-media-encoders';
+import { spoken } from './spoken.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 /**
@@ -136,7 +137,7 @@ const fname = (j) => j.key.replace(/^(name|answer):/, '$1_').replace(/[^a-zA-Zа
 for (const j of jobs) {
   if (j.kind === 'template') continue;
   const pr = presets[j.persona];
-  j.hash = hash(PIPELINE, j.text, pr.voice, pr.pitch, pr.rate, BITRATE);
+  j.hash = hash(PIPELINE, spoken(j.text), pr.voice, pr.pitch, pr.rate, BITRATE); // = j.text, если нечего заменять
   j.rel = `${j.persona}/${fname(j)}.${j.hash}.mp3`;
   j.file = path.join(OUT, j.rel);
 }
@@ -153,7 +154,7 @@ function piperBatch(voice, rate, items, tmp) {
   if (r.status !== 0) throw new Error(`piper: ${r.stderr}`);
 }
 /** текст для синтеза: имя — с восклицанием, так оно звучит как обращение */
-const synthText = (j) => (j.kind === 'slot' && j.slotName === 'name' ? `${j.text}!` : j.kind === 'slot' ? `${j.text}.` : j.text);
+const synthText = (j) => (j.kind === 'slot' && j.slotName === 'name' ? `${j.text}!` : j.kind === 'slot' ? `${j.text}.` : spoken(j.text));
 
 function espeakBin() {
   const local = path.join(PIPER_DIR, 'espeak-ng');
@@ -232,7 +233,7 @@ for (const [k, items] of groups) {
       const mp3 = Buffer.concat([Buffer.from(enc.encode([y])), Buffer.from(enc.finalize())]);
       const dur = y.length / sr;
       const f = dsp.frames(y, sr);
-      const ipaText = ipa(j.text);
+      const ipaText = ipa(spoken(j.text));
       const phones = ipaText ? ru.phonesFromIpa(ipaText) : ru.phonesFromText(j.text);
       const times = ru.alignPhones(phones, f);
       const cues = ru.cuesFromAlignment(phones, times, dur);

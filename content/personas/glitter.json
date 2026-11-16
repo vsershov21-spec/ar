@@ -544,7 +544,7 @@
       },
       {
         "id": "glitter.nice_name.04",
-        "text": "Какое красивое имя! Посыплю его блёстками.",
+        "text": "Ах, какое имя! Прямо для обложки журнала.",
         "emotion": "excited",
         "face": "excited"
       },
@@ -578,7 +578,7 @@
     "mic_hint": [
       {
         "id": "glitter.mic_hint.01",
-        "text": "Нажми на микрофон внизу и скажи что-нибудь!",
+        "text": "Нажми на микрофон внизу — и у нас будет интервью!",
         "emotion": "neutral",
         "face": "neutral"
       },
@@ -630,7 +630,7 @@
       },
       {
         "id": "glitter.invite.03",
-        "text": "Подержи палец на экране — я поцелую стекло. А скажешь «повторяй» — буду повторять за тобой.",
+        "text": "Подержи палец на экране — я поцелую стекло. Чмок!",
         "emotion": "neutral",
         "face": "neutral"
       }
@@ -692,7 +692,7 @@
     "filler": [
       {
         "id": "glitter.filler.01",
-        "text": "Ля-ля-ля... какие у тебя красивые глаза. Ну, я так думаю.",
+        "text": "Ля-ля-ля... Интересно, мне пойдёт розовая кепка?",
         "emotion": "happy",
         "face": "happy"
       },
@@ -704,7 +704,7 @@
       },
       {
         "id": "glitter.filler.03",
-        "text": "А знаешь, что? Я умею кружиться! Скажи «танцуй».",
+        "text": "А знаешь что? Я умею кружиться! Скажи «танцуй».",
         "emotion": "excited",
         "face": "excited"
       },
@@ -716,9 +716,9 @@
       },
       {
         "id": "glitter.filler.05",
-        "text": "Мр-р... скучно без блеска.",
-        "emotion": "happy",
-        "face": "happy"
+        "text": "Если бы у кошек была неделя моды, я бы её открывала.",
+        "emotion": "proud",
+        "face": "proud"
       },
       {
         "id": "glitter.filler.06",
@@ -750,7 +750,7 @@
     "welcome_back": [
       {
         "id": "glitter.welcome_back.01",
-        "text": "{name}! Ты тут! Ура!",
+        "text": "{name}! Ты тут! Я сияю!",
         "emotion": "excited",
         "face": "excited"
       },
@@ -768,7 +768,7 @@
       },
       {
         "id": "glitter.welcome_back.04",
-        "text": "О, снова ты! Ура-ура!",
+        "text": "Ах, снова ты! Мой любимый зритель.",
         "emotion": "excited",
         "face": "excited"
       },
@@ -782,13 +782,13 @@
     "goodbye": [
       {
         "id": "glitter.goodbye.01",
-        "text": "Пока-пока! Посылаю тебе воздушный блестящий поцелуй!",
+        "text": "Пока-пока! Лови воздушный поцелуй. С блёстками!",
         "emotion": "happy",
         "face": "happy"
       },
       {
         "id": "glitter.goodbye.02",
-        "text": "До встречи! Я буду в карте.",
+        "text": "До встречи! Буду в карте наводить красоту.",
         "emotion": "neutral",
         "face": "neutral"
       },
@@ -802,19 +802,19 @@
     "tap_cat": [
       {
         "id": "glitter.tap_cat.01",
-        "text": "Хи-хи! Привет!",
+        "text": "Ой! Осторожно, я при параде.",
         "emotion": "happy",
         "face": "happy"
       },
       {
         "id": "glitter.tap_cat.02",
-        "text": "Ой! Тык! Хи-хи.",
+        "text": "Тык! Хи-хи, щекотно.",
         "emotion": "excited",
         "face": "excited"
       },
       {
         "id": "glitter.tap_cat.03",
-        "text": "Ещё раз! Хи-хи.",
+        "text": "Ещё раз! Мне понравилось.",
         "emotion": "happy",
         "face": "happy"
       },
@@ -870,7 +870,7 @@
     "tap_cat_paw": [
       {
         "id": "glitter.tap_cat_paw.01",
-        "text": "Лапка! Смотри, какие у меня коготки блестящие.",
+        "text": "Лапка! Видишь, у меня маникюр с блёстками.",
         "emotion": "happy",
         "face": "happy"
       },
@@ -926,7 +926,7 @@
     "stroke": [
       {
         "id": "glitter.stroke.01",
-        "text": "Мр-р-р... обожаю!",
+        "text": "Мурр... Обожаю!",
         "emotion": "happy",
         "face": "purr"
       },
@@ -946,7 +946,7 @@
     "stroke_long": [
       {
         "id": "glitter.stroke_long.01",
-        "text": "Мр-р-р... можно так всегда?",
+        "text": "Мурр... Можно так всегда?",
         "emotion": "shy",
         "face": "purr"
       },
@@ -990,7 +990,7 @@
       },
       {
         "id": "glitter.tap_screen.05",
-        "text": "Давай украсим!",
+        "text": "Давай украсим тут всё!",
         "emotion": "excited",
         "face": "excited"
       }
@@ -1122,7 +1122,7 @@
       },
       {
         "id": "glitter.spam.03",
-        "text": "Ты так быстро! Я не успеваю сверкать.",
+        "text": "Так быстро! Я не успеваю сверкать.",
         "emotion": "annoyed",
         "face": "annoyed"
       }
@@ -1148,7 +1148,7 @@
       },
       {
         "id": "glitter.silence.04",
-        "text": "Эй, а давай украсим тут всё?",
+        "text": "Эй, а давай устроим фотосессию?",
         "emotion": "happy",
         "face": "happy"
       }
@@ -1156,13 +1156,13 @@
     "sleep": [
       {
         "id": "glitter.sleep.01",
-        "text": "Пойду сделаю красивый сон...",
+        "text": "Пойду посмотрю красивый сон...",
         "emotion": "sleepy",
         "face": "sleep"
       },
       {
         "id": "glitter.sleep.02",
-        "text": "Тихо... я дремлю... мр-р...",
+        "text": "Тихо... Я дремлю... мур...",
         "emotion": "sleepy",
         "face": "sleep"
       }
@@ -1210,7 +1210,7 @@
     "stickers_all_gone": [
       {
         "id": "glitter.stickers_all_gone.01",
-        "text": "Все! До одной! Ты супер!",
+        "text": "Все! До одной! Это было красиво.",
         "emotion": "excited",
         "face": "excited"
       },
@@ -1230,7 +1230,7 @@
       },
       {
         "id": "glitter.card_lost.02",
-        "text": "Карта пропала! Покажи её снова.",
+        "text": "Ой, карта пропала! Это не по сценарию.",
         "emotion": "neutral",
         "face": "neutral"
       },
@@ -1270,7 +1270,7 @@
     "card_far": [
       {
         "id": "glitter.card_far.01",
-        "text": "Ты так далеко! Поднеси поближе.",
+        "text": "Ты так далеко! Мне нужен крупный план.",
         "emotion": "neutral",
         "face": "neutral"
       },
@@ -1290,7 +1290,7 @@
       },
       {
         "id": "glitter.card_close.02",
-        "text": "Отодвинь чуточку, я не помещаюсь.",
+        "text": "Отодвинь чуточку — меня видно только наполовину!",
         "emotion": "neutral",
         "face": "neutral"
       }
@@ -1338,7 +1338,7 @@
     "bye": [
       {
         "id": "glitter.bye.01",
-        "text": "Уже уходишь? Точно?",
+        "text": "Уже? Ну нет... Точно уходишь?",
         "emotion": "sad",
         "face": "sad"
       },
@@ -1384,7 +1384,7 @@
       },
       {
         "id": "glitter.no.02",
-        "text": "Хорошо, не будем.",
+        "text": "Как скажешь!",
         "emotion": "neutral",
         "face": "neutral"
       },
@@ -1404,7 +1404,7 @@
       },
       {
         "id": "glitter.skip.02",
-        "text": "Хорошо, пропускаем.",
+        "text": "Пропускаем! Следующий номер программы.",
         "emotion": "neutral",
         "face": "neutral"
       }
@@ -1506,7 +1506,7 @@
       },
       {
         "id": "glitter.sberkids.02",
-        "text": "Брат будет очень рад. Идём к нему?",
+        "text": "Брат так обрадуется! Идём к нему?",
         "emotion": "happy",
         "face": "happy"
       },
@@ -1608,13 +1608,13 @@
     "sing": [
       {
         "id": "glitter.sing.01",
-        "text": "Блёстки-блёстки, сверкайте все, я самая блестящая на земле! Ой, как хорошо получилось.",
+        "text": "Блёстки, блёстки, ярче всех, у меня большой успех! Ой, как хорошо получилось.",
         "emotion": "excited",
         "face": "excited"
       },
       {
         "id": "glitter.sing.02",
-        "text": "Ля-ля-ля, мур-мур-мур, я пою, а ты слушай! Конец!",
+        "text": "Ля-ля-ля, мур-мур-мур, я пою, а ты слушай! Всё, поклон.",
         "emotion": "happy",
         "face": "happy"
       }
@@ -1622,21 +1622,21 @@
     "gum": [
       {
         "id": "glitter.gum.01",
-        "text": "Лови блёстки!",
+        "text": "Трюк? Внимание... облако блёсток!",
         "emotion": "excited",
         "face": "excited"
       },
       {
         "id": "glitter.gum.02",
-        "text": "Фух! Целое облако!",
-        "emotion": "excited",
-        "face": "excited"
+        "text": "Мой фирменный трюк. Аплодисменты!",
+        "emotion": "proud",
+        "face": "proud"
       },
       {
         "id": "glitter.gum.03",
-        "text": "Вот это блеск, да?",
-        "emotion": "proud",
-        "face": "proud"
+        "text": "Лови! Только не чихай.",
+        "emotion": "happy",
+        "face": "happy"
       }
     ],
     "stickers": [
@@ -1656,7 +1656,7 @@
     "change_persona": [
       {
         "id": "glitter.change_persona.01",
-        "text": "Хочешь другую меня? Хорошо, переодеваюсь.",
+        "text": "Другой образ? Обожаю переодеваться!",
         "emotion": "neutral",
         "face": "neutral"
       },
@@ -1712,7 +1712,7 @@
       },
       {
         "id": "glitter.compliment.03",
-        "text": "Мр-р... мне так приятно.",
+        "text": "Мурр... Мне так приятно.",
         "emotion": "shy",
         "face": "shy"
       }
@@ -1740,19 +1740,19 @@
     "sad": [
       {
         "id": "glitter.sad.01",
-        "text": "Ой, мне жаль. Я рядом. Расскажи маме, папе или другому взрослому — они помогут.",
+        "text": "Ой, мне так жаль. Я рядом. Расскажи маме или папе — они помогут.",
         "emotion": "caring",
         "face": "caring"
       },
       {
         "id": "glitter.sad.02",
-        "text": "Можно грустить. Давай я посижу рядом. А потом позови взрослого.",
+        "text": "Грустить можно. Я посижу рядом, тихонько. А потом позови взрослого.",
         "emotion": "caring",
         "face": "caring"
       },
       {
         "id": "glitter.sad.03",
-        "text": "Обними экран — я обниму с той стороны. И поговори со взрослым, которому доверяешь.",
+        "text": "Обними экран — я обниму в ответ. И поговори со взрослым, которому доверяешь.",
         "emotion": "caring",
         "face": "caring"
       }
@@ -1820,7 +1820,7 @@
     "joke": [
       {
         "id": "glitter.joke.01",
-        "text": "Почему у меня столько блёсток? Потому что я чихнула в коробку с ними! Хи-хи.",
+        "text": "Почему у меня столько блёсток? Я чихнула в коробку с ними! Хи-хи.",
         "emotion": "happy",
         "face": "happy"
       },
@@ -1844,7 +1844,7 @@
       },
       {
         "id": "glitter.joke.05",
-        "text": "Я такая блестящая, что даже солнце щурится. Хи-хи.",
+        "text": "Я такая блестящая, что даже солнце щурится.",
         "emotion": "proud",
         "face": "proud"
       }
@@ -1852,7 +1852,7 @@
     "thanks": [
       {
         "id": "glitter.thanks.01",
-        "text": "Пожалуйста!",
+        "text": "Для тебя — всегда!",
         "emotion": "happy",
         "face": "happy"
       },
@@ -1884,7 +1884,7 @@
       },
       {
         "id": "glitter.echo_start.03",
-        "text": "Скажи что-нибудь, и послушай, как это звучит у меня.",
+        "text": "Скажи что-нибудь — а я повторю, только звонче.",
         "emotion": "neutral",
         "face": "neutral"
       }
@@ -1912,7 +1912,7 @@
     "echo_stop": [
       {
         "id": "glitter.echo_stop.01",
-        "text": "Хорошо, не повторяю.",
+        "text": "Всё, повторялка ушла на перерыв.",
         "emotion": "neutral",
         "face": "neutral"
       },
@@ -1952,7 +1952,7 @@
       },
       {
         "id": "glitter.whisper.02",
-        "text": "Шёпотом говорить так приятно... как ASMR.",
+        "text": "Шёпотом всё звучит загадочнее... Обожаю.",
         "emotion": "whisper",
         "face": "listen"
       }
@@ -1960,13 +1960,13 @@
     "clap": [
       {
         "id": "glitter.clap.01",
-        "text": "Ой! Хлопок! Я аж подпрыгнула.",
+        "text": "Ой! Я аж подпрыгнула. Это мне хлопают?",
         "emotion": "surprised",
         "face": "surprised"
       },
       {
         "id": "glitter.clap.02",
-        "text": "Аплодисменты? Спасибо, спасибо!",
+        "text": "Браво мне! Поклон!",
         "emotion": "excited",
         "face": "excited"
       }
@@ -2000,7 +2000,7 @@
       },
       {
         "id": "glitter.evening.02",
-        "text": "Вечером блёстки сверкают как звёзды. Ещё чуть-чуть поиграем и спать.",
+        "text": "Вечером блёстки сверкают как звёзды. Ещё чуть-чуть поиграем — и спать.",
         "emotion": "neutral",
         "face": "neutral"
       }
@@ -2154,7 +2154,7 @@
       },
       {
         "id": "glitter.riddle_hint.03",
-        "text": "Подумай ещё. Подсказываю:",
+        "text": "Секретная подсказка:",
         "emotion": "neutral",
         "face": "neutral"
       }
@@ -2182,7 +2182,7 @@
     "riddle_answer": [
       {
         "id": "glitter.riddle_answer.01",
-        "text": "Это {answer}! Хитрая была загадка.",
+        "text": "Та-дам, это {answer}! Хитренькая, правда?",
         "emotion": "neutral",
         "face": "neutral"
       },
@@ -2194,7 +2194,7 @@
       },
       {
         "id": "glitter.riddle_answer.03",
-        "text": "Правильный ответ — {answer}. В следующий раз получится!",
+        "text": "А ответ — {answer}! Следующая точно будет твоя.",
         "emotion": "neutral",
         "face": "neutral"
       }
@@ -2202,7 +2202,7 @@
     "riddle_more": [
       {
         "id": "glitter.riddle_more.01",
-        "text": "Ещё одну?",
+        "text": "Ещё одну загадочку?",
         "emotion": "excited",
         "face": "excited"
       },
@@ -2222,7 +2222,7 @@
     "riddle_bye": [
       {
         "id": "glitter.riddle_bye.01",
-        "text": "Хорошо, загадки потом.",
+        "text": "Загадки уходят на антракт.",
         "emotion": "neutral",
         "face": "neutral"
       },

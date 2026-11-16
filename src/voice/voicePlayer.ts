@@ -95,6 +95,10 @@ export function extractName(template: string, text: string, slot = 'name'): stri
 }
 
 interface Prepared { buf: AudioBuffer; cues: MouthCue[]; offset: number }
+/** запись ElevenLabs (voice/el/manifest.json, собирает scripts/voice/pull-server-voice.mjs) */
+type ElEntry = ClipEntry & { kind?: 'line' | 'part' | 'slot'; line?: string; part?: 'a' | 'b'; slot?: string; v?: string };
+type ElHit = { kind: 'line'; e: ElEntry } | { kind: 'parts'; a?: ElEntry; b?: ElEntry; v: ElEntry };
+const SLOT_RE = /\{(name|answer)\}/;
 
 const LRU_MAX = 48;
 
@@ -108,9 +112,13 @@ export class VoicePlayer {
   private byText = new Map<string, { persona: string; id: string }>();
   private buffers = new Map<string, Promise<AudioBuffer | null>>();
   private legacy: Record<string, Record<string, LegacyEntry>> = {};
-  /** озвучка ElevenLabs (самые частые реплики): id → файл; приоритет выше Piper */
-  private el: Record<string, ClipEntry & { t?: string }> = {};
+  /** озвучка ElevenLabs: id → файл; приоритет выше Piper. kind: line | part (кусок реплики со слотом) | slot (имя, ответ) */
+  private el: Record<string, ElEntry> = {};
   private elByText = new Map<string, string>();
+  /** реплики со слотом: id → шаблон и какие куски есть (a — до слота, b — после) */
+  private elTemplates: Record<string, { t: string; slot: string; parts: string[] }> = {};
+  /** значения слотов: «persona:slot» → норм. значение → запись */
+  private elSlots = new Map<string, Map<string, ElEntry>>();
   private src: AudioBufferSourceNode | null = null;
   private gain: GainNode | null = null;
   private synthVoice: SpeechSynthesisVoice | null = null;
@@ -154,8 +162,17 @@ export class VoicePlayer {
     try {
       const r = await fetch(asset('voice/el/manifest.json'), { cache: 'no-cache' });
       if (r.ok && (r.headers.get('content-type') ?? '').includes('json')) {
-        this.el = (await r.json()).lines ?? {};
-        for (const [id, e] of Object.entries(this.el)) if (e.t) this.elByText.set(`${id.split('.')[0]}:${normText(e.t)}`, id);
+        const man = await r.json();
+        this.el = man.lines ?? {};
+        this.elTemplates = man.templates ?? {};
+        for (const [id, e] of Object.entries(this.el)) {
+          const persona = id.split('.')[0];
+          if (e.kind === 'slot' && e.slot && e.v) {
+            const k = `${persona}:${e.slot}`;
+            if (!this.elSlots.has(k)) this.elSlots.set(k, new Map());
+            this.elSlots.get(k)!.set(normName(e.v), e);
+          } else if ((e.kind ?? 'line') === 'line' && e.t) this.elByText.set(`${persona}:${normText(e.t)}`, id);
+        }
       }
     } catch {
       /* нет — только Piper */
@@ -213,6 +230,9 @@ export class VoicePlayer {
   private lookup(persona: string, template: string, lineId?: string): { kind: 'line'; e: ClipEntry; id: string } | { kind: 'parts'; id: string; slot: string; a?: ClipEntry; b?: ClipEntry } | { kind: 'legacy'; e: LegacyEntry; id: string } | null {
     const m = this.loaded.get(persona);
     let id = lineId;
+    // запись по id, только если её текст совпадает с репликой (текст правили, а озвучку ещё не пересобрали — не она)
+    const stale = (t?: string) => !!t && normText(t) !== normText(template);
+    if (id && (stale(m?.lines[id]?.t) || stale(m?.parts[id]?.t))) id = undefined;
     if (!id || !(m?.lines[id] || m?.parts[id] || this.legacy[persona]?.[id])) id = this.byText.get(`${persona}:${normText(template)}`)?.id;
     if (!id) return null;
     if (m?.lines[id]) return { kind: 'line', e: m.lines[id], id };
@@ -366,19 +386,40 @@ export class VoicePlayer {
     return { buf: out, cues, offset: 0 };
   }
 
-  /** приоритет: ElevenLabs → Piper → speechSynthesis */
-  private elFor(req: SpeakRequest): ClipEntry | null {
-    const id = req.lineId && this.el[req.lineId] ? req.lineId : this.elByText.get(`${req.persona}:${normText(req.template)}`);
-    return id ? this.el[id] : null;
+  /** приоритет: ElevenLabs → Piper → speechSynthesis. Запись берём, только если её текст = текст реплики. */
+  private elFor(req: SpeakRequest): ElHit | null {
+    const tpl = normText(req.template);
+    const m = req.template.match(SLOT_RE);
+    if (!m) {
+      let id = req.lineId && this.el[req.lineId] && (this.el[req.lineId].kind ?? 'line') === 'line' ? req.lineId : undefined;
+      if (id && this.el[id].t && normText(this.el[id].t!) !== tpl) id = undefined;
+      id ??= this.elByText.get(`${req.persona}:${tpl}`);
+      return id ? { kind: 'line', e: this.el[id] } : null;
+    }
+    // реплика со слотом: кусок до + значение (имя / ответ) + кусок после
+    const T = req.lineId ? this.elTemplates[req.lineId] : undefined;
+    if (!T || normText(T.t) !== tpl) return null;
+    const val = extractName(req.template, req.text, T.slot);
+    const v = val ? this.elSlots.get(`${req.persona}:${T.slot}`)?.get(normName(val)) : undefined;
+    if (!v) return null;
+    const a = this.el[`${req.lineId}~a`], b = this.el[`${req.lineId}~b`];
+    if ((T.parts.includes('a') && !a) || (T.parts.includes('b') && !b)) return null;
+    return { kind: 'parts', a, b, v };
   }
 
   private async prepare(req: SpeakRequest): Promise<Prepared | null> {
     const el = this.elFor(req);
-    if (el) {
-      const buf = await this.clip(el);
+    if (el?.kind === 'line') {
+      const buf = await this.clip(el.e);
       if (buf) {
         this.lastSource = 'elevenlabs';
-        return { buf, cues: this.cuesFor(buf, el), offset: this.lipStrategy === 'amp' ? 0 : this.onsetShift(buf, el) };
+        return { buf, cues: this.cuesFor(buf, el.e), offset: this.lipStrategy === 'amp' ? 0 : this.onsetShift(buf, el.e) };
+      }
+    } else if (el?.kind === 'parts') {
+      const p = await this.splice(req.persona, el.a, el.v, el.b);
+      if (p) {
+        this.lastSource = 'elevenlabs';
+        return p;
       }
     }
     this.lastSource = 'piper';
@@ -414,7 +455,8 @@ export class VoicePlayer {
     void this.usePersona(persona).then(() => {
       const f = this.lookup(persona, template, lineId);
       const el = this.elFor({ persona, template, text: template, pitch: 1, rate: 1, lineId });
-      if (el) return void this.clip(el);
+      if (el?.kind === 'line') return void this.clip(el.e);
+      if (el?.kind === 'parts') return void [el.a, el.v, el.b].forEach((e) => e && void this.clip(e));
       if (f?.kind === 'line') void this.clip(f.e);
       if (f?.kind === 'parts') [f.a, f.b].forEach((e) => e && void this.clip(e));
     });
@@ -423,10 +465,13 @@ export class VoicePlayer {
   /** предзагрузка ближайших событий: по max штук на событие (id реплик вида persona.event.NN) */
   preloadEvents(persona: string, events: string[], max = 2) {
     void this.usePersona(persona).then((m) => {
-      if (!m) return;
+      const all = new Set([...Object.keys(m?.lines ?? {}), ...Object.keys(this.el).filter((id) => id.startsWith(`${persona}.`) && (this.el[id].kind ?? 'line') === 'line')]);
       for (const ev of events) {
-        const ids = Object.keys(m.lines).filter((id) => id.split('.')[1] === ev).slice(0, max);
-        ids.forEach((id) => void this.clip(this.el[id] ?? m.lines[id]));
+        const ids = [...all].filter((id) => id.split('.')[1] === ev).sort().slice(0, max);
+        ids.forEach((id) => {
+          const e = this.el[id] ?? m?.lines[id];
+          if (e) void this.clip(e);
+        });
       }
     });
   }

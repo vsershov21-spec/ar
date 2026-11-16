@@ -122,6 +122,59 @@ PIPER_DIR=~/piper PIPER_VOICES=~/piper/voices VOICE_OUT=public/voice npm run voi
 ```
 `npm run voice:build` (старый путь: `voice-src/*.wav` → ffmpeg → m4a/ogg + Rhubarb) оставлен для записей актёра.
 
+## Озвучка ElevenLabs (основная)
+
+Приоритет в плеере: **ElevenLabs → Piper → синтез браузера**. Голоса — `content/src/<характер>.meta.json → voice.elevenVoiceId`,
+модель `voice.elevenModel` (`eleven_v4`). Озвучиваются **все** реплики, вопросы и подсказки загадок, а реплики со слотом
+(`{name}`, `{answer}`) — кусками «до» (`<id>~a`) и «после» (`<id>~b`) плюс каждое имя из `content/names.ru.txt` и каждый
+ответ загадки отдельным файлом для каждого характера (`<характер>.slot.name.<Имя>`, `<характер>.slot.answer.<ответ>`);
+в рантайме куски склеиваются, как у Piper. Имени нет в словаре — фраза уходит в Piper/синтез.
+
+**Интонация** — английские пометки в квадратных скобках перед текстом (`scripts/voice/el-common.mjs → TAGS`):
+`happy` → `[cheerfully]`, `cheeky` → `[mischievously]`, `caring` → `[softly]`, `whisper` → `[whispers]`, `sleepy` → `[sleepily]` и т. д.;
+`neutral` — без пометки. Русских слов в скобках быть не может: модель прочитала бы их вслух (build.py вырезает `[...]` из реплик).
+Ударений `+` и `´` пайплайн не понимает (ни Piper/espeak, ни ElevenLabs) — неоднозначные слова переписаны
+(«Здоро́во!» → «Салют!», «замок» в загадке → другая загадка, «хлопок» → «кто хлопнул»), везде «ё».
+**Текст для синтеза** (`scripts/voice/spoken.mjs`): «СберKids» → «Сбер Кидс» — в пузыре остаётся бренд, в речь — по-русски.
+
+**Пакет** `voice-src/el_batch_all.jsonl` — всё, чего ещё нет на сервере или что изменилось; собирает
+`node scripts/voice/el-batch.mjs` (его же зовёт `python3 content/build.py`). «Уже озвучено» —
+`voice-src/el_voiced_base.tsv` (150 реплик первого прогона: id и текст с пометкой). Строка пакета:
+`{ id, kind: line|part|slot, persona, voice_id, model_id, text (в API), plain (для фонем), t (субтитр), out, h, chars, … }`.
+
+<!-- el-batch:start (пишет node scripts/voice/el-batch.mjs) -->
+Пакет `voice-src/el_batch_all.jsonl`: **1350 заданий, 35 366 символов** (с пометками интонации, как считает ElevenLabs).
+Уже озвучено и не менялось: 93; из первого прогона перепишется (текст поменялся): 57.
+
+| Характер | Заданий | Символов | реплики · куски со слотом · имена и ответы (шт./симв.) |
+|---|---|---|---|
+| hooligan | 467 | 12 600 | 253/10 910 · 15/426 · 199/1 264 |
+| kind | 438 | 11 498 | 225/9 901 · 14/345 · 199/1 252 |
+| glitter | 445 | 11 268 | 232/9 648 · 14/354 · 199/1 266 |
+| **всего** | **1350** | **35 366** | 710/30 459 · 43/1 125 · 597/3 782 |
+<!-- el-batch:end -->
+
+**Запуск** (только на сервере swe, ключ в `/var/lib/vershov-commander/.elevenlabs_key` читается внутри процесса и не выводится):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/vsershov21-spec/ar/main/scripts/voice/el-run.sh | bash -s -- --plan   # сколько осталось
+curl -fsSL https://raw.githubusercontent.com/vsershov21-spec/ar/main/scripts/voice/el-run.sh | bash               # озвучить (в фоне)
+tail -f /var/lib/vershov-commander/ar/el-run.log
+```
+
+`el-run.sh` держит клон `main` в `/var/lib/vershov-commander/ar/el-work`, ставит три wasm-зависимости, пересобирает пакет
+и запускает `node scripts/voice/eleven.mjs --batch voice-src/el_batch_all.jsonl --run` через `nohup setsid` (переживает
+закрытие терминала). Флаги: `--only kind` — один характер, `--max-chars 10000` — лимит символов на прогон,
+`--budget 1800` — секунд. Вывод — `/srv/ar-extra/voice-el` (если доступна на запись; иначе `/var/lib/vershov-commander/ar/voice-el`;
+при первом запуске уже оплаченное из старой папки копируется). Задание с тем же хэшем (текст с пометкой + голос + модель)
+и существующим файлом пропускается — прерванный прогон продолжается с места остановки. Запросы по одному, пауза 350 мс,
+429/5xx — ожидание и повтор, 401/402 (ключ или квота кончилась) — остановка. Манифест `manifest.json` пишется после
+каждого файла. На сайт файлы попадают со следующей сборкой (любой push в `main`): `pull-server-voice.mjs` кладёт их в
+`public/voice/el/` с хэшем в имени и пишет `voice/el/manifest.json` (`lines` + `templates`).
+
+Плеер берёт запись ElevenLabs или Piper **только если её текст совпадает с текстом реплики** — поправили реплику,
+а озвучку ещё не пересобрали, кот скажет новую фразу Piper/синтезом, а не старую запись.
+
 ## Липсинк
 
 ### Русский путь (по умолчанию)

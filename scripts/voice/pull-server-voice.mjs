@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const dst = path.join(root, 'public/voice/el');
+const pick = (o, keys) => Object.fromEntries(keys.filter((k) => o[k] !== undefined).map((k) => [k, o[k]]));
 const ok = (d) => {
   try {
     fs.accessSync(path.join(d, 'manifest.json'), fs.constants.R_OK);
@@ -23,17 +24,18 @@ try {
   if (!src) process.exit(0);
   const man = JSON.parse(fs.readFileSync(path.join(src, 'manifest.json'), 'utf8'));
   fs.rmSync(dst, { recursive: true, force: true });
-  const out = { version: 1, source: 'elevenlabs', lipsync: man.lipsync, lines: {} };
+  const out = { version: 2, source: 'elevenlabs', lipsync: man.lipsync, lines: {}, templates: man.templates ?? {} };
   let n = 0, bytes = 0;
   for (const [id, e] of Object.entries(man.lines ?? {})) {
     const file = path.join(src, e.f);
     if (!fs.existsSync(file)) continue;
     const buf = fs.readFileSync(file);
     const h = crypto.createHash('sha1').update(buf).digest('hex').slice(0, 8);
-    const rel = `el/${e.persona ?? id.split('.')[0]}/${id}.${h}.mp3`;
+    const rel = `el/${e.persona ?? id.split('.')[0]}/${id.replace(/[^a-zA-Zа-яА-ЯёЁ0-9._~-]/g, '_')}.${h}.mp3`;
     fs.mkdirSync(path.dirname(path.join(root, 'public/voice', rel)), { recursive: true });
     fs.writeFileSync(path.join(root, 'public/voice', rel), buf);
-    out.lines[id] = { f: rel, d: e.d, o: e.o, c: e.c, t: e.t };
+    // kind: line (по умолчанию) | part (кусок реплики со слотом: line, part a|b, lead) | slot (значение: slot, v)
+    out.lines[id] = { f: rel, d: e.d, o: e.o, c: e.c, t: e.t, ...pick(e, ['kind', 'line', 'part', 'slot', 'v', 'lead']) };
     n++;
     bytes += buf.length;
   }

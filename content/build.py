@@ -9,6 +9,7 @@
   gen/sfx_prompts.csv               — звуки для генерации
   gen/fx_list.csv                   — экранные эффекты для разработки
   docs/CONTENT.md                   — читаемая «библия» контента
+  voice-src/el_batch_all.jsonl      — пакет озвучки ElevenLabs (через node scripts/voice/el-batch.mjs)
 Запуск: python3 content/build.py  (код возврата 1 при ошибках — годится для CI)
 """
 import csv, json, re, sys
@@ -332,6 +333,18 @@ for it in intents:
     md.append(f"| `{it['intent']}` | {', '.join(it['phrases'])} |")
 (ROOT / "docs").mkdir(exist_ok=True)
 (ROOT / "docs" / "CONTENT.md").write_text("\n".join(md) + "\n", encoding="utf-8")
+
+# пакет для озвучки ElevenLabs (voice-src/el_batch_all.jsonl) — всегда вместе с репликами; нет node — пропускаем
+if not errors:
+    import shutil, subprocess
+    if shutil.which("node"):
+        r = subprocess.run(["node", str(ROOT / "scripts/voice/el-batch.mjs")], capture_output=True, text=True)
+        if r.returncode != 0:
+            warns.append(f"el-batch: {r.stderr.strip()[:200]}")
+        else:
+            print(r.stdout.strip().splitlines()[0])
+    else:
+        warns.append("нет node — voice-src/el_batch_all.jsonl не пересобран (node scripts/voice/el-batch.mjs)")
 
 for wv in warns:
     print("ВНИМАНИЕ:", wv)
