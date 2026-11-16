@@ -18,7 +18,9 @@
     "echoPitchSemitones": 5,
     "echoRate": 1.08,
     "elevenVoiceDesign": "Russian-speaking teenage boy cartoon cat, 15 years old, cheeky and confident, fast talker, slight smirk in the voice, playful raspy texture, bright and energetic, clean studio",
-    "actorDirection": "Подросток-задира с улыбкой в голосе. Темп быстрый, окончания фраз вверх, как будто подкалывает. Смешки короткие, «хе-хе». Не басить и не орать."
+    "actorDirection": "Подросток-задира с улыбкой в голосе. Темп быстрый, окончания фраз вверх, как будто подкалывает. Смешки короткие, «хе-хе». Не басить и не орать.",
+    "elevenVoiceId": "a8u8GOnZXiVnTOyIiZau",
+    "elevenModel": "eleven_v4"
   },
   "palette": {
     "primary": "#111111",

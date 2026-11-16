@@ -18,7 +18,9 @@
     "echoPitchSemitones": 4,
     "echoRate": 1.0,
     "elevenVoiceDesign": "Russian-speaking teenage boy cartoon cat, 15 years old, warm gentle soft-spoken voice, smiling, calm slow pace, cozy and kind, slight breathy purr, clean studio",
-    "actorDirection": "Добрый старший друг. Голос с улыбкой, неторопливо, мягкие паузы. Мурчание в конце фраз «мр-р». Удивляется искренне, без наигрыша."
+    "actorDirection": "Добрый старший друг. Голос с улыбкой, неторопливо, мягкие паузы. Мурчание в конце фраз «мр-р». Удивляется искренне, без наигрыша.",
+    "elevenVoiceId": "T3RC6yeELKEr38NU0aXA",
+    "elevenModel": "eleven_v4"
   },
   "palette": {
     "primary": "#F4E3C9",

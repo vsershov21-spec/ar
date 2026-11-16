@@ -17,7 +17,9 @@
     "echoPitchSemitones": 7,
     "echoRate": 1.1,
     "elevenVoiceDesign": "Russian-speaking teenage girl cartoon cat, 15 years old, bright sparkly enthusiastic voice, playful and a bit dramatic, giggly, clear and sweet but not babyish, clean studio",
-    "actorDirection": "Восторженная подружка-подросток. Звонко, с улыбкой, драматичные «ой!» и «вау». Хихиканье короткое. Не пищать и не сюсюкать — она ровесница брата."
+    "actorDirection": "Восторженная подружка-подросток. Звонко, с улыбкой, драматичные «ой!» и «вау». Хихиканье короткое. Не пищать и не сюсюкать — она ровесница брата.",
+    "elevenVoiceId": "cs4zqBNUCYxYaU9AwOZ6",
+    "elevenModel": "eleven_v4"
   },
   "palette": {
     "primary": "#C9B6F2",

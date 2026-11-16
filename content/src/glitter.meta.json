@@ -4,7 +4,12 @@
   "title": "БЛЁСТКА",
   "selfGender": "f",
   "summary": "Сестра-близняшка того же возраста. Восторженная, немного драматичная, любит блеск, наклейки, красоту и ASMR-звуки. Посыпает всё блёстками.",
-  "speechRules": ["о себе — в женском роде", "много восклицаний, «вау», «ой», «хи-хи», но не в каждой фразе", "красота и блеск — её язык", "к ребёнку — без рода"],
+  "speechRules": [
+    "о себе — в женском роде",
+    "много восклицаний, «вау», «ой», «хи-хи», но не в каждой фразе",
+    "красота и блеск — её язык",
+    "к ребёнку — без рода"
+  ],
   "voice": {
     "piperVoice": "ru_RU-irina-medium",
     "pitchSemitones": 3,
@@ -12,34 +17,125 @@
     "echoPitchSemitones": 7,
     "echoRate": 1.1,
     "elevenVoiceDesign": "Russian-speaking teenage girl cartoon cat, 15 years old, bright sparkly enthusiastic voice, playful and a bit dramatic, giggly, clear and sweet but not babyish, clean studio",
-    "actorDirection": "Восторженная подружка-подросток. Звонко, с улыбкой, драматичные «ой!» и «вау». Хихиканье короткое. Не пищать и не сюсюкать — она ровесница брата."
+    "actorDirection": "Восторженная подружка-подросток. Звонко, с улыбкой, драматичные «ой!» и «вау». Хихиканье короткое. Не пищать и не сюсюкать — она ровесница брата.",
+    "elevenVoiceId": "cs4zqBNUCYxYaU9AwOZ6",
+    "elevenModel": "eleven_v4"
   },
-  "palette": { "primary": "#C9B6F2", "secondary": "#9FF0D6", "accent": "#FFD36B", "fx": ["#FFD36B", "#FF8FCB", "#9FF0D6", "#C9B6F2", "#FFFFFF"] },
+  "palette": {
+    "primary": "#C9B6F2",
+    "secondary": "#9FF0D6",
+    "accent": "#FFD36B",
+    "fx": [
+      "#FFD36B",
+      "#FF8FCB",
+      "#9FF0D6",
+      "#C9B6F2",
+      "#FFFFFF"
+    ]
+  },
   "outfit": {
-    "meshes": ["Hoodie_Glitter", "Bow_Glitter", "Skirt_Glitter", "Clips_Glitter"],
+    "meshes": [
+      "Hoodie_Glitter",
+      "Bow_Glitter",
+      "Skirt_Glitter",
+      "Clips_Glitter"
+    ],
     "description": "Лавандовое худи с мятными и золотыми акцентами и нашивкой Сбера на левой груди, бант-звёздочка между ушами, юбка-пачка поверх, заколки-звёздочки, на хвосте блёстки (шейдер).",
-    "props": ["glitter_pouch", "mirror"]
+    "props": [
+      "glitter_pouch",
+      "mirror"
+    ]
   },
   "idles": [
-    { "clip": "idle_breathe", "weight": 4 },
-    { "clip": "idle_glitter_mirror", "weight": 2 },
-    { "clip": "idle_glitter_twirl", "weight": 2 },
-    { "clip": "idle_look_around", "weight": 1 },
-    { "clip": "idle_stretch", "weight": 1 },
-    { "clip": "idle_tail_play", "weight": 1 }
+    {
+      "clip": "idle_breathe",
+      "weight": 4
+    },
+    {
+      "clip": "idle_glitter_mirror",
+      "weight": 2
+    },
+    {
+      "clip": "idle_glitter_twirl",
+      "weight": 2
+    },
+    {
+      "clip": "idle_look_around",
+      "weight": 1
+    },
+    {
+      "clip": "idle_stretch",
+      "weight": 1
+    },
+    {
+      "clip": "idle_tail_play",
+      "weight": 1
+    }
   ],
-  "signature": { "event": "double_tap", "clip": "glitter_throw", "fx": ["glitter_burst"], "sound": "sparkle_burst" },
+  "signature": {
+    "event": "double_tap",
+    "clip": "glitter_throw",
+    "fx": [
+      "glitter_burst"
+    ],
+    "sound": "sparkle_burst"
+  },
   "fxTuning": {
-    "knock": { "rings": 2, "shakePx": 2 },
-    "glitter_burst": { "count": 110 },
-    "glitter_trail": { "perPx": 0.7 },
-    "snow_globe": { "count": 200 },
-    "holo_shine": { "angleFromGyro": true }
+    "knock": {
+      "rings": 2,
+      "shakePx": 2
+    },
+    "glitter_burst": {
+      "count": 110
+    },
+    "glitter_trail": {
+      "perPx": 0.7
+    },
+    "snow_globe": {
+      "count": 200
+    },
+    "holo_shine": {
+      "angleFromGyro": true
+    }
   },
   "ambience": "amb_room_glitter",
   "stickers": [
-    { "kind": "holo" }, { "kind": "heart" }, { "kind": "star" }, { "kind": "text", "text": "ВАУ" },
-    { "kind": "holo" }, { "kind": "skull_free_smile" }, { "kind": "text", "text": "БЛЕСК" }, { "kind": "heart" }
+    {
+      "kind": "holo"
+    },
+    {
+      "kind": "heart"
+    },
+    {
+      "kind": "star"
+    },
+    {
+      "kind": "text",
+      "text": "ВАУ"
+    },
+    {
+      "kind": "holo"
+    },
+    {
+      "kind": "skull_free_smile"
+    },
+    {
+      "kind": "text",
+      "text": "БЛЕСК"
+    },
+    {
+      "kind": "heart"
+    }
   ],
-  "glb": { "show": ["Hoodie_Glitter", "Bow_Glitter", "Skirt_Glitter"], "hide": ["_Hooligan", "_Kind"] }
+  "glb": {
+    "show": [
+      "Hoodie_Glitter",
+      "Bow_Glitter",
+      "Skirt_Glitter"
+    ],
+    "hide": [
+      "_Hooligan",
+      "_Kind"
+    ]
+  }
 }

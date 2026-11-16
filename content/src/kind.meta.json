@@ -4,7 +4,13 @@
   "title": "ДОБРЯК",
   "selfGender": "m",
   "summary": "Тёплый, неторопливый, заботливый. Мурчит, обнимает экран, пьёт какао, выдувает мыльные пузыри, рисует сердечки на запотевшем стекле. Хвалит и поддерживает.",
-  "speechRules": ["мягкие полные фразы", "хвалит конкретно («ловко получается»)", "без сюсюканья и уменьшительных через слово", "если ребёнку плохо — поддержать и предложить взрослого", "к ребёнку — без рода"],
+  "speechRules": [
+    "мягкие полные фразы",
+    "хвалит конкретно («ловко получается»)",
+    "без сюсюканья и уменьшительных через слово",
+    "если ребёнку плохо — поддержать и предложить взрослого",
+    "к ребёнку — без рода"
+  ],
   "voice": {
     "piperVoice": "ru_RU-ruslan-medium",
     "pitchSemitones": 2,
@@ -12,35 +18,125 @@
     "echoPitchSemitones": 4,
     "echoRate": 1.0,
     "elevenVoiceDesign": "Russian-speaking teenage boy cartoon cat, 15 years old, warm gentle soft-spoken voice, smiling, calm slow pace, cozy and kind, slight breathy purr, clean studio",
-    "actorDirection": "Добрый старший друг. Голос с улыбкой, неторопливо, мягкие паузы. Мурчание в конце фраз «мр-р». Удивляется искренне, без наигрыша."
+    "actorDirection": "Добрый старший друг. Голос с улыбкой, неторопливо, мягкие паузы. Мурчание в конце фраз «мр-р». Удивляется искренне, без наигрыша.",
+    "elevenVoiceId": "T3RC6yeELKEr38NU0aXA",
+    "elevenModel": "eleven_v4"
   },
-  "palette": { "primary": "#F4E3C9", "secondary": "#8BC6A8", "accent": "#FFB37A", "fx": ["#FFC86B", "#FFB3C1", "#8BC6A8", "#FFFFFF"] },
+  "palette": {
+    "primary": "#F4E3C9",
+    "secondary": "#8BC6A8",
+    "accent": "#FFB37A",
+    "fx": [
+      "#FFC86B",
+      "#FFB3C1",
+      "#8BC6A8",
+      "#FFFFFF"
+    ]
+  },
   "outfit": {
-    "meshes": ["Hoodie_Kind", "Scarf_Kind", "Socks_Kind"],
+    "meshes": [
+      "Hoodie_Kind",
+      "Scarf_Kind",
+      "Socks_Kind"
+    ],
     "description": "Мягкое молочное худи-толстовка с мятной оторочкой и нашивкой Сбера на левой груди, вязаный шарф (персиковый), носки-тапочки. В лапах иногда кружка какао или колечко для мыльных пузырей.",
-    "props": ["cocoa_mug", "bubble_wand"]
+    "props": [
+      "cocoa_mug",
+      "bubble_wand"
+    ]
   },
   "idles": [
-    { "clip": "idle_breathe", "weight": 4 },
-    { "clip": "idle_kind_cocoa", "weight": 2 },
-    { "clip": "idle_kind_hug_self", "weight": 2 },
-    { "clip": "idle_look_around", "weight": 1 },
-    { "clip": "idle_stretch", "weight": 1 },
-    { "clip": "idle_yawn", "weight": 1 }
+    {
+      "clip": "idle_breathe",
+      "weight": 4
+    },
+    {
+      "clip": "idle_kind_cocoa",
+      "weight": 2
+    },
+    {
+      "clip": "idle_kind_hug_self",
+      "weight": 2
+    },
+    {
+      "clip": "idle_look_around",
+      "weight": 1
+    },
+    {
+      "clip": "idle_stretch",
+      "weight": 1
+    },
+    {
+      "clip": "idle_yawn",
+      "weight": 1
+    }
   ],
-  "signature": { "event": "double_tap", "clip": "kind_bubbles", "fx": ["soap_bubbles"], "sound": "bubbles" },
+  "signature": {
+    "event": "double_tap",
+    "clip": "kind_bubbles",
+    "fx": [
+      "soap_bubbles"
+    ],
+    "sound": "bubbles"
+  },
   "fxTuning": {
-    "knock": { "rings": 1, "shakePx": 1 },
-    "steam": { "radiusPx": 180, "opacity": 0.6 },
-    "soap_bubbles": { "count": 14 },
-    "warm_lights": { "count": 24 },
-    "hearts_float": { "count": 5 }
+    "knock": {
+      "rings": 1,
+      "shakePx": 1
+    },
+    "steam": {
+      "radiusPx": 180,
+      "opacity": 0.6
+    },
+    "soap_bubbles": {
+      "count": 14
+    },
+    "warm_lights": {
+      "count": 24
+    },
+    "hearts_float": {
+      "count": 5
+    }
   },
   "ambience": "amb_room_kind",
   "stickers": [
-    { "kind": "heart" }, { "kind": "text", "text": "ТЫ СУПЕР" }, { "kind": "star" },
-    { "kind": "heart" }, { "kind": "text", "text": "МУР" }, { "kind": "image", "src": "stickers/kind_paw.png" },
-    { "kind": "text", "text": "ОБНИМУ" }, { "kind": "star" }
+    {
+      "kind": "heart"
+    },
+    {
+      "kind": "text",
+      "text": "ТЫ СУПЕР"
+    },
+    {
+      "kind": "star"
+    },
+    {
+      "kind": "heart"
+    },
+    {
+      "kind": "text",
+      "text": "МУР"
+    },
+    {
+      "kind": "image",
+      "src": "stickers/kind_paw.png"
+    },
+    {
+      "kind": "text",
+      "text": "ОБНИМУ"
+    },
+    {
+      "kind": "star"
+    }
   ],
-  "glb": { "show": ["Hoodie_Kind", "Scarf_Kind"], "hide": ["_Hooligan", "_Glitter"] }
+  "glb": {
+    "show": [
+      "Hoodie_Kind",
+      "Scarf_Kind"
+    ],
+    "hide": [
+      "_Hooligan",
+      "_Glitter"
+    ]
+  }
 }

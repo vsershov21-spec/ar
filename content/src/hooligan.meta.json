@@ -4,7 +4,13 @@
   "title": "ХУЛИГАН",
   "selfGender": "m",
   "summary": "Дерзкий, быстрый, смешной. Скейт, жвачка, наушники. Задирается, но не обижает. Взрослость показывает поведением, а не грубостью.",
-  "speechRules": ["короткие фразы, 3–10 слов", "лёгкий сленг: чё, йо, норм, погнали", "дразнит, но не высмеивает ребёнка", "никаких ругательств, даже «детских»", "к ребёнку — без рода"],
+  "speechRules": [
+    "короткие фразы, 3–10 слов",
+    "лёгкий сленг: чё, йо, норм, погнали",
+    "дразнит, но не высмеивает ребёнка",
+    "никаких ругательств, даже «детских»",
+    "к ребёнку — без рода"
+  ],
   "voice": {
     "piperVoice": "ru_RU-ruslan-medium",
     "pitchSemitones": 3,
@@ -12,35 +18,129 @@
     "echoPitchSemitones": 5,
     "echoRate": 1.08,
     "elevenVoiceDesign": "Russian-speaking teenage boy cartoon cat, 15 years old, cheeky and confident, fast talker, slight smirk in the voice, playful raspy texture, bright and energetic, clean studio",
-    "actorDirection": "Подросток-задира с улыбкой в голосе. Темп быстрый, окончания фраз вверх, как будто подкалывает. Смешки короткие, «хе-хе». Не басить и не орать."
+    "actorDirection": "Подросток-задира с улыбкой в голосе. Темп быстрый, окончания фраз вверх, как будто подкалывает. Смешки короткие, «хе-хе». Не басить и не орать.",
+    "elevenVoiceId": "a8u8GOnZXiVnTOyIiZau",
+    "elevenModel": "eleven_v4"
   },
-  "palette": { "primary": "#111111", "secondary": "#B6FF3B", "accent": "#FF6FB5", "fx": ["#B6FF3B", "#FF6FB5", "#1EE3CF", "#FFFFFF"] },
+  "palette": {
+    "primary": "#111111",
+    "secondary": "#B6FF3B",
+    "accent": "#FF6FB5",
+    "fx": [
+      "#B6FF3B",
+      "#FF6FB5",
+      "#1EE3CF",
+      "#FFFFFF"
+    ]
+  },
   "outfit": {
-    "meshes": ["Hoodie_Hooligan", "Cap_Hooligan", "Headphones_Hooligan", "Sneakers_Hooligan"],
+    "meshes": [
+      "Hoodie_Hooligan",
+      "Cap_Hooligan",
+      "Headphones_Hooligan",
+      "Sneakers_Hooligan"
+    ],
     "description": "Чёрное оверсайз-худи с лаймовым кантом и нашивкой Сбера на левой груди, кепка козырьком назад (лайм), наушники на шее (бирюзовые), кеды. Розовая жвачка — отдельный объект у рта.",
-    "props": ["mini_skateboard", "gum"]
+    "props": [
+      "mini_skateboard",
+      "gum"
+    ]
   },
   "idles": [
-    { "clip": "idle_breathe", "weight": 4 },
-    { "clip": "idle_look_around", "weight": 2 },
-    { "clip": "idle_hooligan_headphones", "weight": 2 },
-    { "clip": "idle_hooligan_skate", "weight": 2 },
-    { "clip": "idle_yawn", "weight": 1 },
-    { "clip": "idle_tail_play", "weight": 1 }
+    {
+      "clip": "idle_breathe",
+      "weight": 4
+    },
+    {
+      "clip": "idle_look_around",
+      "weight": 2
+    },
+    {
+      "clip": "idle_hooligan_headphones",
+      "weight": 2
+    },
+    {
+      "clip": "idle_hooligan_skate",
+      "weight": 2
+    },
+    {
+      "clip": "idle_yawn",
+      "weight": 1
+    },
+    {
+      "clip": "idle_tail_play",
+      "weight": 1
+    }
   ],
-  "signature": { "event": "double_tap", "clip": "gum_blow", "fx": ["gum_bubble", "gum_splat"], "sound": "gum_pop" },
+  "signature": {
+    "event": "double_tap",
+    "clip": "gum_blow",
+    "fx": [
+      "gum_bubble",
+      "gum_splat"
+    ],
+    "sound": "gum_pop"
+  },
   "fxTuning": {
-    "knock": { "rings": 3, "shakePx": 5 },
-    "claws": { "lines": 3, "fadeMs": 1400 },
-    "glitch": { "intensity": 0.9 },
-    "gum_splat": { "blobs": 6 },
-    "skate_sparks": { "count": 28 }
+    "knock": {
+      "rings": 3,
+      "shakePx": 5
+    },
+    "claws": {
+      "lines": 3,
+      "fadeMs": 1400
+    },
+    "glitch": {
+      "intensity": 0.9
+    },
+    "gum_splat": {
+      "blobs": 6
+    },
+    "skate_sparks": {
+      "count": 28
+    }
   },
   "ambience": "amb_room_hooligan",
   "stickers": [
-    { "kind": "tag", "text": "КОТ" }, { "kind": "bolt" }, { "kind": "text", "text": "ТУТ БЫЛ КОТ" },
-    { "kind": "tag", "text": "ЙО!" }, { "kind": "bolt" }, { "kind": "text", "text": "СКЕЙТ" },
-    { "kind": "star" }, { "kind": "tag", "text": "ХОП" }
+    {
+      "kind": "tag",
+      "text": "КОТ"
+    },
+    {
+      "kind": "bolt"
+    },
+    {
+      "kind": "text",
+      "text": "ТУТ БЫЛ КОТ"
+    },
+    {
+      "kind": "tag",
+      "text": "ЙО!"
+    },
+    {
+      "kind": "bolt"
+    },
+    {
+      "kind": "text",
+      "text": "СКЕЙТ"
+    },
+    {
+      "kind": "star"
+    },
+    {
+      "kind": "tag",
+      "text": "ХОП"
+    }
   ],
-  "glb": { "show": ["Hoodie_Hooligan", "Cap_Hooligan", "Headphones_Hooligan"], "hide": ["_Kind", "_Glitter"] }
+  "glb": {
+    "show": [
+      "Hoodie_Hooligan",
+      "Cap_Hooligan",
+      "Headphones_Hooligan"
+    ],
+    "hide": [
+      "_Kind",
+      "_Glitter"
+    ]
+  }
 }
