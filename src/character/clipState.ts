@@ -39,7 +39,12 @@ export class ClipState {
     if (this.idleMode) this.startIdle();
   }
 
+  /** реальная длина клипов из модели (GLB): каталог даёт ориентир, а играть надо до конца движения */
+  readonly realDuration = new Map<string, number>();
+
   private track(def: ClipDef, loop?: boolean, onEnd?: () => void): Track {
+    const real = this.realDuration.get(def.id);
+    if (real && def.layer !== 'additive') def = { ...def, durationS: real };
     return { id: def.id, def, t: 0, loop: loop ?? def.loop, onEnd };
   }
 

@@ -175,6 +175,8 @@ export class GlbCharacter implements Character {
     if (anims.length) {
       this.mixer = new THREE.AnimationMixer(model);
       for (const clip of anims) this.addClip(clip);
+      // одноразовые клипы играют до конца движения, а не по ориентиру каталога
+      this.actions.forEach((a, id) => this.clips.realDuration.set(id, a.getClip().duration));
     }
     this.setFaceObj('usual');
     this.collider = new BodyCollider(this.object, (n) => this.bones.get(n) ?? model.getObjectByName('mixamorig' + n) ?? undefined);
@@ -183,7 +185,7 @@ export class GlbCharacter implements Character {
     this.props = new PropRig(
       async (u) => (await propLoader.loadAsync(asset(u))).scene,
       (n) => this.bones.get(n) ?? model.getObjectByName('mixamorig' + n) ?? undefined,
-      this.object,
+      this.inner,
     );
   }
 

@@ -16,5 +16,5 @@ const face={happy:'happy',sad:'sad',puff:'surprised',angry:'offended',dance:'exc
 ch.play(clip,{loop:true}); ch.face(face);
 let t=0; window.__frames=0;
 function tick(){ ch.update(1/30,cam); r.render(sc,cam); t+=1/30; window.__frames++; document.getElementById('info').textContent=`${persona} · ${mode} · ${ch.tailOut?.mode}`; requestAnimationFrame(tick);} tick();
-window.__ready=true;
+window.__ready=true; window.__ch=ch;
 </script></body></html>
