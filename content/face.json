@@ -1,0 +1,43 @@
+{
+  "$comment": "Пресеты лица: веса блендшейпов 0..1 (имена из docs/CHARACTER_SPEC.md) + положение ушей и зрачков. Липсинк (mouth_*) накладывается поверх пресета, моргание — всегда, кроме sleep/purr. ears: -1 прижаты, 0 норма, 1 торчком. pupils: 0.6 узкие, 1 норма, 1.4 широкие. Переход между пресетами 120–200 мс.",
+  "version": 1,
+  "morphTargets": ["blink_L", "blink_R", "smile", "smirk", "wink_L", "wink_R", "mouth_A", "mouth_E", "mouth_O", "mouth_U", "mouth_M", "cheeks_gum", "brow_up", "brow_down", "brow_sad", "eyes_squint", "eyes_wide", "eyes_spiral", "tongue_out", "blush"],
+  "presets": [
+    { "id": "neutral", "weights": {}, "ears": 0, "pupils": 1.0 },
+    { "id": "happy", "weights": { "smile": 0.7, "eyes_squint": 0.2 }, "ears": 0.3, "pupils": 1.1 },
+    { "id": "smile_big", "weights": { "smile": 1.0, "mouth_A": 0.3, "eyes_squint": 0.4 }, "ears": 0.5, "pupils": 1.2 },
+    { "id": "smirk", "weights": { "smirk": 0.9, "brow_down": 0.2 }, "ears": 0.2, "pupils": 0.9 },
+    { "id": "wink", "weights": { "smirk": 0.6, "wink_R": 1.0 }, "ears": 0.3, "pupils": 1.0 },
+    { "id": "cheeky", "weights": { "smirk": 0.8, "tongue_out": 0.6, "wink_L": 0.7 }, "ears": 0.4, "pupils": 1.1 },
+    { "id": "surprised", "weights": { "eyes_wide": 1.0, "brow_up": 1.0, "mouth_O": 0.6 }, "ears": 1.0, "pupils": 1.4 },
+    { "id": "excited", "weights": { "smile": 0.9, "eyes_wide": 0.5, "brow_up": 0.5, "mouth_A": 0.4 }, "ears": 1.0, "pupils": 1.4 },
+    { "id": "annoyed", "weights": { "brow_down": 0.8, "eyes_squint": 0.5, "mouth_M": 0.3 }, "ears": -0.6, "pupils": 0.8 },
+    { "id": "offended", "weights": { "brow_down": 0.6, "mouth_U": 0.4, "eyes_squint": 0.3 }, "ears": -0.8, "pupils": 0.8 },
+    { "id": "shy", "weights": { "smile": 0.4, "blush": 1.0, "brow_sad": 0.3, "eyes_squint": 0.3 }, "ears": -0.3, "pupils": 1.3 },
+    { "id": "proud", "weights": { "smirk": 0.5, "smile": 0.4, "eyes_squint": 0.4, "brow_up": 0.2 }, "ears": 0.6, "pupils": 1.0 },
+    { "id": "sad", "weights": { "brow_sad": 0.9, "mouth_U": 0.3 }, "ears": -0.7, "pupils": 1.3 },
+    { "id": "caring", "weights": { "smile": 0.5, "brow_sad": 0.4, "eyes_squint": 0.2 }, "ears": 0.0, "pupils": 1.3 },
+    { "id": "purr", "weights": { "smile": 0.6, "blink_L": 0.75, "blink_R": 0.75 }, "ears": -0.2, "pupils": 1.0, "noBlink": true },
+    { "id": "dizzy", "weights": { "eyes_spiral": 1.0, "mouth_O": 0.3, "tongue_out": 0.3 }, "ears": -0.4, "pupils": 1.0, "noBlink": true },
+    { "id": "sleep", "weights": { "blink_L": 1.0, "blink_R": 1.0, "smile": 0.2 }, "ears": -0.3, "pupils": 1.0, "noBlink": true },
+    { "id": "listen", "weights": { "brow_up": 0.4, "eyes_wide": 0.2 }, "ears": 1.0, "pupils": 1.2 },
+    { "id": "think", "weights": { "brow_up": 0.3, "smirk": 0.3, "eyes_squint": 0.2 }, "ears": 0.3, "pupils": 1.0 },
+    { "id": "cheeks_gum", "weights": { "cheeks_gum": 1.0, "mouth_M": 0.6, "eyes_wide": 0.3 }, "ears": 0.5, "pupils": 1.1 },
+    { "id": "squished", "weights": { "eyes_squint": 0.8, "mouth_O": 0.4, "cheeks_gum": 0.4 }, "ears": -0.2, "pupils": 1.0 },
+    { "id": "pain_ears", "weights": { "eyes_squint": 1.0, "brow_down": 0.5, "mouth_E": 0.4 }, "ears": -1.0, "pupils": 0.7 }
+  ],
+  "emotionToFace": {
+    "neutral": "neutral",
+    "happy": "happy",
+    "cheeky": "smirk",
+    "surprised": "surprised",
+    "annoyed": "annoyed",
+    "shy": "shy",
+    "proud": "proud",
+    "sad": "sad",
+    "excited": "excited",
+    "caring": "caring",
+    "sleepy": "sleep",
+    "whisper": "listen"
+  }
+}

@@ -1,0 +1,1047 @@
+{
+  "$comment": "Клипы тела на общем скелете (docs/CHARACTER_SPEC.md). layer: body — основной, additive — накладывается поверх (уши, хвост, дыхание), face — только лицо. rootMotion: false = на месте, движение делает код. usedBy: события и характеры. persona: all | hooligan | kind | glitter. priority генерации: P0 — нужно для первого демо, P1 — для пилота, P2 — потом.",
+  "version": 1,
+  "clips": [
+    {
+      "id": "idle_breathe",
+      "durationS": 4.0,
+      "loop": true,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 300,
+      "persona": "all",
+      "priority": "P0",
+      "usedBy": [
+        "idle"
+      ],
+      "notes": "Дыхание, переминание, хвост покачивается, моргание раз в 3–5 с. Бесшовная петля."
+    },
+    {
+      "id": "idle_look_around",
+      "durationS": 3.5,
+      "loop": false,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 300,
+      "persona": "all",
+      "priority": "P0",
+      "usedBy": [
+        "idle"
+      ],
+      "notes": "Смотрит влево-вправо, потом в камеру."
+    },
+    {
+      "id": "idle_stretch",
+      "durationS": 3.0,
+      "loop": false,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 300,
+      "persona": "all",
+      "priority": "P1",
+      "usedBy": [
+        "idle",
+        "wake_up"
+      ],
+      "notes": "Потягивается вверх лапами, хвост трубой."
+    },
+    {
+      "id": "idle_yawn",
+      "durationS": 2.5,
+      "loop": false,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 250,
+      "persona": "all",
+      "priority": "P1",
+      "usedBy": [
+        "idle",
+        "evening",
+        "silence"
+      ],
+      "notes": "Зевок, прикрывает рот лапой."
+    },
+    {
+      "id": "idle_tail_play",
+      "durationS": 3.0,
+      "loop": false,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 300,
+      "persona": "all",
+      "priority": "P2",
+      "usedBy": [
+        "idle"
+      ],
+      "notes": "Ловит собственный хвост, полоборота."
+    },
+    {
+      "id": "idle_hooligan_skate",
+      "durationS": 4.0,
+      "loop": false,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 300,
+      "persona": "hooligan",
+      "priority": "P1",
+      "usedBy": [
+        "idle"
+      ],
+      "notes": "Подкидывает мини-скейт ногой и ловит; без скейта — делает вид, что катится."
+    },
+    {
+      "id": "idle_hooligan_headphones",
+      "durationS": 4.0,
+      "loop": true,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 300,
+      "persona": "hooligan",
+      "priority": "P1",
+      "usedBy": [
+        "idle"
+      ],
+      "notes": "Качает головой в такт музыке в наушниках, щёлкает пальцами."
+    },
+    {
+      "id": "idle_kind_hug_self",
+      "durationS": 3.0,
+      "loop": false,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 300,
+      "persona": "kind",
+      "priority": "P1",
+      "usedBy": [
+        "idle"
+      ],
+      "notes": "Обнимает себя, улыбается с закрытыми глазами."
+    },
+    {
+      "id": "idle_kind_cocoa",
+      "durationS": 4.0,
+      "loop": false,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 300,
+      "persona": "kind",
+      "priority": "P1",
+      "usedBy": [
+        "idle"
+      ],
+      "notes": "Достаёт кружку какао, дует, пьёт, пар поднимается."
+    },
+    {
+      "id": "idle_glitter_mirror",
+      "durationS": 3.5,
+      "loop": false,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 300,
+      "persona": "glitter",
+      "priority": "P1",
+      "usedBy": [
+        "idle"
+      ],
+      "notes": "Смотрится в экран как в зеркало, поправляет бантик и ушки."
+    },
+    {
+      "id": "idle_glitter_twirl",
+      "durationS": 2.5,
+      "loop": false,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 300,
+      "persona": "glitter",
+      "priority": "P1",
+      "usedBy": [
+        "idle"
+      ],
+      "notes": "Кружится на месте, юбка/худи разлетается, блёстки с хвоста."
+    },
+    {
+      "id": "appear_jump_in",
+      "durationS": 1.6,
+      "loop": false,
+      "rootMotion": true,
+      "layer": "body",
+      "blendInMs": 0,
+      "persona": "all",
+      "priority": "P0",
+      "usedBy": [
+        "intro",
+        "card_found"
+      ],
+      "notes": "Выпрыгивает из карты: из-под поверхности вверх, приземление со сквошем, отряхивается."
+    },
+    {
+      "id": "dive_out",
+      "durationS": 1.2,
+      "loop": false,
+      "rootMotion": true,
+      "layer": "body",
+      "blendInMs": 100,
+      "persona": "all",
+      "priority": "P0",
+      "usedBy": [
+        "goodbye",
+        "outro"
+      ],
+      "notes": "Машет и ныряет обратно в карту."
+    },
+    {
+      "id": "fall_off_card",
+      "durationS": 1.4,
+      "loop": false,
+      "rootMotion": true,
+      "layer": "body",
+      "blendInMs": 100,
+      "persona": "all",
+      "priority": "P1",
+      "usedBy": [
+        "card_lost",
+        "code:card_lost"
+      ],
+      "notes": "Карта уехала — кот теряет опору, машет лапами, «прилипает» к стеклу."
+    },
+    {
+      "id": "peek_from_edge",
+      "durationS": 2.0,
+      "loop": true,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 300,
+      "persona": "all",
+      "priority": "P0",
+      "usedBy": [
+        "card_lost",
+        "point_camera"
+      ],
+      "notes": "Выглядывает из-за края экрана, ищет карту."
+    },
+    {
+      "id": "walk",
+      "durationS": 1.0,
+      "loop": true,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 200,
+      "persona": "all",
+      "priority": "P0",
+      "usedBy": [
+        "walk_to"
+      ],
+      "notes": "Цикл шага на двух лапах, хвост для баланса. Скорость в коде."
+    },
+    {
+      "id": "run",
+      "durationS": 0.6,
+      "loop": true,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 150,
+      "persona": "all",
+      "priority": "P1",
+      "usedBy": [
+        "walk_to",
+        "outro",
+        "code:walk_far"
+      ],
+      "notes": "Бег, уши назад."
+    },
+    {
+      "id": "turn_left",
+      "durationS": 0.5,
+      "loop": false,
+      "rootMotion": true,
+      "layer": "body",
+      "blendInMs": 100,
+      "persona": "all",
+      "priority": "P1",
+      "usedBy": [
+        "walk_to",
+        "code:walk_turn"
+      ],
+      "notes": "Поворот на 90° влево на месте."
+    },
+    {
+      "id": "turn_right",
+      "durationS": 0.5,
+      "loop": false,
+      "rootMotion": true,
+      "layer": "body",
+      "blendInMs": 100,
+      "persona": "all",
+      "priority": "P1",
+      "usedBy": [
+        "walk_to",
+        "code:walk_turn"
+      ],
+      "notes": "Поворот на 90° вправо."
+    },
+    {
+      "id": "jump",
+      "durationS": 1.0,
+      "loop": false,
+      "rootMotion": true,
+      "layer": "body",
+      "blendInMs": 100,
+      "persona": "all",
+      "priority": "P0",
+      "usedBy": [
+        "jump",
+        "clap"
+      ],
+      "notes": "Присед, прыжок, приземление со сквошем."
+    },
+    {
+      "id": "flip",
+      "durationS": 1.2,
+      "loop": false,
+      "rootMotion": true,
+      "layer": "body",
+      "blendInMs": 100,
+      "persona": "all",
+      "priority": "P0",
+      "usedBy": [
+        "flip",
+        "double_tap"
+      ],
+      "notes": "Сальто назад, приземление в ту же точку, поза «та-да»."
+    },
+    {
+      "id": "tumble",
+      "durationS": 1.4,
+      "loop": false,
+      "rootMotion": true,
+      "layer": "body",
+      "blendInMs": 100,
+      "persona": "all",
+      "priority": "P1",
+      "usedBy": [
+        "spam",
+        "poke_hard"
+      ],
+      "notes": "Кувырок вперёд с перекатом, встаёт отряхиваясь."
+    },
+    {
+      "id": "dizzy",
+      "durationS": 2.0,
+      "loop": false,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 150,
+      "persona": "all",
+      "priority": "P0",
+      "usedBy": [
+        "spam",
+        "shake"
+      ],
+      "notes": "Шатается, глаза-спирали (face dizzy), трясёт головой."
+    },
+    {
+      "id": "sit_down",
+      "durationS": 0.8,
+      "loop": false,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 150,
+      "persona": "all",
+      "priority": "P1",
+      "usedBy": [
+        "sit"
+      ],
+      "notes": "Садится на попу, хвост обвивает лапы."
+    },
+    {
+      "id": "sit_idle",
+      "durationS": 4.0,
+      "loop": true,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 300,
+      "persona": "all",
+      "priority": "P1",
+      "usedBy": [
+        "sit",
+        "code:after_sit_down"
+      ],
+      "notes": "Сидит, болтает лапами."
+    },
+    {
+      "id": "stand_up",
+      "durationS": 0.7,
+      "loop": false,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 150,
+      "persona": "all",
+      "priority": "P1",
+      "usedBy": [
+        "sit",
+        "code:leave_sit"
+      ],
+      "notes": "Встаёт из сидячей позы."
+    },
+    {
+      "id": "sleep_loop",
+      "durationS": 4.0,
+      "loop": true,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 600,
+      "persona": "all",
+      "priority": "P1",
+      "usedBy": [
+        "sleep"
+      ],
+      "notes": "Сворачивается клубком на карте, бок поднимается от дыхания."
+    },
+    {
+      "id": "wake_startle",
+      "durationS": 1.2,
+      "loop": false,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 100,
+      "persona": "all",
+      "priority": "P1",
+      "usedBy": [
+        "wake_up"
+      ],
+      "notes": "Вздрагивает, протирает глаза."
+    },
+    {
+      "id": "wave",
+      "durationS": 1.2,
+      "loop": false,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 150,
+      "persona": "all",
+      "priority": "P0",
+      "usedBy": [
+        "wave",
+        "hello",
+        "goodbye"
+      ],
+      "notes": "Машет лапой."
+    },
+    {
+      "id": "point_button",
+      "durationS": 1.5,
+      "loop": false,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 150,
+      "persona": "all",
+      "priority": "P0",
+      "usedBy": [
+        "mic_hint",
+        "outro",
+        "money",
+        "sberkids"
+      ],
+      "notes": "Показывает лапой вниз на кнопку (микрофон / СберKids). Направление задаёт IK по координате кнопки."
+    },
+    {
+      "id": "talk_casual",
+      "durationS": 3.0,
+      "loop": true,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 250,
+      "persona": "all",
+      "priority": "P0",
+      "usedBy": [
+        "*speech"
+      ],
+      "notes": "Жестикулирует при разговоре, спокойно. Лицо и рот — липсинк поверх."
+    },
+    {
+      "id": "talk_excited",
+      "durationS": 3.0,
+      "loop": true,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 250,
+      "persona": "all",
+      "priority": "P1",
+      "usedBy": [
+        "*speech:excited"
+      ],
+      "notes": "Активная жестикуляция, подпрыгивает."
+    },
+    {
+      "id": "listen",
+      "durationS": 2.0,
+      "loop": true,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 200,
+      "persona": "all",
+      "priority": "P0",
+      "usedBy": [
+        "ask_name",
+        "unknown",
+        "echo_start"
+      ],
+      "notes": "Прикладывает ухо к стеклу, уши торчком."
+    },
+    {
+      "id": "think",
+      "durationS": 2.0,
+      "loop": false,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 200,
+      "persona": "all",
+      "priority": "P1",
+      "usedBy": [
+        "riddle",
+        "unknown"
+      ],
+      "notes": "Лапа у подбородка, взгляд вверх."
+    },
+    {
+      "id": "laugh",
+      "durationS": 1.8,
+      "loop": false,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 150,
+      "persona": "all",
+      "priority": "P0",
+      "usedBy": [
+        "tap_cat",
+        "joke",
+        "tap_cat_belly"
+      ],
+      "notes": "Смеётся, держится за живот."
+    },
+    {
+      "id": "shy",
+      "durationS": 2.0,
+      "loop": false,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 200,
+      "persona": "all",
+      "priority": "P1",
+      "usedBy": [
+        "compliment",
+        "tap_cat_cheek"
+      ],
+      "notes": "Смущается, ковыряет ногой, прячет мордочку."
+    },
+    {
+      "id": "surprised",
+      "durationS": 1.0,
+      "loop": false,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 100,
+      "persona": "all",
+      "priority": "P0",
+      "usedBy": [
+        "intro",
+        "clap",
+        "card_found"
+      ],
+      "notes": "Отшатывается, уши вверх."
+    },
+    {
+      "id": "offended",
+      "durationS": 2.0,
+      "loop": false,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 150,
+      "persona": "all",
+      "priority": "P1",
+      "usedBy": [
+        "poke_hard",
+        "rude"
+      ],
+      "notes": "Скрещивает лапы, отворачивается, через 1,5 с косится обратно."
+    },
+    {
+      "id": "proud",
+      "durationS": 1.5,
+      "loop": false,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 150,
+      "persona": "all",
+      "priority": "P1",
+      "usedBy": [
+        "hello_new",
+        "flip"
+      ],
+      "notes": "Поза победителя, лапы в боки."
+    },
+    {
+      "id": "comfort",
+      "durationS": 3.0,
+      "loop": false,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 300,
+      "persona": "all",
+      "priority": "P1",
+      "usedBy": [
+        "sad",
+        "scared"
+      ],
+      "notes": "Медленно подходит к стеклу, прикладывает лапу изнутри, мягко кивает."
+    },
+    {
+      "id": "cover_ears",
+      "durationS": 1.5,
+      "loop": false,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 100,
+      "persona": "all",
+      "priority": "P1",
+      "usedBy": [
+        "loud"
+      ],
+      "notes": "Закрывает уши лапами, жмурится."
+    },
+    {
+      "id": "lean_in",
+      "durationS": 2.0,
+      "loop": false,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 200,
+      "persona": "all",
+      "priority": "P1",
+      "usedBy": [
+        "whisper"
+      ],
+      "notes": "Наклоняется к экрану, прикладывает палец к губам."
+    },
+    {
+      "id": "celebrate",
+      "durationS": 2.0,
+      "loop": false,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 150,
+      "persona": "all",
+      "priority": "P1",
+      "usedBy": [
+        "yes",
+        "nice_name",
+        "stickers_all_gone"
+      ],
+      "notes": "Подпрыгивает с поднятыми лапами."
+    },
+    {
+      "id": "sing",
+      "durationS": 4.0,
+      "loop": false,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 200,
+      "persona": "all",
+      "priority": "P2",
+      "usedBy": [
+        "sing"
+      ],
+      "notes": "Поёт в воображаемый микрофон, качается."
+    },
+    {
+      "id": "knock_glass",
+      "durationS": 0.9,
+      "loop": false,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 80,
+      "persona": "all",
+      "priority": "P0",
+      "usedBy": [
+        "tap_screen"
+      ],
+      "notes": "Подходит вплотную и стучит костяшками в стекло дважды. Лапа попадает в точку тапа (IK)."
+    },
+    {
+      "id": "press_glass",
+      "durationS": 2.0,
+      "loop": true,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 150,
+      "persona": "all",
+      "priority": "P0",
+      "usedBy": [
+        "longpress"
+      ],
+      "notes": "Прижимается к стеклу носом и лапами, мордочка сплющена."
+    },
+    {
+      "id": "scratch_glass",
+      "durationS": 1.0,
+      "loop": false,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 80,
+      "persona": "hooligan",
+      "priority": "P0",
+      "usedBy": [
+        "swipe"
+      ],
+      "notes": "Проводит когтями по стеклу по траектории свайпа."
+    },
+    {
+      "id": "slide_down_glass",
+      "durationS": 1.6,
+      "loop": false,
+      "rootMotion": true,
+      "layer": "body",
+      "blendInMs": 100,
+      "persona": "all",
+      "priority": "P2",
+      "usedBy": [
+        "card_lost",
+        "code:card_lost_long"
+      ],
+      "notes": "Сползает по стеклу вниз со скрипом."
+    },
+    {
+      "id": "breath_draw",
+      "durationS": 2.5,
+      "loop": false,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 150,
+      "persona": "kind",
+      "priority": "P0",
+      "usedBy": [
+        "swipe",
+        "longpress"
+      ],
+      "notes": "Дышит на стекло, рисует пальцем по запотевшему."
+    },
+    {
+      "id": "hug_screen",
+      "durationS": 2.5,
+      "loop": false,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 200,
+      "persona": "kind",
+      "priority": "P0",
+      "usedBy": [
+        "double_tap",
+        "stroke_long"
+      ],
+      "notes": "Обнимает экран изнутри, щекой к стеклу."
+    },
+    {
+      "id": "sticker_slap",
+      "durationS": 0.7,
+      "loop": false,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 80,
+      "persona": "all",
+      "priority": "P0",
+      "usedBy": [
+        "switch_start",
+        "stickers"
+      ],
+      "notes": "Хлопает наклейку на стекло изнутри. Повторяется серией."
+    },
+    {
+      "id": "sticker_react",
+      "durationS": 1.0,
+      "loop": false,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 100,
+      "persona": "all",
+      "priority": "P1",
+      "usedBy": [
+        "sticker_peel"
+      ],
+      "notes": "Смотрит, как отклеивают, уши вслед."
+    },
+    {
+      "id": "gum_blow",
+      "durationS": 2.6,
+      "loop": false,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 120,
+      "persona": "hooligan",
+      "priority": "P0",
+      "usedBy": [
+        "gum",
+        "double_tap"
+      ],
+      "notes": "Надувает пузырь из жвачки (face cheeks_gum), пузырь растёт, лопается, жвачка на мордочке, снимает лапой."
+    },
+    {
+      "id": "kind_bubbles",
+      "durationS": 2.6,
+      "loop": false,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 120,
+      "persona": "kind",
+      "priority": "P0",
+      "usedBy": [
+        "gum"
+      ],
+      "notes": "Выдувает мыльные пузыри из колечка, ловит один лапой."
+    },
+    {
+      "id": "glitter_throw",
+      "durationS": 1.6,
+      "loop": false,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 120,
+      "persona": "glitter",
+      "priority": "P0",
+      "usedBy": [
+        "gum",
+        "double_tap"
+      ],
+      "notes": "Достаёт горсть блёсток и сдувает их в камеру."
+    },
+    {
+      "id": "snowglobe_shake",
+      "durationS": 2.0,
+      "loop": false,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 120,
+      "persona": "glitter",
+      "priority": "P1",
+      "usedBy": [
+        "shake"
+      ],
+      "notes": "Кот внутри «снежного шара»: прикрывает голову, вокруг кружатся блёстки."
+    },
+    {
+      "id": "purr_stroke",
+      "durationS": 2.0,
+      "loop": true,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 200,
+      "persona": "all",
+      "priority": "P0",
+      "usedBy": [
+        "stroke",
+        "stroke_long"
+      ],
+      "notes": "Тянется под ладонь, глаза прищурены, хвост дрожит."
+    },
+    {
+      "id": "poke_head",
+      "durationS": 0.8,
+      "loop": false,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 60,
+      "persona": "all",
+      "priority": "P0",
+      "usedBy": [
+        "tap_cat_head"
+      ],
+      "notes": "Голова качается от тычка, уши прижимаются."
+    },
+    {
+      "id": "poke_cheek",
+      "durationS": 0.8,
+      "loop": false,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 60,
+      "persona": "all",
+      "priority": "P1",
+      "usedBy": [
+        "tap_cat_cheek"
+      ],
+      "notes": "Щека вминается (сквош), голова отклоняется."
+    },
+    {
+      "id": "poke_belly",
+      "durationS": 1.0,
+      "loop": false,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 60,
+      "persona": "all",
+      "priority": "P0",
+      "usedBy": [
+        "tap_cat_belly"
+      ],
+      "notes": "Сгибается пополам и хихикает."
+    },
+    {
+      "id": "poke_paw",
+      "durationS": 0.8,
+      "loop": false,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 60,
+      "persona": "all",
+      "priority": "P1",
+      "usedBy": [
+        "tap_cat_paw"
+      ],
+      "notes": "Отдёргивает лапу и трясёт ей."
+    },
+    {
+      "id": "poke_tail",
+      "durationS": 0.9,
+      "loop": false,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 60,
+      "persona": "all",
+      "priority": "P1",
+      "usedBy": [
+        "tap_cat_tail"
+      ],
+      "notes": "Подпрыгивает, хвост трубой, оборачивается."
+    },
+    {
+      "id": "flinch",
+      "durationS": 0.7,
+      "loop": false,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 50,
+      "persona": "all",
+      "priority": "P0",
+      "usedBy": [
+        "poke_hard"
+      ],
+      "notes": "Резко отшатывается."
+    },
+    {
+      "id": "dance_hooligan",
+      "durationS": 4.0,
+      "loop": true,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 200,
+      "persona": "hooligan",
+      "priority": "P1",
+      "usedBy": [
+        "dance"
+      ],
+      "notes": "Брейк-элементы, «волна», поза с кепкой."
+    },
+    {
+      "id": "dance_kind",
+      "durationS": 4.0,
+      "loop": true,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 200,
+      "persona": "kind",
+      "priority": "P1",
+      "usedBy": [
+        "dance"
+      ],
+      "notes": "Покачивается из стороны в сторону, хлопает в лапы."
+    },
+    {
+      "id": "dance_glitter",
+      "durationS": 4.0,
+      "loop": true,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 200,
+      "persona": "glitter",
+      "priority": "P1",
+      "usedBy": [
+        "dance"
+      ],
+      "notes": "Кружения, «сердечко» лапами, поза на носочках."
+    },
+    {
+      "id": "ear_twitch",
+      "durationS": 0.5,
+      "loop": false,
+      "rootMotion": false,
+      "layer": "additive",
+      "blendInMs": 50,
+      "persona": "all",
+      "priority": "P0",
+      "usedBy": [
+        "idle",
+        "loud"
+      ],
+      "notes": "Подёргивание одного уха. Накладывается на любой клип."
+    },
+    {
+      "id": "ears_back",
+      "durationS": 0.6,
+      "loop": false,
+      "rootMotion": false,
+      "layer": "additive",
+      "blendInMs": 80,
+      "persona": "all",
+      "priority": "P1",
+      "usedBy": [
+        "loud",
+        "offended",
+        "card_lost"
+      ],
+      "notes": "Уши прижаты назад."
+    },
+    {
+      "id": "tail_wag",
+      "durationS": 1.0,
+      "loop": true,
+      "rootMotion": false,
+      "layer": "additive",
+      "blendInMs": 150,
+      "persona": "all",
+      "priority": "P0",
+      "usedBy": [
+        "*happy"
+      ],
+      "notes": "Хвост ходит из стороны в сторону."
+    },
+    {
+      "id": "tail_puff",
+      "durationS": 0.8,
+      "loop": false,
+      "rootMotion": false,
+      "layer": "additive",
+      "blendInMs": 60,
+      "persona": "all",
+      "priority": "P1",
+      "usedBy": [
+        "surprised",
+        "clap"
+      ],
+      "notes": "Хвост распушается трубой."
+    },
+    {
+      "id": "echo_speak",
+      "durationS": 2.0,
+      "loop": true,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 120,
+      "persona": "all",
+      "priority": "P0",
+      "usedBy": [
+        "echo_done",
+        "code:echo_playback"
+      ],
+      "notes": "Повторяет фразу: смешно гримасничает, лапами изображает собеседника."
+    }
+  ]
+}

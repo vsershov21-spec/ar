@@ -1,0 +1,32 @@
+id,layer,persona,duration_ms,sound,params,notes
+knock,glass,all,700,glass_knock,"{""rings"": 2, ""ringMaxPx"": 90, ""dentDepth"": 0.35, ""shakePx"": 3}",Круги от стука в точке тапа + лёгкая вмятина (искажение) и дрожание экрана. Без трещин.
+claws,glass,hooligan,1800,claws_glass,"{""lines"": 3, ""spacingPx"": 14, ""followSwipe"": true, ""fadeMs"": 1200, ""sparkles"": false}","Три белые царапины по траектории свайпа, медленно гаснут."
+gum_bubble,world,hooligan,2600,gum_blow,"{""maxScale"": 1.4, ""color"": ""#FF6FB5"", ""popAt"": 0.8}",Пузырь растёт у рта и лопается.
+gum_splat,glass,hooligan,3500,gum_pop,"{""blobs"": 5, ""spreadPx"": 220, ""drip"": true, ""wipeByFinger"": true}",Жвачка прилипает к стеклу пятнами; ребёнок может стереть пальцем.
+glitch,glass,all,900,glitch,"{""slices"": 8, ""rgbShiftPx"": 10, ""intensity"": 0.8}","Полосы-сдвиги и RGB-раздвоение, как сбой картинки. Не дольше 1 с, без мигания чаще 3 раз в секунду."
+skate_sparks,world,hooligan,1200,skate_grind,"{""count"": 24, ""color"": ""#B6FF3B""}",Искры из-под лап при приземлении после трюка.
+tag_spray,glass,hooligan,2500,spray,"{""text"": ""КОТ"", ""fadeMs"": 2000}","Надпись-граффити баллончиком на стекле, исчезает."
+steam,glass,kind,4000,breath,"{""radiusPx"": 160, ""opacity"": 0.55, ""fadeMs"": 3000}",Кот дышит — стекло запотевает пятном.
+steam_draw,glass,kind,6000,finger_squeak,"{""brushPx"": 18, ""fadeMs"": 4000}",Ребёнок рисует пальцем по запотевшему стеклу.
+steam_heart,glass,kind,4000,finger_squeak,"{""shape"": ""heart"", ""drawMs"": 1200}","Кот изнутри рисует сердечко на запотевшем стекле (в зеркальном виде, как изнутри)."
+soap_bubbles,world,kind,3500,bubbles,"{""count"": 12, ""minPx"": 20, ""maxPx"": 70, ""tapToPop"": true}",Мыльные пузыри летят к экрану; по ним можно тапать — лопаются.
+warm_lights,world,kind,5000,chime_soft,"{""count"": 20, ""color"": ""#FFC86B"", ""drift"": 0.3}",Тёплые светлячки вокруг кота (успокаивающая реакция).
+hearts_float,world,kind|glitter,2500,pop_soft,"{""count"": 6}",Сердечки поднимаются над котом при глажке и комплиментах.
+paw_print,glass,kind,3000,paw_glass,"{""fadeMs"": 2500}",Отпечаток лапки на стекле изнутри.
+glitter_burst,glass,glitter,1600,sparkle_burst,"{""count"": 90, ""gravity"": 0.4, ""shapes"": [""star"", ""dot"", ""heart""]}",Взрыв блёсток в точке тапа.
+glitter_trail,glass,glitter,1500,sparkle_swipe,"{""perPx"": 0.5, ""fadeMs"": 1200}",Блестящий след за пальцем.
+snow_globe,glass,glitter,4000,snowglobe,"{""count"": 160, ""settleMs"": 3500}",При встряске блёстки кружат по всему экрану и медленно оседают.
+holo_shine,glass,glitter,1200,shimmer,"{""angleFromGyro"": true}","Голографический перелив по наклейкам и по коту, зависит от наклона телефона."
+kiss_print,glass,glitter,3000,kiss,"{""color"": ""#FF8FCB""}",Кот целует стекло — остаётся блестящий отпечаток-сердечко.
+glass_cat,glass,all,2000,glass_squeak,"{""squash"": 0.3, ""fogAroundNose"": true}","Кот прижат к стеклу: мордочка сплющена, вокруг носа запотевание."
+sticker,glass,all,400,sticker_slap,"{""mirrored"": true, ""rotateDeg"": [-18, 18], ""scale"": [0.8, 1.2]}","Наклейка шлёпается изнутри (рисунок зеркальный), блик при наклоне."
+sticker_peel,glass,all,600,sticker_peel,"{""fromCorner"": true}",Отклеивание с угла за палец.
+stickers_cover,glass,all,2800,sticker_slap,"{""count"": 14, ""intervalMs"": 180}",Серия наклеек заклеивает экран перед сменой характера.
+stickers_blow,glass,all,1000,whoosh_big,"{""spin"": true}",Наклейки разлетаются при встряске.
+confetti,glass,all,2000,confetti,"{""count"": 80}","Праздник: выбор характера, имя, все наклейки отклеены."
+zzz,world,all,3000,snore,"{""loop"": true}",Буквы Zzz над спящим котом.
+dizzy_stars,world,all,2000,dizzy,"{""count"": 4}",Звёздочки кружат над головой.
+ear_ring,world,all,1000,none,{},Волны у ушей при крике (кот закрывает уши).
+echo_wave,ui,all,0,none,"{""bars"": 5}","Индикатор записи: волна у уха кота, пока ребёнок говорит в режиме повтора."
+listen_ears,ui,all,0,listen_on,{},"Значок «ушки» у кнопки микрофона, пока кот слушает."
+spotlight_button,ui,all,2000,chime_soft,"{""pulse"": 3}","Подсветка кнопки, на которую показывает кот (микрофон, СберKids)."

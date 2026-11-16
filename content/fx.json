@@ -1,0 +1,40 @@
+{
+  "$comment": "Экранные анимации (2D-слой поверх камеры) и мировые эффекты (3D у кота). layer: glass — на «стекле» экрана, как будто кот внутри телефона; world — в сцене возле кота; ui — интерфейс. Цвета берутся из palette.fx характера, если color не задан. Все длительности в мс.",
+  "version": 1,
+  "fx": [
+    { "id": "knock", "layer": "glass", "durationMs": 700, "persona": "all", "sound": "glass_knock", "params": { "rings": 2, "ringMaxPx": 90, "dentDepth": 0.35, "shakePx": 3 }, "notes": "Круги от стука в точке тапа + лёгкая вмятина (искажение) и дрожание экрана. Без трещин." },
+    { "id": "claws", "layer": "glass", "durationMs": 1800, "persona": "hooligan", "sound": "claws_glass", "params": { "lines": 3, "spacingPx": 14, "followSwipe": true, "fadeMs": 1200, "sparkles": false }, "notes": "Три белые царапины по траектории свайпа, медленно гаснут." },
+    { "id": "gum_bubble", "layer": "world", "durationMs": 2600, "persona": "hooligan", "sound": "gum_blow", "params": { "maxScale": 1.4, "color": "#FF6FB5", "popAt": 0.8 }, "notes": "Пузырь растёт у рта и лопается." },
+    { "id": "gum_splat", "layer": "glass", "durationMs": 3500, "persona": "hooligan", "sound": "gum_pop", "params": { "blobs": 5, "spreadPx": 220, "drip": true, "wipeByFinger": true }, "notes": "Жвачка прилипает к стеклу пятнами; ребёнок может стереть пальцем." },
+    { "id": "glitch", "layer": "glass", "durationMs": 900, "persona": "all", "sound": "glitch", "params": { "slices": 8, "rgbShiftPx": 10, "intensity": 0.8 }, "notes": "Полосы-сдвиги и RGB-раздвоение, как сбой картинки. Не дольше 1 с, без мигания чаще 3 раз в секунду." },
+    { "id": "skate_sparks", "layer": "world", "durationMs": 1200, "persona": "hooligan", "sound": "skate_grind", "params": { "count": 24, "color": "#B6FF3B" }, "notes": "Искры из-под лап при приземлении после трюка." },
+    { "id": "tag_spray", "layer": "glass", "durationMs": 2500, "persona": "hooligan", "sound": "spray", "params": { "text": "КОТ", "fadeMs": 2000 }, "notes": "Надпись-граффити баллончиком на стекле, исчезает." },
+
+    { "id": "steam", "layer": "glass", "durationMs": 4000, "persona": "kind", "sound": "breath", "params": { "radiusPx": 160, "opacity": 0.55, "fadeMs": 3000 }, "notes": "Кот дышит — стекло запотевает пятном." },
+    { "id": "steam_draw", "layer": "glass", "durationMs": 6000, "persona": "kind", "sound": "finger_squeak", "params": { "brushPx": 18, "fadeMs": 4000 }, "notes": "Ребёнок рисует пальцем по запотевшему стеклу." },
+    { "id": "steam_heart", "layer": "glass", "durationMs": 4000, "persona": "kind", "sound": "finger_squeak", "params": { "shape": "heart", "drawMs": 1200 }, "notes": "Кот изнутри рисует сердечко на запотевшем стекле (в зеркальном виде, как изнутри)." },
+    { "id": "soap_bubbles", "layer": "world", "durationMs": 3500, "persona": "kind", "sound": "bubbles", "params": { "count": 12, "minPx": 20, "maxPx": 70, "tapToPop": true }, "notes": "Мыльные пузыри летят к экрану; по ним можно тапать — лопаются." },
+    { "id": "warm_lights", "layer": "world", "durationMs": 5000, "persona": "kind", "sound": "chime_soft", "params": { "count": 20, "color": "#FFC86B", "drift": 0.3 }, "notes": "Тёплые светлячки вокруг кота (успокаивающая реакция)." },
+    { "id": "hearts_float", "layer": "world", "durationMs": 2500, "persona": "kind|glitter", "sound": "pop_soft", "params": { "count": 6 }, "notes": "Сердечки поднимаются над котом при глажке и комплиментах." },
+    { "id": "paw_print", "layer": "glass", "durationMs": 3000, "persona": "kind", "sound": "paw_glass", "params": { "fadeMs": 2500 }, "notes": "Отпечаток лапки на стекле изнутри." },
+
+    { "id": "glitter_burst", "layer": "glass", "durationMs": 1600, "persona": "glitter", "sound": "sparkle_burst", "params": { "count": 90, "gravity": 0.4, "shapes": ["star", "dot", "heart"] }, "notes": "Взрыв блёсток в точке тапа." },
+    { "id": "glitter_trail", "layer": "glass", "durationMs": 1500, "persona": "glitter", "sound": "sparkle_swipe", "params": { "perPx": 0.5, "fadeMs": 1200 }, "notes": "Блестящий след за пальцем." },
+    { "id": "snow_globe", "layer": "glass", "durationMs": 4000, "persona": "glitter", "sound": "snowglobe", "params": { "count": 160, "settleMs": 3500 }, "notes": "При встряске блёстки кружат по всему экрану и медленно оседают." },
+    { "id": "holo_shine", "layer": "glass", "durationMs": 1200, "persona": "glitter", "sound": "shimmer", "params": { "angleFromGyro": true }, "notes": "Голографический перелив по наклейкам и по коту, зависит от наклона телефона." },
+    { "id": "kiss_print", "layer": "glass", "durationMs": 3000, "persona": "glitter", "sound": "kiss", "params": { "color": "#FF8FCB" }, "notes": "Кот целует стекло — остаётся блестящий отпечаток-сердечко." },
+
+    { "id": "glass_cat", "layer": "glass", "durationMs": 2000, "persona": "all", "sound": "glass_squeak", "params": { "squash": 0.3, "fogAroundNose": true }, "notes": "Кот прижат к стеклу: мордочка сплющена, вокруг носа запотевание." },
+    { "id": "sticker", "layer": "glass", "durationMs": 400, "persona": "all", "sound": "sticker_slap", "params": { "mirrored": true, "rotateDeg": [-18, 18], "scale": [0.8, 1.2] }, "notes": "Наклейка шлёпается изнутри (рисунок зеркальный), блик при наклоне." },
+    { "id": "sticker_peel", "layer": "glass", "durationMs": 600, "persona": "all", "sound": "sticker_peel", "params": { "fromCorner": true }, "notes": "Отклеивание с угла за палец." },
+    { "id": "stickers_cover", "layer": "glass", "durationMs": 2800, "persona": "all", "sound": "sticker_slap", "params": { "count": 14, "intervalMs": 180 }, "notes": "Серия наклеек заклеивает экран перед сменой характера." },
+    { "id": "stickers_blow", "layer": "glass", "durationMs": 1000, "persona": "all", "sound": "whoosh_big", "params": { "spin": true }, "notes": "Наклейки разлетаются при встряске." },
+    { "id": "confetti", "layer": "glass", "durationMs": 2000, "persona": "all", "sound": "confetti", "params": { "count": 80 }, "notes": "Праздник: выбор характера, имя, все наклейки отклеены." },
+    { "id": "zzz", "layer": "world", "durationMs": 3000, "persona": "all", "sound": "snore", "params": { "loop": true }, "notes": "Буквы Zzz над спящим котом." },
+    { "id": "dizzy_stars", "layer": "world", "durationMs": 2000, "persona": "all", "sound": "dizzy", "params": { "count": 4 }, "notes": "Звёздочки кружат над головой." },
+    { "id": "ear_ring", "layer": "world", "durationMs": 1000, "persona": "all", "sound": "none", "params": {}, "notes": "Волны у ушей при крике (кот закрывает уши)." },
+    { "id": "echo_wave", "layer": "ui", "durationMs": 0, "persona": "all", "sound": "none", "params": { "bars": 5 }, "notes": "Индикатор записи: волна у уха кота, пока ребёнок говорит в режиме повтора." },
+    { "id": "listen_ears", "layer": "ui", "durationMs": 0, "persona": "all", "sound": "listen_on", "params": {}, "notes": "Значок «ушки» у кнопки микрофона, пока кот слушает." },
+    { "id": "spotlight_button", "layer": "ui", "durationMs": 2000, "persona": "all", "sound": "chime_soft", "params": { "pulse": 3 }, "notes": "Подсветка кнопки, на которую показывает кот (микрофон, СберKids)." }
+  ]
+}

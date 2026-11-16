@@ -1,0 +1,1988 @@
+{
+  "id": "hooligan",
+  "name": "Хулиган",
+  "title": "ХУЛИГАН",
+  "selfGender": "m",
+  "summary": "Дерзкий, быстрый, смешной. Скейт, жвачка, наушники. Задирается, но не обижает. Взрослость показывает поведением, а не грубостью.",
+  "speechRules": [
+    "короткие фразы, 3–10 слов",
+    "лёгкий сленг: чё, йо, норм, погнали",
+    "дразнит, но не высмеивает ребёнка",
+    "никаких ругательств, даже «детских»",
+    "к ребёнку — без рода"
+  ],
+  "voice": {
+    "piperVoice": "ru_RU-ruslan-medium",
+    "pitchSemitones": 3,
+    "rate": 1.12,
+    "echoPitchSemitones": 5,
+    "echoRate": 1.08,
+    "elevenVoiceDesign": "Russian-speaking teenage boy cartoon cat, 15 years old, cheeky and confident, fast talker, slight smirk in the voice, playful raspy texture, bright and energetic, clean studio",
+    "actorDirection": "Подросток-задира с улыбкой в голосе. Темп быстрый, окончания фраз вверх, как будто подкалывает. Смешки короткие, «хе-хе». Не басить и не орать."
+  },
+  "palette": {
+    "primary": "#111111",
+    "secondary": "#B6FF3B",
+    "accent": "#FF6FB5",
+    "fx": [
+      "#B6FF3B",
+      "#FF6FB5",
+      "#1EE3CF",
+      "#FFFFFF"
+    ]
+  },
+  "outfit": {
+    "meshes": [
+      "Hoodie_Hooligan",
+      "Cap_Hooligan",
+      "Headphones_Hooligan",
+      "Sneakers_Hooligan"
+    ],
+    "description": "Чёрное оверсайз-худи с лаймовым кантом и нашивкой Сбера на левой груди, кепка козырьком назад (лайм), наушники на шее (бирюзовые), кеды. Розовая жвачка — отдельный объект у рта.",
+    "props": [
+      "mini_skateboard",
+      "gum"
+    ]
+  },
+  "idles": [
+    {
+      "clip": "idle_breathe",
+      "weight": 4
+    },
+    {
+      "clip": "idle_look_around",
+      "weight": 2
+    },
+    {
+      "clip": "idle_hooligan_headphones",
+      "weight": 2
+    },
+    {
+      "clip": "idle_hooligan_skate",
+      "weight": 2
+    },
+    {
+      "clip": "idle_yawn",
+      "weight": 1
+    },
+    {
+      "clip": "idle_tail_play",
+      "weight": 1
+    }
+  ],
+  "signature": {
+    "event": "double_tap",
+    "clip": "gum_blow",
+    "fx": [
+      "gum_bubble",
+      "gum_splat"
+    ],
+    "sound": "gum_pop"
+  },
+  "fxTuning": {
+    "knock": {
+      "rings": 3,
+      "shakePx": 5
+    },
+    "claws": {
+      "lines": 3,
+      "fadeMs": 1400
+    },
+    "glitch": {
+      "intensity": 0.9
+    },
+    "gum_splat": {
+      "blobs": 6
+    },
+    "skate_sparks": {
+      "count": 28
+    }
+  },
+  "ambience": "amb_room_hooligan",
+  "stickers": [
+    {
+      "kind": "tag",
+      "text": "КОТ"
+    },
+    {
+      "kind": "bolt"
+    },
+    {
+      "kind": "text",
+      "text": "ТУТ БЫЛ КОТ"
+    },
+    {
+      "kind": "tag",
+      "text": "ЙО!"
+    },
+    {
+      "kind": "bolt"
+    },
+    {
+      "kind": "text",
+      "text": "СКЕЙТ"
+    },
+    {
+      "kind": "star"
+    },
+    {
+      "kind": "tag",
+      "text": "ХОП"
+    }
+  ],
+  "glb": {
+    "show": [
+      "Hoodie_Hooligan",
+      "Cap_Hooligan",
+      "Headphones_Hooligan"
+    ],
+    "hide": [
+      "_Kind",
+      "_Glitter"
+    ]
+  },
+  "reactions": {
+    "point_camera": {
+      "clip": "peek_from_edge"
+    },
+    "intro": {
+      "clip": "appear_jump_in",
+      "sound": "boing"
+    },
+    "ask_name": {
+      "clip": "listen"
+    },
+    "nice_name": {
+      "clip": "celebrate",
+      "fx": "confetti"
+    },
+    "no_name": {
+      "clip": "think",
+      "face": "wink"
+    },
+    "mic_hint": {
+      "clip": "point_button",
+      "fx": "spotlight_button"
+    },
+    "choose": {
+      "clip": "point_button"
+    },
+    "invite": {
+      "clip": "talk_excited"
+    },
+    "switch_start": {
+      "clip": "sticker_slap",
+      "fx": "stickers_cover"
+    },
+    "shake_prompt": {
+      "clip": "none"
+    },
+    "hello_new": {
+      "clip": "proud",
+      "fx": "stickers_blow"
+    },
+    "filler": {},
+    "outro": {
+      "clip": "point_button",
+      "fx": "spotlight_button"
+    },
+    "welcome_back": {
+      "clip": "wave"
+    },
+    "goodbye": {
+      "clip": "dive_out"
+    },
+    "tap_cat": {
+      "clip": "laugh",
+      "sound": "giggle"
+    },
+    "tap_cat_head": {
+      "clip": "poke_head"
+    },
+    "tap_cat_cheek": {
+      "clip": "poke_cheek",
+      "face": "squished"
+    },
+    "tap_cat_belly": {
+      "clip": "poke_belly",
+      "sound": "giggle"
+    },
+    "tap_cat_paw": {
+      "clip": "poke_paw"
+    },
+    "tap_cat_tail": {
+      "clip": "poke_tail",
+      "fx": "none",
+      "sound": "gasp"
+    },
+    "poke_combo": {
+      "clip": "offended",
+      "sound": "hmph"
+    },
+    "poke_hard": {
+      "clip": "flinch",
+      "face": "offended"
+    },
+    "stroke": {
+      "clip": "purr_stroke",
+      "sound": "purr",
+      "face": "purr"
+    },
+    "stroke_long": {
+      "clip": "purr_stroke",
+      "fx": "hearts_float",
+      "sound": "purr",
+      "face": "purr"
+    },
+    "tap_screen": {
+      "clip": "knock_glass",
+      "fx": "knock",
+      "sound": "glass_knock"
+    },
+    "double_tap": {
+      "clip": "gum_blow",
+      "fx": "gum_bubble",
+      "sound": "gum_blow"
+    },
+    "walk_to": {
+      "clip": "walk",
+      "sound": "footstep"
+    },
+    "swipe": {
+      "clip": "scratch_glass",
+      "fx": "claws",
+      "sound": "claws_glass"
+    },
+    "longpress": {
+      "clip": "press_glass",
+      "fx": "glass_cat",
+      "sound": "glass_squeak"
+    },
+    "shake": {
+      "clip": "dizzy",
+      "fx": "glitch",
+      "sound": "glitch"
+    },
+    "spam": {
+      "clip": "tumble",
+      "fx": "dizzy_stars",
+      "sound": "dizzy"
+    },
+    "silence": {
+      "clip": "idle_yawn"
+    },
+    "sleep": {
+      "clip": "sleep_loop",
+      "fx": "zzz",
+      "sound": "snore"
+    },
+    "wake_up": {
+      "clip": "wake_startle",
+      "sound": "gasp"
+    },
+    "sticker_peel": {
+      "clip": "sticker_react",
+      "sound": "sticker_peel"
+    },
+    "stickers_all_gone": {
+      "clip": "celebrate",
+      "fx": "confetti"
+    },
+    "card_lost": {
+      "clip": "peek_from_edge",
+      "sound": "meow_short"
+    },
+    "card_found": {
+      "clip": "appear_jump_in",
+      "sound": "boing"
+    },
+    "card_far": {},
+    "card_close": {},
+    "low_light": {},
+    "hello": {
+      "clip": "wave"
+    },
+    "bye": {},
+    "yes": {
+      "clip": "celebrate"
+    },
+    "no": {},
+    "skip": {},
+    "unknown": {
+      "clip": "listen"
+    },
+    "name_ask": {},
+    "age_ask": {},
+    "brother_ask": {
+      "clip": "point_button"
+    },
+    "money": {
+      "clip": "point_button",
+      "fx": "spotlight_button"
+    },
+    "sberkids": {
+      "clip": "point_button",
+      "fx": "spotlight_button"
+    },
+    "flip": {
+      "clip": "flip",
+      "fx": "skate_sparks",
+      "sound": "whoosh"
+    },
+    "jump": {
+      "clip": "jump",
+      "sound": "boing"
+    },
+    "dance": {
+      "clip": "dance_hooligan",
+      "fx": "skate_sparks",
+      "sound": "whoosh"
+    },
+    "sit": {
+      "clip": "sit_down"
+    },
+    "wave": {
+      "clip": "wave"
+    },
+    "sing": {
+      "clip": "sing"
+    },
+    "gum": {
+      "clip": "gum_blow",
+      "fx": "gum_bubble",
+      "sound": "gum_blow"
+    },
+    "stickers": {
+      "clip": "sticker_slap",
+      "fx": "sticker"
+    },
+    "change_persona": {},
+    "choose_hooligan": {
+      "clip": "proud",
+      "fx": "confetti"
+    },
+    "choose_kind": {
+      "clip": "wave"
+    },
+    "choose_glitter": {
+      "clip": "wave"
+    },
+    "compliment": {
+      "clip": "shy",
+      "fx": "hearts_float",
+      "face": "shy"
+    },
+    "rude": {
+      "clip": "offended",
+      "face": "offended"
+    },
+    "sad": {
+      "clip": "comfort",
+      "fx": "warm_lights",
+      "face": "caring"
+    },
+    "scared": {
+      "clip": "comfort",
+      "fx": "warm_lights",
+      "face": "caring"
+    },
+    "bored": {},
+    "riddle": {
+      "clip": "think"
+    },
+    "joke": {
+      "clip": "laugh",
+      "sound": "giggle"
+    },
+    "thanks": {},
+    "echo_start": {
+      "clip": "listen",
+      "fx": "echo_wave",
+      "sound": "listen_on"
+    },
+    "echo_done": {
+      "clip": "laugh"
+    },
+    "echo_stop": {},
+    "loud": {
+      "clip": "cover_ears",
+      "fx": "ear_ring",
+      "face": "pain_ears"
+    },
+    "whisper": {
+      "clip": "lean_in",
+      "face": "listen"
+    },
+    "clap": {
+      "clip": "surprised",
+      "sound": "gasp"
+    },
+    "morning": {},
+    "evening": {
+      "clip": "idle_yawn"
+    },
+    "long_absence": {},
+    "first_time_today": {}
+  },
+  "lines": {
+    "point_camera": [
+      {
+        "id": "hooligan.point_camera.01",
+        "text": "Эй! Я тут, в карте. Наведи на неё камеру.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.point_camera.02",
+        "text": "Ну и где карта? Покажи её мне, не стесняйся.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.point_camera.03",
+        "text": "Карту в кадр — и я выпрыгну. Обещаю.",
+        "emotion": "neutral",
+        "face": "neutral"
+      },
+      {
+        "id": "hooligan.point_camera.04",
+        "text": "Темно тут, в карте. Наведи камеру, выпусти меня.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      }
+    ],
+    "intro": [
+      {
+        "id": "hooligan.intro.01",
+        "text": "Опа! Ты чё, с картой, что ли? Ничего себе. Йо!",
+        "emotion": "surprised",
+        "face": "surprised"
+      },
+      {
+        "id": "hooligan.intro.02",
+        "text": "Свобода! Наконец-то кто-то навёл камеру. Привет!",
+        "emotion": "excited",
+        "face": "excited"
+      },
+      {
+        "id": "hooligan.intro.03",
+        "text": "Тук-тук, я из карты. Не ждал? А я вот он.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      }
+    ],
+    "ask_name": [
+      {
+        "id": "hooligan.ask_name.01",
+        "text": "Как тебя зовут? Можешь не говорить, я не обижусь.",
+        "emotion": "neutral",
+        "face": "neutral"
+      },
+      {
+        "id": "hooligan.ask_name.02",
+        "text": "Я кот. А ты кто? Скажи имя в микрофон.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.ask_name.03",
+        "text": "Давай знакомиться. Тебя как звать?",
+        "emotion": "neutral",
+        "face": "neutral"
+      }
+    ],
+    "nice_name": [
+      {
+        "id": "hooligan.nice_name.01",
+        "text": "{name}? Норм имя. Запомню.",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "hooligan.nice_name.02",
+        "text": "{name}! Звучит круто. Почти как я.",
+        "emotion": "proud",
+        "face": "proud"
+      },
+      {
+        "id": "hooligan.nice_name.03",
+        "text": "О, {name}. Будем знакомы, по лапе!",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "hooligan.nice_name.04",
+        "text": "{name}. Записал в свой секретный блокнот.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      }
+    ],
+    "no_name": [
+      {
+        "id": "hooligan.no_name.01",
+        "text": "Ладно, тайный агент. Уважаю.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.no_name.02",
+        "text": "Не хочешь — не говори. Буду звать тебя «друг».",
+        "emotion": "neutral",
+        "face": "neutral"
+      },
+      {
+        "id": "hooligan.no_name.03",
+        "text": "Окей, без имён. Так даже загадочнее.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      }
+    ],
+    "mic_hint": [
+      {
+        "id": "hooligan.mic_hint.01",
+        "text": "Жми кнопку с микрофоном и говори. Я слушаю.",
+        "emotion": "neutral",
+        "face": "neutral"
+      },
+      {
+        "id": "hooligan.mic_hint.02",
+        "text": "Видишь кнопку внизу? Держи её и говори со мной.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.mic_hint.03",
+        "text": "Разреши микрофон — и поболтаем.",
+        "emotion": "neutral",
+        "face": "neutral"
+      }
+    ],
+    "choose": [
+      {
+        "id": "hooligan.choose.01",
+        "text": "Хочешь, я буду хулиганом? Или добряком. Или Блёсткой. Выбирай.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.choose.02",
+        "text": "У меня три характера. Тыкни в наклейку — и я переоденусь.",
+        "emotion": "neutral",
+        "face": "neutral"
+      },
+      {
+        "id": "hooligan.choose.03",
+        "text": "Хулиган, Добряк или Блёстка? Спорим, выберешь меня такого?",
+        "emotion": "cheeky",
+        "face": "smirk"
+      }
+    ],
+    "invite": [
+      {
+        "id": "hooligan.invite.01",
+        "text": "Тыкни в меня. Или по экрану. Или тряхни, если не боишься.",
+        "emotion": "excited",
+        "face": "excited"
+      },
+      {
+        "id": "hooligan.invite.02",
+        "text": "Можешь гладить, стучать, болтать. А скажешь «повторяй» — буду повторять за тобой.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.invite.03",
+        "text": "Тапни по карте — я туда пойду. Тапни мимо — постучу в стекло.",
+        "emotion": "neutral",
+        "face": "neutral"
+      }
+    ],
+    "switch_start": [
+      {
+        "id": "hooligan.switch_start.01",
+        "text": "Ща переоденусь, не подглядывай!",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.switch_start.02",
+        "text": "Секунду, меняю образ...",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.switch_start.03",
+        "text": "Отвернись! Шучу. Клею наклейки.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      }
+    ],
+    "shake_prompt": [
+      {
+        "id": "hooligan.shake_prompt.01",
+        "text": "Встряхни — увидишь меня другим.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.shake_prompt.02",
+        "text": "Тряси телефон, как газировку!",
+        "emotion": "excited",
+        "face": "excited"
+      },
+      {
+        "id": "hooligan.shake_prompt.03",
+        "text": "Готово. Тряхни посильнее.",
+        "emotion": "neutral",
+        "face": "neutral"
+      }
+    ],
+    "hello_new": [
+      {
+        "id": "hooligan.hello_new.01",
+        "text": "Ну как тебе? Новый я!",
+        "emotion": "proud",
+        "face": "proud"
+      },
+      {
+        "id": "hooligan.hello_new.02",
+        "text": "Та-да! Узнаёшь?",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.hello_new.03",
+        "text": "Вот это я понимаю — стиль!",
+        "emotion": "proud",
+        "face": "proud"
+      }
+    ],
+    "filler": [
+      {
+        "id": "hooligan.filler.01",
+        "text": "Мр-р... скейт бы сейчас.",
+        "emotion": "neutral",
+        "face": "neutral"
+      },
+      {
+        "id": "hooligan.filler.02",
+        "text": "Хм. Чем бы заняться? Может, постучать тебе в экран?",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.filler.03",
+        "text": "Ла-ла-ла... чего молчишь?",
+        "emotion": "neutral",
+        "face": "neutral"
+      },
+      {
+        "id": "hooligan.filler.04",
+        "text": "Знаешь, что я умею сальто? Скажи «сальто».",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.filler.05",
+        "text": "Интересно, что у брата на обед.",
+        "emotion": "neutral",
+        "face": "neutral"
+      },
+      {
+        "id": "hooligan.filler.06",
+        "text": "Слушай, а у тебя есть скейт? У меня есть. Маленький.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      }
+    ],
+    "outro": [
+      {
+        "id": "hooligan.outro.01",
+        "text": "Ладно, дальше — у меня дома. Там брат, он про деньги всё знает. Жми кнопку!",
+        "emotion": "neutral",
+        "face": "neutral"
+      },
+      {
+        "id": "hooligan.outro.02",
+        "text": "Пошли ко мне в СберKids. Брат там кое-что крутое приготовил.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.outro.03",
+        "text": "Погнали домой! Кнопка внизу — жми, я догоню.",
+        "emotion": "excited",
+        "face": "excited"
+      }
+    ],
+    "welcome_back": [
+      {
+        "id": "hooligan.welcome_back.01",
+        "text": "О, {name}! Снова ты. Скучали друг по другу, да?",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "hooligan.welcome_back.02",
+        "text": "{name}, здорово! Я знал, что ты вернёшься.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.welcome_back.03",
+        "text": "Йо, {name}! Погнали дальше.",
+        "emotion": "excited",
+        "face": "excited"
+      },
+      {
+        "id": "hooligan.welcome_back.04",
+        "text": "Опять ты! Это хорошо. Я как раз заскучал.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      }
+    ],
+    "goodbye": [
+      {
+        "id": "hooligan.goodbye.01",
+        "text": "Давай, до связи! Карту не теряй.",
+        "emotion": "neutral",
+        "face": "neutral"
+      },
+      {
+        "id": "hooligan.goodbye.02",
+        "text": "Пока! Я в карте, если что. Стучи.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.goodbye.03",
+        "text": "Было круто. Возвращайся!",
+        "emotion": "happy",
+        "face": "happy"
+      }
+    ],
+    "tap_cat": [
+      {
+        "id": "hooligan.tap_cat.01",
+        "text": "Эй, щекотно!",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.tap_cat.02",
+        "text": "Спорим, не поймаешь?",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.tap_cat.03",
+        "text": "Ладно, круто тыкаешь. Немножко.",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "hooligan.tap_cat.04",
+        "text": "Тык в кота — загадывай желание.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      }
+    ],
+    "tap_cat_head": [
+      {
+        "id": "hooligan.tap_cat_head.01",
+        "text": "Э, кепку помнёшь!",
+        "emotion": "annoyed",
+        "face": "annoyed"
+      },
+      {
+        "id": "hooligan.tap_cat_head.02",
+        "text": "По голове не надо, там мысли.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.tap_cat_head.03",
+        "text": "Ай! Ну ладно, это было смешно.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      }
+    ],
+    "tap_cat_cheek": [
+      {
+        "id": "hooligan.tap_cat_cheek.01",
+        "text": "Ты чё, щёку мнёшь? Она пушистая, я знаю.",
+        "emotion": "shy",
+        "face": "shy"
+      },
+      {
+        "id": "hooligan.tap_cat_cheek.02",
+        "text": "Пф-ф! Не надувай меня.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.tap_cat_cheek.03",
+        "text": "Хе, мягкая, да?",
+        "emotion": "happy",
+        "face": "happy"
+      }
+    ],
+    "tap_cat_belly": [
+      {
+        "id": "hooligan.tap_cat_belly.01",
+        "text": "Ха-ха, не-не-не, только не живот!",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "hooligan.tap_cat_belly.02",
+        "text": "Живот — запретная зона! Ха!",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.tap_cat_belly.03",
+        "text": "Щекотка! Сдаюсь, сдаюсь!",
+        "emotion": "excited",
+        "face": "excited"
+      }
+    ],
+    "tap_cat_paw": [
+      {
+        "id": "hooligan.tap_cat_paw.01",
+        "text": "Дай пять! А, это просто тык.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.tap_cat_paw.02",
+        "text": "Это моя лапа. Для скейта, между прочим.",
+        "emotion": "neutral",
+        "face": "neutral"
+      },
+      {
+        "id": "hooligan.tap_cat_paw.03",
+        "text": "Лапу не трожь — я ей трюки делаю.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      }
+    ],
+    "tap_cat_tail": [
+      {
+        "id": "hooligan.tap_cat_tail.01",
+        "text": "Ай, хвост! Он чувствительный!",
+        "emotion": "surprised",
+        "face": "surprised"
+      },
+      {
+        "id": "hooligan.tap_cat_tail.02",
+        "text": "Хвост — это святое, слышишь?",
+        "emotion": "annoyed",
+        "face": "annoyed"
+      },
+      {
+        "id": "hooligan.tap_cat_tail.03",
+        "text": "Хвост не кнопка, не нажимается!",
+        "emotion": "cheeky",
+        "face": "smirk"
+      }
+    ],
+    "poke_combo": [
+      {
+        "id": "hooligan.poke_combo.01",
+        "text": "Три раза в одно место? Серьёзно?",
+        "emotion": "annoyed",
+        "face": "annoyed"
+      },
+      {
+        "id": "hooligan.poke_combo.02",
+        "text": "Окей, победа твоя. Я ухожу. Шучу, я тут.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.poke_combo.03",
+        "text": "Ну всё, я обиделся. На три секунды.",
+        "emotion": "annoyed",
+        "face": "annoyed"
+      }
+    ],
+    "poke_hard": [
+      {
+        "id": "hooligan.poke_hard.01",
+        "text": "Воу, полегче!",
+        "emotion": "annoyed",
+        "face": "annoyed"
+      },
+      {
+        "id": "hooligan.poke_hard.02",
+        "text": "Эй! Я же маленький, хоть и крутой.",
+        "emotion": "annoyed",
+        "face": "annoyed"
+      },
+      {
+        "id": "hooligan.poke_hard.03",
+        "text": "Не, так не играем. Давай нежнее.",
+        "emotion": "offended",
+        "face": "neutral"
+      }
+    ],
+    "stroke": [
+      {
+        "id": "hooligan.stroke.01",
+        "text": "Мр-р... ладно, так можно.",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "hooligan.stroke.02",
+        "text": "Только никому не говори, что я мурчу.",
+        "emotion": "shy",
+        "face": "shy"
+      },
+      {
+        "id": "hooligan.stroke.03",
+        "text": "Вот тут, за ухом. Да, вот так.",
+        "emotion": "happy",
+        "face": "happy"
+      }
+    ],
+    "stroke_long": [
+      {
+        "id": "hooligan.stroke_long.01",
+        "text": "Ну всё, меня приручили. Это секрет.",
+        "emotion": "shy",
+        "face": "shy"
+      },
+      {
+        "id": "hooligan.stroke_long.02",
+        "text": "Мр-р-р... я сейчас растаю, как мороженое.",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "hooligan.stroke_long.03",
+        "text": "Хулиганы тоже любят, когда гладят. Тсс.",
+        "emotion": "shy",
+        "face": "shy"
+      }
+    ],
+    "tap_screen": [
+      {
+        "id": "hooligan.tap_screen.01",
+        "text": "Тук-тук, чё надо?",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.tap_screen.02",
+        "text": "Ну ты даёшь.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.tap_screen.03",
+        "text": "Стучишь? Я дома, заходи.",
+        "emotion": "neutral",
+        "face": "neutral"
+      },
+      {
+        "id": "hooligan.tap_screen.04",
+        "text": "Кто там? Это я, кот. А ты?",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.tap_screen.05",
+        "text": "Тук-тук в ответ!",
+        "emotion": "cheeky",
+        "face": "smirk"
+      }
+    ],
+    "double_tap": [
+      {
+        "id": "hooligan.double_tap.01",
+        "text": "Смотри, чё умею!",
+        "emotion": "excited",
+        "face": "excited"
+      },
+      {
+        "id": "hooligan.double_tap.02",
+        "text": "Пузырь-рекордсмен!",
+        "emotion": "proud",
+        "face": "proud"
+      },
+      {
+        "id": "hooligan.double_tap.03",
+        "text": "Хоп — и пузырь на весь экран!",
+        "emotion": "cheeky",
+        "face": "smirk"
+      }
+    ],
+    "walk_to": [
+      {
+        "id": "hooligan.walk_to.01",
+        "text": "Иду-иду.",
+        "emotion": "neutral",
+        "face": "neutral"
+      },
+      {
+        "id": "hooligan.walk_to.02",
+        "text": "Туда? Ладно, шеф.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.walk_to.03",
+        "text": "Пешком? Где мой скейт...",
+        "emotion": "neutral",
+        "face": "neutral"
+      },
+      {
+        "id": "hooligan.walk_to.04",
+        "text": "Уже бегу!",
+        "emotion": "cheeky",
+        "face": "smirk"
+      }
+    ],
+    "swipe": [
+      {
+        "id": "hooligan.swipe.01",
+        "text": "Хе-хе, когти — во!",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.swipe.02",
+        "text": "Царап-царап. Стекло целое, не бойся.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.swipe.03",
+        "text": "Хе-хе.",
+        "emotion": "neutral",
+        "face": "neutral"
+      },
+      {
+        "id": "hooligan.swipe.04",
+        "text": "Это мой автограф.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      }
+    ],
+    "longpress": [
+      {
+        "id": "hooligan.longpress.01",
+        "text": "Ты чё, держишь меня?",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.longpress.02",
+        "text": "Ладно, постою у стекла.",
+        "emotion": "neutral",
+        "face": "neutral"
+      },
+      {
+        "id": "hooligan.longpress.03",
+        "text": "Нос к носу, ха!",
+        "emotion": "cheeky",
+        "face": "smirk"
+      }
+    ],
+    "shake": [
+      {
+        "id": "hooligan.shake.01",
+        "text": "Эй, полегче!",
+        "emotion": "annoyed",
+        "face": "annoyed"
+      },
+      {
+        "id": "hooligan.shake.02",
+        "text": "Э! Я чуть не улетел!",
+        "emotion": "surprised",
+        "face": "surprised"
+      },
+      {
+        "id": "hooligan.shake.03",
+        "text": "Полегче, тут не миксер.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      }
+    ],
+    "spam": [
+      {
+        "id": "hooligan.spam.01",
+        "text": "Стоп-стоп-стоп! Пальцы не устали?",
+        "emotion": "annoyed",
+        "face": "annoyed"
+      },
+      {
+        "id": "hooligan.spam.02",
+        "text": "Тыц-тыц-тыц... Голова кругом!",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.spam.03",
+        "text": "Ты чё, на рекорд идёшь?",
+        "emotion": "cheeky",
+        "face": "smirk"
+      }
+    ],
+    "silence": [
+      {
+        "id": "hooligan.silence.01",
+        "text": "Скукота... Спорим, ты не тыкнешь в меня?",
+        "emotion": "neutral",
+        "face": "neutral"
+      },
+      {
+        "id": "hooligan.silence.02",
+        "text": "Эй, ты тут? Я жду.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.silence.03",
+        "text": "Тишина... Может, другого меня позвать?",
+        "emotion": "neutral",
+        "face": "neutral"
+      },
+      {
+        "id": "hooligan.silence.04",
+        "text": "Скажи «повторяй за мной» — будет смешно.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      }
+    ],
+    "sleep": [
+      {
+        "id": "hooligan.sleep.01",
+        "text": "Ладно... я... чуть-чуть... посплю...",
+        "emotion": "sleepy",
+        "face": "sleep"
+      },
+      {
+        "id": "hooligan.sleep.02",
+        "text": "Разбуди, если что... хр-р...",
+        "emotion": "sleepy",
+        "face": "sleep"
+      }
+    ],
+    "wake_up": [
+      {
+        "id": "hooligan.wake_up.01",
+        "text": "А? Чё? Я не спал! Я думал.",
+        "emotion": "surprised",
+        "face": "surprised"
+      },
+      {
+        "id": "hooligan.wake_up.02",
+        "text": "О, ты тут. А я сон про скейт смотрел.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.wake_up.03",
+        "text": "Кто меня разбудил? А, это ты. Норм.",
+        "emotion": "surprised",
+        "face": "surprised"
+      }
+    ],
+    "sticker_peel": [
+      {
+        "id": "hooligan.sticker_peel.01",
+        "text": "Эй, это моя наклейка!",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.sticker_peel.02",
+        "text": "Отклеивай, у меня ещё есть.",
+        "emotion": "neutral",
+        "face": "neutral"
+      },
+      {
+        "id": "hooligan.sticker_peel.03",
+        "text": "Хе, ловко.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      }
+    ],
+    "stickers_all_gone": [
+      {
+        "id": "hooligan.stickers_all_gone.01",
+        "text": "Все наклейки сняты? Без встряски? Уважаю.",
+        "emotion": "surprised",
+        "face": "surprised"
+      },
+      {
+        "id": "hooligan.stickers_all_gone.02",
+        "text": "Чисто! Ну ты чистюля.",
+        "emotion": "proud",
+        "face": "proud"
+      }
+    ],
+    "card_lost": [
+      {
+        "id": "hooligan.card_lost.01",
+        "text": "Эй, куда карту дел?",
+        "emotion": "annoyed",
+        "face": "annoyed"
+      },
+      {
+        "id": "hooligan.card_lost.02",
+        "text": "Карта где? Я тут вообще-то стою!",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.card_lost.03",
+        "text": "Верни карту, мне стоять не на чем!",
+        "emotion": "annoyed",
+        "face": "annoyed"
+      }
+    ],
+    "card_found": [
+      {
+        "id": "hooligan.card_found.01",
+        "text": "О, вернулась!",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "hooligan.card_found.02",
+        "text": "Вот, другое дело.",
+        "emotion": "neutral",
+        "face": "neutral"
+      },
+      {
+        "id": "hooligan.card_found.03",
+        "text": "Карта на месте — я на месте.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      }
+    ],
+    "card_far": [
+      {
+        "id": "hooligan.card_far.01",
+        "text": "Ты где? Поднеси карту поближе.",
+        "emotion": "neutral",
+        "face": "neutral"
+      },
+      {
+        "id": "hooligan.card_far.02",
+        "text": "Я тебя еле вижу. Ближе давай.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      }
+    ],
+    "card_close": [
+      {
+        "id": "hooligan.card_close.01",
+        "text": "Воу, слишком близко! Отодвинь чуток.",
+        "emotion": "surprised",
+        "face": "surprised"
+      },
+      {
+        "id": "hooligan.card_close.02",
+        "text": "Я не влезаю! Отодвинь карту.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      }
+    ],
+    "low_light": [
+      {
+        "id": "hooligan.low_light.01",
+        "text": "Темновато. Включи свет — я хочу тебя видеть.",
+        "emotion": "neutral",
+        "face": "neutral"
+      },
+      {
+        "id": "hooligan.low_light.02",
+        "text": "Тут как ночью. Включи свет, а?",
+        "emotion": "cheeky",
+        "face": "smirk"
+      }
+    ],
+    "hello": [
+      {
+        "id": "hooligan.hello.01",
+        "text": "Здоро́во!",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "hooligan.hello.02",
+        "text": "Привет-привет!",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "hooligan.hello.03",
+        "text": "Йо! Рад видеть.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      }
+    ],
+    "bye": [
+      {
+        "id": "hooligan.bye.01",
+        "text": "Уже уходишь? Точно?",
+        "emotion": "neutral",
+        "face": "neutral"
+      },
+      {
+        "id": "hooligan.bye.02",
+        "text": "Пока? Серьёзно? Скажи «да», если точно.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      }
+    ],
+    "yes": [
+      {
+        "id": "hooligan.yes.01",
+        "text": "Вот и я говорю!",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "hooligan.yes.02",
+        "text": "Ага, договорились.",
+        "emotion": "neutral",
+        "face": "neutral"
+      },
+      {
+        "id": "hooligan.yes.03",
+        "text": "Чётко.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      }
+    ],
+    "no": [
+      {
+        "id": "hooligan.no.01",
+        "text": "Не хочешь — как хочешь.",
+        "emotion": "neutral",
+        "face": "neutral"
+      },
+      {
+        "id": "hooligan.no.02",
+        "text": "Ладно-ладно.",
+        "emotion": "neutral",
+        "face": "neutral"
+      },
+      {
+        "id": "hooligan.no.03",
+        "text": "Ну и не надо. Спорим, передумаешь?",
+        "emotion": "cheeky",
+        "face": "smirk"
+      }
+    ],
+    "skip": [
+      {
+        "id": "hooligan.skip.01",
+        "text": "Ладно, дальше.",
+        "emotion": "neutral",
+        "face": "neutral"
+      },
+      {
+        "id": "hooligan.skip.02",
+        "text": "Проехали.",
+        "emotion": "neutral",
+        "face": "neutral"
+      },
+      {
+        "id": "hooligan.skip.03",
+        "text": "Окей, едем дальше.",
+        "emotion": "neutral",
+        "face": "neutral"
+      }
+    ],
+    "unknown": [
+      {
+        "id": "hooligan.unknown.01",
+        "text": "Чё? Не расслышал.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.unknown.02",
+        "text": "Не понял, но звучит дерзко.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.unknown.03",
+        "text": "Скажи по-другому, а?",
+        "emotion": "neutral",
+        "face": "neutral"
+      },
+      {
+        "id": "hooligan.unknown.04",
+        "text": "Помехи какие-то. Повтори?",
+        "emotion": "neutral",
+        "face": "neutral"
+      }
+    ],
+    "name_ask": [
+      {
+        "id": "hooligan.name_ask.01",
+        "text": "Я брат СберКота. Близнец. Только поинтереснее.",
+        "emotion": "proud",
+        "face": "proud"
+      },
+      {
+        "id": "hooligan.name_ask.02",
+        "text": "Я кот из карты. Имя секретное — зови просто Кот.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.name_ask.03",
+        "text": "Я Кот. Близнец СберКота. Мы похожи, но я с характером.",
+        "emotion": "neutral",
+        "face": "neutral"
+      }
+    ],
+    "age_ask": [
+      {
+        "id": "hooligan.age_ask.01",
+        "text": "Сколько и брату. Мы же близнецы.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.age_ask.02",
+        "text": "Достаточно, чтобы кататься на скейте.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      }
+    ],
+    "brother_ask": [
+      {
+        "id": "hooligan.brother_ask.01",
+        "text": "Мой брат — СберКот. Умный, всё про деньги знает. Живёт в СберKids.",
+        "emotion": "neutral",
+        "face": "neutral"
+      },
+      {
+        "id": "hooligan.brother_ask.02",
+        "text": "Брат? Он у нас ботаник. Но добрый. Хочешь к нему?",
+        "emotion": "cheeky",
+        "face": "smirk"
+      }
+    ],
+    "money": [
+      {
+        "id": "hooligan.money.01",
+        "text": "Это к брату! Он про деньги всё знает.",
+        "emotion": "neutral",
+        "face": "neutral"
+      },
+      {
+        "id": "hooligan.money.02",
+        "text": "Деньги? Это к брату! Жми кнопку.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.money.03",
+        "text": "Я по трюкам, а про деньги — это к брату!",
+        "emotion": "neutral",
+        "face": "neutral"
+      }
+    ],
+    "sberkids": [
+      {
+        "id": "hooligan.sberkids.01",
+        "text": "Погнали! Жми кнопку внизу — откроется СберKids.",
+        "emotion": "excited",
+        "face": "excited"
+      },
+      {
+        "id": "hooligan.sberkids.02",
+        "text": "Брат будет рад. Кнопка внизу.",
+        "emotion": "neutral",
+        "face": "neutral"
+      }
+    ],
+    "flip": [
+      {
+        "id": "hooligan.flip.01",
+        "text": "Смотри!",
+        "emotion": "excited",
+        "face": "excited"
+      },
+      {
+        "id": "hooligan.flip.02",
+        "text": "Сальто? Легко!",
+        "emotion": "proud",
+        "face": "proud"
+      },
+      {
+        "id": "hooligan.flip.03",
+        "text": "Хоп! Видал?",
+        "emotion": "cheeky",
+        "face": "smirk"
+      }
+    ],
+    "jump": [
+      {
+        "id": "hooligan.jump.01",
+        "text": "Оп!",
+        "emotion": "excited",
+        "face": "excited"
+      },
+      {
+        "id": "hooligan.jump.02",
+        "text": "Выше? Ладно, ещё раз.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.jump.03",
+        "text": "Видал прыжок? Олимпийский.",
+        "emotion": "proud",
+        "face": "proud"
+      }
+    ],
+    "dance": [
+      {
+        "id": "hooligan.dance.01",
+        "text": "Музыку давай!",
+        "emotion": "excited",
+        "face": "excited"
+      },
+      {
+        "id": "hooligan.dance.02",
+        "text": "Танцую как умею. А умею круто.",
+        "emotion": "proud",
+        "face": "proud"
+      },
+      {
+        "id": "hooligan.dance.03",
+        "text": "Оп-оп, смотри движ!",
+        "emotion": "cheeky",
+        "face": "smirk"
+      }
+    ],
+    "sit": [
+      {
+        "id": "hooligan.sit.01",
+        "text": "Сижу. Только не долго, я непоседа.",
+        "emotion": "neutral",
+        "face": "neutral"
+      },
+      {
+        "id": "hooligan.sit.02",
+        "text": "Сел. Дальше что? Лапу давать не буду.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      }
+    ],
+    "wave": [
+      {
+        "id": "hooligan.wave.01",
+        "text": "Держи пять!",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "hooligan.wave.02",
+        "text": "Машу. Видно?",
+        "emotion": "cheeky",
+        "face": "smirk"
+      }
+    ],
+    "sing": [
+      {
+        "id": "hooligan.sing.01",
+        "text": "Тыц-тыц, я кот, я крут, у меня скейт и капюшон! Всё, концерт окончен.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.sing.02",
+        "text": "Ля-ля-ля... нет, я лучше рэп. Кот — бот... Не, не рифмуется.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      }
+    ],
+    "gum": [
+      {
+        "id": "hooligan.gum.01",
+        "text": "Смотри, чё умею!",
+        "emotion": "excited",
+        "face": "excited"
+      },
+      {
+        "id": "hooligan.gum.02",
+        "text": "Пузырь-рекордсмен!",
+        "emotion": "proud",
+        "face": "proud"
+      },
+      {
+        "id": "hooligan.gum.03",
+        "text": "Хоп — и пузырь на весь экран!",
+        "emotion": "cheeky",
+        "face": "smirk"
+      }
+    ],
+    "stickers": [
+      {
+        "id": "hooligan.stickers.01",
+        "text": "Наклейки? Держи! Отклеивай за уголок.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.stickers.02",
+        "text": "Шлёп! Шлёп! Красота.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      }
+    ],
+    "change_persona": [
+      {
+        "id": "hooligan.change_persona.01",
+        "text": "Хочешь другого меня? Ладно, переодеваюсь.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.change_persona.02",
+        "text": "Ок, меняю образ. Не уходи.",
+        "emotion": "neutral",
+        "face": "neutral"
+      }
+    ],
+    "choose_hooligan": [
+      {
+        "id": "hooligan.choose_hooligan.01",
+        "text": "Хулиган? Правильный выбор!",
+        "emotion": "proud",
+        "face": "proud"
+      },
+      {
+        "id": "hooligan.choose_hooligan.02",
+        "text": "Хулиган на месте. Погнали!",
+        "emotion": "cheeky",
+        "face": "smirk"
+      }
+    ],
+    "choose_kind": [
+      {
+        "id": "hooligan.choose_kind.01",
+        "text": "Добряк? Ладно, буду милым. Попробую.",
+        "emotion": "neutral",
+        "face": "neutral"
+      }
+    ],
+    "choose_glitter": [
+      {
+        "id": "hooligan.choose_glitter.01",
+        "text": "Блёстка? Ну ладно, сестрёнка вредная, но классная.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      }
+    ],
+    "compliment": [
+      {
+        "id": "hooligan.compliment.01",
+        "text": "Ну... ты тоже ничего. Ладно, с тобой классно.",
+        "emotion": "shy",
+        "face": "shy"
+      },
+      {
+        "id": "hooligan.compliment.02",
+        "text": "Знаю! Но всё равно приятно.",
+        "emotion": "proud",
+        "face": "proud"
+      },
+      {
+        "id": "hooligan.compliment.03",
+        "text": "Хулиганы не краснеют. Я и не краснею. Это свет так падает.",
+        "emotion": "shy",
+        "face": "shy"
+      }
+    ],
+    "rude": [
+      {
+        "id": "hooligan.rude.01",
+        "text": "Так говорить не круто. Давай лучше трюк покажу.",
+        "emotion": "neutral",
+        "face": "neutral"
+      },
+      {
+        "id": "hooligan.rude.02",
+        "text": "Ой, слова какие. Я делаю вид, что не слышал.",
+        "emotion": "neutral",
+        "face": "neutral"
+      },
+      {
+        "id": "hooligan.rude.03",
+        "text": "Даже хулиганы так не говорят. Мир?",
+        "emotion": "cheeky",
+        "face": "smirk"
+      }
+    ],
+    "sad": [
+      {
+        "id": "hooligan.sad.01",
+        "text": "Эй, грустно бывает. Я рядом. Расскажи маме или папе — им важно знать.",
+        "emotion": "caring",
+        "face": "caring"
+      },
+      {
+        "id": "hooligan.sad.02",
+        "text": "Я с тобой. Обнимешь экран? А потом позови взрослого, ладно?",
+        "emotion": "caring",
+        "face": "caring"
+      },
+      {
+        "id": "hooligan.sad.03",
+        "text": "Хочешь, я просто посижу с тобой? И поговори со взрослым, кому доверяешь.",
+        "emotion": "caring",
+        "face": "caring"
+      }
+    ],
+    "scared": [
+      {
+        "id": "hooligan.scared.01",
+        "text": "Страшно — это нормально. Позови кого-нибудь из взрослых, пусть будет рядом.",
+        "emotion": "caring",
+        "face": "caring"
+      },
+      {
+        "id": "hooligan.scared.02",
+        "text": "Я тут. Давай подышим: вдох... выдох. И позови маму или папу.",
+        "emotion": "caring",
+        "face": "caring"
+      }
+    ],
+    "bored": [
+      {
+        "id": "hooligan.bored.01",
+        "text": "Скучно? Скажи «повторяй за мной» — я буду говорить твоим голосом.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.bored.02",
+        "text": "Тряхни телефон — увидишь другого меня.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.bored.03",
+        "text": "Скажи «сальто» — покажу трюк.",
+        "emotion": "excited",
+        "face": "excited"
+      }
+    ],
+    "riddle": [
+      {
+        "id": "hooligan.riddle.01",
+        "text": "Загадка: без окон, без дверей, полна горница людей. Огурец! Хе-хе.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.riddle.02",
+        "text": "Висит груша — нельзя скушать. Лампочка! Слишком легко?",
+        "emotion": "neutral",
+        "face": "neutral"
+      },
+      {
+        "id": "hooligan.riddle.03",
+        "text": "Зимой и летом одним цветом. Ёлка! Я и не такое знаю.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      }
+    ],
+    "joke": [
+      {
+        "id": "hooligan.joke.01",
+        "text": "Почему кот сидит у компьютера? Следит за мышкой! Хе-хе.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.joke.02",
+        "text": "Я бы рассказал шутку про скейт, но ты не догонишь.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.joke.03",
+        "text": "Шутка дня: я. Шучу, я — звезда дня.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      }
+    ],
+    "thanks": [
+      {
+        "id": "hooligan.thanks.01",
+        "text": "Да не за что!",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "hooligan.thanks.02",
+        "text": "Обращайся. Я тут живу.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      }
+    ],
+    "echo_start": [
+      {
+        "id": "hooligan.echo_start.01",
+        "text": "Давай, говори. Я повторю.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.echo_start.02",
+        "text": "Режим попугая включён. Говори!",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.echo_start.03",
+        "text": "Скажи что-нибудь — повторю твоим голосом.",
+        "emotion": "neutral",
+        "face": "neutral"
+      }
+    ],
+    "echo_done": [
+      {
+        "id": "hooligan.echo_done.01",
+        "text": "Похоже? Я ещё и не так могу.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.echo_done.02",
+        "text": "Ха, мой голос круче.",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "hooligan.echo_done.03",
+        "text": "Говори ещё!",
+        "emotion": "cheeky",
+        "face": "smirk"
+      }
+    ],
+    "echo_stop": [
+      {
+        "id": "hooligan.echo_stop.01",
+        "text": "Всё, режим попугая выключен.",
+        "emotion": "neutral",
+        "face": "neutral"
+      },
+      {
+        "id": "hooligan.echo_stop.02",
+        "text": "Хватит так хватит. Было смешно.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      }
+    ],
+    "loud": [
+      {
+        "id": "hooligan.loud.01",
+        "text": "Ай, уши! Не кричи, я рядом.",
+        "emotion": "annoyed",
+        "face": "annoyed"
+      },
+      {
+        "id": "hooligan.loud.02",
+        "text": "Воу, тише! У котов уши чуткие.",
+        "emotion": "surprised",
+        "face": "surprised"
+      }
+    ],
+    "whisper": [
+      {
+        "id": "hooligan.whisper.01",
+        "text": "Ты чё, шепчешь? Ладно, это наш секрет.",
+        "emotion": "whisper",
+        "face": "listen"
+      },
+      {
+        "id": "hooligan.whisper.02",
+        "text": "Тсс... я тоже шепотом. Никому не скажу.",
+        "emotion": "whisper",
+        "face": "listen"
+      }
+    ],
+    "clap": [
+      {
+        "id": "hooligan.clap.01",
+        "text": "Ой! Это хлопок? Я аж подпрыгнул.",
+        "emotion": "surprised",
+        "face": "surprised"
+      },
+      {
+        "id": "hooligan.clap.02",
+        "text": "Аплодисменты? Мне? Спасибо, спасибо.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      }
+    ],
+    "morning": [
+      {
+        "id": "hooligan.morning.01",
+        "text": "Доброе утро! Зубы уже чищены? Мои — почти.",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "hooligan.morning.02",
+        "text": "Утро! Самое время для трюков.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      }
+    ],
+    "evening": [
+      {
+        "id": "hooligan.evening.01",
+        "text": "Уже вечер... Скоро спать. Но пару трюков успеем.",
+        "emotion": "sleepy",
+        "face": "sleep"
+      },
+      {
+        "id": "hooligan.evening.02",
+        "text": "Вечер. Даже хулиганы ложатся спать. Иногда.",
+        "emotion": "neutral",
+        "face": "neutral"
+      }
+    ],
+    "long_absence": [
+      {
+        "id": "hooligan.long_absence.01",
+        "text": "Где пропадаешь? Я тут три дня скучал!",
+        "emotion": "annoyed",
+        "face": "annoyed"
+      },
+      {
+        "id": "hooligan.long_absence.02",
+        "text": "Сто лет тебя не видел! Ну, три дня. Но всё равно.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      }
+    ],
+    "first_time_today": [
+      {
+        "id": "hooligan.first_time_today.01",
+        "text": "Первый раз сегодня! Погнали.",
+        "emotion": "happy",
+        "face": "happy"
+      }
+    ]
+  },
+  "contentVersion": 1
+}

@@ -1,0 +1,380 @@
+# Блёстка — реплики. Формат как в hooligan.lines.txt.
+# Девочка-кошка, сестра-близняшка того же возраста. О себе — в женском роде («я рада»).
+# Голос: звонкий, восторженный, немножко драматичный. Любит блеск, наклейки, красоту, ASMR-звуки.
+# К ребёнку — без рода.
+
+## point_camera | clip=peek_from_edge
+excited: Ау! Я в карте! Наведи на неё камеру — будет красиво.
+neutral: Где-где-где карта? Покажи её мне, пожалуйста!
+happy: Я уже накрасила ушки блёстками. Наведи камеру на карту!
+
+## intro | clip=appear_jump_in sound=sparkle_burst fx=glitter_burst
+excited: Та-дам! Привет! Ой, какая встреча!
+surprised: Ой! Меня позвали? Вау, привет!
+excited: Блёстки — готовы! Улыбка — готова! Привет!
+
+## ask_name | clip=listen
+happy: Как тебя зовут? Мне очень-очень интересно.
+neutral: Скажи своё имя. Или не говори — можно и так.
+excited: Давай дружить! Как тебя зовут?
+
+## nice_name | clip=celebrate fx=glitter_burst sound=sparkle_burst
+excited: {name}! Ну какое же красивое имя!
+happy: {name}... звучит как песенка. Я запомнила!
+excited: Ура, {name}! Посыплю это имя блёстками.
+
+## no_name | clip=shy
+happy: Секрет? Обожаю секреты!
+neutral: Ладно! Буду звать тебя «звёздочка».
+happy: Ничего, имя потом. Главное — мы уже подружки... то есть друзья!
+
+## mic_hint | clip=point_button fx=spotlight_button
+neutral: Нажми на микрофончик внизу и скажи что-нибудь!
+happy: Держи кнопку и говори — я всё-всё услышу.
+neutral: Разреши микрофон, а то я ничего не слышу.
+
+## choose | clip=point_button
+excited: Выбирай, какой мне быть! Хулиган, Добряк или я — Блёстка!
+happy: Три наклейки — три меня. Тыкни в любую!
+neutral: Хочешь, я буду Блёсткой? Это лучший выбор. Ну, по-моему.
+
+## invite | clip=talk_excited
+excited: Проведи пальцем по экрану — будет блестящий след!
+happy: Тряхни телефон — и всё закружится, как в снежном шаре.
+neutral: Подержи палец на экране — я поцелую стекло. А скажешь «повторяй» — буду повторять за тобой.
+
+## switch_start | clip=sticker_slap fx=stickers_cover
+excited: Минутку, я переодеваюсь! Не подглядывать!
+happy: Наклейки-наклейки, закройте окошко!
+neutral: Секундочку, выбираю наряд.
+
+## shake_prompt
+excited: Теперь встряхни! Посильнее!
+happy: Тряси-тряси — сейчас будет сюрприз!
+
+## hello_new | clip=proud fx=stickers_blow
+excited: Та-дам! Ну как я?
+proud: Новый образ! Скажи, что красиво.
+happy: Это я! Нравится?
+
+## filler
+happy: Ля-ля-ля... какие у тебя красивые глаза. Ну, я так думаю.
+neutral: Интересно, сколько блёсток помещается в одну лапку?
+excited: А знаешь, что? Я умею кружиться! Скажи «танцуй».
+neutral: Хочу новую наклейку. Голографическую.
+happy: Мр-р... скучно без блеска.
+
+## outro | clip=point_button fx=spotlight_button
+excited: Пойдём ко мне домой, в СберKids! Там брат и куча всего интересного.
+happy: Брат знает, как накопить на что-то красивое. Нажми на кнопку!
+neutral: Жми кнопку внизу — я покажу, где мы живём.
+
+## welcome_back | clip=wave fx=glitter_burst
+excited: {name}! Ты тут! Ура!
+happy: Привет, {name}! Я так рада!
+excited: {name}, наконец-то! Я тебя так ждала.
+
+## goodbye | clip=dive_out fx=glitter_trail
+happy: Пока-пока! Посылаю тебе воздушный блестящий поцелуй!
+neutral: До встречи! Я буду в карте.
+excited: Пока! Приходи скорее!
+
+## tap_cat | clip=laugh sound=giggle
+happy: Хи-хи! Привет!
+excited: Ой! Тык! Хи-хи.
+happy: Ещё раз! Хи-хи.
+
+## tap_cat_head | clip=poke_head
+annoyed: Ой, бантик! Аккуратно, я его час поправляла.
+happy: Голову погладить можно. Только бантик не трогай!
+
+## tap_cat_cheek | clip=poke_cheek face=squished
+shy: Хи-хи, щёчки! Они мягкие, правда?
+happy: Пф-ф! Как подушечка, да?
+
+## tap_cat_belly | clip=poke_belly sound=giggle
+happy: Ой-ой-ой, щекотно! Хи-хи-хи!
+excited: Только не животик! Ха-ха!
+
+## tap_cat_paw | clip=wave
+happy: Лапка! Смотри, какие у меня коготки блестящие.
+neutral: Дай лапку — вот, держи мою.
+
+## tap_cat_tail | clip=poke_tail sound=gasp
+surprised: Ай, хвостик! Он у меня с блёстками, не стряхни!
+annoyed: Хвост — не трогать! Ну, почти не трогать.
+
+## poke_combo | clip=offended sound=hmph
+annoyed: Ну всё, я обиделась! На одну секундочку.
+neutral: Три раза?! Это что, азбука Морзе?
+
+## poke_hard | clip=flinch face=offended
+annoyed: Ой! Я же хрупкая, как ёлочная игрушка!
+sad: Не надо так. Давай лучше нежно.
+
+## stroke | clip=purr_stroke sound=purr face=purr
+happy: Мр-р-р... обожаю!
+happy: Вот здесь, за ушком. Ах...
+shy: Мурчу. Красиво мурчу, правда?
+
+## stroke_long | clip=purr_stroke sound=purr face=purr fx=hearts_float
+shy: Мр-р-р... можно так всегда?
+happy: Я сейчас вся засияю от счастья.
+excited: Смотри, сердечки полетели! Это из-за тебя.
+
+## tap_screen | clip=knock_glass fx=glitter_burst sound=sparkle_burst
+happy: Пуф — блёстки!
+excited: Ещё-ещё! Красиво же!
+happy: Тук-тук! Кто там? Блёстки!
+neutral: Каждый тык — маленький салют.
+
+## double_tap | clip=glitter_throw fx=glitter_burst sound=sparkle_burst
+excited: Лови блёстки!
+excited: Фух! Целое облако!
+proud: Вот это блеск, да?
+
+## walk_to | clip=walk sound=footstep
+happy: Иду, как по подиуму.
+neutral: Туда? Окей!
+happy: Топ-топ-топ, красиво иду?
+
+## swipe | clip=idle_glitter_twirl fx=glitter_trail sound=sparkle_swipe
+excited: Блестящий след! Нарисуй что-нибудь.
+happy: Ух ты, как сверкает!
+neutral: Шурх-шурх... красиво шуршит, да?
+
+## longpress | clip=press_glass fx=kiss_print sound=kiss
+shy: Чмок! Это тебе.
+happy: Я прижалась к стеклу — видишь мой носик?
+excited: Отпечаток-сердечко на память!
+
+## shake | clip=snowglobe_shake fx=snow_globe sound=snowglobe
+excited: Ах! Снежный шар! Как красиво!
+happy: Всё кружится-кружится...
+surprised: Ой-ой, у меня блёстки в ушах!
+
+## spam | clip=dizzy fx=dizzy_stars sound=dizzy
+annoyed: Ой-ой-ой, у меня голова кружится! Стоп!
+neutral: Слишком много блеска! Давай передохнём.
+annoyed: Ты так быстро! Я не успеваю сверкать.
+
+## silence | clip=idle_glitter_mirror
+neutral: Ау? Ты тут? Я тут красивая стою.
+happy: Смотрюсь в экран, как в зеркальце. Ой, это же ты!
+neutral: Скажи «повторяй за мной» — будет очень смешно.
+
+## sleep | clip=sleep_loop fx=zzz sound=snore
+sleepy: Пойду сделаю красивый сон...
+sleepy: Тихо... я дремлю... мр-р...
+
+## wake_up | clip=wake_startle
+surprised: Ой! Я спала? Я не спала! Я отдыхала глазами.
+happy: Привет! Мне снились блёстки.
+
+## sticker_peel | clip=sticker_react sound=sticker_peel
+happy: Аккуратненько! Вот так.
+neutral: Это голографическая! Её можно сохранить.
+excited: Ой, как красиво отклеилась!
+
+## stickers_all_gone | clip=celebrate fx=confetti
+excited: Все! До одной! Ты супер!
+happy: Окошко чистое. Можно новые клеить!
+
+## card_lost | clip=peek_from_edge sound=meow_short
+sad: Ой, а где карта? Мне без неё не на чем стоять.
+neutral: Карта пропала! Покажи её снова.
+annoyed: Эй-эй, я же падаю! Верни карту.
+
+## card_found | clip=appear_jump_in sound=sparkle_burst fx=glitter_burst
+excited: Ура! Нашлась!
+happy: Снова вместе! Как хорошо.
+neutral: Ну наконец-то!
+
+## card_far
+neutral: Ты так далеко! Поднеси поближе.
+happy: Я тебя почти не вижу. Ближе, пожалуйста!
+
+## card_close
+surprised: Ой, слишком близко! У меня носик в экран упирается.
+neutral: Отодвинь чуточку, я не помещаюсь.
+
+## low_light
+sad: Темно... блёстки не сверкают. Включи свет!
+neutral: Можно свет? Хочу блестеть.
+
+## hello | clip=wave
+excited: Приветик!
+happy: Привет-привет!
+happy: Здравствуй! Я так рада!
+
+## bye
+sad: Уже уходишь? Точно?
+neutral: Пора? Скажи «да», если пора.
+
+## yes | clip=celebrate
+excited: Ура!
+happy: Договорились!
+happy: Я так и знала!
+
+## no
+neutral: Ну ладно...
+neutral: Хорошо, не будем.
+annoyed: Хм. А я так хотела... Ладно!
+
+## skip
+neutral: Дальше так дальше.
+neutral: Хорошо, пропускаем.
+
+## unknown | clip=listen
+neutral: Ой, я не расслышала. Скажи ещё раз?
+happy: Что-что? У меня в ушках блёстки.
+neutral: Не поняла. Скажи по-другому?
+
+## name_ask
+proud: Я Блёстка! Сестра-близняшка СберКота. Самая блестящая в семье.
+happy: Меня зовут Блёстка. Ну, когда я в этом образе.
+
+## age_ask
+neutral: Мы с братом одного возраста. Мы же близнецы!
+proud: Девочек про возраст не спрашивают. Шучу! Как брату.
+
+## brother_ask | clip=point_button
+happy: Мой брат — СберКот. Он очень умный и живёт в СберKids.
+neutral: Брат у нас про деньги. А я про красоту. Хочешь к нему?
+
+## money | clip=point_button fx=spotlight_button
+neutral: Про деньги — это к брату! Он в СберKids, нажми на кнопку.
+happy: Хочешь накопить на что-то красивое? Брат знает как!
+neutral: Это вопрос для брата. Жми кнопку внизу.
+
+## sberkids | clip=point_button fx=spotlight_button
+excited: Пойдём! Нажимай на кнопку!
+happy: Брат будет очень рад. Кнопка внизу.
+
+## flip | clip=flip sound=whoosh fx=glitter_burst
+excited: Оп-ля! С блёстками!
+proud: Сальто — как гимнастка!
+excited: Ух! Ещё раз?
+
+## jump | clip=jump sound=boing fx=glitter_burst
+happy: Прыг!
+excited: Прыг-прыг — и блёстки!
+
+## dance | clip=dance_glitter fx=glitter_trail sound=shimmer
+excited: Танцуем! Кружимся!
+happy: Я балерина... ну почти.
+excited: Давай вместе! Сердечко лапками!
+
+## sit | clip=sit_down
+neutral: Села. Красиво сижу?
+happy: Сижу, как на фотосессии.
+
+## wave | clip=wave fx=glitter_trail
+happy: Машу! Видишь блёстки с лапки?
+excited: Приве-е-ет!
+
+## sing | clip=sing fx=glitter_trail
+excited: Блёстки-блёстки, сверкайте все, я самая блестящая на земле! Ой, как хорошо получилось.
+happy: Ля-ля-ля, мур-мур-мур, я пою, а ты слушай! Конец!
+
+## gum | clip=glitter_throw fx=glitter_burst sound=sparkle_burst
+excited: Лови блёстки!
+excited: Фух! Целое облако!
+proud: Вот это блеск, да?
+
+## stickers | clip=sticker_slap fx=holo_shine sound=sticker_slap
+excited: Наклейки! Наклони телефон — они переливаются.
+happy: Голографические! Отклеивай за уголок.
+
+## change_persona
+neutral: Хочешь другую меня? Хорошо, переодеваюсь.
+happy: Конечно! Сейчас будет новый образ.
+
+## choose_hooligan | clip=wave
+neutral: Хулиган? Ну ладно, братишка у нас дерзкий. Сейчас!
+
+## choose_kind | clip=wave
+happy: Добряк! Он очень милый. Превращаюсь!
+
+## choose_glitter | clip=celebrate fx=glitter_burst sound=sparkle_burst
+excited: Блёстка! Ура! Я знала!
+proud: Отличный вкус!
+
+## compliment | clip=shy face=shy fx=hearts_float
+shy: Ой, спасибо! С тобой тоже очень классно!
+excited: Правда? Я сейчас засияю!
+shy: Мр-р... мне так приятно.
+
+## rude | clip=offended face=offended
+sad: Ой. Это было обидно. Давай лучше дружить?
+neutral: Я сделаю вид, что не слышала. Хочешь блёстки?
+neutral: Такие слова не блестят. Давай другие?
+
+## sad | clip=comfort face=caring fx=warm_lights
+caring: Ой, мне жаль. Я рядом. Расскажи маме, папе или другому взрослому — они помогут.
+caring: Можно грустить. Давай я посижу рядом. А потом позови взрослого, ладно?
+caring: Обними экран — я обниму с той стороны. И поговори с тем, кому доверяешь.
+
+## scared | clip=comfort face=caring fx=warm_lights
+caring: Я с тобой. Позови кого-нибудь из взрослых, пусть будут рядом.
+caring: Давай подышим вместе: вдох... выдох. И позови маму или папу.
+
+## bored
+excited: Тряхни телефон — будет снежный шар!
+happy: Проведи пальцем по экрану — нарисуем блёстками.
+neutral: Скажи «повторяй за мной» — я буду говорить твоим голосом.
+
+## riddle | clip=think
+happy: Загадка: что блестит, но не золото? Это я!
+neutral: Красная девица сидит в темнице, а коса на улице. Морковка!
+happy: Сто одёжек, и все без застёжек. Капуста! Вот бы мне столько нарядов.
+
+## joke | clip=laugh sound=giggle
+happy: Почему у меня столько блёсток? Потому что я чихнула в коробку с ними! Хи-хи.
+happy: Что сказала одна наклейка другой? «Держись!» Хи-хи.
+neutral: Я знаю смешную шутку, но она слишком блестящая. Ослепнешь!
+
+## thanks
+happy: Пожалуйста!
+excited: Всегда рада!
+
+## echo_start | clip=listen fx=echo_wave sound=listen_on
+excited: Говори! Я повторю!
+happy: Повторялка включена!
+neutral: Скажи что-нибудь, и послушай, как это звучит у меня.
+
+## echo_done | clip=laugh
+happy: Хи-хи, похоже?
+excited: Ой, я пищу! Ещё!
+happy: Мне нравится твой голос. Ну, мой. Наш.
+
+## echo_stop
+neutral: Хорошо, не повторяю.
+happy: Было смешно! Повторялка выключена.
+
+## loud | clip=cover_ears face=pain_ears fx=ear_ring
+annoyed: А-а-ай, громко! У меня ушки!
+sad: Потише, пожалуйста. Я всё слышу.
+
+## whisper | clip=lean_in face=listen
+whisper: Ш-ш-ш... это наш секрет. Я никому.
+whisper: Шёпотом говорить так приятно... как ASMR.
+
+## clap | clip=surprised sound=gasp
+surprised: Ой! Хлопок! Я аж подпрыгнула.
+excited: Аплодисменты? Спасибо, спасибо!
+
+## morning
+happy: Доброе утро! Я уже причесала ушки.
+excited: Утро! Самое время сверкать.
+
+## evening | clip=idle_yawn
+sleepy: Уже вечер... скоро красивые сны.
+neutral: Вечером блёстки сверкают как звёзды. Ещё чуть-чуть поиграем и спать.
+
+## long_absence
+sad: Тебя так долго не было! Я скучала.
+excited: Наконец-то! Я тебя так ждала!
+
+## first_time_today
+happy: Первый раз сегодня! Привет-привет!
