@@ -52,7 +52,7 @@ export const TRIPO_ALIAS: Record<string, string[]> = {
   greet_01: ['wave'],
   greet_02: ['point_button'],
   wave_goodbye_01: ['wave_goodbye'],
-  laugh_01: ['laugh'],
+  laugh_01: ['laugh', 'sticker_react'],
   laugh_02: ['talk_excited'],
   cheer: ['celebrate', 'proud'],
   clap: ['clap'],

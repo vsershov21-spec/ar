@@ -26,5 +26,10 @@
  "hug_screen": "Friendly cat steps forward and gives the viewer a warm hug, arms wrapping around, then steps back smiling",
  "idle_tail_play": "Cat turns around chasing its own tail, spins half a turn, stops dizzy and giggles",
  "cover_ears": "Cat covers both ears with the hands, squeezes the eyes and shakes the head",
- "celebrate": "Happy cat jumps up with both fists in the air celebrating a victory, then lands and cheers"
+ "celebrate": "Happy cat jumps up with both fists in the air celebrating a victory, then lands and cheers",
+ "purr_stroke": "Content cat leans the head into a petting hand from above, eyes closed, sways happily side to side, shoulders relaxed",
+ "poke_paw": "Poked on the paw, the cat pulls the hand back quickly, shakes it, then looks at it and laughs",
+ "poke_tail": "Startled cat jumps up when its tail is touched, spins around to look behind and then turns back grinning",
+ "idle_stretch": "Relaxed cat does a big full body stretch, arms up and back, rising on tiptoes, then relaxes with a satisfied shake",
+ "jump": "Cheerful cat bends the knees and does a big happy vertical jump, landing softly with arms out"
 }
