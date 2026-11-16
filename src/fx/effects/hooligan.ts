@@ -163,7 +163,7 @@ class GumSplat extends Timed {
       this.splats.push({
         x: clamp(c.x + Math.cos(a) * d * (env.w / Math.max(env.w, env.h) + 0.3), 10, env.w - 10),
         y: clamp(c.y + Math.sin(a) * d * 1.3, 10, env.h - 10),
-        r: big ? rand(48, 95) : rand(20, 42),
+        r: big ? rand(38, 72) : rand(16, 32),
         blobs: Array.from({ length: 7 }, () => ({ a: rand(0, Math.PI * 2), d: rand(0.4, 1.0), r: rand(0.25, 0.55) })),
         drips: drip ? Array.from({ length: 1 + Math.floor(rand(0, 3)) }, () => ({ x: rand(-0.6, 0.6), len: 0, speed: rand(10, 28), drawn: 0 })) : [],
       });
