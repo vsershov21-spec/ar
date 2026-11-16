@@ -492,6 +492,12 @@ export class GlbCharacter implements Character {
     const l = this.object.worldToLocal(p);
     if (name === 'feet') l.y = 0.02;
     if (name === 'head' && bone === 'Head') l.y += 0.12;
+    // без кости челюсти рот — спереди головы: кость Head стоит у основания черепа (рост модели ≈ 1)
+    if (name === 'mouth' && !this.bones.has('Jaw')) {
+      const k = this.inner.scale.x || 1;
+      l.y += 0.075 * k;
+      l.z += 0.15 * k;
+    }
     return l;
   }
 
