@@ -166,6 +166,22 @@ export class App {
     fx.onSound = (id, v) => this.audio.play(id, v ?? 1);
     fx.onLog = (m) => this.director.log(m);
     fx.anchorFn = (n) => this.stage.anchorScreen(n, this.root.clientWidth, this.root.clientHeight);
+    // голос: уровень микрофона для echo_wave; «ушки» у кнопки, пока кот слушает; волна у уха в режиме повтора
+    fx.levelFn = () => (this.engine?.mic.isOpen ? this.engine.mic.level : 0);
+    let listening = false, echo = false;
+    this.engine?.on('state', (st) => {
+      if (st.listening !== listening) {
+        listening = st.listening;
+        if (listening) fx.play('listen_ears');
+        else fx.stop('listen_ears');
+      }
+      const e = st.echo !== 'off';
+      if (e !== echo) {
+        echo = e;
+        if (echo) fx.play('echo_wave');
+        else fx.stop('echo_wave');
+      }
+    });
     fx.glassCatHook = (ms) => {
       const poster = this.character.posterImage();
       if (poster) {
@@ -325,7 +341,14 @@ export class App {
       if (d.persona.reactions?.double_tap) d.interaction('double_tap' as InteractionKind, p);
       else (d as unknown as { signature(): void }).signature();
     });
-    i.on('tap_screen', (p) => d.interaction('tap_screen', p));
+    i.on('tap_screen', (p) => {
+      d.interaction('tap_screen', p);
+      // лапа тянется к точке стука (если кот не пошёл по карте)
+      if (!this.stage.walking) {
+        const h = this.stage.anchorScreen('head', this.root.clientWidth, this.root.clientHeight);
+        this.character.reach?.({ dx: (p.x - h.x) / h.s, dy: (p.y - h.y) / h.s });
+      }
+    });
     i.on('longpress', (p) => d.interaction('longpress', p));
     i.on('swipe', (s) => d.interaction('swipe', { x: s.x, y: s.y, from: s.path[0], path: s.path }));
     i.on('shake', () => d.interaction('shake'));

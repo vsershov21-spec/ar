@@ -431,6 +431,7 @@ export class SpriteCharacter implements Character {
     }
     this.tweens = this.tweens.filter((t) => t.t < t.dur);
 
+    if (this.reachSide && this.clips.cur.id === 'knock_glass') rz -= this.reachSide * 0.12 * Math.sin(Math.min(1, this.clips.cur.t / this.clips.cur.def.durationS) * Math.PI);
     this.pivot.position.set(x, y, z);
     this.pivot.scale.set(sx, sy, 1);
     this.pivot.rotation.set(rx, 0, rz);
@@ -447,6 +448,13 @@ export class SpriteCharacter implements Character {
     if (this.usingRig && this.rig) return this.rig.hitTest(ray);
     return this.hitUv(ray) !== null;
   }
+
+  reach(target: { dx: number; dy: number } | null) {
+    this.rig?.reach(target);
+    // спрайт: поза «показывает» и плоскость чуть наклоняется к точке
+    this.reachSide = target ? Math.sign(target.dx) : 0;
+  }
+  private reachSide = 0;
 
   /** зона касания: по прямоугольникам позы (manifest poses.<pose>.zones) или по умолчанию */
   hitZone(ray: THREE.Raycaster): TouchZone | null {

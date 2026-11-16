@@ -304,6 +304,7 @@ export class RigCat implements Character {
   }
 
   play(clip: ClipName, opts: PlayOptions = {}) {
+    if (clip !== 'knock_glass') this.reachT = null;
     this.clips.play(clip, opts);
   }
 
@@ -348,7 +349,35 @@ export class RigCat implements Character {
   }
 
   private poseOf(id: string, k: number, t: number): Pose {
-    return (RIG_CLIPS[id] ?? RIG_CLIPS.idle_breathe)(k, t);
+    const p = (RIG_CLIPS[id] ?? RIG_CLIPS.idle_breathe)(k, t);
+    return id === 'knock_glass' && this.reachT ? this.reachPose(p, k, t) : p;
+  }
+
+  private reachT: { dx: number; dy: number } | null = null;
+  /** стук в точку тапа: выбор руки (точка левее на экране — правая лапа кота) + подъём/опускание к точке */
+  reach(target: { dx: number; dy: number } | null) {
+    this.reachT = target;
+  }
+  private reachPose(p: Pose, k: number, t: number): Pose {
+    const r = this.reachT!;
+    // кот смотрит в камеру: левая часть экрана — его правая сторона
+    const right = r.dx < 0;
+    const side = right ? -1 : 1;
+    const arm = right ? 'RightArm' : 'LeftArm', fore = right ? 'RightForeArm' : 'LeftForeArm';
+    const other = right ? 'LeftArm' : 'RightArm', otherFore = right ? 'LeftForeArm' : 'RightForeArm';
+    const w = tri(k);
+    // угол к точке: 0 — вбок, + вверх; рука тянется вперёд к стеклу и в сторону точки
+    const elev = clamp(Math.atan2(-r.dy, Math.max(0.05, Math.abs(r.dx))), -1.0, 1.3);
+    const outward = clamp(Math.abs(r.dx) * 2.2, 0.15, 1.2);
+    const knock = 0.5 * Math.max(0, Math.sin(t * 16));
+    const b = { ...p.b };
+    b[arm] = [(-1.2 + 0.5 * outward) * w, 0, side * ((Math.PI / 2) * Math.min(1, outward) + elev * 0.9) * w];
+    b[fore] = [(-0.4 - knock) * w, 0, 0];
+    delete b[other];
+    delete b[otherFore];
+    b.Spine1 = [0.12 * w, side * 0.15 * w * outward, side * 0.08 * w];
+    b.Head = [-0.1 * w - elev * 0.15 * w, side * 0.25 * w * outward, 0];
+    return { ...p, b };
   }
 
   update(dt: number, camera: THREE.Camera) {

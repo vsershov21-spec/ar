@@ -61,6 +61,11 @@ export interface Character {
   update(dt: number, camera: THREE.Camera): void;
   /** попадание луча в кота */
   hitTest(ray: THREE.Raycaster): boolean;
+  /**
+   * Лапа тянется к точке на стекле (стук в точку тапа, knock_glass): dx, dy — смещение точки от головы кота
+   * на экране в долях роста кота (dx > 0 — правее на экране, dy > 0 — ниже). null — сбросить.
+   */
+  reach?(target: { dx: number; dy: number } | null): void;
   /** зона касания: head | cheek | belly | paw | tail | body; null — мимо */
   hitZone?(ray: THREE.Raycaster): TouchZone | null;
   /** точка части кота в локальных координатах object (ноги в 0, рост 1) — для эффектов; null — по умолчанию */
