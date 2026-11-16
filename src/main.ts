@@ -1,5 +1,6 @@
 import './ui/styles.css';
 import { App, readParams } from './app';
+import { installCatApi } from './debug/catApi';
 
 const params = readParams();
 const app = new App(document.getElementById('app')!, params);
@@ -7,6 +8,7 @@ const app = new App(document.getElementById('app')!, params);
 app
   .init()
   .then(async () => {
+    installCatApi(app); // window.__cat: проверка реплик и событий с телефона/консоли
     if (params.debug) {
       const { DebugPanel } = await import('./debug/debugPanel');
       new DebugPanel(app);

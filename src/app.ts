@@ -14,7 +14,7 @@ import { FxLayer } from './fx/fxLayer';
 import { Audio } from './audio/audio';
 import { VoicePlayer } from './voice/voicePlayer';
 import { makeAsr, type Asr } from './voice/asr';
-import { loadPersonas } from './persona/loader';
+import { loadContent } from './persona/content';
 import { Input } from './input/input';
 import { UI, posterUrl } from './ui/ui';
 import { Director } from './director';
@@ -63,6 +63,7 @@ export class App {
   private frames = 0;
   private fpsT = 0;
   onFrame: (dt: number) => void = () => {};
+  private listenStop = 0;
 
   constructor(root: HTMLElement, readonly params: AppParams) {
     this.root = root;
@@ -93,7 +94,7 @@ export class App {
     this.fx = new FxLayer(this.root);
     this.voice = new VoicePlayer(this.audio);
     this.speech = makeAsr(p.asr, () => this.audio.ctx);
-    const [personas] = await Promise.all([loadPersonas(ASSETS.personas), this.audio.load(ASSETS.sfx), this.voice.load(ASSETS.voice)]);
+    const [content] = await Promise.all([loadContent(), this.audio.load(ASSETS.sfx), this.voice.load(ASSETS.voice)]);
 
     this.ui = new UI(this.root, {
       onWake: () => void this.wake(),
@@ -129,7 +130,17 @@ export class App {
 
     this.director = new Director({
       tracker: this.tracker, stage: this.stage, fx: this.fx, audio: this.audio, voice: this.voice, ui: this.ui,
-      personas, glCanvas: this.renderer.domElement, size: () => ({ w: this.root.clientWidth, h: this.root.clientHeight }),
+      content, glCanvas: this.renderer.domElement, size: () => ({ w: this.root.clientWidth, h: this.root.clientHeight }),
+      // окно ответа: кот спросил — микрофон слушает сам ms
+      listen: (ms) => {
+        clearTimeout(this.listenStop);
+        this.speech.start();
+        this.listenStop = window.setTimeout(() => this.speech.stop(), ms);
+      },
+      stopListen: () => {
+        clearTimeout(this.listenStop);
+        this.speech.stop();
+      },
     });
     await this.setCharacterMode(p.character);
 

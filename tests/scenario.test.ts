@@ -1,6 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { initialState, step, type ScenarioEvent, type ScenarioState, type Action } from '../src/scenario/machine';
+import { initialState, step as rawStep, makeScenarioConfig, type ScenarioEvent, type ScenarioState, type Action } from '../src/scenario/machine';
 import { loadMemory, saveMemory } from '../src/scenario/memory';
+import { dialogsFile } from './helpers/content';
+
+const cfg = makeScenarioConfig(dialogsFile, { random: () => 0.5 });
+const step = (s: ScenarioState, e: ScenarioEvent) => rawStep(s, e, cfg);
 
 const run = (s: ScenarioState, events: ScenarioEvent[]) => {
   const all: Action[] = [];
@@ -27,16 +31,18 @@ describe('сценарий первой встречи', () => {
   });
 
   it('имя голосом → выбор → 5 с без выбора = Хулиган', () => {
-    const { s, all } = run(initialState(), [
+    let { s, all } = run(initialState(), [
       ...toChoose,
-      { type: 'intent', intent: { type: 'name', name: 'Маша' } },
+      { type: 'intent', intent: { type: 'name', name: 'Маша', known: true } },
       { type: 'choice_shown' },
-      { type: 'timer', id: 'choose_timeout' },
     ]);
+    expect(s.phase).toBe('choose');
+    const listen = [...all].reverse().find((x) => x.type === 'listen') as Extract<Action, { type: 'listen' }>;
+    expect(listen.ms).toBe(5000);
+    ({ s, all } = run(s, [{ type: 'listen_timeout', token: listen.token }]));
     expect(s.name).toBe('Маша');
     expect(s.persona).toBe('hooligan');
     expect(s.phase).toBe('play');
-    expect(has(all, 'timer', { id: 'choose_timeout', ms: 5000 })).toBe(true);
     expect(has(all, 'remember')).toBe(true);
     expect(has(all, 'signature')).toBe(true);
   });
@@ -48,26 +54,32 @@ describe('сценарий первой встречи', () => {
     expect(has(all, 'say', { key: 'no_name' })).toBe(true);
   });
 
-  it('3 взаимодействия → приглашение в СберKids', () => {
+  it('outro через 4–6 минут игры (таймер ставится при входе в игру)', () => {
     let { s, all } = run(initialState(), [...toChoose, { type: 'skip_name' }, { type: 'choose', persona: 'hooligan' }]);
-    ({ s, all } = run(s, [
-      { type: 'interaction', kind: 'tap_cat' },
-      { type: 'interaction', kind: 'swipe' },
-      { type: 'shake' },
-    ]));
-    expect(has(all, 'timer', { id: 'outro' })).toBe(true);
+    const t = all.find((x) => x.type === 'timer' && x.id === 'outro') as Extract<Action, { type: 'timer' }>;
+    expect(t.ms).toBeGreaterThanOrEqual(4 * 60_000);
+    expect(t.ms).toBeLessThanOrEqual(6 * 60_000);
+    ({ s, all } = run(s, [{ type: 'interaction', kind: 'tap_cat' }, { type: 'interaction', kind: 'swipe' }, { type: 'shake' }]));
+    expect(s.outroShown).toBe(false);
     ({ s, all } = run(s, [{ type: 'timer', id: 'outro' }]));
     expect(s.phase).toBe('free');
     expect(has(all, 'ui', { ui: 'sberkids', show: true })).toBe(true);
     expect(has(all, 'say', { key: 'outro' })).toBe(true);
   });
 
-  it('вопрос про деньги сразу ведёт к брату', () => {
+  it('outro по кнопке', () => {
+    let { s, all } = run(initialState(), [...toChoose, { type: 'skip_name' }, { type: 'choose', persona: 'kind' }]);
+    ({ s, all } = run(s, [{ type: 'outro_request' }]));
+    expect(s.outroShown).toBe(true);
+    expect(has(all, 'say', { key: 'outro' })).toBe(true);
+  });
+
+  it('вопрос про деньги: «это к брату» → «хочешь к брату?»', () => {
     let { s } = run(initialState(), [...toChoose, { type: 'skip_name' }, { type: 'choose', persona: 'hooligan' }]);
     const r = step(s, { type: 'intent', intent: { type: 'money' } });
-    expect(r.state.outroShown).toBe(true);
-    expect(has(r.actions, 'react', { event: 'money' })).toBe(true);
-    expect(has(r.actions, 'ui', { ui: 'sberkids', show: true })).toBe(true);
+    expect(has(r.actions, 'say', { key: 'money' })).toBe(true);
+    expect(has(r.actions, 'say', { key: 'sberkids_ask' })).toBe(true);
+    expect(r.state.dialog?.id).toBe('brother');
   });
 
   it('потеря карты: кот остаётся и говорит, поза фиксируется', () => {
@@ -88,9 +100,9 @@ describe('сценарий первой встречи', () => {
 
   it('смена характера: «давай другого» → заклеивание → встряска → новый образ', () => {
     let { s } = run(initialState(), [...toChoose, { type: 'skip_name' }, { type: 'choose', persona: 'hooligan' }]);
-    let r = step(s, { type: 'intent', intent: { type: 'switch' } });
+    let r = step(s, { type: 'intent', intent: { type: 'change_persona' } });
     expect(r.state.phase).toBe('switching');
-    expect(has(r.actions, 'cover_stickers', { persona: 'glitter' })).toBe(true);
+    expect(has(r.actions, 'cover_stickers', { persona: 'kind' })).toBe(true);
     r = step(r.state, { type: 'covered' });
     expect(has(r.actions, 'say', { key: 'shake_prompt' })).toBe(true);
     expect(has(r.actions, 'ui', { ui: 'shake_button', show: true })).toBe(true);
@@ -98,7 +110,7 @@ describe('сценарий первой встречи', () => {
     r = step(r.state, { type: 'interaction', kind: 'tap_screen' });
     expect(r.state.phase).toBe('switching');
     r = step(r.state, { type: 'shake' });
-    expect(r.state.persona).toBe('glitter');
+    expect(r.state.persona).toBe('kind');
     expect(r.state.phase).toBe('play');
     expect(has(r.actions, 'blow_stickers')).toBe(true);
     expect(has(r.actions, 'remember')).toBe(true);
@@ -113,11 +125,36 @@ describe('сценарий первой встречи', () => {
     expect(r.state.switchTo).toBe('hooligan');
   });
 
-  it('повторный визит: узнаёт по имени, без анкеты', () => {
-    const { s, all } = run(initialState({ name: 'Петя', persona: 'glitter', visits: 3 }), toChoose);
+  it('повторный визит: узнаёт, без анкеты; контекст — префикс к приветствию', () => {
+    const { s, all } = run(initialState({ name: 'Петя', persona: 'glitter', visits: 3 }, 'long_absence'), toChoose);
     expect(s.phase).toBe('play');
-    expect(has(all, 'say', { key: 'welcome_back' })).toBe(true);
+    const keys = all.filter((x) => x.type === 'say').map((x) => (x as { key: string }).key);
+    expect(keys.slice(0, 2)).toEqual(['long_absence', 'welcome_back']);
     expect(has(all, 'set_persona', { persona: 'glitter' })).toBe(true);
+    expect(has(all, 'say', { key: 'ask_name' })).toBe(false);
+  });
+
+  it('первая встреча: intro → утро → вопрос имени', () => {
+    const { all } = run(initialState({}, 'morning'), toChoose);
+    const keys = all.filter((x) => x.type === 'say').map((x) => (x as { key: string }).key);
+    expect(keys).toEqual(['intro', 'morning', 'ask_name']);
+  });
+
+  it('смена по кругу: hooligan → kind → glitter → hooligan', () => {
+    let { s } = run(initialState(), [...toChoose, { type: 'skip_name' }, { type: 'choose', persona: 'hooligan' }]);
+    const seen: string[] = [];
+    for (let i = 0; i < 3; i++) {
+      ({ s } = run(s, [{ type: 'switch_request' }, { type: 'covered' }, { type: 'shake' }]));
+      seen.push(s.persona!);
+    }
+    expect(seen).toEqual(['kind', 'glitter', 'hooligan']);
+  });
+
+  it('голосом «будь добряком» в игре — подтверждение и смена именно на Добряка', () => {
+    let { s } = run(initialState(), [...toChoose, { type: 'skip_name' }, { type: 'choose', persona: 'glitter' }]);
+    const r = step(s, { type: 'intent', intent: { type: 'choose_kind' } });
+    expect(has(r.actions, 'say', { key: 'choose_kind' })).toBe(true);
+    expect(r.state.switchTo).toBe('kind');
   });
 });
 
@@ -126,7 +163,11 @@ describe('память', () => {
     const m = new Map<string, string>();
     const st = { getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => void m.set(k, v) };
     saveMemory({ name: 'Аня', visits: 2 }, st);
-    expect(loadMemory(st)).toEqual({ name: 'Аня', persona: null, visits: 2 });
+    expect(loadMemory(st)).toEqual({ name: 'Аня', persona: null, visits: 2, lastVisitAt: null });
+    saveMemory({ persona: 'kind', lastVisitAt: 123 }, st);
+    expect(loadMemory(st).persona).toBe('kind');
+    m.set('sber-ar-cat:v1', JSON.stringify({ persona: 'evil' }));
+    expect(loadMemory(st).persona).toBeNull();
     m.set('sber-ar-cat:v1', '{oops');
     expect(loadMemory(st).visits).toBe(0);
     const broken = { getItem: () => { throw new Error('denied'); }, setItem: () => { throw new Error('denied'); } };

@@ -71,7 +71,6 @@ export const ASSETS = {
   voice: 'sounds/voice/manifest.json',
   voskModel: 'models/vosk-ru-small/model.tar.gz',
   eighthWallTarget: 'targets/8thwall/card.json',
-  personas: ['personas/hooligan.json', 'personas/glitter.json'],
   debugBg: 'debug/table.jpg',
   sberKidsUrl: 'https://www.sberbank.ru/ru/person/kids',
 };
