@@ -14,6 +14,7 @@ import type { Persona } from '../persona/types';
 import { asset, clamp } from '../core/util';
 import { VISEME_TO_BLENDSHAPES, type MouthShape, type Viseme } from '../lipsync/visemes';
 import { ClipState } from './clipState';
+import { TailRig, type TailOutput } from './tailRig';
 import { FaceMixer, EMOTE_FACE, MORPH_TARGETS } from './face';
 import { personaMeta } from './personaMeta';
 import type { AnchorName } from '../fx/core';
@@ -88,6 +89,14 @@ export class GlbCharacter implements Character {
   private mixer: THREE.AnimationMixer | null = null;
   private actions = new Map<string, THREE.AnimationAction>();
   private aliased = new Set<string>();
+  readonly tailRig = new TailRig();
+  /** последний результат хвоста/ушей (для debug и тестов) */
+  tailOut: TailOutput | null = null;
+  private personaId = 'kind';
+  private hipsPrev: { yaw: number; y: number } | null = null;
+  private tq = new THREE.Quaternion();
+  private tq2 = new THREE.Quaternion();
+  private tv = new THREE.Vector3();
   private bones = new Map<string, THREE.Bone>();
   private rest = new Map<string, THREE.Quaternion>();
   readonly clips = new ClipState();
@@ -167,6 +176,7 @@ export class GlbCharacter implements Character {
   }
 
   setPersona(p: Persona) {
+    this.personaId = p.id;
     const meta = personaMeta(p.id);
     this.clips.setIdles(meta.idles, p.id);
     if (!this.model) return;
@@ -342,7 +352,7 @@ export class GlbCharacter implements Character {
         inf[i] = v;
       }
     }
-    for (const L of ['LeftEar1', 'RightEar1']) this.bones.get(L)?.quaternion.multiply(this.q.setFromEuler(this.e.set(f.ears >= 0 ? f.ears * 0.3 : f.ears * 0.9, 0, 0)));
+    this.applyTailEars(dt, f.ears);
     for (const E of ['LeftEye', 'RightEye']) this.bones.get(E)?.scale.setScalar(f.pupils);
 
     const head = this.bones.get('Head');
@@ -353,6 +363,79 @@ export class GlbCharacter implements Character {
       const pitch = clamp(Math.atan2(local.y - 0.85, Math.hypot(local.x, local.z)), -0.4, 0.4);
       head.quaternion.multiply(this.q.setFromEuler(this.e.set(-pitch * 0.5, yaw * 0.6, 0)));
     }
+  }
+
+  /** хвост и уши: сброс к покою и вторичная анимация TailRig поверх тела */
+  private applyTailEars(dt: number, faceEars: number) {
+    const names = ['Tail1', 'Tail2', 'Tail3', 'Tail4', 'LeftEar1', 'RightEar1'];
+    for (const n of names) {
+      const b = this.bones.get(n);
+      const r = this.rest.get(n);
+      if (b && r) b.quaternion.copy(r);
+    }
+    if (!this.bones.has('Tail1') && !this.bones.has('LeftEar1')) return;
+    // скорость таза в пространстве персонажа (дрожание трекинга не трогает хвост)
+    let yawVel = 0;
+    let upVel = 0;
+    const hips = this.bones.get('Hips');
+    if (hips && dt > 0) {
+      hips.updateWorldMatrix(true, false);
+      const objQ = this.object.getWorldQuaternion(this.tq2).invert();
+      const hq = hips.getWorldQuaternion(this.tq).premultiply(objQ);
+      const fwd = this.tv.set(0, 0, 1).applyQuaternion(hq);
+      const yaw = Math.atan2(fwd.x, fwd.z);
+      const y = this.object.worldToLocal(hips.getWorldPosition(new THREE.Vector3())).y;
+      if (this.hipsPrev) {
+        let dy = yaw - this.hipsPrev.yaw;
+        if (dy > Math.PI) dy -= 2 * Math.PI;
+        if (dy < -Math.PI) dy += 2 * Math.PI;
+        yawVel = clamp(dy / dt, -12, 12);
+        upVel = clamp((y - this.hipsPrev.y) / dt, -4, 4);
+      }
+      this.hipsPrev = { yaw, y };
+    }
+    const out = this.tailRig.update(dt, {
+      clip: this.clips.cur.id,
+      face: this.faceMix.preset,
+      faceEars: faceEars,
+      additive: this.clips.additive.map((a) => a.id),
+      persona: this.personaId,
+      speaking: this.mouth,
+      hipsYawVel: yawVel,
+      hipsUpVel: upVel,
+    });
+    this.tailOut = out;
+    const mq = (this.model ?? this.object).getWorldQuaternion(this.tq2);
+    const up = new THREE.Vector3(0, 1, 0).applyQuaternion(mq);
+    const side = new THREE.Vector3(1, 0, 0).applyQuaternion(mq);
+    const fwd = new THREE.Vector3(0, 0, 1).applyQuaternion(mq);
+    ['Tail1', 'Tail2', 'Tail3', 'Tail4'].forEach((n, i) => {
+      const b = this.bones.get(n);
+      if (!b) return;
+      this.rotWorld(b, up, out.tail[i][0]);
+      this.rotWorld(b, side, out.tail[i][1]);
+    });
+    const eL = this.bones.get('LeftEar1');
+    if (eL) {
+      this.rotWorld(eL, side, out.earL[0]);
+      this.rotWorld(eL, fwd, -out.earL[1]);
+    }
+    const eR = this.bones.get('RightEar1');
+    if (eR) {
+      this.rotWorld(eR, side, out.earR[0]);
+      this.rotWorld(eR, fwd, out.earR[1]);
+    }
+  }
+
+  /** поворот кости вокруг оси в мировых координатах (ось — уже в мире) */
+  private rotWorld(b: THREE.Object3D, axis: THREE.Vector3, angle: number) {
+    if (!angle || !b.parent) return;
+    b.parent.updateWorldMatrix(true, false);
+    const pq = b.parent.getWorldQuaternion(this.tq);
+    const d = new THREE.Quaternion().setFromAxisAngle(axis, angle);
+    const local = pq.clone().invert().multiply(d).multiply(pq);
+    b.quaternion.premultiply(local);
+    b.updateMatrixWorld(false);
   }
 
   hitTest(ray: THREE.Raycaster) {
