@@ -506,9 +506,10 @@ export class Director extends Emitter<DirectorEvents> {
         if (Date.now() < this.busyUntil) return;
         this.busyUntil = Date.now() + 2500;
         const m = d.stage.headScreen(w, h, 0.62);
-        await d.fx.gumBubble(m.x, m.y, pal.accent);
+        const byTouch = this.ctx.x !== undefined;
+        await d.fx.gumBubble(m.x, m.y, pal.accent, byTouch);
         d.audio.play('gum_pop');
-        d.audio.play('gum_splat', 0.8);
+        if (byTouch) d.audio.play('gum_splat', 0.8);
         break;
       }
       case 'steam_heart':

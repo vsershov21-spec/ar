@@ -284,9 +284,10 @@ export class FxLayer {
   glitch(ms = 500) {
     this.play('glitch', { durationMs: ms });
   }
-  gumBubble(x: number, y: number, color?: string): Promise<void> {
+  /** splat: жвачка прилипает к стеклу — только когда ребёнок сам тыкал в экран (иначе пятна закрывают кота без повода) */
+  gumBubble(x: number, y: number, color?: string, splat = true): Promise<void> {
     const h = this.play('gum_bubble', { x, y, params: color ? { color } : undefined });
-    this.play('gum_splat');
+    if (splat) this.play('gum_splat');
     return h.done;
   }
   steamHeart(): Promise<void> {
