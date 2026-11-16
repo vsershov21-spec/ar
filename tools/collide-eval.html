@@ -1,0 +1,16 @@
+<!doctype html><html><body><script type="module">
+import * as THREE from 'three';
+import { GlbCharacter } from '../src/character/glbCharacter';
+const q=new URLSearchParams(location.search); const persona=q.get('p')||'hooligan';
+const ch=new GlbCharacter(`/models/${persona}_v1.glb`,'/models/anims_v1.glb'); await ch.load();
+const scene=new THREE.Scene(); scene.add(ch.object);
+const mixer=ch.mixer, acts=ch.actions; const res={}; const seen=new Set();
+for (const [name,act] of acts){ if(seen.has(act)) continue; seen.add(act);
+  mixer.stopAllAction(); act.reset().play(); const dur=act.getClip().duration; let n=0,bad0=0,bad1=0,max0=0,max1=0;
+  for(let t=0;t<dur;t+=0.1){ act.time=t; mixer.update(0); ch.collider.enabled=true;
+    const m0=ch.collider.measure(); ch.collider.apply(); const m1=ch.collider.measure(); n++;
+    if(m0>0.05)bad0++; if(m1>0.05)bad1++; max0=Math.max(max0,m0); max1=Math.max(max1,m1);}
+  res[act.getClip().name]={n,bad0,bad1,max0:+max0.toFixed(2),max1:+max1.toFixed(2)};
+}
+window.__res=res;
+</script></body></html>

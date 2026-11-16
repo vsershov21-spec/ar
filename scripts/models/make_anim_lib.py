@@ -12,6 +12,11 @@ PROMPT_IDS = [
     ('presses both palms', 'press_glass'),
     ('knocks t', 'knock_glass'),
 ]
+import os
+_pj = os.path.join(os.path.dirname(__file__), 't2m_prompts.json')
+if os.path.exists(_pj):
+    for cid, txt in json.load(open(_pj, encoding='utf-8')).items():
+        PROMPT_IDS.append((txt[:55], cid))
 src, dst = sys.argv[1], sys.argv[2]
 b = open(src, 'rb').read()
 jl = struct.unpack('<I', b[12:16])[0]

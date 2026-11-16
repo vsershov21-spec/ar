@@ -10,8 +10,8 @@ const sc=new THREE.Scene(); sc.add(new THREE.HemisphereLight(0xffffff,0x445566,2
 const cam=new THREE.PerspectiveCamera(30,innerWidth/innerHeight,0.01,20);
 const a=yaw*Math.PI/180; cam.position.set(Math.sin(a)*2.6,0.75,Math.cos(a)*2.6); cam.lookAt(0,0.45,0);
 const ch=new GlbCharacter(`/models/${persona}_v1.glb`,'/models/anims_v1.glb'); await ch.load(); sc.add(ch.object);
-ch.personaId=persona;
-const clip={happy:'idle_breathe',sad:'idle_breathe',puff:'idle_breathe',angry:'idle_breathe',dance:'dance_'+persona,walk:'walk',sleep:'sleep_loop'}[mode]||'idle_breathe';
+ch.personaId=persona; if(q.get('col')==='0') ch.collider.enabled=false;
+const clip=q.get('c')||{happy:'idle_breathe',sad:'idle_breathe',puff:'idle_breathe',angry:'idle_breathe',dance:'dance_'+persona,walk:'walk',sleep:'sleep_loop'}[mode]||'idle_breathe';
 const face={happy:'happy',sad:'sad',puff:'surprised',angry:'offended',dance:'excited',walk:'neutral',sleep:'sleep'}[mode]||'neutral';
 ch.play(clip,{loop:true}); ch.face(face);
 let t=0; window.__frames=0;

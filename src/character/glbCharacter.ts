@@ -15,6 +15,8 @@ import { asset, clamp } from '../core/util';
 import { VISEME_TO_BLENDSHAPES, type MouthShape, type Viseme } from '../lipsync/visemes';
 import { ClipState } from './clipState';
 import { TailRig, type TailOutput } from './tailRig';
+import { PropRig } from './props';
+import { BodyCollider } from './bodyCollide';
 import { FaceMixer, EMOTE_FACE, MORPH_TARGETS } from './face';
 import { personaMeta } from './personaMeta';
 import type { AnchorName } from '../fx/core';
@@ -86,10 +88,12 @@ export class GlbCharacter implements Character {
   readonly object = new THREE.Group();
   private model: THREE.Object3D | null = null;
   private inner = new THREE.Group();
-  private mixer: THREE.AnimationMixer | null = null;
-  private actions = new Map<string, THREE.AnimationAction>();
+  mixer: THREE.AnimationMixer | null = null;
+  readonly actions = new Map<string, THREE.AnimationAction>();
   private aliased = new Set<string>();
   readonly tailRig = new TailRig();
+  private props: PropRig | null = null;
+  collider: BodyCollider | null = null;
   /** последний результат хвоста/ушей (для debug и тестов) */
   tailOut: TailOutput | null = null;
   private personaId = 'kind';
@@ -173,6 +177,14 @@ export class GlbCharacter implements Character {
       for (const clip of anims) this.addClip(clip);
     }
     this.setFaceObj('usual');
+    this.collider = new BodyCollider(this.object, (n) => this.bones.get(n) ?? model.getObjectByName('mixamorig' + n) ?? undefined);
+    console.info('[glb] объёмы тела', this.collider.build(model));
+    const propLoader = new GLTFLoader();
+    this.props = new PropRig(
+      async (u) => (await propLoader.loadAsync(asset(u))).scene,
+      (n) => this.bones.get(n) ?? model.getObjectByName('mixamorig' + n) ?? undefined,
+      this.object,
+    );
   }
 
   setPersona(p: Persona) {
@@ -352,7 +364,9 @@ export class GlbCharacter implements Character {
         inf[i] = v;
       }
     }
+    this.collider?.apply();
     this.applyTailEars(dt, f.ears);
+    this.props?.update(this.clips.cur.id);
     for (const E of ['LeftEye', 'RightEye']) this.bones.get(E)?.scale.setScalar(f.pupils);
 
     const head = this.bones.get('Head');
