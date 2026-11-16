@@ -67,6 +67,8 @@ export class Director extends Emitter<DirectorEvents> {
   private busyUntil = 0;
   private paused = false;
   private ctx: { x?: number; y?: number; from?: { x: number; y: number }; path?: { x: number; y: number }[] } = {};
+  /** последнее касание экрана (жвачка липнет к стеклу только сразу после тапа по стеклу) */
+  private lastTouch: { kind: string; at: number } | null = null;
 
   constructor(private d: DirectorDeps) {
     super();
@@ -136,6 +138,7 @@ export class Director extends Emitter<DirectorEvents> {
   interaction(kind: InteractionKind, ctx: { x?: number; y?: number; from?: { x: number; y: number }; path?: { x: number; y: number }[] } = {}) {
     if (kind === 'swipe' && ctx.from) this.lastSwipe = ctx.from;
     this.ctx = ctx;
+    this.lastTouch = { kind, at: Date.now() };
     // тап по поверхности карты (не по коту) → кот идёт в эту точку (локомоция)
     if (kind === 'tap_screen' && ctx.x !== undefined && this.state.appeared && !this.d.stage.atGlass && this.canWalk()) {
       const { w, h } = this.d.size();
@@ -341,7 +344,8 @@ export class Director extends Emitter<DirectorEvents> {
   private async signature() {
     await wait(250);
     const sig = this.personas.signature;
-    this.playVisual({ clip: sig.clip, fx: sig.fx, sound: sig.sound });
+    // сам по себе (приветствие) — без пятен на стекле: жвачку на экран ребёнок «заслуживает» двойным тапом
+    this.playVisual({ clip: sig.clip, fx: sig.fx.filter((f) => f !== 'gum_splat'), sound: sig.sound });
     this.speakEvent(sig.event, { visuals: false });
   }
 
@@ -506,7 +510,8 @@ export class Director extends Emitter<DirectorEvents> {
         if (Date.now() < this.busyUntil) return;
         this.busyUntil = Date.now() + 2500;
         const m = d.stage.headScreen(w, h, 0.62);
-        const byTouch = this.ctx.x !== undefined;
+        const lt = this.lastTouch;
+        const byTouch = !!lt && /tap|spam|longpress/.test(lt.kind) && Date.now() - lt.at < 1500;
         await d.fx.gumBubble(m.x, m.y, pal.accent, byTouch);
         d.audio.play('gum_pop');
         if (byTouch) d.audio.play('gum_splat', 0.8);
