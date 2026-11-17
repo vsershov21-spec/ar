@@ -7,6 +7,13 @@ export const CARD_W_MM = 85.6;
 export const CARD_H_MM = 53.98;
 export const CARD_ASPECT = CARD_W_MM / CARD_H_MM; // 1.586
 
+/**
+ * Кот садится только на карту Сбера (знак Сбера на лицевой стороне, любой дизайн). true — и на карты других
+ * банков, и на оборот карты (тогда для них нет подсказки «я живу в картах Сбера»). См. docs/CARD_DETECTION.md.
+ * ?anycard — старое поведение: любой прямоугольник с пропорциями карты, без проверки содержимого.
+ */
+export const ACCEPT_OTHER_BANKS = false;
+
 export interface StageConfig {
   /** точка опоры (между лап) относительно центра карты, +X вправо по картинке */
   footX: number;

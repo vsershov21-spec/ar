@@ -1,7 +1,8 @@
 /**
- * Трекер «любая банковская карта»: камера → уменьшенный кадр (320 px по длинной стороне) → Web Worker с
+ * Трекер «карта Сбера»: камера → уменьшенный кадр (320 px по длинной стороне) → Web Worker с
  * детектором (src/tracker/card/detector.ts) → 4 угла → поза карты (гомография → R, t) → якорь кота.
- * Никакой картинки-маркера: подходит любая карта ID-1 (85.60 × 53.98 мм), в том числе любая карта Сбера.
+ * Никакой картинки-маркера: форма — любая карта ID-1 (85.60 × 53.98 мм), а по содержимому (чип, знак Сбера,
+ * src/tracker/card/verify.ts) кот садится только на карту Сбера любого дизайна (ACCEPT_OTHER_BANKS, ?anycard).
  *
  * Рамка на экране не висит статично: CardOverlay рисует контур по реальным углам карты, когда она найдена
  * (см. ./card/overlay.ts). Найдена — после 2 кадров подряд (случайный прямоугольник не «моргнёт» котом),
@@ -13,8 +14,10 @@ import type { Tracker } from './types';
 import { CARD_ASPECT, focalFromQuad, labelCard, poseFromQuad, quadDiag, type Intrinsics, type Pose, type Pt, type Quad } from './card/geometry';
 import { focalFromFov } from './card/detector';
 import type { CardWorkerIn, CardWorkerOut } from './card/worker';
-import { CardOverlay } from './card/overlay';
+import { CardOverlay, type CandidateKind } from './card/overlay';
+import type { CardKind } from './card/verify';
 import { perf } from '../core/perf';
+import { ACCEPT_OTHER_BANKS } from '../config';
 
 export interface CardView {
   /** углы карты (TL, TR, BR, BL) в px экрана */
@@ -32,7 +35,14 @@ export class CardTracker extends TrackerBase implements Tracker {
   readonly overlay: CardOverlay;
   /** последнее, что видел детектор (для оверлея и debug) */
   view: CardView | null = null;
-  stats = { ms: 0, fps: 0, score: 0, mode: 'none' };
+  stats = { ms: 0, fps: 0, score: 0, mode: 'none', ver: '' as CardKind | '', verLine: '' };
+  /**
+   * Проверка «это карта Сбера?» по содержимому кандидата (чип, знак Сбера, оборот — src/tracker/card/verify.ts).
+   * ?anycard — выключить: кот садится на любой прямоугольник с пропорциями карты (старое поведение).
+   */
+  readonly verify = !hasParam('anycard');
+  private verState: CardKind = 'unknown';
+  private verDebug = hasParam('debug');
   /** последняя нумерация углов: держим ориентацию кота и после короткой потери карты */
   private orientRef: Quad | null = null;
   private orientAt = -1e9;
@@ -42,6 +52,10 @@ export class CardTracker extends TrackerBase implements Tracker {
   private running = false;
   private canvas = document.createElement('canvas');
   private ctx = this.canvas.getContext('2d', { willReadFrequently: true })!;
+  /** фрагмент кадра вокруг карты в большем разрешении — для чипа и знака Сбера */
+  private cropCanvas = document.createElement('canvas');
+  private cropCtx = this.cropCanvas.getContext('2d', { willReadFrequently: true })!;
+  private cropAt = -1e9;
   private dw = 320;
   private dh = 180;
   private K: Intrinsics = { f: 300, cx: 160, cy: 90 };
@@ -214,21 +228,66 @@ export class CardTracker extends TrackerBase implements Tracker {
       this.busy = true;
       const t0 = performance.now();
       const frame = this.frameGrab ? grabFrame(v) : null;
+      const crop = this.cropRect(v);
       if (frame) {
         // кадр уходит в воркер без копирования: уменьшение и чтение пикселей там (на главном потоке ~0,1 мс вместо 4–17)
         const msg = this.message(new ArrayBuffer(0));
         msg.frame = frame;
+        msg.crop = crop; // фрагмент вырежет воркер из того же кадра
         this.worker.postMessage(msg, [frame as unknown as Transferable]);
       } else {
         this.ctx.drawImage(v, 0, 0, this.dw, this.dh);
         const img = this.ctx.getImageData(0, 0, this.dw, this.dh);
         const msg = this.message(img.data.buffer as ArrayBuffer);
-        this.worker.postMessage(msg, [msg.rgba]);
+        const tr: Transferable[] = [msg.rgba];
+        if (crop) {
+          // тот же кадр видео (рисуем подряд в одном обработчике) — углы из кадра детектора ложатся на фрагмент
+          const k = (v.videoWidth || this.dw) / this.dw;
+          if (this.cropCanvas.width !== crop.cw || this.cropCanvas.height !== crop.ch) {
+            this.cropCanvas.width = crop.cw;
+            this.cropCanvas.height = crop.ch;
+          }
+          this.cropCtx.drawImage(v, crop.x0 * k, crop.y0 * k, crop.w * k, crop.h * k, 0, 0, crop.cw, crop.ch);
+          crop.rgba = this.cropCtx.getImageData(0, 0, crop.cw, crop.ch).data.buffer as ArrayBuffer;
+          tr.push(crop.rgba);
+          msg.crop = crop;
+        }
+        this.worker.postMessage(msg, tr);
       }
       perf.add('tracker.grab', performance.now() - t0);
     }
     requestAnimationFrame(this.pump);
   };
+
+  /**
+   * Фрагмент кадра вокруг карты (по прошлому положению) в разрешении камеры: карта в нём ≈ 280 px шириной —
+   * чип и знак Сбера видны лучше, чем на 320-px кадре детектора. До посадки — к каждому кадру (не чаще 12 Гц),
+   * после — раз в секунду (переверификация). Без карты в прошлом кадре — не нужен.
+   */
+  private cropRect(v: HTMLVideoElement): CardWorkerIn['crop'] {
+    if (!this.verify || !this.prevQuad) return null;
+    const now = performance.now();
+    if (now - this.cropAt < (this.locked ? 1000 : 80)) return null;
+    const vw = v.videoWidth || this.dw;
+    const k = vw / this.dw; // px видео на px детектора
+    if (k < 1.3) return null; // камера не больше кадра детектора — фрагмент ничего не даст
+    const q = this.prevQuad;
+    let x0 = Math.min(...q.map((p) => p.x)), x1 = Math.max(...q.map((p) => p.x));
+    let y0 = Math.min(...q.map((p) => p.y)), y1 = Math.max(...q.map((p) => p.y));
+    const mx = (x1 - x0) * 0.25 + 4, my = (y1 - y0) * 0.25 + 4;
+    x0 = Math.max(0, Math.floor(x0 - mx));
+    y0 = Math.max(0, Math.floor(y0 - my));
+    x1 = Math.min(this.dw, Math.ceil(x1 + mx));
+    y1 = Math.min(this.dh, Math.ceil(y1 + my));
+    const w = x1 - x0, h = y1 - y0;
+    if (w < 8 || h < 8) return null;
+    const long = Math.max(quadSide(q, 0), quadSide(q, 1));
+    let s = Math.min(k, Math.max(1, 280 / Math.max(1, long)));
+    s = Math.min(s, 420 / Math.max(w, h)); // не больше 420 px по стороне: чтение пикселей ~1 мс
+    if (s < 1.3) return null;
+    this.cropAt = now;
+    return { x0, y0, w, h, cw: Math.round(w * s), ch: Math.round(h * s) };
+  }
 
   /** пора ли слать кадр: новый кадр камеры и не чаще maxHz */
   private frameDue() {
@@ -245,7 +304,7 @@ export class CardTracker extends TrackerBase implements Tracker {
   }
 
   private message(rgba: ArrayBuffer): CardWorkerIn {
-    const msg: CardWorkerIn = { rgba, w: this.dw, h: this.dh, focal: this.K.f, lock: this.locked };
+    const msg: CardWorkerIn = { rgba, w: this.dw, h: this.dh, focal: this.K.f, lock: this.locked, verify: this.verify };
     if (this.detectEvery > 0) msg.detectEvery = this.detectEvery;
     // карты не видно, кот держится по гироскопу: подсказываем детектору, где её ждать (только там её и примем)
     if (this.locked) msg.hint = this.isTracking ? null : this.heldQuad();
@@ -263,6 +322,18 @@ export class CardTracker extends TrackerBase implements Tracker {
     this.stats.ms = r.ms;
     this.stats.score = r.score;
     this.stats.mode = r.mode;
+    if (r.ver) {
+      this.verState = r.ver.state;
+      this.stats.ver = r.ver.state;
+      this.stats.verLine = r.ver.line;
+      if (this.verDebug) this.overlay.debugLine = r.ver.line;
+      // кот сидит, а под ним 5 проверок подряд «не карта» (посадили по ошибке) — ищем карту заново
+      if (r.ver.postNotCard && this.locked) {
+        console.info('[card] переверификация: под котом не карта — пересадка');
+        this.reanchor();
+        return;
+      }
+    } else if (!this.verify) this.verState = 'sber';
     this.frames++;
     const now = performance.now();
     if (now - this.fpsT > 1000) {
@@ -290,8 +361,13 @@ export class CardTracker extends TrackerBase implements Tracker {
         const w = this.hold.angularSpeed;
         const still = !(w > 0.6);
         this.stable = pose.err < 2.5 && jitter < 0.04 && still ? this.stable + 1 : Math.max(0, this.stable - 2);
-        this.overlay.candidate({ quad: quad.map((p) => this.toScreen(p)) as Quad, pose, project: () => null }, this.stable / LOCK_FRAMES);
-        if (this.stable < LOCK_FRAMES) return;
+        // посадка — только на карту Сбера (несколько кадров подряд с признаками, см. CardEvidence)
+        const kind = this.candidateKind();
+        const ok = kind === 'sber';
+        // пока проверяем — кольцо заполняется только наполовину; «не карта» — ничего не рисуем
+        const k = ok ? this.stable / LOCK_FRAMES : Math.min(this.stable / LOCK_FRAMES, 0.5);
+        this.overlay.candidate({ quad: quad.map((p) => this.toScreen(p)) as Quad, pose, project: () => null }, k, kind);
+        if (this.stable < LOCK_FRAMES || !ok) return;
         this.locked = true;
       }
       this.hits++;
@@ -310,6 +386,16 @@ export class CardTracker extends TrackerBase implements Tracker {
         this.overlay.lost();
       }
     }
+  }
+
+  /** что показать над кандидатом: карта Сбера / проверяем / чужая карта / оборот / не карта */
+  private candidateKind(): CandidateKind {
+    const st = this.verState;
+    if (!this.verify || st === 'sber') return 'sber';
+    if (st === 'card') return ACCEPT_OTHER_BANKS ? 'sber' : 'other';
+    if (st === 'back') return ACCEPT_OTHER_BANKS ? 'sber' : 'back';
+    if (st === 'notcard') return 'notcard';
+    return 'checking';
   }
 
   /** кот посажен на карту — новые прямоугольники его не утаскивают */
@@ -386,6 +472,16 @@ export class CardTracker extends TrackerBase implements Tracker {
     super.update(dt, t);
     this.overlay.update(dt);
   }
+}
+
+function hasParam(name: string): boolean {
+  return typeof location !== 'undefined' && new URLSearchParams(location.search).has(name);
+}
+
+/** длина стороны i → i+1 четырёхугольника */
+function quadSide(q: Quad, i: number) {
+  const a = q[i], b = q[(i + 1) % 4];
+  return Math.hypot(a.x - b.x, a.y - b.y);
 }
 
 function useFrameGrab(): boolean {

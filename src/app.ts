@@ -380,7 +380,7 @@ export class App {
     const { CardTracker } = await import('./tracker/cardTracker');
     document.querySelector('.scan')?.classList.add('free');
     const scanText = document.querySelector('.scan span');
-    if (scanText) scanText.textContent = 'Положи карту на стол и наведи камеру';
+    if (scanText) scanText.textContent = 'Наведи камеру на банковскую карту';
     return new CardTracker(this.root);
   }
 

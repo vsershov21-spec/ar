@@ -8,6 +8,18 @@ import { roundedCardOutline, type Pt } from './geometry';
 import type { CardView } from '../cardTracker';
 
 type State = 'search' | 'snap' | 'glow' | 'locked';
+/**
+ * Что за кандидат (проверка по содержимому, verify.ts): sber — карта Сбера, кольцо «держи ровно» и посадка;
+ * checking — ещё смотрим (кольцо до половины); other — карта другого банка; back — оборот; notcard — не карта.
+ */
+export type CandidateKind = 'sber' | 'checking' | 'other' | 'back' | 'notcard';
+
+/** подсказки над кандидатом (короткие строки — влезают на узкий экран) */
+const MSG: Partial<Record<CandidateKind, string[]>> = {
+  other: ['Это карта другого банка —', 'я живу в картах Сбера'],
+  back: ['Переверни карту', 'лицевой стороной'],
+  notcard: ['Это не карта 🙂'],
+};
 
 const MODEL = roundedCardOutline(85.6 / 53.98, 3.18 / 85.6, 6);
 const SNAP_S = 0.38;
@@ -163,16 +175,90 @@ export class CardOverlay {
     g.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
   }
 
-  /** карта видна, но кот ещё не посажен: пунктир по карте + прогресс «держи ровно» */
-  private cand: { pts: Pt[]; k: number; at: number } | null = null;
-  candidate(v: CardView, k: number) {
+  /** строка признаков проверки карты (?debug) */
+  debugLine = '';
+  /** «Это не карта» — тихо, не чаще раза в 5 с, на 1,5 с */
+  private notCard: { pts: Pt[]; at: number } | null = null;
+
+  /** карта видна, но кот ещё не посажен: пунктир по карте + прогресс «держи ровно» (или подсказка, что это не та карта) */
+  private cand: { pts: Pt[]; k: number; at: number; kind: CandidateKind } | null = null;
+  candidate(v: CardView, k: number, kind: CandidateKind = 'sber') {
     if (this.state !== 'search') return;
-    this.cand = { pts: v.quad, k: Math.max(0, Math.min(1, k)), at: performance.now() };
+    const now = performance.now();
+    if (kind === 'notcard') {
+      this.cand = null;
+      if (k >= 0.3 && (!this.notCard || now - this.notCard.at > 5000)) this.notCard = { pts: v.quad, at: now };
+      return;
+    }
+    this.cand = { pts: v.quad, k: Math.max(0, Math.min(1, k)), at: now, kind };
   }
+
+  private pill(lines: string[], cx: number, yTop: number, color = '#157a2c') {
+    const g = this.g;
+    g.font = '800 14px "SB Sans Text", system-ui, sans-serif';
+    const tw = Math.max(...lines.map((l) => g.measureText(l).width));
+    const lh = 18, hgt = lines.length * lh + 10;
+    const y0 = Math.max(8, yTop - hgt);
+    const x = Math.max(8 + tw / 2 + 14, Math.min(this.w - 8 - tw / 2 - 14, cx));
+    g.fillStyle = '#fff';
+    g.beginPath();
+    g.roundRect(x - tw / 2 - 14, y0, tw + 28, hgt, 14);
+    g.fill();
+    g.fillStyle = color;
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    lines.forEach((l, i) => g.fillText(l, x, y0 + 5 + lh * (i + 0.5) + 1));
+  }
+
+  private drawNotCard() {
+    const n = this.notCard;
+    if (!n || this.state !== 'search') return;
+    const age = performance.now() - n.at;
+    if (age > 1500) return;
+    const g = this.g;
+    g.save();
+    g.globalAlpha = age < 200 ? age / 200 : age > 1200 ? (1500 - age) / 300 : 1;
+    const cx = n.pts.reduce((s, p) => s + p.x, 0) / 4, top = Math.min(...n.pts.map((p) => p.y));
+    this.pill(MSG.notcard!, cx, top - 8, '#5b6670');
+    g.restore();
+  }
+
+  private drawDebug() {
+    if (!this.debugLine) return;
+    const g = this.g;
+    g.save();
+    g.font = '600 10px ui-monospace, monospace';
+    g.textAlign = 'left';
+    g.textBaseline = 'top';
+    // строку бьём на части: на узком экране не влезает
+    const words = this.debugLine.split(' · ');
+    const y0 = 64;
+    g.fillStyle = 'rgba(0,0,0,0.55)';
+    g.fillRect(4, y0 - 2, Math.min(this.w - 8, 330), words.length * 12 + 4);
+    g.fillStyle = '#d8ffb0';
+    words.forEach((w, i) => g.fillText(w, 8, y0 + i * 12, this.w - 16));
+    g.restore();
+  }
+
   private drawCandidate() {
     const c = this.cand;
     if (!c || this.state !== 'search' || performance.now() - c.at > 250) return;
     const g = this.g;
+    if (c.kind === 'other' || c.kind === 'back') {
+      // не та карта/сторона: тихий оранжевый пунктир и подсказка, без кольца
+      g.save();
+      g.lineJoin = 'round';
+      g.setLineDash([8, 8]);
+      g.strokeStyle = c.kind === 'other' ? 'rgba(255,181,71,0.95)' : 'rgba(255,255,255,0.9)';
+      g.lineWidth = 2.5;
+      path(g, c.pts);
+      g.stroke();
+      g.setLineDash([]);
+      const cx = c.pts.reduce((s, p) => s + p.x, 0) / 4, top = Math.min(...c.pts.map((p) => p.y));
+      this.pill(MSG[c.kind]!, cx, top - 8, c.kind === 'other' ? '#b35c00' : '#157a2c');
+      g.restore();
+      return;
+    }
     g.save();
     g.lineJoin = 'round';
     g.setLineDash([10, 8]);
@@ -228,6 +314,8 @@ export class CardOverlay {
     }
     this.drawBurst(dt);
     this.drawCandidate();
+    this.drawNotCard();
+    this.drawDebug();
     let alpha = 0;
     let pts = this.outline();
     if (this.state === 'snap' && pts) {
