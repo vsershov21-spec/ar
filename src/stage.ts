@@ -24,6 +24,9 @@ export class Stage {
   private mode: StageMode = 'card';
   private t = 0; // 0 = на карте, 1 = у стекла
   private yaw = 0;
+  /** угловая скорость поворота, рад/с (пружина с ограничением — без «волчка») */
+  private yawVel = 0;
+  private yawChase = false;
   private visibleK = 0; // появление (масштаб)
   private hiddenUntil = 0;
   private now = 0;
@@ -134,7 +137,7 @@ export class Stage {
   }
 
   /** поза центра карты → поза кота на карте */
-  private cardPose(out: THREE.Matrix4) {
+  private cardPose(out: THREE.Matrix4, dt: number) {
     const c = this.cfg;
     const a = this.tracker.anchor;
     a.updateMatrixWorld(true);
@@ -145,13 +148,35 @@ export class Stage {
     const targetYaw = this.walkYaw ?? (c.yawFollow ? Math.atan2(dx, -dy) : 0);
     let d = targetYaw - this.yaw;
     d = Math.atan2(Math.sin(d), Math.cos(d));
-    this.yaw += d * (this.walkYaw !== null ? 0.25 : 0.12);
+    this.turn(d, dt, this.walkYaw !== null);
     const local = new THREE.Matrix4().compose(
       new THREE.Vector3(this.pos.x, this.pos.y, c.footZ),
       new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI / 2, this.yaw, 0, 'XYZ')),
       new THREE.Vector3(c.height, c.height, c.height),
     );
     out.multiplyMatrices(a.matrixWorld, local);
+  }
+
+  /**
+   * Поворот к цели: критически демпфированная пружина, угловая скорость ограничена (к зрителю 2,6 рад/с,
+   * в ходьбе 5 рад/с), не зависит от частоты кадров. К зрителю — с гистерезисом: дрожание трекинга
+   * не крутит кота, а сдвиг камеры больше ~7° он плавно догоняет до точного взгляда.
+   */
+  private turn(d: number, dt: number, walking: boolean) {
+    if (!(dt > 0)) return;
+    dt = Math.min(dt, 0.1);
+    if (walking) this.yawChase = true;
+    else {
+      // гистерезис: начинает поворот, когда зритель ушёл дальше ~7°, и доворачивает точно на него
+      if (Math.abs(d) > 0.12) this.yawChase = true;
+      else if (Math.abs(d) < 0.015 && Math.abs(this.yawVel) < 0.05) this.yawChase = false;
+      if (!this.yawChase) d = 0;
+    }
+    const w = walking ? 9 : 5;
+    const vMax = walking ? 5 : 2.6;
+    this.yawVel += (w * w * d - 2 * w * this.yawVel) * dt;
+    this.yawVel = clamp(this.yawVel, -vMax, vMax);
+    this.yaw += this.yawVel * dt;
   }
 
   /** «у стекла»: прямо перед камерой, ноги у нижнего края экрана, рост = glassHeightFrac экрана */
@@ -174,9 +199,11 @@ export class Stage {
     if (this.walkTarget) {
       const d = this.walkTarget.clone().sub(this.pos);
       const len = d.length();
-      const step = this.cfg.walkSpeed * dt;
       // направление движения в координатах карты → yaw (вперёд кота = -Y карты при yaw=0)
       this.walkYaw = Math.atan2(d.x, -d.y);
+      // шагает, когда уже почти развернулся по ходу (не едет боком/задом)
+      const err = Math.abs(Math.atan2(Math.sin(this.walkYaw - this.yaw), Math.cos(this.walkYaw - this.yaw)));
+      const step = this.cfg.walkSpeed * dt * clamp((Math.cos(err) - 0.2) / 0.7, 0.15, 1);
       if (len <= step) {
         this.pos.copy(this.walkTarget);
         this.walkTarget = null;
@@ -192,7 +219,7 @@ export class Stage {
     const hidden = this.now < this.hiddenUntil;
     this.visibleK = clamp(this.visibleK + (this.shown && !hidden ? dt / 0.25 : -dt / 0.15), 0, 1);
 
-    this.cardPose(this.m1);
+    this.cardPose(this.m1, dt);
     this.m1.decompose(this.p1, this.q1, this.s1);
     if (this.t > 0) {
       this.glassPose(this.m1);
@@ -208,7 +235,11 @@ export class Stage {
     this.root.matrix.compose(this.p1, this.q1, this.s1);
     this.root.matrixWorldNeedsUpdate = true;
     this.root.visible = this.visibleK > 0.001;
-    if (this.character) this.character.object.userData.tilt = this.cfg.billboardTilt * (1 - this.t);
+    if (this.character) {
+      this.character.object.userData.tilt = this.cfg.billboardTilt * (1 - this.t);
+      // скорость шага в ростах кота в секунду — 3D-кот подгоняет под неё темп клипа ходьбы
+      this.character.object.userData.moveSpeed = this.walkTarget ? this.cfg.walkSpeed / Math.max(0.01, this.cfg.height) : 0;
+    }
 
     // тень: под лапами, пропадает у стекла
     const c = this.cfg;

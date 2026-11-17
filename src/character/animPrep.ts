@@ -36,6 +36,8 @@ export interface ClipPrepInfo {
   groundDy: number;
   /** скорость опорной лапы относительно таза, роста/с (для ходьбы без скольжения) */
   footSpeed: number;
+  /** лёжа: сдвиг по горизонтали, чтобы тело лежало на месте кота (доли роста) */
+  lieShift: number;
 }
 
 export interface PrepOptions {
@@ -167,7 +169,7 @@ export function prepareClip(clip: THREE.AnimationClip, names: Set<string>, opts:
   const loop = opts.isLoop(clip.name);
   const info: ClipPrepInfo = {
     name: clip.name, retargeted: 0, dropped: 0, dur0: clip.duration, dur: clip.duration, trimStart: 0, trimEnd: 0, loop,
-    seam0: 0, seam: 0, smooth: 0, noise: 0, p95: 0, timeScale: 1, groundDy: 0, footSpeed: 0,
+    seam0: 0, seam: 0, smooth: 0, noise: 0, p95: 0, timeScale: 1, groundDy: 0, footSpeed: 0, lieShift: 0,
   };
   if (done.has(clip)) return info;
   done.add(clip);
@@ -285,17 +287,20 @@ export interface GroundProbe {
   /** система координат «кот» (рост 1, ноги в 0) — родитель модели */
   space: THREE.Object3D;
   hips: THREE.Bone;
+  head: THREE.Object3D | null;
   bones: { b: THREE.Object3D; r: number; foot: boolean }[];
 }
 
 export function groundProbe(model: THREE.Object3D, space: THREE.Object3D): GroundProbe | null {
   let hips: THREE.Bone | null = null;
+  let head: THREE.Object3D | null = null;
   const bones: GroundProbe['bones'] = [];
   model.updateMatrixWorld(true);
   const p = new THREE.Vector3();
   model.traverse((o) => {
     if (!(o as THREE.Bone).isBone) return;
     if (/Hips$/.test(o.name) && !hips) hips = o as THREE.Bone;
+    if (/Head$/.test(o.name) && !head) head = o;
     for (const [rx, r] of GROUND_BONES) {
       if (!rx.test(o.name)) continue;
       const foot = r < 0;
@@ -303,7 +308,7 @@ export function groundProbe(model: THREE.Object3D, space: THREE.Object3D): Groun
       break;
     }
   });
-  return hips && bones.length ? { model, space, hips, bones } : null;
+  return hips && bones.length ? { model, space, hips, head, bones } : null;
 }
 
 /**
@@ -311,7 +316,7 @@ export function groundProbe(model: THREE.Object3D, space: THREE.Object3D): Groun
  * чтобы опора стояла на карте. Плюс скорость опорной лапы (для подгонки темпа ходьбы).
  * Позу костей после замера возвращаем как было.
  */
-export function measureGround(pr: GroundProbe, clip: THREE.AnimationClip): { dy: number; footSpeed: number } {
+export function measureGround(pr: GroundProbe, clip: THREE.AnimationClip): { dy: number; footSpeed: number; lieShift: THREE.Vector3 | null } {
   const saved: [THREE.Object3D, THREE.Quaternion, THREE.Vector3][] = [];
   pr.model.traverse((o) => saved.push([o, o.quaternion.clone(), o.position.clone()]));
   const mx = new THREE.AnimationMixer(pr.model);
@@ -322,9 +327,23 @@ export function measureGround(pr: GroundProbe, clip: THREE.AnimationClip): { dy:
   const fs: number[] = [];
   let prev: { i: number; z: number; x: number } | null = null;
   const step = 1 / 15;
+  const heads: number[] = [];
+  const mid = new THREE.Vector3();
+  let nMid = 0;
   for (let t = 0; t <= clip.duration + 1e-4; t += step) {
     mx.setTime(Math.min(t, clip.duration - 1e-4));
     pr.hips.updateMatrixWorld(true);
+    if (pr.head) {
+      // лёжа: середина «голова—таз» по горизонтали (кот должен лежать на карте, а не свисать к зрителю)
+      const h = pr.space.worldToLocal(pr.head.getWorldPosition(p));
+      heads.push(h.y);
+      mid.x += h.x / 2;
+      mid.z += h.z / 2;
+      const hp = pr.space.worldToLocal(pr.hips.getWorldPosition(p));
+      mid.x += hp.x / 2;
+      mid.z += hp.z / 2;
+      nMid++;
+    }
     let fl = Infinity, fi = -1, fz = 0, fx = 0;
     for (let i = 0; i < pr.bones.length; i++) {
       const g = pr.bones[i];
@@ -344,17 +363,21 @@ export function measureGround(pr: GroundProbe, clip: THREE.AnimationClip): { dy:
   }
   pr.model.updateMatrixWorld(true);
   fs.sort((a, b) => a - b);
-  return { dy: Number.isFinite(low) ? -low : 0, footSpeed: fs.length ? fs[Math.floor(fs.length / 2)] : 0 };
+  heads.sort((a, b) => a - b);
+  const lying = heads.length > 0 && heads[Math.floor(heads.length / 2)] < 0.25;
+  const lieShift = lying && nMid ? new THREE.Vector3(-mid.x / nMid, 0, -mid.z / nMid) : null;
+  return { dy: Number.isFinite(low) ? -low : 0, footSpeed: fs.length ? fs[Math.floor(fs.length / 2)] : 0, lieShift };
 }
 
-/** сдвиг корня на dy (доли роста) в треке Hips.position (трек в системе родителя Hips) */
-export function applyGround(pr: GroundProbe, clip: THREE.AnimationClip, dy: number) {
+/** сдвиг корня (доли роста; число — только вверх) в треке Hips.position (трек в системе родителя Hips) */
+export function applyGround(pr: GroundProbe, clip: THREE.AnimationClip, shift: number | THREE.Vector3) {
+  const sv = typeof shift === 'number' ? new THREE.Vector3(0, shift, 0) : shift;
   const parent = pr.hips.parent;
   if (!parent) return;
   // вектор (0, dy, 0) пространства «кот» → в систему родителя Hips
   pr.model.updateMatrixWorld(true);
   const a = pr.space.localToWorld(new THREE.Vector3(0, 0, 0));
-  const b = pr.space.localToWorld(new THREE.Vector3(0, dy, 0));
+  const b = pr.space.localToWorld(sv.clone());
   const d = parent.worldToLocal(b).sub(parent.worldToLocal(a));
   const name = `${THREE.PropertyBinding.sanitizeNodeName(pr.hips.name)}.position`;
   let tr = clip.tracks.find((t) => t.name === name);
@@ -388,6 +411,11 @@ export function prepareClips(model: THREE.Object3D, space: THREE.Object3D, clips
       const low = -g.dy;
       i.groundDy = low < -0.008 ? Math.min(0.08, -low) : low > 0.02 ? -Math.min(0.08, low) : 0;
       if (i.groundDy) applyGround(pr, c, i.groundDy);
+      // только петли (сон): у одноразовых «лёг—встал» сдвиг поехал бы лапами по карте
+      if (i.loop && g.lieShift && g.lieShift.length() > 0.03) {
+        applyGround(pr, c, g.lieShift);
+        i.lieShift = +g.lieShift.length().toFixed(3);
+      }
       i.footSpeed = g.footSpeed;
     }
     info.set(c, i);

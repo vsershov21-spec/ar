@@ -35,7 +35,7 @@ await page.evaluate(() => window.__debugPanel.fastForward());
 await page.waitForFunction(() => window.__app.director.state.phase === 'play', { timeout: 30000 }).catch(() => {});
 await page.evaluate((id) => window.__cat.persona(id), persona);
 await page.waitForFunction(() => window.__app.character?.kind === 'glb' && window.__app.character.mixer, { timeout: 90000 });
-await wait(2500);
+await wait(Number(process.env.ANIM_SETTLE ?? 2500)); // пузырь появления и реплика успевают закончиться (для кадров — 8000)
 
 // время ведём сами: цикл приложения не трогает кота, шаги по 1/60 с (headless рендерит ~5 к/с)
 await page.evaluate(() => {

@@ -40,6 +40,8 @@ interface BoneSlot {
 export class AnimBlender {
   private slots: BoneSlot[] = [];
   private playing = '';
+  /** дорожка ClipState, под которую запущен клип (повторный play того же id — новая дорожка) */
+  private track: unknown = null;
   private action: THREE.AnimationAction | null = null;
   private pending = false;
   private from = '';
@@ -92,14 +94,21 @@ export class AnimBlender {
       if (s.hasPos) s.b.position.copy(s.rawP);
     }
     const id = cs.cur.id;
-    if (id !== this.playing) {
+    const retrig = id === this.playing && cs.cur !== this.track;
+    if (id !== this.playing || retrig) {
       const next = actions.get(id) ?? null;
       const from = this.playing;
       this.playing = id;
+      this.track = cs.cur;
       if (next) {
         const same = next === this.action;
-        // та же петля под другим id (псевдоним) — не перезапускаем
-        if (!(same && cs.cur.loop && next.isRunning())) {
+        const ts = next.timeScale || 1;
+        // та же петля (или псевдоним той же петли) — не перезапускаем
+        const keepLoop = same && cs.cur.loop && next.isRunning();
+        // та же реакция повторно в первой трети (частые тапы) — доигрывает, без перезапуска; таймер ClipState — по клипу
+        const keepShot = same && !cs.cur.loop && next.isRunning() && next.time < next.getClip().duration * 0.35;
+        if (keepShot) cs.cur.t = next.time / ts;
+        if (!keepLoop && !keepShot) {
           if (this.action && !same) this.action.stop();
           next.reset();
           next.setLoop(cs.cur.loop ? THREE.LoopRepeat : THREE.LoopOnce, Infinity);
