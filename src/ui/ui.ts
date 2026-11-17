@@ -15,6 +15,8 @@ export interface UiHandlers {
   onShakeButton(): void;
   onKids(): void;
   onMute(m: boolean): void;
+  /** «слушаю всегда» ↔ «по кнопке» */
+  onMicMode(m: 'auto' | 'ptt'): void;
 }
 
 /** вариант в листе выбора характера */
@@ -64,6 +66,8 @@ export class UI {
   private chips: HTMLDivElement;
   private mic: HTMLButtonElement;
   private micHint: HTMLDivElement;
+  private micMode!: HTMLButtonElement;
+  private micModeNow: 'auto' | 'ptt' = 'auto';
   private dock: HTMLDivElement;
   private hintsBtn: HTMLButtonElement;
   private kids: HTMLButtonElement;
@@ -125,7 +129,7 @@ export class UI {
       </div>
       <div class="dock no-mic">
         <button class="iconbtn side-l" data-a="mute" aria-label="Выключить звук">${ICON.sound}</button>
-        <div class="mic-slot"><button class="mic hidden" aria-label="Держи и говори">${ICON.mic}</button></div>
+        <div class="mic-slot"><button class="mic-mode" type="button" aria-label="Режим микрофона"></button><button class="mic hidden" aria-label="Держи и говори">${ICON.mic}</button></div>
         <button class="iconbtn side-r" data-a="hints" aria-label="Подсказки" aria-pressed="false">${ICON.hints}</button>
       </div>`;
     parent.appendChild(root);
@@ -136,6 +140,8 @@ export class UI {
     this.bubble = q('.bubble');
     this.chips = q('.chips');
     this.mic = q('.mic');
+    this.micMode = q('.mic-mode');
+    this.micMode.addEventListener('click', () => h.onMicMode(this.micModeNow === 'auto' ? 'ptt' : 'auto'));
     this.micHint = q('.mic-hint');
     this.dock = q('.dock');
     this.hintsBtn = q('[data-a="hints"]');
@@ -359,6 +365,16 @@ export class UI {
     const y = Math.max(top, Math.min(H - h2 - 120, cat.headY - h2 / 2));
     st.top = `${y}px`;
     st.setProperty('--tail-y', `${Math.max(20, Math.min(h2 - 20, cat.headY - y))}px`);
+  }
+
+  /** режим микрофона: в «слушаю всегда» кнопка — для перебивания и как «держи и говори» */
+  setMicMode(m: 'auto' | 'ptt') {
+    this.micModeNow = m;
+    this.micMode.textContent = m === 'auto' ? 'Слушаю всегда' : 'По кнопке';
+    this.micMode.classList.toggle('auto', m === 'auto');
+    this.micMode.setAttribute('aria-pressed', String(m === 'auto'));
+    this.mic.classList.toggle('auto', m === 'auto');
+    this.mic.setAttribute('aria-label', m === 'auto' ? 'Кот слушает. Можно нажать и говорить' : 'Держи и говори');
   }
 
   micLevel(v: number) {

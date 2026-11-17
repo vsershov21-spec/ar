@@ -66,7 +66,12 @@ export class CardTracker extends TrackerBase implements Tracker {
     video.muted = true;
     video.playsInline = true;
     video.className = 'camera-video';
+    // экран заполняет сам браузер (object-fit: cover); геометрию той же обрезки считаем в resize()
+    Object.assign(video.style, { position: 'absolute', inset: '0', width: '100%', height: '100%', objectFit: 'cover', zIndex: '0' });
     this.container.prepend(video);
+    // iOS: размер кадра становится известен (и меняется при повороте) после старта — пересчитать всё
+    video.addEventListener('resize', () => this.onVideoSize());
+    video.addEventListener('loadedmetadata', () => this.onVideoSize());
     this.video = video;
     if (!navigator.mediaDevices?.getUserMedia) throw new Error('no-getusermedia');
     const stream = await navigator.mediaDevices.getUserMedia({
@@ -103,6 +108,20 @@ export class CardTracker extends TrackerBase implements Tracker {
     this.overlay.hide(true);
   }
 
+  private lastVW = 0;
+  private lastVH = 0;
+  private onVideoSize() {
+    const v = this.video;
+    if (!v || !v.videoWidth || !v.videoHeight) return;
+    if (v.videoWidth === this.lastVW && v.videoHeight === this.lastVH) return;
+    this.lastVW = v.videoWidth;
+    this.lastVH = v.videoHeight;
+    this.setupFrame();
+    this.resize(this.w, this.h);
+    this.prevQuad = null;
+    this.worker?.postMessage({ rgba: new ArrayBuffer(4), w: 1, h: 1, focal: 1, reset: true });
+  }
+
   private setupFrame() {
     const v = this.video!;
     const vw = v.videoWidth || 1280, vh = v.videoHeight || 720;
@@ -119,10 +138,7 @@ export class CardTracker extends TrackerBase implements Tracker {
     if (!this.running) return;
     const v = this.video;
     if (!this.busy && v && v.readyState >= 2 && this.worker) {
-      if (v.videoWidth && Math.round((v.videoWidth * 320) / Math.max(v.videoWidth, v.videoHeight)) !== this.dw) {
-        this.setupFrame();
-        this.resize(this.w, this.h);
-      }
+      if (v.videoWidth !== this.lastVW || v.videoHeight !== this.lastVH) this.onVideoSize();
       this.ctx.drawImage(v, 0, 0, this.dw, this.dh);
       const img = this.ctx.getImageData(0, 0, this.dw, this.dh);
       this.busy = true;
@@ -207,15 +223,6 @@ export class CardTracker extends TrackerBase implements Tracker {
     this.camera.far = 1000;
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
-    if (v)
-      Object.assign(v.style, {
-        position: 'absolute',
-        top: `${-(this.vh - h) / 2}px`,
-        left: `${-(this.vw - w) / 2}px`,
-        width: `${this.vw}px`,
-        height: `${this.vh}px`,
-        objectFit: 'fill',
-      });
   }
 
   update(dt: number, t: number) {

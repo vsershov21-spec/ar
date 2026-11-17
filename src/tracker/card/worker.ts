@@ -25,7 +25,10 @@ export interface CardWorkerOut {
 
 self.onmessage = (e: MessageEvent<CardWorkerIn>) => {
   const m = e.data;
-  if (m.reset) det.reset();
+  if (m.reset) {
+    det.reset();
+    if (m.w <= 1) return; // только сброс (сменился размер кадра) — без ответа
+  }
   let out: CardWorkerOut;
   try {
     const r = det.process(new Uint8ClampedArray(m.rgba), m.w, m.h, { focal: m.focal });

@@ -39,7 +39,15 @@ export function readParams(search = location.search): AppParams {
   const debug = q.has('debug');
   const t = (q.get('tracker') as TrackerKind) || (debug ? 'debug' : 'card');
   const c = (q.get('char') as CharacterMode) || 'glb';
-  return { debug, tracker: t, character: ['sprite', 'rig', 'glb'].includes(c) ? c : 'sprite', asr: q.get('asr'), mic: q.get('mic') };
+  // микрофон: по умолчанию «слушаю всегда»; ?mic=ptt — по кнопке; выбор ребёнка/родителя запоминается
+  let savedMic: string | null = null;
+  try {
+    savedMic = localStorage.getItem('ar.micMode');
+  } catch {
+    /* приватный режим */
+  }
+  const mic = q.get('mic') || savedMic || 'auto';
+  return { debug, tracker: t, character: ['sprite', 'rig', 'glb'].includes(c) ? c : 'sprite', asr: q.get('asr'), mic };
 }
 
 /** GLB-режим грузится лениво: GLTFLoader (и Draco, если модель сжата) не попадают в основной бандл */
@@ -119,6 +127,12 @@ export class App {
       onWake: () => void this.wake(),
       onMicDown: () => this.engine.pttDown(),
       onMicUp: () => this.engine.pttUp(),
+      onMicMode: (m) => {
+        this.engine.setMode(m);
+        if (m === 'auto') this.engine.resumeAuto();
+        this.ui.setMicMode(m);
+        this.ui.toast(m === 'auto' ? 'Кот слушает всё время — просто говори' : 'Держи кнопку и говори', 2200);
+      },
       onChip: (t) => {
         this.input.activity();
         this.engine.handleText(t, 'chip');
@@ -133,6 +147,7 @@ export class App {
         if (m) this.voice.cancel();
       },
     }, { micSupported: this.engine.asr.supported, posterUrl: posterUrl() });
+    this.ui.setMicMode(this.engine.mode);
 
     // пузырь реплик держится над котом / сбоку от головы, не закрывая морду
     this.ui.catRect = () => {
@@ -391,6 +406,8 @@ export class App {
   async wake() {
     this.audio.unlock();
     this.voice.unlock();
+    // «слушаю всегда»: микрофон открываем в жесте (iOS), до него AudioContext спит
+    this.engine.resumeAuto();
     // офлайн-распознавание (~45 МБ + 2.4 МБ движок) — заранее, чтобы первое «нажми и скажи» не ждало;
     // не на «экономии трафика»
     if (!(navigator as any).connection?.saveData) setTimeout(() => void this.engine.asr.preload?.(), 3000);

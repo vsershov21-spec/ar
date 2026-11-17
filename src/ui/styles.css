@@ -318,3 +318,12 @@ body > .toast { position: fixed; }
   *, *::before, *::after { animation-duration: .001s !important; animation-iteration-count: 1 !important; transition-duration: .001s !important; }
   .hero .zzz span { opacity: 1; }
 }
+
+/* режим микрофона: пилюля над кнопкой (слушаю всегда ↔ по кнопке) */
+.mic-slot { position: relative; }
+.mic-mode { position: absolute; bottom: calc(100% + 10px); left: 50%; transform: translateX(-50%); white-space: nowrap;
+  font: 600 12px/1 var(--font, system-ui); padding: 7px 12px; border-radius: 999px; border: 0; color: #fff;
+  background: rgba(11, 94, 107, .72); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); box-shadow: 0 2px 10px rgba(0,0,0,.18); }
+.mic-mode.auto::before { content: ''; display: inline-block; width: 7px; height: 7px; margin-right: 7px; border-radius: 50%; background: var(--lime, #B5E36A); vertical-align: 1px; animation: scandot 1.4s ease-in-out infinite; }
+.dock.no-mic .mic-mode { display: none; }
+.mic.auto:not(.listening) { box-shadow: 0 0 0 4px rgba(181, 227, 106, .35); }

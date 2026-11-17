@@ -16,8 +16,9 @@
  * Режимы микрофона:
  *   'ptt'  (по умолчанию) — «держи и говори» (pttDown/pttUp); нажал, пока кот говорит, — перебил.
  *          Окна ответа director открывает сам (кот спросил → слушаем 5 с).
- *   'auto' («слушаю сам», ?mic=auto) — микрофон держится открытым: перебивание голосом и окно ответа
- *          после любой реплики кота, которая кончается на «?».
+ *   'auto' («слушаю всегда», по умолчанию с 17.11; ?mic=ptt — по кнопке) — микрофон открыт постоянно:
+ *          ребёнок заговорил (VAD) — распознаём фразу целиком (с началом из кольца 400 мс), замолчал — отдаём текст;
+ *          голосом можно перебить кота; после реплики-вопроса — окно ответа.
  * Кот не слушает себя: пока он говорит (и 250 мс после), распознавание/VAD/повтор не получают звук.
  * Перебивание: реплика затухает за 120 мс, новые реплики ждут (VoicePlayer.hold), очередь со своими
  * приоритетами остаётся как была; отпускаем, когда пришёл ответ или ребёнок замолчал.
@@ -47,7 +48,7 @@ export interface EngineState {
   asr: string;
   asrState: AsrState;
   listening: boolean;
-  listenReason: 'ptt' | 'window' | 'barge' | null;
+  listenReason: 'ptt' | 'window' | 'barge' | 'vad' | null;
   level: number;
   floorDb: number;
   modelProgress: number;
@@ -144,7 +145,21 @@ export class VoiceEngine extends Emitter<EngineEvents> {
       this.fire('echo_done', { count: this.echo.count });
     };
     voice.onSpeaking = (on) => this.onCatSpeaking(on);
-    this.asr.onResult = (t) => this.handleText(t, 'asr');
+    this.asr.onResult = (t) => {
+      // «слушаю всегда»: фраза, начатая самим ребёнком (не ответ на вопрос и не кнопка), — реагируем только на понятое.
+      // Шум, телевизор, разговор взрослых не должны превращаться в «не расслышал» каждые 10 секунд.
+      if (this.listenReason === 'vad' && !intentContext().question) {
+        const m = matchIntent(t, intentContext());
+        if (!t.trim() || m.intent === 'unknown' || m.confidence < 0.5) {
+          this.st.lastText = t;
+          this.st.lastIntent = 'ignored:' + m.intent;
+          this.pushState();
+          setTimeout(() => !this.listening && this.voice.release(), 50);
+          return;
+        }
+      }
+      this.handleText(t, 'asr');
+    };
     this.asr.onInterim = (t) => this.emit('interim', t);
     this.asr.onState = (s, m) => {
       this.st.asrState = s;
@@ -182,7 +197,7 @@ export class VoiceEngine extends Emitter<EngineEvents> {
     if (this.listenReason === 'ptt') this.asr.stop();
   }
 
-  private startListening(reason: 'ptt' | 'window' | 'barge') {
+  private startListening(reason: 'ptt' | 'window' | 'barge' | 'vad') {
     if (this.listening) {
       if (reason === 'ptt') this.listenReason = 'ptt';
       return;
@@ -191,7 +206,7 @@ export class VoiceEngine extends Emitter<EngineEvents> {
     this.listenReason = reason;
     this.asr.paused = this.selfMuted;
     this.audio.duck(true, 'mic');
-    this.asr.start(reason === 'barge' ? this.ring.slice() : undefined);
+    this.asr.start(reason === 'barge' || reason === 'vad' ? this.ring.slice() : undefined);
     this.pushState();
   }
 
@@ -240,8 +255,21 @@ export class VoiceEngine extends Emitter<EngineEvents> {
     }
   }
 
+  /** после жеста (iOS): режим «слушаю всегда» должен заново открыть микрофон — до жеста AudioContext спит */
+  resumeAuto() {
+    if (this.mode !== 'auto') return;
+    if (this.autoMicHeld) this.mic.release();
+    this.autoMicHeld = true;
+    void this.mic.acquire();
+  }
+
   setMode(m: MicMode) {
     this.mode = m;
+    try {
+      localStorage.setItem('ar.micMode', m);
+    } catch {
+      /* приватный режим */
+    }
     if (m === 'auto' && !this.autoMicHeld) {
       this.autoMicHeld = true;
       void this.mic.acquire();
@@ -298,10 +326,12 @@ export class VoiceEngine extends Emitter<EngineEvents> {
       if (this.selfMuted) continue;
       this.mic.floor.push(f, this.vad.speaking);
       const ev = this.vad.push(f);
+      // «слушаю всегда»: заговорили — сразу распознаём (начало фразы — из кольца)
+      if (ev?.type === 'start' && this.mode === 'auto' && !this.listening && !this.echo.active) this.startListening('vad');
       if (ev?.type === 'end') {
         const w = this.sound.phraseEnded(ev.durMs, this.vad.stats);
         if (w && !this.echo.active) this.fire('whisper', { meanDb: +(this.vad.stats.sumDb / Math.max(1, this.vad.stats.n)).toFixed(1) });
-        if (this.listenReason === 'window' || this.listenReason === 'barge') this.asr.stop(); // ответ кончился — не ждём таймаута
+        if (this.listenReason === 'window' || this.listenReason === 'barge' || this.listenReason === 'vad') this.asr.stop(); // фраза кончилась — не ждём таймаута
       }
       const s = this.sound.push(f);
       // в повторе громкость — часть игры (кот повторит и крик), хлопки/шёпот не отвлекают; в окне ответа — без хлопков
