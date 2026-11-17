@@ -21,6 +21,7 @@ import { BodyCollider } from './bodyCollide';
 import { buildFurShells } from './furShell';
 import { FaceMixer, EMOTE_FACE, MORPH_TARGETS, facePreset, type FacePreset } from './face';
 import { EyeRig } from './eyeRig';
+import { FaceWrinkles } from './faceWrinkles';
 import { personaMeta } from './personaMeta';
 import type { AnchorName } from '../fx/core';
 
@@ -151,6 +152,8 @@ export class GlbCharacter implements Character {
   readonly life = new FaceLife();
   /** 3D-глаза и веки (модели после scripts/models/face_detail.py); null — старая модель с нарисованными глазами */
   eyes: EyeRig | null = null;
+  /** складки лица в шейдере тела (по весам эмоции) */
+  wrinkles: FaceWrinkles | null = null;
   /** эмоция поверх пресета реплики (setEmotion) */
   private emo: { p: FacePreset; w: number; t: number; dur: number } | null = null;
   /** итоговые веса лица за кадр (для глаз, debug и тестов) */
@@ -229,6 +232,7 @@ export class GlbCharacter implements Character {
     }
     this.setFaceObj('usual');
     this.eyes = EyeRig.find(model);
+    this.wrinkles = FaceWrinkles.attach(model);
     if (this.eyes) console.info('[glb] 3D-глаза');
     this.collider = new BodyCollider(this.object, (n) => this.bones.get(n) ?? model.getObjectByName('mixamorig' + n) ?? undefined);
     console.info('[glb] объёмы тела', this.collider.build(model));
@@ -462,6 +466,7 @@ export class GlbCharacter implements Character {
     W.cheek_up = Math.max(W.cheek_up ?? 0, 0.5 * (W.smile ?? 0), 0.3 * (W.smirk ?? 0));
     W.nose_wrinkle = Math.max(W.nose_wrinkle ?? 0, 0.35 * (W.brow_down ?? 0));
     for (const k in this.visemeW) W[k] = Math.max((W[k] ?? 0) * 0.5, this.visemeW[k]);
+    this.wrinkles?.update(W);
     for (const m of this.morphMeshes) {
       const d = m.morphTargetDictionary!;
       const inf = m.morphTargetInfluences!;

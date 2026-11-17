@@ -34,14 +34,16 @@ VERSION = 1
 # насколько открыть глаза относительно нарисованных (доля высоты разреза): Хулиган нарисован прищуренным
 OPEN = {'hooligan': 0.45, 'kind': 0.12, 'glitter': 0.12}
 # верхнее веко в покое (доля закрытия): Хулиган смотрит чуть свысока
-REST_UP = {'hooligan': 0.2, 'kind': 0.06, 'glitter': 0.08}
+REST_UP = {'hooligan': 0.2, 'kind': 0.14, 'glitter': 0.12}
 # радужка: оттенки (sRGB) — обод, середина, светлая часть у зрачка
 IRIS = {
     'hooligan': ((22, 74, 34), (58, 150, 62), (150, 214, 92)),
     'kind': ((24, 78, 40), (64, 156, 70), (156, 216, 104)),
     'glitter': ((18, 70, 40), (46, 150, 78), (140, 220, 120)),
 }
-BROW = {'hooligan': {'dark': 0.52, 'thick': 1.15}, 'kind': {'dark': 0.62, 'thick': 1.0}, 'glitter': {'dark': 0.66, 'thick': 0.8}}
+BROW = {'hooligan': {'dark': 0.45, 'thick': 0.95}, 'kind': {'dark': 0.5, 'thick': 0.8}, 'glitter': {'dark': 0.55, 'thick': 0.7}}
+# радужка: диаметр в долях высоты разреза (референс — радужка заметно меньше разреза, белок виден)
+IRIS_K = {'hooligan': 0.9, 'kind': 0.78, 'glitter': 0.8}
 
 
 def norm(v):
@@ -547,8 +549,8 @@ def build_eyes(g, persona, F, fr, base_lin, head_node, IBM):
         close_lo = 0.32 * gap + 0.07
         # радужка: физический радиус ~ 0.47 высоты разреза у центра, не меньше 0.4·A
         Hc = H[midm].mean()
-        Ri = max(0.5 * Hc * 0.98, 0.42 * A)
-        Ri = min(Ri, 0.62 * B)
+        Ri = max(0.5 * Hc * IRIS_K.get(persona, 0.85), 0.36 * A)
+        Ri = min(Ri, 0.58 * B)
         eyes[side] = dict(O=O, R=R, A=A, B=B, C=C, ag=ag, th_t=th_t, th_b=th_b, close_up=close_up, close_lo=close_lo,
                           Ri=Ri, p0=p0, P=P, top3=T3, bot3=B3, W=W, H=Hc)
     # общие для пары: текстура глаза
@@ -647,7 +649,7 @@ def build_eyes(g, persona, F, fr, base_lin, head_node, IBM):
 
 
 # ───────────────────────── брови ─────────────────────────
-def build_brows(g, persona, F, fr, base_lin, eyes, head_node, IBM):
+def build_brows(g, persona, F, fr, base_lin, eyes, head_node, IBM, marks=None):
     cfg = BROW.get(persona, BROW['kind'])
     V, Nn, C, Fs = [], [], [], []
     keys = {'brow_up': [], 'brow_down': [], 'brow_sad': []}
@@ -697,7 +699,7 @@ def build_brows(g, persona, F, fr, base_lin, eyes, head_node, IBM):
         V += list(pos['base'])
         dark = furc * cfg['dark']
         for idx, (v, t) in enumerate(C[-NU * NV:]):
-            k = (1 - abs(v)) ** 0.8
+            k = (1 - abs(v)) ** 0.45
             fur.append(dark[idx] * k + furc[idx] * (1 - k))
         colors += fur
         Fs += grid_faces(NU, NV, base)
@@ -709,8 +711,114 @@ def build_brows(g, persona, F, fr, base_lin, eyes, head_node, IBM):
     tg = {k: np.array(d) @ IR.T for k, d in keys.items()}
     mat = add_material(g, 'Brows_mat', rough=0.85)
     mi = add_mesh(g, 'Brows', Vl, Nl, Fs, mat, col=np.array(colors), targets=tg)
-    add_node(g, head_node, 'Brows', mesh=mi)
+    add_node(g, head_node, 'Brows', mesh=mi, extras={'marks': marks} if marks else None)
     print(f'  брови: {len(V)} вершин')
+
+
+def face_marks(F, eyes, fr):
+    """ориентиры лица в координатах меша (для складок в шейдере src/character/faceWrinkles.ts)"""
+    m = F['mouth']; nose = F['nose']
+    mw = abs(m['left'][0] - m['right'][0])
+    out = {'s': mw / 0.13}
+    for side, E in eyes.items():
+        top = E['top3']; bot = E['bot3']
+        outer = top[np.argmax(top[:, 0])] if side == 'L' else top[np.argmin(top[:, 0])]
+        inner = top[np.argmin(top[:, 0])] if side == 'L' else top[np.argmax(top[:, 0])]
+        ob = bot[np.argmax(bot[:, 0])] if side == 'L' else bot[np.argmin(bot[:, 0])]
+        out[f'eyeOuter{side}'] = ((outer + ob) / 2).round(5).tolist()
+        out[f'eyeInner{side}'] = inner.round(5).tolist()
+        out[f'eyeBottom{side}'] = bot[len(bot) // 2].round(5).tolist()
+        out[f'eyeTop{side}'] = float(top[:, 1].max())
+    p, _, _ = fr.hit(np.array([nose['top'], nose['c'], m['left'], m['right'], m['center']]))
+    out['noseTop'] = p[0].round(5).tolist(); out['nose'] = p[1].round(5).tolist()
+    out['mouthL'] = p[2].round(5).tolist(); out['mouthR'] = p[3].round(5).tolist(); out['mouth'] = p[4].round(5).tolist()
+    out['noseHalfW'] = float(abs(nose['left'][0] - nose['right'][0]) / 2)
+    return out
+
+
+# ───────────────────────── пушистые щёки (карточки меха по силуэту) ─────────────────────────
+def tuft_texture(S=128):
+    """пучок шерсти: пряди от основания (u=0) к кончику (u=1), альфа по прядям; цвет — белый (оттенок из вершин)"""
+    yy, xx = np.mgrid[0:S, 0:S].astype(np.float64)
+    u = (xx + 0.5) / S; v = (yy + 0.5) / S * 2 - 1
+    rng = np.random.default_rng(3)
+    a = np.zeros((S, S)); shade = np.ones((S, S))
+    for _ in range(26):
+        v0 = rng.uniform(-0.55, 0.55); spread = rng.uniform(-0.5, 0.5); ln = rng.uniform(0.55, 1.0)
+        curve = rng.uniform(-0.25, 0.25)
+        center = v0 * (1 - u * 0.3) + spread * u + curve * u * u
+        wdt = 0.09 * (1 - np.clip(u / ln, 0, 1)) ** 0.7 + 0.004
+        k = np.clip(1 - np.abs(v - center) / wdt, 0, 1) * (u < ln)
+        a = np.maximum(a, k)
+        shade = np.minimum(shade, 1 - 0.15 * k * rng.uniform(0, 1))
+    a *= smooth(0.0, 0.12, u)  # у основания мягче (уходит в мех)
+    root = 0.72 + 0.28 * smooth(0.0, 0.6, u)
+    col = np.stack([root * shade] * 3, -1) * 255
+    img = np.concatenate([col, (np.clip(a * 1.6, 0, 1) * 255)[..., None]], -1)
+    return Image.fromarray(np.clip(img, 0, 255).astype(np.uint8), 'RGBA')
+
+
+def build_tufts(g, persona, F, fr, base_lin, P, hw, head_node, IBM):
+    m = F['mouth']
+    s = abs(m['left'][0] - m['right'][0]) / 0.13
+    ey = np.mean([F['eyes'][k]['c'][1] for k in 'LR'])
+    my = m['center'][1]
+    rng = np.random.default_rng(11)
+    V, Nn, UV, C, Fs = [], [], [], [], []
+
+    def card(base, d, L, Wd, col):
+        side_v = norm(np.cross(d, np.array([0, 0, 1.0])))
+        tip = base + d * L
+        i0 = len(V)
+        for t in (0.0, 1.0):
+            for sv in (-1.0, 1.0):
+                q = base + (tip - base) * t + side_v * sv * Wd / 2 * (1 - 0.35 * t)
+                V.append(q); Nn.append(np.array([0, 0, 1.0])); UV.append((t, (sv + 1) / 2)); C.append(col)
+        Fs.extend([(i0, i0 + 1, i0 + 3), (i0, i0 + 3, i0 + 2)])
+
+    head = hw > 0.55
+    for sg in (1, -1):
+        levels = np.linspace(my - 0.035 * s, ey + 0.02 * s, 8)
+        for yl in levels:
+            band = head & (np.abs(P[:, 1] - yl) < 0.006) & (P[:, 2] > 0.0)
+            if not band.any():
+                continue
+            idx = np.where(band)[0]
+            i = idx[np.argmax(sg * P[idx, 0])]
+            p = P[i]
+            hit = fr.hit(np.array([[p[0] - sg * 0.006 * s, p[1]]]))
+            col = sample_tex(base_lin, hit[2])[0] if not np.isnan(hit[0][0, 0]) else np.array([0.4, 0.45, 0.6])
+            low = (yl - levels[0]) / (levels[-1] - levels[0])  # 0 — у подбородка
+            for layer in range(2):
+                ang = (-0.55 + 0.75 * low) + rng.uniform(-0.15, 0.15) + layer * 0.25
+                d = norm(np.array([sg * math.cos(ang), math.sin(ang), 0.15 + 0.1 * layer]))
+                base = p - np.array([sg, 0, 0]) * 0.007 * s + np.array([0, 0, -0.004 * layer])
+                card(base, d, (0.022 + 0.008 * rng.uniform()) * s * (1.1 - 0.3 * low), 0.02 * s, col * (0.97 + 0.06 * layer))
+    if persona == 'kind':  # макушка без шапки — пара вихров
+        top = head & (np.abs(P[:, 0]) < 0.05) & (P[:, 2] > -0.02)
+        idx = np.where(top)[0]
+        for xl in (-0.025, 0.0, 0.022):
+            sel = idx[np.abs(P[idx, 0] - xl) < 0.006]
+            if not len(sel):
+                continue
+            p = P[sel[np.argmax(P[sel, 1])]]
+            hit = fr.hit(np.array([[p[0], p[1] - 0.01]]))
+            col = sample_tex(base_lin, hit[2])[0]
+            d = norm(np.array([xl * 6, 1.0, 0.25]))
+            card(p - np.array([0, 0.006, 0]), d, 0.022 * s, 0.022 * s, col)
+    V = np.array(V); Nn = np.array(Nn)
+    Fs = orient(V, Fs, Nn)
+    ii = g.add_image(tuft_texture(), 'tuft')
+    g.j['images'][ii]['extras'] = {TAG: VERSION}
+    ti = g.add_texture(ii)
+    g.j['textures'][ti]['extras'] = {TAG: VERSION}
+    mat = add_material(g, 'Tuft_mat', tex=ti, rough=0.92, double=True)
+    g.j['materials'][mat]['alphaMode'] = 'MASK'
+    g.j['materials'][mat]['alphaCutoff'] = 0.5
+    IR = IBM[:3, :3]; It = IBM[:3, 3]
+    mi = add_mesh(g, 'FaceTufts', V @ IR.T + It, Nn @ IR.T, Fs, mat, uv=np.array(UV), col=np.array(C))
+    add_node(g, head_node, 'FaceTufts', mesh=mi)
+    print(f'  пушистые щёки: {len(V) // 4} карточек')
 
 
 # ───────────────────────── усы ─────────────────────────
@@ -925,12 +1033,17 @@ def paint_eyes(g, persona, F, eyes, P, N, UV, I, fr):
     base[yy, xx] = base[yy, xx] * (1 - k) + fill * k
     g.set_image(i_base, Image.fromarray(np.clip(base, 0, 255).astype(np.uint8)))
     g.jpeg_q[i_base] = 92
+    # карты шероховатости и нормалей могут быть другого размера (стадия тела держит rm в 1024)
     rm = np.asarray(g.image(i_rm).convert('RGB')).astype(np.float32)
-    rm[yy, xx, 1] = rm[yy, xx, 1] * (1 - k[:, 0]) + 205 * k[:, 0]
-    rm[yy, xx, 2] = rm[yy, xx, 2] * (1 - k[:, 0])
+    sy, sx = rm.shape[0] / S, rm.shape[1] / S
+    ry_, rx_ = (yy * sy).astype(int), (xx * sx).astype(int)
+    rm[ry_, rx_, 1] = rm[ry_, rx_, 1] * (1 - k[:, 0]) + 205 * k[:, 0]
+    rm[ry_, rx_, 2] = rm[ry_, rx_, 2] * (1 - k[:, 0])
     g.set_image(i_rm, Image.fromarray(rm.astype(np.uint8)))
     nm = np.asarray(g.image(i_n).convert('RGB')).astype(np.float32)
-    nm[yy, xx] = nm[yy, xx] * (1 - k) + np.array([128, 128, 255.0]) * k
+    sy, sx = nm.shape[0] / S, nm.shape[1] / S
+    ny_, nx_ = (yy * sy).astype(int), (xx * sx).astype(int)
+    nm[ny_, nx_] = nm[ny_, nx_] * (1 - k) + np.array([128, 128, 255.0]) * k
     g.set_image(i_n, Image.fromarray(nm.astype(np.uint8)))
     print(f'  закраска глаз: {len(yy)} текселей')
 
@@ -959,8 +1072,10 @@ def main():
     base_img = np.asarray(g.image(i_base).convert('RGB')).astype(np.float64) / 255
     base_lin = srgb2lin(base_img)
     eyes = build_eyes(g, persona, F, fr, base_lin, head_node, IBM)
-    build_brows(g, persona, F, fr, base_lin, eyes, head_node, IBM)
+    build_brows(g, persona, F, fr, base_lin, eyes, head_node, IBM, face_marks(F, eyes, fr))
     build_whiskers(g, persona, F, fr, head_node, IBM)
+    Jt = g.acc(A['JOINTS_0']); Wt = g.acc(A['WEIGHTS_0']).astype(np.float64)
+    build_tufts(g, persona, F, fr, base_lin, P, (Wt * (Jt == head_j)).sum(1), head_node, IBM)
     add_body_keys(g, fields(F, eyes), head_j)
     paint_eyes(g, persona, F, eyes, P, N, UV, I, fr)
     j.setdefault('asset', {}).setdefault('extras', {})[TAG] = VERSION
