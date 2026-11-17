@@ -92,8 +92,8 @@ vec3 furHash(vec3 p) {
     vec3 nn = normalize(vRestN);
     float d = length(v - nn * dot(v, nn));
     // волосок тоньше к кончику; у каждого своя длина
-    float rad = 0.5 * (1.0 - 0.55 * uShell) * (0.75 + 0.4 * r.z);
-    float alive = step(uShell, 0.35 + 0.75 * r.x);
+    float rad = 0.55 * (1.0 - 0.5 * uShell) * (0.8 + 0.35 * r.z);
+    float alive = step(uShell, 0.5 + 0.6 * r.x);
     float facing = abs(dot(normalize(vNormal), normalize(vViewPosition)));
     float edge = 1.0 - smoothstep(0.55, 0.98, facing) * 0.75;
     if (vFur < 0.0008 || d > rad * edge || alive < 0.5) discard;

@@ -462,13 +462,20 @@ def foot_pads(body, ov):
 
 
 # ───────────────────────── мех: данные для оболочек ─────────────────────────
-def fur_shell(g, body, at, persona, head_v):
+def fur_shell(g, body, at, persona, head_v, k):
     """треугольники меха ниже головы + _FURLEN (длина шерсти, ед. модели); оболочки строит рантайм"""
     # мех по текселям (как в cat_look: голубовато-серый, неяркий) → доля меха в треугольнике → в вершине
     c = at.base
     r, gg, b = c[..., 0], c[..., 1], c[..., 2]
     mx = c.max(-1); mn = c.min(-1); sat = (mx - mn) / np.maximum(mx, 1)
     ft = at.has & (b > r + 8) & (b > gg + 4) & (sat < 0.5) & (mx > 60)
+    # ноги и руки: всё, что не одежда (у Добряка ноги темнее и уходят из порога по цвету)
+    clothes = np.zeros_like(ft)
+    for v in k.values():
+        clothes |= v
+    limbs = at.vert_attr(body.wsum(lambda n: 'Leg' in n or 'Arm' in n)) > 0.5
+    ft |= limbs & at.has & ~clothes & (b > r) & (mx > 50)
+    ft &= ~clothes
     nt = len(body.I)
     t = at.tid[at.has]
     frac = np.bincount(t, weights=ft[at.has].astype(np.float64), minlength=nt) / np.maximum(np.bincount(t, minlength=nt), 1)
@@ -512,8 +519,8 @@ def fur_shell(g, body, at, persona, head_v):
         lo = m
     lo = smooth(lo, 3)
     L = lo[weld] * (1 - smoothstep(0.1, 0.5, hand))  # на кистях мех мешал бы подушечкам
-    base_len = {'hooligan': 0.011, 'kind': 0.013, 'glitter': 0.012}[persona]
-    tail_k = {'hooligan': 1.9, 'kind': 2.0, 'glitter': 1.5}[persona]
+    base_len = {'hooligan': 0.010, 'kind': 0.011, 'glitter': 0.009}[persona]
+    tail_k = {'hooligan': 1.9, 'kind': 2.0, 'glitter': 1.25}[persona]
     length = base_len * L * (1 + (tail_k - 1) * np.clip(tail, 0, 1)) * (1 - 0.35 * np.clip(foot, 0, 1))
     tri = np.where((length[body.I] > 0.0012).all(1))[0]
     if not len(tri):
@@ -527,9 +534,9 @@ def fur_shell(g, body, at, persona, head_v):
     g.j['materials'].append({'name': PFX + 'FurShell_mat', 'alphaMode': 'MASK', 'alphaCutoff': 0.5,
                              'pbrMetallicRoughness': {'baseColorFactor': [1, 1, 1, 0], 'metallicFactor': 0}})
     g.j['meshes'].append({'name': PFX + 'FurShell', 'primitives': [{'attributes': attrs, 'indices': ind, 'material': len(g.j['materials']) - 1}]})
-    fx = {'hooligan': {'layers': 4, 'density': 150, 'tip': [1.06, 1.06, 1.08]},
-          'kind': {'layers': 4, 'density': 140, 'tip': [1.08, 1.08, 1.1]},
-          'glitter': {'layers': 4, 'density': 150, 'tip': [1.08, 1.06, 1.1]}}[persona]
+    fx = {'hooligan': {'layers': 4, 'density': 210, 'tip': [1.04, 1.04, 1.06]},
+          'kind': {'layers': 4, 'density': 200, 'tip': [1.05, 1.05, 1.07]},
+          'glitter': {'layers': 3, 'density': 220, 'tip': [1.0, 1.0, 1.02]}}[persona]
     add_node(g, body, PFX + 'FurShell', len(g.j['meshes']) - 1, {'fur': fx})
     print(f'  {PFX}FurShell: {len(tri)} треуг., длина {length.max():.4f}')
 
@@ -553,6 +560,41 @@ def raster(body, persona):
     pos, nrm, tid = raster_uv(body.P, body.N, body.UV, body.I, S)
     np.savez_compressed(cache, pos=pos, nrm=nrm, tid=tid)
     return pos, nrm, tid
+
+
+HIPOLY = os.environ.get('HIPOLY', '/home/claude/models/hipoly')
+BLENDER_PY = os.environ.get('BLENDER_PY', '/home/claude/bl/bin/python')
+
+
+def hipoly_bake(persona, low_path):
+    """запечённые с high-poly нормаль/AO/маска (2048) или None, если исходника нет"""
+    hp = os.path.join(HIPOLY, f'{persona}.glb')
+    if not os.path.exists(hp):
+        return None
+    pre = f'/tmp/bd/{persona}_hp'
+    outs = [f'{pre}_{k}.png' for k in ('normal', 'ao', 'mask')]
+    if not all(os.path.exists(o) and os.path.getmtime(o) > max(os.path.getmtime(hp), os.path.getmtime(low_path)) for o in outs):
+        subprocess.check_call([BLENDER_PY, os.path.join(HERE, 'blender', 'bake_hipoly.py'), '--', low_path, hp, pre, str(S)])
+    ld = lambda f, m: np.asarray(Image.open(f).convert(m).resize((S, S), Image.LANCZOS)).astype(np.float32)
+    print('  high-poly: запечённые нормаль и AO')
+    return ld(outs[0], 'RGB'), ld(outs[1], 'L') / 255, ld(outs[2], 'L') / 255
+
+
+def with_hipoly(persona, L_nrm, L_base, hp):
+    """основа нормали тела — запечённая с high-poly; процедурный мех/ткань cat_look ложится сверху (whiteout)"""
+    hn, ao, mk = hp
+    src = Glb(f'/home/claude/models/{persona}_rig_v1.glb')
+    m = src.j['materials'][src.main_mesh()[1]['material']]
+    T = np.asarray(src.image(src.j['textures'][m['normalTexture']['index']]['source']).convert('RGB').resize((S, S), Image.LANCZOS)).astype(np.float32)
+    t = T / 127.5 - 1; l = L_nrm.astype(np.float32) / 127.5 - 1; h = hn / 127.5 - 1
+    det = l[..., :2] - t[..., :2]  # процедурная добавка cat_look поверх Tripo
+    w = (mk > 0.5)[..., None]
+    b = np.where(w, h, t)
+    nx = b[..., 0] + det[..., 0]; ny = b[..., 1] + det[..., 1]; nz = b[..., 2]
+    nl = np.sqrt(nx * nx + ny * ny + nz * nz) + 1e-9
+    out = np.clip((np.stack([nx / nl, ny / nl, nz / nl], -1) + 1) * 127.5, 0, 255)
+    base = L_base.astype(np.float32) * np.where(w[..., 0], 0.45 + 0.55 * ao, 1.0)[..., None]
+    return out, base
 
 
 class Atlas:
@@ -686,7 +728,7 @@ def cls(at, persona):
         k['sock'] = peach & (y < 0.2)
     else:
         k['trim'] = h & (g > r + 25) & (b > r + 15) & (g > 150) & (y < 0.6) & (y > 0.33)
-        k['skirt'] = h & (g > r + 5) & (b > r) & (y < 0.34) & (y > 0.12) & (sat < 0.45)
+        k['skirt'] = h & (g > r + 5) & (b > r) & (g > b - 15) & (y < 0.34) & (y > 0.12) & (sat < 0.45)
         k['gold'] = h & (r > 165) & (g > 0.72 * r) & (b < 0.86 * r) & (sat > 0.15) & (y < 0.6)
         k['hoodie'] = h & (b > r) & (r > 130) & (b > 180) & (g < r) & (y > 0.3) & (y < 0.6)
     return k
@@ -1089,6 +1131,9 @@ def main():
     L_rm = np.asarray(lb.image(ltsrc(lmat['pbrMetallicRoughness']['metallicRoughnessTexture'])).convert('RGB').resize((S, S), Image.LANCZOS))
     cur = {i: np.asarray(g.image(i).convert('RGB').resize((S, S), Image.BICUBIC)).astype(np.float32) for i in (i_base, i_nrm, i_rm)}
 
+    hp = hipoly_bake(persona, src)
+    if hp is not None:
+        L_nrm, L_base = with_hipoly(persona, L_nrm, L_base, hp)
     at = Atlas(body, pos, nrm, tid, L_base, L_nrm, L_rm)
     head_t = at.vert_attr(head_v)
     mine = has & (head_t < 0.5)
@@ -1151,7 +1196,7 @@ def main():
         foot_pads(body, pads)
     pads.emit(g, body, {'pbrMetallicRoughness': {'baseColorFactor': [1, 1, 1, 1], 'metallicFactor': 0, 'roughnessFactor': 0.5}})
 
-    fur_shell(g, body, at, persona, head_v)
+    fur_shell(g, body, at, persona, head_v, k)
     metal.emit(g, body, {'pbrMetallicRoughness': {'baseColorFactor': [1, 1, 1, 1], 'metallicFactor': 0.85, 'roughnessFactor': 0.32}})
     soft.emit(g, body, {'pbrMetallicRoughness': {'baseColorFactor': [1, 1, 1, 1], 'metallicFactor': 0, 'roughnessFactor': 0.85}})
     if at.emis is not None:
@@ -1164,7 +1209,7 @@ def main():
         jpeg_extra = {}
 
     g.j.setdefault('asset', {}).setdefault('extras', {})['body_detail'] = 1
-    jpeg = {i_base: (S, 88), i_nrm: (S, 90), i_rm: (1024, 88), **jpeg_extra}
+    jpeg = {i_base: (S, 92), i_nrm: (S, 92), i_rm: (1024, 90), **jpeg_extra}
     total = save(g, dst, jpeg)
     print(f'  → {dst} {total / 1e6:.2f} MB')
 

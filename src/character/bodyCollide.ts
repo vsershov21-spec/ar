@@ -50,7 +50,8 @@ export class BodyCollider {
     for (const [g, list] of Object.entries(GROUPS)) for (const b of list) owner[b] = g;
     model.traverse((o) => {
       const sm = o as THREE.SkinnedMesh;
-      if (!sm.isSkinnedMesh) return;
+      // накладки и оболочки меха стадии body_detail (BD_*) объём тела не меняют — их не считаем
+      if (!sm.isSkinnedMesh || /^BD_/.test(sm.name)) return;
       const pos = sm.geometry.attributes.position;
       const si = sm.geometry.attributes.skinIndex;
       const sw = sm.geometry.attributes.skinWeight;
