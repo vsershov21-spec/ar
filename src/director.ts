@@ -304,6 +304,11 @@ export class Director extends Emitter<DirectorEvents> {
   }
   private sleepTimer = 0;
 
+  /** петля «Zzz» над спящим котом — только пока спит */
+  private stopSleepFx() {
+    (this.d.fx as FxLayer & { stop?: (id: string) => void }).stop?.('zzz');
+  }
+
   /**
    * Действие ребёнка: лестница тишины — с начала; кот дремал — просыпается молча (команда кнопкой/голосом
    * выполняется сразу; касание будит отдельной реакцией — см. interaction).
@@ -314,6 +319,7 @@ export class Director extends Emitter<DirectorEvents> {
     this.ladder.reset(now);
     if (this.dozing) {
       this.dozing = false;
+      this.stopSleepFx();
       if (this.character && !this.d.stage.walking) this.character.play('idle');
       this.log('проснулся (действие ребёнка)');
     }
@@ -581,8 +587,16 @@ export class Director extends Emitter<DirectorEvents> {
   /** реакция на ввод: эффект/звук/клип сразу, реплика — через очередь */
   private react(event: string, quiet = false) {
     if (this.paused && this.picker.event(event).priority < 3) return;
-    if (event === 'sleep') this.dozing = true;
-    if (event === 'wake_up') this.dozing = false;
+    // «Zzz» над спящим котом — петля (fx.json: loop): сама не кончается. Без остановки буквы летали над проснувшимся
+    // котом до конца сессии, а живой эффект держал энергобюджет в «boost» (60 к/с) — QA-стенд, docs/qa/BUGS.md
+    if (event === 'sleep') {
+      this.stopSleepFx();
+      this.dozing = true;
+    }
+    if (event === 'wake_up') {
+      this.dozing = false;
+      this.stopSleepFx();
+    }
     this.emotion(event);
     if (quiet) {
       // знакомство / мини-игра: касание видно (клип, эффект, эмоция), но слова не перебивают шаг

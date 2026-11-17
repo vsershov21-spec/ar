@@ -21,6 +21,14 @@ export type EnergyMode = 'boost' | 'normal' | 'calm' | 'doze';
 export const RENDER_FPS: Record<EnergyMode, number> = { boost: 60, normal: 30, calm: 20, doze: 12 };
 export const TRACKER_HZ: Record<EnergyMode, number> = { boost: 15, normal: 15, calm: 10, doze: 5 };
 
+/**
+ * Фоновые петли эффектов: идут, пока длится состояние (кот слушает, повторяет, спит), и не считаются «быстрым действием».
+ * Иначе спящий кот с «Zzz» держал бы 60 к/с всю дрёму и энергобюджет никогда не уходил бы в «doze».
+ */
+export const AMBIENT_FX: ReadonlySet<string> = new Set(['listen_ears', 'echo_wave', 'zzz']);
+/** живой эффект требует частоты «boost» (взрыв блёсток, жвачка, наклейки), а не фоновая петля */
+export const fxNeedsBoost = (id: string): boolean => !AMBIENT_FX.has(id);
+
 export interface EnergyInput {
   /** мс */
   now: number;

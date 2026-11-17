@@ -2,7 +2,7 @@
 """Синтетическое видео камеры с картой для стенда энергобюджета (scripts/bench/energy.mjs).
 
 Usage: python3 scripts/bench/gen_card_video.py [out_dir=/tmp/ebench]
-Пишет still.y4m (телефон на столе: кадр стоит, шум сенсора) и move.y4m (медленное движение) 1280×720, 30 к/с.
+Пишет table.png (стол без карты, кадр 1280×720), still.y4m (телефон на столе: кадр стоит, шум сенсора) и move.y4m (медленное движение) 1280×720, 30 к/с.
 Карта — public/targets/card.png в честной перспективе (угол обзора как у детектора), чтобы трекер её посадил.
 """
 import math, os, re, subprocess, sys
@@ -32,6 +32,8 @@ bg = np.zeros((H, W, 3), np.float32)
 bg[..., 0] = 120 + 25 * np.sin(xx * 40 + yy * 3); bg[..., 1] = 95 + 18 * np.sin(xx * 40 + yy * 3); bg[..., 2] = 65
 bg += rng.normal(0, 5, (H, W, 1))
 img = Image.fromarray(np.clip(bg, 0, 255).astype(np.uint8))
+# стол без карты (стенд QA: «карта пропала» — камера видит тот же стол)
+img.crop((ox, oy, ox + FW, oy + FH)).save(os.path.join(out, 'table.png'))
 card = Image.open(os.path.join(root, 'public/targets/card.png')).convert('RGB').resize((856, 540))
 mask = Image.new('L', card.size, 0); ImageDraw.Draw(mask).rounded_rectangle([0, 0, 855, 539], radius=30, fill=255)
 src4 = [(0, 0), (856, 0), (856, 540), (0, 540)]

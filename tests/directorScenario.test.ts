@@ -103,6 +103,39 @@ describe('лестница тишины: ребёнок молчит 3 мину�
     expect(ev(h, t)).toEqual(['wake_up', 'silence']);
   });
 
+  // QA-стенд (docs/qa/BUGS.md): «Zzz» — петля, без остановки буквы летали над проснувшимся котом до конца сессии
+  it('дрёма: «Zzz» над котом только пока спит — касание или кнопка останавливают петлю', async () => {
+    h = await makeDirector({ memory: { met: true, name: 'Маша', persona: 'hooligan', visits: 3 } });
+    await h.boot();
+    await h.tick(130_000);
+    expect(h.d.dozing).toBe(true);
+    const zzz = () => h!.fxLog.filter((f) => f.id === 'zzz').map((f) => f.op);
+    expect(zzz().at(-1)).toBe('play');
+    h.d.interaction('tap_cat');
+    await h.tick(1000);
+    expect(zzz().at(-1)).toBe('stop');
+    // снова заснул — и разбужен кнопкой
+    await h.tick(130_000);
+    expect(h.d.dozing).toBe(true);
+    expect(zzz().at(-1)).toBe('play');
+    h.d.action('dance');
+    await h.tick(1000);
+    expect(h.d.dozing).toBe(false);
+    expect(zzz().at(-1)).toBe('stop');
+  });
+
+  it('«Усыпи»: проснулся сам — «Zzz» остановлен', async () => {
+    h = await makeDirector({ memory: { met: true, name: 'Маша', persona: 'hooligan', visits: 3 } });
+    await h.boot();
+    await h.tick(3000);
+    h.d.action('sleep');
+    await h.tick(1000);
+    expect(h.fxLog.filter((f) => f.id === 'zzz').at(-1)?.op).toBe('play');
+    await h.tick(8000);
+    expect(h.d.dozing).toBe(false);
+    expect(h.fxLog.filter((f) => f.id === 'zzz').at(-1)?.op).toBe('stop');
+  });
+
   it('«Хочешь загадку?» → «да» → загадка; ответ → похвала → «ещё?» → тишина → кот закрывает игру', async () => {
     h = await makeDirector({ memory: { met: true, name: 'Маша', persona: 'kind', visits: 3 } });
     await h.boot();

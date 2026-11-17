@@ -170,7 +170,13 @@ export async function makeDirector(o: HarnessOpts = {}) {
     },
   });
   const stage = anything({ walking: false, atGlass: false, cfg: { lostHoldMs: 2500, worldWalkRadius: 1 }, headScreen: () => ({ x: 200, y: 300 }) });
-  const fx = anything({ stickers: [] as unknown[], palette: {}, fogActive: false, cover: () => new Promise<void>((r) => setTimeout(r, 3400)) });
+  /** эффекты: что запущено и что остановлено (петли вроде «Zzz» сами не кончаются) */
+  const fxLog: { t: number; op: 'play' | 'stop'; id: string }[] = [];
+  const fx = anything({
+    stickers: [] as unknown[], palette: {}, fogActive: false, cover: () => new Promise<void>((r) => setTimeout(r, 3400)),
+    play: (id: string) => void fxLog.push({ t: T(), op: 'play', id }),
+    stop: (id: string) => void fxLog.push({ t: T(), op: 'stop', id }),
+  });
   const audio = anything({ has: () => true });
 
   const { Director } = await import('../../src/director');
@@ -198,7 +204,7 @@ export async function makeDirector(o: HarnessOpts = {}) {
   };
   const listening = () => !!d.state.dialog?.listening && !d.queue.busy;
   return {
-    d, voice, spoken, bubble, listens, clips, log, T, tick, until, voiced, isVoiced,
+    d, voice, spoken, bubble, listens, clips, log, fxLog, T, tick, until, voiced, isVoiced,
     /** кот договорил и ждёт ответ (микрофон открыт) */
     listening,
     async boot() {

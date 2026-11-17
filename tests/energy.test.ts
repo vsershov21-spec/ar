@@ -119,3 +119,15 @@ describe('адаптивное качество под потолком энер
     expect(q.level).toBeGreaterThan(0);
   });
 });
+
+// QA-стенд (docs/qa/BUGS.md): петля «Zzz» над спящим котом считалась «живым эффектом» → boost 60 к/с всю дрёму
+describe('фоновые петли эффектов не держат boost', () => {
+  it('zzz, ушки, волна повтора — фон; взрыв блёсток и жвачка — действие', async () => {
+    const { fxNeedsBoost } = await import('../src/core/energy');
+    expect(fxNeedsBoost('zzz')).toBe(false);
+    expect(fxNeedsBoost('listen_ears')).toBe(false);
+    expect(fxNeedsBoost('echo_wave')).toBe(false);
+    expect(fxNeedsBoost('glitter_burst')).toBe(true);
+    expect(fxNeedsBoost('gum_bubble')).toBe(true);
+  });
+});

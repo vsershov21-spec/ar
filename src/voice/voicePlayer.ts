@@ -257,8 +257,23 @@ export class VoicePlayer {
   }
 
   /** основная озвучка (ElevenLabs) на сайте есть — иначе «неозвученность» не проверяем (локально, без озвучки — синтез) */
+  /**
+   * Есть ли на сайте живая озвучка. Раньше — Object.keys(this.el) (1600+ ключей) на каждый вызов, а зовут его на каждую
+   * реплику-кандидата (строгий режим, hasVoiced для чипов кота 3 раза в секунду): в профиле QA-стенда — 5 с главного потока
+   * за 14 мин (CPU ×4). Теперь — один раз на манифест.
+   */
+  private elChecked: object | null = null;
+  private elAny = false;
   get hasRecordings(): boolean {
-    return Object.keys(this.el).length > 0;
+    if (this.elChecked !== this.el) {
+      this.elChecked = this.el;
+      this.elAny = false;
+      for (const _ in this.el) {
+        this.elAny = true;
+        break;
+      }
+    }
+    return this.elAny;
   }
 
   /**
@@ -648,7 +663,10 @@ export class VoicePlayer {
     this.cancel();
     const gen = this.gen;
     if (this.held) await new Promise<void>((r) => this.holdWaiters.push(r));
-    if (gen !== this.gen || this.muted) return;
+    if (gen !== this.gen) return;
+    // звук выключен: реплика «звучит» молча столько же, сколько запись, — пузырь успевают прочитать.
+    // Раньше speak возвращался сразу и пузырь гас через 250 мс (QA-стенд, docs/qa/BUGS.md)
+    if (this.muted) return this.silentLine(req, gen);
     const prep = await this.prepare(req).catch(() => null);
     if (gen !== this.gen) return;
     const ctx = this.audio.ctx;
@@ -664,6 +682,25 @@ export class VoicePlayer {
     }
     this.last = { id: req.lineId, source: 'synth', text: req.text };
     return this.synth(req, gen);
+  }
+
+  /** длина реплики, с: по записи (манифест), иначе — как живая речь (0,45 с + 1 с на 14 символов), не меньше 1,2 с */
+  lineSeconds(req: SpeakRequest): number {
+    const el = this.elFor(req);
+    let d = 0;
+    if (el?.kind === 'line') d = el.e.d ?? 0;
+    else if (el?.kind === 'parts') d = (el.a?.d ?? 0) + (el.v?.d ?? 0) + (el.b?.d ?? 0);
+    return Math.max(1.2, d || 0.45 + req.text.length / 14);
+  }
+
+  /** реплика без звука (кнопка «Без звука»): ждём её длину; cancel/новая реплика обрывают ожидание */
+  private silentLine(req: SpeakRequest, gen: number): Promise<void> {
+    this.last = { id: req.lineId, source: 'muted', text: req.text };
+    const end = Date.now() + this.lineSeconds(req) * 1000;
+    return new Promise<void>((resolve) => {
+      const tick = () => (gen !== this.gen || Date.now() >= end ? resolve() : setTimeout(tick, 100));
+      tick();
+    });
   }
 
   /** Сыграть готовый буфер (повтор «эхо»): рот — по амплитуде, cues считаются здесь же */

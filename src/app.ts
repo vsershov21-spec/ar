@@ -30,7 +30,7 @@ import { prefetchModel, warmModel } from './core/modelUrl';
 import { loadMemory } from './scenario/memory';
 import { PERSONA_IDS } from './persona/types';
 import { setGlRenderer } from './core/glRenderer';
-import { EnergyBudget, defaultPixelRatio, isMobileDevice } from './core/energy';
+import { EnergyBudget, defaultPixelRatio, fxNeedsBoost, isMobileDevice } from './core/energy';
 
 export type CharacterMode = 'sprite' | 'rig' | 'glb';
 export type TrackerKind = 'card' | 'mindar' | 'debug' | '8thwall' | 'webxr';
@@ -566,7 +566,7 @@ export class App {
     }
     // реакция (не idle-вариант и не сон) — первые 4 с клипа; длинные петли (танец, сон) дальше идут на обычной частоте
     const reacting = !/^idle|sleep/.test(clip) && now - this.clipSince < 4000;
-    const fxLive = this.fx.parts.list.length > 0 || this.fx.hasLive((id) => id !== 'listen_ears' && id !== 'echo_wave');
+    const fxLive = this.fx.parts.list.length > 0 || this.fx.hasLive(fxNeedsBoost);
     const action = reacting || this.stage.walking || fxLive || this.fx.isPeeling || !!this.input?.touch.isStroking;
     const out = this.energy.update({
       now,
@@ -792,7 +792,7 @@ export class App {
     this.quality.tick(raw, this.energy.out.renderFps);
     this.elapsed += dt;
     this.frames++;
-    this.fpsT += dt;
+    this.fpsT += raw; // реальное время: dt обрезан energy.maxDt — при тормозах app.fps (debug, perf) завышал частоту
     if (this.fpsT >= 0.5) {
       this.fps = this.frames / this.fpsT;
       this.frames = 0;

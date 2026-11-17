@@ -18,7 +18,8 @@
     "bench": "node scripts/bench/run_bench.mjs",
     "voice:piper": "node scripts/voice/piper.mjs",
     "video-manifest": "node scripts/video-manifest.mjs",
-    "voice:eleven": "node scripts/voice/eleven.mjs"
+    "voice:eleven": "node scripts/voice/eleven.mjs",
+    "qa": "node scripts/qa/run.mjs"
   },
   "keywords": [],
   "author": "",
