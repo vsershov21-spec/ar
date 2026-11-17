@@ -17,7 +17,7 @@
   • Старая накладка EyeLids (веки поверх нарисованных глаз) убирается; нарисованные глаза закрашиваются мехом/тенью
     глазницы (цвет — из кольца вокруг, поэтому повторная закраска даёт тот же результат).
 
-Usage: python3 scripts/models/face_detail.py <persona> in.glb out.glb [--preview prefix]
+Usage: python3 scripts/models/face_detail.py <persona> in.glb out.glb [--bake /tmp/bake/<n>]  (bake — scripts/models/blender/bake_head.py)
 Ориентиры лица — scripts/models/face_landmarks/<persona>.json (координаты Blender: x, глубина y (−y — вперёд), z вверх).
 """
 import io, json, math, os, sys
@@ -1048,8 +1048,72 @@ def paint_eyes(g, persona, F, eyes, P, N, UV, I, fr):
     print(f'  закраска глаз: {len(yy)} текселей')
 
 
+def merge_bake(g, persona, prefix, P, N, UV, I, hw_v):
+    """запечённые с high-poly нормали и AO головы (scripts/models/blender/bake_head.py) → тексели головы:
+    нормали = запечённые ⊕ процедурный мех (добавочный слой, как в cat_look); AO — мягко в цвет (один раз, метка в asset.extras)"""
+    from cat_look import fur_height, grad3, tri_tangents
+    mi, pr = g.main_mesh()
+    mat = g.j['materials'][pr['material']]
+    tsrc = lambda t: g.j['textures'][t['index']]['source']
+    i_base = tsrc(mat['pbrMetallicRoughness']['baseColorTexture']); i_n = tsrc(mat['normalTexture'])
+    nm_img = g.image(i_n).convert('RGB')
+    S = nm_img.size[0]
+    nb = np.asarray(Image.open(prefix + '_normal.png').convert('RGB').resize((S, S), Image.BICUBIC)).astype(np.float64) / 127.5 - 1
+    key = f'/tmp/face_detail_{persona}_{S}_{len(P)}_{float(np.abs(P).sum()):.4f}.npz'
+    if os.path.exists(key):
+        d = np.load(key); pos, tid = d['pos'], d['tid']
+    else:
+        pos, nrm_, tid = raster_uv(P, N, UV, I, S)
+        np.savez_compressed(key, pos=pos, tid=tid)
+    has = tid >= 0
+    head = np.zeros(tid.shape, bool)
+    head[has] = hw_v[I[tid[has]]].mean(1) >= 0.5
+    base = np.asarray(g.image(i_base).convert('RGB').resize((S, S))).astype(np.float32)
+    r, gch, b = base[..., 0], base[..., 1], base[..., 2]
+    mx = base.max(-1); mn = base.min(-1)
+    fur = head & (b > r + 12) & (b > gch + 8) & (mx > 70) & ((mx - mn) / np.maximum(mx, 1) < 0.45)
+    # процедурный мех (как cat_look.apply): градиент высоты прядей в касательном пространстве
+    Tt, Bt = tri_tangents(P, UV, I)
+    idx = np.where(fur)
+    p = pos[idx].astype(np.float64)
+    h, gr = grad3(fur_height, p, 0.0006)
+    t = tid[idx]
+    nn = N[I[t]].mean(1); nn /= np.linalg.norm(nn, axis=1, keepdims=True) + 1e-12
+    gr = gr - nn * (gr * nn).sum(1, keepdims=True)
+    T = Tt[t] - nn * (Tt[t] * nn).sum(1, keepdims=True); T /= np.linalg.norm(T, axis=1, keepdims=True) + 1e-12
+    B = Bt[t] - nn * (Bt[t] * nn).sum(1, keepdims=True); B /= np.linalg.norm(B, axis=1, keepdims=True) + 1e-12
+    fy = np.clip(1 - np.abs(p[:, 1] - 0.70) / 0.09, 0, 1); fx = np.clip(1 - np.abs(p[:, 0]) / 0.17, 0, 1); fz = np.clip((p[:, 2] - 0.08) / 0.06, 0, 1)
+    amp = 0.0015 * (1 - 0.55 * np.minimum(1, fy * 2.2) * np.minimum(1, fx * 2.2) * fz)
+    det = np.zeros(nb.shape[:2] + (2,))
+    det[idx[0], idx[1], 0] = np.clip(-(gr * T).sum(1) * amp, -0.9, 0.9)
+    det[idx[0], idx[1], 1] = np.clip(-(gr * B).sum(1) * amp, -0.9, 0.9)
+    nx = nb[..., 0] + det[..., 0]; ny = nb[..., 1] + det[..., 1]
+    nz = nb[..., 2] * np.sqrt(np.clip(1 - det[..., 0] ** 2 - det[..., 1] ** 2, 0.05, 1))
+    nl = np.sqrt(nx * nx + ny * ny + nz * nz) + 1e-9
+    nout = np.clip((np.stack([nx, ny, nz], -1) / nl[..., None] + 1) * 127.5, 0, 255)
+    cur = np.asarray(nm_img).astype(np.float64)
+    cur[head] = nout[head]
+    g.set_image(i_n, Image.fromarray(cur.astype(np.uint8)))
+    ex = g.j.setdefault('asset', {}).setdefault('extras', {})
+    tagb = os.path.basename(prefix)
+    if ex.get(TAG + 'AO') != tagb:
+        ao = np.asarray(Image.open(prefix + '_ao.png').convert('L').resize((S, S), Image.BILINEAR)).astype(np.float32) / 255
+        bimg = np.asarray(g.image(i_base).convert('RGB')).astype(np.float32)
+        if bimg.shape[0] != S:
+            ao = np.asarray(Image.fromarray((ao * 255).astype(np.uint8)).resize(bimg.shape[1::-1], Image.BILINEAR)).astype(np.float32) / 255
+            head_b = np.asarray(Image.fromarray(head.astype(np.uint8) * 255).resize(bimg.shape[1::-1])) > 127
+        else:
+            head_b = head
+        k = np.where(head_b, 1 - 0.35 * (1 - ao), 1.0)
+        g.set_image(i_base, Image.fromarray(np.clip(bimg * k[..., None], 0, 255).astype(np.uint8)))
+        g.jpeg_q[i_base] = 92
+        ex[TAG + 'AO'] = tagb
+    print(f'  запечённое с high-poly: голова {int(head.sum())} текселей, мех {len(idx[0])}')
+
+
 def main():
     persona, src, dst = sys.argv[1:4]
+    bake = sys.argv[sys.argv.index('--bake') + 1] if '--bake' in sys.argv else None
     F = json.load(open(os.path.join(HERE, 'face_landmarks', f'{persona}.json')))
     g = G2(src)
     n0 = strip_stage(g)
@@ -1077,6 +1141,8 @@ def main():
     Jt = g.acc(A['JOINTS_0']); Wt = g.acc(A['WEIGHTS_0']).astype(np.float64)
     build_tufts(g, persona, F, fr, base_lin, P, (Wt * (Jt == head_j)).sum(1), head_node, IBM)
     add_body_keys(g, fields(F, eyes), head_j)
+    if bake:
+        merge_bake(g, persona, bake, P, N, UV, I, (Wt * (Jt == head_j)).sum(1))
     paint_eyes(g, persona, F, eyes, P, N, UV, I, fr)
     j.setdefault('asset', {}).setdefault('extras', {})[TAG] = VERSION
     total = g.save(dst)
