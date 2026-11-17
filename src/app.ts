@@ -325,7 +325,7 @@ export class App {
       else if (s.echo === 'waiting') this.ui.micHintText('Говори — повторю!');
       if (s.asrState === 'idle' && !s.listening && s.echo === 'off') this.ui.micLevel(0);
     });
-    // уровень микрофона на кнопке — в frame() (micLevelTick): ~15 раз в секунду и только при заметном изменении;
+    // уровень микрофона на кнопке — в frame() (micLevelTick): ≤ 10 раз в секунду и только при заметном изменении;
     // раньше — отдельный requestAnimationFrame-цикл, крутившийся 60 раз в секунду всегда, даже в дрёме
     e.on('state', (s) => {
       this.voiceBusy = s.catSpeaking || s.listening;
@@ -647,16 +647,17 @@ export class App {
 
   private lvlT = 0;
   private lvlV = -1;
-  /** уровень микрофона → кольцо кнопки: ≤ 15 Гц и только при изменении (стиль кнопки — перерисовка) */
+  /** уровень микрофона → кольцо кнопки: ≤ 10 Гц и только при изменении (стиль кнопки — перерисовка) */
   private micLevelTick(now: number) {
     const mic = this.engine?.mic;
     if (!mic?.isOpen) {
       if (this.lvlV > 0) this.ui.micLevel((this.lvlV = 0));
       return;
     }
-    if (now - this.lvlT < 66) return;
+    if (now - this.lvlT < 100) return;
     this.lvlT = now;
-    const v = Math.round(mic.level * 20) / 20;
+    // шаг 0,1 (кольцо 1,8 px) и 10 Гц: каждое новое значение — пересчёт стиля и перерисовка тени кнопки
+    const v = Math.round(mic.level * 10) / 10;
     if (v !== this.lvlV) this.ui.micLevel((this.lvlV = v));
   }
 
