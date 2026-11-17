@@ -18,6 +18,7 @@ import { ClipState } from './clipState';
 import { TailRig, type TailOutput } from './tailRig';
 import { PropRig } from './props';
 import { BodyCollider } from './bodyCollide';
+import { buildFurShells } from './furShell';
 import { FaceMixer, EMOTE_FACE, MORPH_TARGETS, facePreset, type FacePreset } from './face';
 import { EyeRig } from './eyeRig';
 import { personaMeta } from './personaMeta';
@@ -184,6 +185,8 @@ export class GlbCharacter implements Character {
     model.scale.setScalar(k);
     model.position.set(-((box.min.x + box.max.x) / 2) * k, -box.min.y * k, -((box.min.z + box.max.z) / 2) * k);
     this.inner.add(model);
+    // мех по силуэту (оболочки) — если стадия body_detail положила в GLB меш BD_FurShell
+    buildFurShells(model);
 
     model.traverse((o) => {
       const name = o.name.replace(/^mixamorig:?/, '');

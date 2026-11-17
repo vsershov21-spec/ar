@@ -1,0 +1,88 @@
+<!doctype html><html><head><meta charset="utf-8"><title>body preview</title>
+<style>html,body{margin:0;background:#cfd2d6;color:#222;font:13px sans-serif}canvas{display:block}</style></head>
+<body><script type="module">
+// Контактный лист тела через рантайм GlbCharacter (мех-оболочки, подушечки, коллайдер рук — как в приложении).
+// ?p=hooligan&m=/models/hooligan_v1.glb&tile=420&v=full,hands,cloth,back,raise
+// Виды: full — общий план спереди; hands — правая лапа крупно (ладонь чуть снизу); cloth — торс крупно;
+// back — сзади с хвостом; raise — кадр клипа cheer (руки вверх); feet — стопы снизу-спереди.
+import * as THREE from 'three';
+import { GlbCharacter } from '../src/character/glbCharacter';
+const q = new URLSearchParams(location.search);
+const persona = q.get('p') || 'hooligan';
+const url = q.get('m') || `/models/${persona}_v1.glb`;
+const views = (q.get('v') || 'full,hands,cloth,back,raise').split(',');
+const T = +(q.get('tile') || 420);
+const r = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+r.setPixelRatio(1); r.setSize(views.length * T, T); r.setScissorTest(true); document.body.appendChild(r.domElement);
+r.outputColorSpace = THREE.SRGBColorSpace;
+r.toneMapping = THREE.ACESFilmicToneMapping; r.toneMappingExposure = 1.0;
+const sc = new THREE.Scene(); sc.background = new THREE.Color(0xd8dadd);
+sc.add(new THREE.HemisphereLight(0xffffff, 0x6a6560, 1.6));
+const dl = new THREE.DirectionalLight(0xffffff, 2.0); dl.position.set(1.2, 2.2, 2.4); sc.add(dl);
+const rim = new THREE.DirectionalLight(0xdde6ff, 1.0); rim.position.set(-1.5, 1.5, -2); sc.add(rim);
+const ch = new GlbCharacter(url, '/models/anims_v1.glb');
+await ch.load(); sc.add(ch.object); ch.personaId = persona;
+if (q.has('fd')) ch.object.traverse((o) => { if (/^BD_FurShell_/.test(o.name)) o.material.color.set(0xff3030); });
+const bone = (n) => { let b = null; ch.object.traverse((o) => { if (!b && o.name.replace(/^mixamorig:?/, '') === n) b = o; }); return b; };
+const wp = (n) => bone(n).getWorldPosition(new THREE.Vector3());
+const cam = new THREE.PerspectiveCamera(28, 1, 0.01, 50);
+function pose(clip, t) {
+  const m = ch.mixer; m.stopAllAction();
+  const a = ch.actions.get(clip) || ch.actions.get('idle');
+  a.reset().play(); a.time = Math.min(t, a.getClip().duration - 0.01); m.update(0);
+  ch.object.updateMatrixWorld(true); ch.collider?.apply(); ch.object.updateMatrixWorld(true);
+  ch.object.traverse((o) => o.morphTargetInfluences?.fill(0));
+}
+/** кадр клипа, где лапы выше всего (для вида raise) */
+function highest(clip) {
+  const a = ch.actions.get(clip); if (!a) return 0.5;
+  let best = 0, by = -1e9; const d = a.getClip().duration;
+  for (let t = 0; t < d; t += d / 40) { pose(clip, t); const y = wp('RightHand').y + wp('LeftHand').y; if (y > by) { by = y; best = t; } }
+  return best;
+}
+function look(target, yawDeg, pitchDeg, dist, fov = 28) {
+  const y = yawDeg * Math.PI / 180, p = pitchDeg * Math.PI / 180;
+  cam.fov = fov; cam.updateProjectionMatrix();
+  cam.position.set(target.x + Math.sin(y) * Math.cos(p) * dist, target.y + Math.sin(p) * dist, target.z + Math.cos(y) * Math.cos(p) * dist);
+  cam.lookAt(target);
+}
+const raiseClip = q.get('rc') || 'cheer', raiseT = q.get('rt') ? +q.get('rt') : highest(raiseClip);
+const waveT = views.includes('wave') ? highest('greet_01') : 0;
+views.forEach((v, i) => {
+  if (v === 'restpalm') { ch.mixer.stopAllAction(); ch.object.traverse((o) => o.isSkinnedMesh && o.skeleton.pose()); ch.object.updateMatrixWorld(true); }
+  else if (v === 'raise') pose(raiseClip, raiseT);
+  else if (v.startsWith('arm:')) pose(v.split(':')[1], +(v.split(':')[2] || highest(v.split(':')[1]))); else if (v === 'wave') pose('greet_01', waveT); else pose('idle', 0.5);
+  if (v === 'full') look(new THREE.Vector3(0, 0.5, 0), 0, 4, 2.4);
+  else if (v === 'back') look(new THREE.Vector3(0, 0.45, 0), 180, 8, 2.4);
+  else if (v === 'side') look(new THREE.Vector3(0, 0.45, 0), 90, 5, 2.4);
+  else if (v === 'raise') look(new THREE.Vector3(0, 0.6, 0), 15, 4, 2.8);
+  else if (v === 'cloth') look(new THREE.Vector3(0, 0.4, 0.05), 20, 5, 1.6);
+  else if (v === 'hands') {
+    const h = wp('RightHand'), e = wp('RightForeArm');
+    const c = h.clone().add(h.clone().sub(e).multiplyScalar(0.35));
+    look(c, -30, -20, 0.75);
+  } else if (v === 'lhand') {
+    const h = wp('LeftHand'), e = wp('LeftForeArm');
+    const c = h.clone().add(h.clone().sub(e).multiplyScalar(0.35));
+    look(c, 30, 20, 0.75);
+  } else if (v.startsWith('arm:')) {
+    const e = wp('RightForeArm'), h = wp('RightHand');
+    look(e.clone().lerp(h, 0.4), -20, 5, 0.75);
+  } else if (v === 'restpalm') {
+    const h = wp('RightHand'), m4 = wp('RightHandMiddle4');
+    look(h.clone().lerp(m4, 0.5), 75, -50, 0.32);
+  } else if (v === 'wave') {
+    const hs = [wp('RightHand'), wp('LeftHand')].sort((a, b) => b.y - a.y)[0];
+    look(hs.clone().add(new THREE.Vector3(0, 0.03, 0)), 0, 0, 0.6);
+  } else if (v === 'palm') {
+    const h = wp('RightHand'), e = wp('RightForeArm');
+    const c = h.clone().add(h.clone().sub(e).multiplyScalar(0.4));
+    look(c, -60, -55, 0.55);
+  } else if (v === 'feet') look(new THREE.Vector3(0, 0.0, 0.05), 15, 18, 1.0);
+  else if (v === 'tail') look(new THREE.Vector3(0, 0.25, -0.15), 150, 10, 1.0);
+  const x = i * T;
+  r.setViewport(x, 0, T, T); r.setScissor(x, 0, T, T); r.render(sc, cam);
+});
+if (q.has('fd')) ch.object.traverse((o) => { if (/^BD_FurShell_/.test(o.name)) { o.material.color.set(0xff3030); } });
+window.__ready = true;
+</script></body></html>
