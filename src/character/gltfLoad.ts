@@ -10,8 +10,19 @@ import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.j
 
 let ktx2: KTX2Loader | null = null;
 
+let meshoptWorkers = false;
+
 export function makeGltfLoader(): GLTFLoader {
   const loader = new GLTFLoader();
+  // распаковка meshopt (модели и библиотека движений) — в двух воркерах: главный поток не замирает на онбординге
+  if (!meshoptWorkers && typeof Worker !== 'undefined') {
+    meshoptWorkers = true;
+    try {
+      MeshoptDecoder.useWorkers(2);
+    } catch {
+      /* без воркеров — как раньше, на главном потоке */
+    }
+  }
   loader.setMeshoptDecoder(MeshoptDecoder);
   const renderer = glRenderer();
   // KTX2 выбирает формат сжатия видеокарты (ASTC/ETC2/BC/PVRTC) — нужен рендерер (App регистрирует его сразу)

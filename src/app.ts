@@ -109,15 +109,6 @@ export class App {
 
   async init() {
     const p = this.params;
-    // быстрый старт: модель выбранного характера, библиотека движений и код 3D-персонажа качаются сразу,
-    // параллельно с контентом и звуками (раньше — только после них)
-    if (p.character === 'glb' && !new URLSearchParams(location.search).get('glb')) {
-      const pid = loadMemory().persona ?? PERSONA_IDS[0];
-      const own = (ASSETS.glbByPersona as Record<string, string>)[pid];
-      // низкий приоритет: онбординг (контент, звуки) не ждёт модель, модель забирает оставшуюся полосу
-      if (own) prefetchModel(own, 'low');
-      prefetchModel(ASSETS.glbAnims, 'low');
-    }
     this.quality.onChange = (lvl, i) => this.applyQuality(lvl, i);
     document.addEventListener('visibilitychange', () => this.quality.pause());
     if (p.debug) {
@@ -140,7 +131,11 @@ export class App {
     this.fx.attachScene(this.renderer.domElement);
     this.voice = new VoicePlayer(this.audio);
     this.engine = new VoiceEngine(this.audio, this.voice, { asr: p.asr, mode: p.mic, grammar: new URLSearchParams(location.search).get('grammar') !== '0' });
-    const [content] = await Promise.all([loadContent(), this.audio.load(ASSETS.sfx), this.voice.load(ASSETS.voice)]);
+    // быстрый старт: онбординг ждёт только контент и манифест озвучки; звуки эффектов (~0,3 МБ) догружаются
+    // за ним (до «Открыть камеру» их не играем), модель — сразу как онбординг на экране
+    const sfx = this.audio.load(ASSETS.sfx);
+    sfx.catch(() => undefined);
+    const [content] = await Promise.all([loadContent(), this.voice.load(ASSETS.voice)]);
 
     this.ui = new UI(this.root, {
       onWake: () => void this.wake(),
@@ -172,6 +167,14 @@ export class App {
       },
     }, { micSupported: this.engine.asr.supported, posterUrl: posterUrl() });
     perf.mark('ui');
+    // модель выбранного характера и библиотека движений: качаются, пока ребёнок листает онбординг
+    // (код 3D-персонажа — параллельно, а не после звуков и режиссёра)
+    if (p.character === 'glb' && !new URLSearchParams(location.search).get('glb')) {
+      const own = (ASSETS.glbByPersona as Record<string, string>)[loadMemory().persona ?? PERSONA_IDS[0]];
+      if (own) prefetchModel(own, 'high');
+      prefetchModel(ASSETS.glbAnims, 'high');
+      void import('./character/glbCharacter').catch(() => undefined);
+    }
     this.ui.setMicMode(this.engine.mode);
     if (typeof (this.tracker as unknown as { reanchor?: unknown }).reanchor === 'function') this.tracker.onFound(() => this.ui.showReanchor(true));
 
@@ -192,6 +195,7 @@ export class App {
       stopListen: () => this.engine.stopListen(),
     });
     await this.setCharacterMode(p.character);
+    await sfx;
     perf.mark('char');
     this.wireFx();
     // озвучка: манифест текущего характера и первые реплики сценария — заранее

@@ -1,6 +1,10 @@
 import './ui/styles.css';
 import { App, readParams } from './app';
 import { installCatApi } from './debug/catApi';
+import { perf } from './core/perf';
+
+perf.enabled = new URLSearchParams(location.search).has('perf');
+(window as any).__perf = perf;
 
 const params = readParams();
 const app = new App(document.getElementById('app')!, params);

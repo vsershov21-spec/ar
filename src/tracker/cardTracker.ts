@@ -14,6 +14,7 @@ import { CARD_ASPECT, labelCard, poseFromQuad, quadDiag, type Intrinsics, type P
 import { focalFromFov } from './card/detector';
 import type { CardWorkerIn, CardWorkerOut } from './card/worker';
 import { CardOverlay } from './card/overlay';
+import { perf } from '../core/perf';
 
 export interface CardView {
   /** углы карты (TL, TR, BR, BL) в px экрана */
@@ -78,6 +79,7 @@ export class CardTracker extends TrackerBase implements Tracker {
     video.addEventListener('resize', () => this.onVideoSize());
     video.addEventListener('loadedmetadata', () => this.onVideoSize());
     this.video = video;
+    this.watchFrames(video);
     if (!navigator.mediaDevices?.getUserMedia) throw new Error('no-getusermedia');
     const stream = await navigator.mediaDevices.getUserMedia({
       audio: false,
@@ -97,6 +99,7 @@ export class CardTracker extends TrackerBase implements Tracker {
     this.worker.onmessage = (e: MessageEvent<CardWorkerOut>) => this.onResult(e.data);
     this.worker.onerror = (e) => console.warn('[card] worker', e.message);
     this.running = true;
+    this.rvfcAt = performance.now();
     this.setupFrame();
     this.resize(this.w, this.h);
     this.pump();
@@ -138,25 +141,87 @@ export class CardTracker extends TrackerBase implements Tracker {
     this.K = { f: focalFromFov(this.dw, this.dh), cx: this.dw / 2, cy: this.dh / 2 };
   }
 
+  /**
+   * Производительность: в воркер идут только новые кадры камеры (requestVideoFrameCallback: камера даёт 30 к/с,
+   * экран — 60; повтор того же кадра ничего не добавляет, а грел телефон вдвое). maxHz — потолок частоты
+   * (адаптивное качество на слабых телефонах, 0 — без потолка).
+   */
+  maxHz = 0;
+  private frameSeq = 0;
+  private sentSeq = -1;
+  private rvfc = false;
+  private rvfcAt = 0;
+  private sentAt = 0;
+  /** кадр в воркер как VideoFrame (Chrome/Android); Safari и отказ воркера — по-старому, ?grab=main|frame — вручную */
+  private frameGrab = useFrameGrab();
+
+  private watchFrames(v: HTMLVideoElement) {
+    const vv = v as HTMLVideoElement & { requestVideoFrameCallback?: (cb: () => void) => number };
+    if (typeof vv.requestVideoFrameCallback !== 'function') return;
+    this.rvfc = true;
+    const cb = () => {
+      this.frameSeq++;
+      this.rvfcAt = performance.now();
+      if (this.video === v) vv.requestVideoFrameCallback!(cb);
+    };
+    vv.requestVideoFrameCallback(cb);
+  }
+
   /** следующий кадр — в воркер, как только он освободился */
   private pump = () => {
     if (!this.running) return;
     const v = this.video;
-    if (!this.busy && v && v.readyState >= 2 && this.worker) {
+    if (!this.busy && v && v.readyState >= 2 && this.worker && this.frameDue()) {
       if (v.videoWidth !== this.lastVW || v.videoHeight !== this.lastVH) this.onVideoSize();
-      this.ctx.drawImage(v, 0, 0, this.dw, this.dh);
-      const img = this.ctx.getImageData(0, 0, this.dw, this.dh);
+      this.sentSeq = this.frameSeq;
+      this.sentAt = performance.now();
       this.busy = true;
-      const msg: CardWorkerIn = { rgba: img.data.buffer as ArrayBuffer, w: this.dw, h: this.dh, focal: this.K.f, lock: this.locked };
-      // карты не видно, кот держится по гироскопу: подсказываем детектору, где её ждать (только там её и примем)
-      if (this.locked) msg.hint = this.isTracking ? null : this.heldQuad();
-      this.worker.postMessage(msg, [msg.rgba]);
+      const t0 = performance.now();
+      const frame = this.frameGrab ? grabFrame(v) : null;
+      if (frame) {
+        // кадр уходит в воркер без копирования: уменьшение и чтение пикселей там (на главном потоке ~0,1 мс вместо 4–17)
+        const msg = this.message(new ArrayBuffer(0));
+        msg.frame = frame;
+        this.worker.postMessage(msg, [frame as unknown as Transferable]);
+      } else {
+        this.ctx.drawImage(v, 0, 0, this.dw, this.dh);
+        const img = this.ctx.getImageData(0, 0, this.dw, this.dh);
+        const msg = this.message(img.data.buffer as ArrayBuffer);
+        this.worker.postMessage(msg, [msg.rgba]);
+      }
+      perf.add('tracker.grab', performance.now() - t0);
     }
     requestAnimationFrame(this.pump);
   };
 
+  /** пора ли слать кадр: новый кадр камеры и не чаще maxHz */
+  private frameDue() {
+    const now = performance.now();
+    if (this.maxHz > 0 && now - this.sentAt < 1000 / this.maxHz - 4) return false;
+    if (!this.rvfc) return true;
+    if (now - this.rvfcAt > 400) {
+      // requestVideoFrameCallback так и не заработал — по кадрам экрана, как раньше
+      if (this.frameSeq === 0) this.rvfc = false;
+      // браузер временно перестал его звать (скрытое/свёрнутое видео) — не реже 20 раз в секунду
+      return now - this.sentAt > 50;
+    }
+    return this.frameSeq !== this.sentSeq;
+  }
+
+  private message(rgba: ArrayBuffer): CardWorkerIn {
+    const msg: CardWorkerIn = { rgba, w: this.dw, h: this.dh, focal: this.K.f, lock: this.locked };
+    // карты не видно, кот держится по гироскопу: подсказываем детектору, где её ждать (только там её и примем)
+    if (this.locked) msg.hint = this.isTracking ? null : this.heldQuad();
+    return msg;
+  }
+
   private onResult(r: CardWorkerOut) {
     this.busy = false;
+    if (r.mode === 'no-frame') {
+      this.frameGrab = false; // воркер не смог прочитать VideoFrame — дальше кадры читаем на главном потоке
+      return;
+    }
+    perf.add('tracker.worker', r.ms);
     this.stats.ms = r.ms;
     this.stats.score = r.score;
     this.stats.mode = r.mode;
@@ -277,6 +342,24 @@ export class CardTracker extends TrackerBase implements Tracker {
   update(dt: number, t: number) {
     super.update(dt, t);
     this.overlay.update(dt);
+  }
+}
+
+function useFrameGrab(): boolean {
+  const q = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('grab') : null;
+  if (q === 'main') return false;
+  if (typeof VideoFrame === 'undefined' || typeof OffscreenCanvas === 'undefined') return false;
+  if (q === 'frame') return true;
+  // WebKit (iPhone): поворот кадра камеры в VideoFrame не проверен на устройствах — оставляем проверенный путь
+  const ua = typeof navigator !== 'undefined' ? navigator.userAgent : '';
+  return !/AppleWebKit/.test(ua) || /Chrome\/|Android/.test(ua);
+}
+
+function grabFrame(v: HTMLVideoElement): VideoFrame | null {
+  try {
+    return new VideoFrame(v);
+  } catch {
+    return null;
   }
 }
 

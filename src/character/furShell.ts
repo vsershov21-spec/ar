@@ -101,7 +101,8 @@ vec3 furHash(vec3 p) {
   }`,
         );
     };
-    mat.customProgramCacheKey = () => `bdfur${k}`;
+    // слой задаётся униформой uShell — шейдер у всех оболочек один: компилируется один раз, а не по разу на слой
+    mat.customProgramCacheKey = () => 'bdfur';
     const m = new THREE.SkinnedMesh(sm.geometry, mat);
     m.name = `BD_FurShell_${k}`;
     m.position.copy(sm.position);
@@ -114,4 +115,22 @@ vec3 furHash(vec3 p) {
     shells.push(m);
   }
   return shells;
+}
+
+/**
+ * Адаптивное качество: показать долю оболочек меха (1 — все). Оставшиеся равномерно покрывают ту же длину
+ * шерсти (последняя, самая внешняя, видна всегда) — силуэт меха тот же, волоски реже. Без пересборки шейдеров.
+ */
+export function setFurQuality(root: THREE.Object3D, frac: number) {
+  const shells: THREE.Object3D[] = [];
+  root.traverse((o) => {
+    if (/^BD_FurShell_\d+$/.test(o.name)) shells.push(o);
+  });
+  const n = shells.length;
+  if (!n) return;
+  shells.sort((a, b) => Number(a.name.slice(12)) - Number(b.name.slice(12)));
+  const m = Math.max(1, Math.min(n, Math.round(n * frac)));
+  const keep = new Set<number>();
+  for (let j = 1; j <= m; j++) keep.add(Math.round((j * n) / m) - 1);
+  shells.forEach((s, i) => (s.visible = keep.has(i)));
 }

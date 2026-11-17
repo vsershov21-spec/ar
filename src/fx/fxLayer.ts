@@ -136,6 +136,7 @@ export class FxLayer {
     this.dpr = Math.min(2, window.devicePixelRatio || 1);
     this.w = w;
     this.h = h;
+    this.wasEmpty = false;
     this.canvas.width = Math.round(w * this.dpr);
     this.canvas.height = Math.round(h * this.dpr);
     this.canvas.style.width = w + 'px';
@@ -435,9 +436,22 @@ export class FxLayer {
   }
   private cost = 0;
 
+  /** прошлый кадр слоя был пуст (холст уже чистый) */
+  private wasEmpty = false;
+
   draw() {
     const t0 = performance.now();
     const g = this.g;
+    // нечего рисовать и холст уже чистый — не трогаем его: браузер не перекомпонует полноэкранный слой каждый кадр
+    const empty = !this.live.length && !this.parts.list.length && !this.fog.visible && !this.gum.visible && !this.sheet.list.length;
+    if (empty && this.wasEmpty) {
+      this.cost = 0;
+      this.frameMs += (0 - this.frameMs) * 0.1;
+      if (this.frameMs < 2.5 && this.lod < 1) this.lod = Math.min(1, this.lod + 0.005);
+      this.parts.cap = Math.round(900 * this.lod);
+      return;
+    }
+    this.wasEmpty = empty;
     g.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     g.clearRect(0, 0, this.w, this.h);
     const env = this.env;

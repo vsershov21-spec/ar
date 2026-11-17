@@ -17,7 +17,7 @@ import { type MouthShape, type Viseme } from '../lipsync/visemes';
 import { FaceLife } from './faceLife';
 import { ClipState } from './clipState';
 import { clipDef } from './clips';
-import { prepareClips, type ClipPrepInfo } from './animPrep';
+import { prepareClipsAsync, type ClipPrepInfo } from './animPrep';
 import { AnimBlender } from './animBlend';
 import { TailRig, type TailOutput } from './tailRig';
 import { PropRig } from './props';
@@ -246,7 +246,7 @@ export class GlbCharacter implements Character {
       // ?anim=raw — как было (для сравнения в debug)
       const raw = typeof location !== 'undefined' && /[?&]anim=raw/.test(location.search);
       if (!raw) {
-        this.animInfo = prepareClips(model, this.inner, anims, {
+        this.animInfo = await prepareClipsAsync(model, this.inner, anims, {
           isLoop: (n) => GlbCharacter.aliasIds(n).some((id) => clipDef(id)?.loop),
           keepSpeed: (n) => /dance|run|jump|flip|dive|fall|tumble|celebrate|cheer/.test(n),
         });

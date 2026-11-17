@@ -17,6 +17,7 @@
 |---|---|---|
 | `/targets/` | маркеры `.mind`, PNG карт | долгий |
 | `/models/` | GLB, Vosk-модель `models/vosk-ru-small-0.22/model.tar.gz` (из `/srv/ar-extra`, см. ниже) | долгий |
+| `/models/opt/` | сжатые при сборке копии моделей `<имя>.<хэш>.glb` (meshopt + KTX2), см. ниже | долгий (хэш в имени) |
 | `/sounds/` | `sfx.*` | долгий |
 | `/voice/` | озвучка Piper: `manifest.json` (индекс) + `<характер>.<хэш>.json` + `<характер>/*.<хэш>.mp3` (из `/srv/ar-extra`) | обычный; файлы с хэшем в имени |
 | `/video/` | спрайты, позы, видео с альфой, формы рта | долгий |
@@ -26,6 +27,19 @@
 
 **Меняете ассет в долгокэшируемой папке — меняйте имя файла** (`card-v2.mind`, `character-2026-12.glb`) и путь
 в `src/config.ts`/манифесте. Иначе телефоны будут показывать старую версию.
+
+### Сжатие моделей при сборке
+
+`vite build` (плагин `scripts/build/vite-model-opt.mjs`) пережимает персонажей и реквизит из `public/models/` в
+`dist/models/opt/<имя>.<хэш>.glb`: геометрия — EXT_meshopt_compression (без квантования, вершины те же), текстуры от
+1024 px — KTX2/Basis ETC1S (на телефоне остаются сжатыми и в видеопамяти). Исходники в `public/models/` не меняются
+(их правят python-стадии `scripts/models`). Рантайм берёт сжатый путь из карты в бандле (`src/core/modelUrl.ts`),
+декодеры — `src/character/gltfLoad.ts` (транскодер Basis — ассет vite в `/assets/` с хэшем).
+
+- Первый раз после изменения модели — ~30–40 с на модель (кодер Basis, wasm), дальше — кэш по содержимому
+  `.cache/model-opt/` в рабочей папке сборки (или `$AR_MODEL_CACHE`). Сеть и root не нужны.
+- Ошибка сжатия не роняет сборку — модель остаётся исходной. `AR_MODEL_OPT=0 npm run build` — выключить.
+- Вручную: `node scripts/build/model-opt.mjs public/models/kind_v1.glb --out /tmp/kind.glb`.
 
 ## Логи и откат
 

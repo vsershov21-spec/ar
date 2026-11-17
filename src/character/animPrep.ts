@@ -402,7 +402,43 @@ export function prepareClips(model: THREE.Object3D, space: THREE.Object3D, clips
   const names = nodeNames(model);
   const pr = groundProbe(model, space);
   const info = new Map<THREE.AnimationClip, ClipPrepInfo>();
+  for (const c of clips) prepareOne(c, names, pr, opts, info);
+  return info;
+}
+
+/**
+ * То же, что prepareClips, но с паузами для браузера каждые ~12 мс: подготовка ~90 клипов на слабом телефоне —
+ * секунда-две счёта, а идёт она, пока ребёнок листает онбординг (без пауз экран замирал). Результат тот же.
+ */
+export async function prepareClipsAsync(model: THREE.Object3D, space: THREE.Object3D, clips: THREE.AnimationClip[], opts: PrepOptions) {
+  const names = nodeNames(model);
+  const pr = groundProbe(model, space);
+  const info = new Map<THREE.AnimationClip, ClipPrepInfo>();
+  let t = performance.now();
   for (const c of clips) {
+    prepareOne(c, names, pr, opts, info);
+    if (performance.now() - t > 12) {
+      await yieldToBrowser();
+      t = performance.now();
+    }
+  }
+  return info;
+}
+
+/** уступить главный поток (не setTimeout: в фоне он тормозится до 1 с) */
+function yieldToBrowser(): Promise<void> {
+  const sch = (globalThis as { scheduler?: { yield?: () => Promise<void> } }).scheduler;
+  if (sch?.yield) return sch.yield();
+  if (typeof MessageChannel === 'undefined') return Promise.resolve();
+  return new Promise((r) => {
+    const ch = new MessageChannel();
+    ch.port1.onmessage = () => r();
+    ch.port2.postMessage(0);
+  });
+}
+
+function prepareOne(c: THREE.AnimationClip, names: Set<string>, pr: ReturnType<typeof groundProbe>, opts: PrepOptions, info: Map<THREE.AnimationClip, ClipPrepInfo>) {
+  {
     const already = done.has(c);
     const i = prepareClip(c, names, opts);
     if (pr && !already && c.tracks.length) {
@@ -420,5 +456,4 @@ export function prepareClips(model: THREE.Object3D, space: THREE.Object3D, clips
     }
     info.set(c, i);
   }
-  return info;
 }
