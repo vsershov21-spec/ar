@@ -4,6 +4,8 @@
  * Сглаживание краёв — 3×3 подвыборки. Всё детерминировано (seed).
  */
 export interface SynthOptions {
+  /** текстура стола лежит на плоскости карты (а не на экране) — для проверки ведения по поверхности */
+  tableOnPlane?: boolean;
   w?: number;
   h?: number;
   /** горизонтальный угол обзора по длинной стороне, градусы */
@@ -26,6 +28,8 @@ export interface SynthOptions {
   noise?: number;
   blur?: number;
   seed?: number;
+  /** отдельное зерно шума сенсора (по кадрам разное, как у настоящей камеры) */
+  noiseSeed?: number;
   /** без карты (негативный пример) */
   noCard?: boolean;
 }
@@ -119,6 +123,20 @@ export function renderCardScene(o: SynthOptions = {}): SynthFrame {
     return c;
   };
 
+  // текстура стола на плоскости (едет вместе с картой — проверка ведения по поверхности)
+  const planeTex = (X: number, Y: number): V3 => {
+    const u = X * 140, v = Y * 140;
+    const base = bgColor(u * 0.6 + 500, v * 0.6 + 500);
+    const gx = Math.floor(u / 9), gy = Math.floor(v / 9);
+    const hsh = Math.sin(gx * 127.1 + gy * 311.7) * 43758.5453;
+    const r = hsh - Math.floor(hsh);
+    if (r > 0.72) {
+      const fx = u / 9 - gx - 0.5, fy = v / 9 - gy - 0.5;
+      if (fx * fx + fy * fy < 0.09 + 0.06 * r) return [base[0] * 0.55, base[1] * 0.55, base[2] * 0.6];
+    }
+    return base;
+  };
+
   // карта
   const card = o.card ?? { rgb: [33, 160, 56] as [number, number, number], design: 'doodle' as const };
   const design = card.design ?? 'plain';
@@ -174,7 +192,7 @@ export function renderCardScene(o: SynthOptions = {}): SynthFrame {
         for (let sx = 0; sx < SS; sx++) {
           const px = x + (sx + 0.5) / SS, py = y + (sy + 0.5) / SS;
           let c: V3 | null = null;
-          if (!o.noCard) {
+          if (!o.noCard || o.tableOnPlane) {
             const d: V3 = [(px - cx) / f, -(py - cy) / f, -1];
             const den = dot(r3, d);
             if (Math.abs(den) > 1e-9) {
@@ -182,7 +200,8 @@ export function renderCardScene(o: SynthOptions = {}): SynthFrame {
               if (s > 0) {
                 const P: V3 = [d[0] * s - t[0], d[1] * s - t[1], d[2] * s - t[2]];
                 const X = dot(P, r1), Y = dot(P, r2);
-                if (inCard(X, Y)) {
+                if (o.tableOnPlane && (o.noCard || !inCard(X, Y))) c = planeTex(X, Y);
+                else if (inCard(X, Y)) {
                   c = cardColor(X, Y);
                   if (o.glare) {
                     const gd = Math.hypot(px - glareC.x, (py - glareC.y) * 1.8) / (w * 0.09);
@@ -209,9 +228,10 @@ export function renderCardScene(o: SynthOptions = {}): SynthFrame {
   if (o.blur) boxBlur(rgba, w, h, o.blur);
   const light = o.light ?? 1, noise = o.noise ?? 0;
   if (light !== 1 || noise) {
+    const RN = o.noiseSeed != null ? rng(o.noiseSeed * 7919 + 17) : R;
     const g = () => {
       // нормальный шум (Бокс–Мюллер)
-      const u = Math.max(1e-9, R()), v = R();
+      const u = Math.max(1e-9, RN()), v = RN();
       return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
     };
     for (let i = 0; i < rgba.length; i += 4) {

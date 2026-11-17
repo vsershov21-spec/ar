@@ -109,7 +109,8 @@ export interface DetectResult {
   quad: Quad | null;
   /** 0..1 */
   score: number;
-  mode: 'detect' | 'track' | 'none';
+  /** plane — карту ведём по поверхности стола (края карты не подтверждены: размыта, закрыта, ушла из кадра) */
+  mode: 'detect' | 'track' | 'plane' | 'none';
   /** время обработки, мс */
   ms: number;
   edgeThreshold: number;
@@ -157,6 +158,20 @@ export class CardDetector {
   private pyrDims: [number, number][] = [];
   private thr = 0;
   private prevQuad: Quad | null = null;
+  /** карта была подтверждена краями — дальше можно вести по плоскости стола */
+  private anchored = false;
+  private planeFrames = 0;
+  /** движение прошлого кадра (гомография кадр→кадр) — начальное приближение для потока */
+  private lastH: number[] | null = null;
+  private guess(a: Pt): Pt | undefined {
+    if (!this.lastH) return undefined;
+    const b = applyH(this.lastH, a);
+    const g = { x: b.x - a.x, y: b.y - a.y };
+    return Number.isFinite(g.x) && Number.isFinite(g.y) && Math.hypot(g.x, g.y) < 80 ? g : undefined;
+  }
+  /** диагностика ведения по поверхности (debug) */
+  planeInfo = { pts: 0, tracked: 0, inliers: 0, why: '' };
+  private planeMiss = 0;
   private sinceDetect = 0;
   private K: Intrinsics = { f: 1, cx: 0, cy: 0 };
 
@@ -166,6 +181,9 @@ export class CardDetector {
 
   /** забыть прошлый кадр (сброс трекинга) */
   reset() {
+    this.lastH = null;
+    this.anchored = false;
+    this.planeFrames = 0;
     this.prevQuad = null;
   }
 
@@ -217,13 +235,22 @@ export class CardDetector {
       if (tr.cand) {
         best = tr.cand;
         mode = 'track';
+      } else if (this.anchored && this.planeFrames < MAX_PLANE_FRAMES) {
+        // края карты не видно — ведём её по поверхности: кот остаётся на месте и масштабируется с расстоянием
+        const pq = this.planeStep(this.prevQuad);
+        if (pq) {
+          best = { quad: pq, score: 0.56, support: [0, 0, 0, 0], aspect: 0, cos: 0 };
+          mode = 'plane';
+        }
       }
       this.sinceDetect++;
     }
     if (!best || this.sinceDetect >= p.detectEvery) {
       detectOut = this.detect();
       this.sinceDetect = 0;
-      const d = detectOut.candidates[0];
+      let d: Candidate | undefined = detectOut.candidates[0];
+      // карта ведётся по поверхности — чужой прямоугольник (книга, телефон) кота не утащит: только рядом с ожидаемым местом
+      if (d && mode === 'plane' && best && quadDistance(alignQuad(d.quad, best.quad), best.quad) > 0.35 * quadDiag(best.quad)) d = undefined;
       if (d) {
         if (!best) {
           best = d;
@@ -238,6 +265,11 @@ export class CardDetector {
       }
     }
     this.prevQuad = best ? best.quad : null;
+    if (best && mode !== 'plane') {
+      this.anchored = true;
+      this.planeFrames = 0;
+    } else if (mode === 'plane') this.planeFrames++;
+    else this.anchored = false;
 
     const res: DetectResult = { quad: best ? best.quad : null, score: best ? best.score : 0, mode: best ? mode : 'none', ms: now() - t0, edgeThreshold: this.thr };
     if (opts.debug) {
@@ -745,10 +777,11 @@ export class CardDetector {
     const tracked: { a: Pt; b: Pt }[] = [];
     const flow: DetectResult['flow'] = [];
     for (const a of pts) {
-      const b = lk(this.prevPyr, this.pyr, this.pyrDims, a);
+      const g = this.guess(a);
+      const b = lk(this.prevPyr, this.pyr, this.pyrDims, a, g);
       let ok = false;
       if (b) {
-        const back = lk(this.pyr, this.prevPyr, this.pyrDims, b);
+        const back = lk(this.pyr, this.prevPyr, this.pyrDims, b, g && { x: -g.x, y: -g.y });
         ok = !!back && dist(back, a) < 0.8;
         if (ok) tracked.push({ a, b });
       }
@@ -756,6 +789,7 @@ export class CardDetector {
     }
     let pred: Quad = prev;
     const H = ransacHomography(tracked, 2);
+    if (H) this.lastH = H;
     if (H) pred = prev.map((c) => applyH(H, c)) as Quad;
     else if (tracked.length >= 3) {
       const dx = median(tracked.map((t) => t.b.x - t.a.x)), dy = median(tracked.map((t) => t.b.y - t.a.y));
@@ -767,24 +801,86 @@ export class CardDetector {
     return { cand, flow: debug ? flow : undefined };
   }
 
+  /**
+   * Карта не подтверждается краями — двигаем её вместе с поверхностью стола: точки текстуры вокруг карты
+   * (карта ушла из кадра — по всему кадру), поток Лукаса–Канаде туда-обратно, гомография плоскости по RANSAC
+   * (стол — самая большая плоскость в кадре; бутылки и руки отсеиваются как выбросы).
+   */
+  private planeStep(prev: Quad): Quad | null {
+    const { w, h } = this;
+    // точки вокруг карты берём, только пока карта в основном в кадре; иначе — весь кадр
+    const pc = { x: (prev[0].x + prev[2].x) / 2, y: (prev[0].y + prev[2].y) / 2 };
+    const inside = pc.x > w * 0.1 && pc.x < w * 0.9 && pc.y > h * 0.1 && pc.y < h * 0.9;
+    const near = inside ? this.features(prev, 3.2, 96) : [];
+    const whole = this.featuresRect(6, 6, w - 7, h - 7, 120);
+    // попытки: возле карты с прогнозом → весь кадр с прогнозом → весь кадр без прогноза (пирамида)
+    const tries: [Pt[], boolean, number][] = [];
+    if (near.length >= 24) tries.push([near, true, 24]);
+    if (this.lastH) tries.push([whole, true, 20]);
+    tries.push([whole, false, 20]);
+    let H: number[] | null = null;
+    for (const [pts, useGuess, minInl] of tries) {
+      H = this.planeH(pts, useGuess, minInl);
+      if (H) break;
+    }
+    // прогноз движения обновляем только удачным шагом: одна осечка не должна сбивать следующие
+    if (H) (this.lastH = H), (this.planeMiss = 0);
+    else if (++this.planeMiss > 4) this.lastH = null;
+    const info = this.planeInfo;
+    if (!H) return null;
+    const q = prev.map((c) => applyH(H!, c)) as Quad;
+    // вырожденное преобразование (сложилась, перевернулась, улетела) — лучше потерять, чем показать кривого кота
+    if (!isConvex(q) || signedArea(q) * signedArea(prev) <= 0) return (info.why = 'degenerate'), null;
+    const a0 = Math.abs(signedArea(prev)), a1 = Math.abs(signedArea(q));
+    if (a1 < a0 * 0.6 || a1 > a0 * 1.6) return (info.why = 'scale-jump'), null;
+    const diag = quadDiag(q);
+    const cx = (q[0].x + q[2].x) / 2, cy = (q[0].y + q[2].y) / 2;
+    if (cx < -2 * w || cx > 3 * w || cy < -2 * h || cy > 3 * h || diag < 8 || diag > 6 * Math.hypot(w, h)) return (info.why = 'far'), null;
+    info.why = 'ok';
+    return q;
+  }
+
+  /** гомография плоскости между кадрами по точкам pts (поток туда-обратно + RANSAC) */
+  private planeH(pts: Pt[], useGuess: boolean, minInl = 10): number[] | null {
+    const tracked: { a: Pt; b: Pt }[] = [];
+    for (const a of pts) {
+      const g = useGuess ? this.guess(a) : undefined;
+      const b = lk(this.prevPyr, this.pyr, this.pyrDims, a, g);
+      if (!b) continue;
+      const back = lk(this.pyr, this.prevPyr, this.pyrDims, b, g && { x: -g.x, y: -g.y });
+      if (back && dist(back, a) < 0.8) tracked.push({ a, b });
+    }
+    const info = (this.planeInfo = { pts: pts.length, tracked: tracked.length, inliers: 0, why: '' });
+    if (tracked.length < 12) return (info.why = 'few-tracked'), null;
+    const H = ransacHomography(tracked, 2);
+    if (!H) return (info.why = 'no-H'), null;
+    let inl = 0;
+    for (const t of tracked) if (dist(applyH(H, t.a), t.b) < 2) inl++;
+    info.inliers = inl;
+    if (inl < minInl || inl < tracked.length * 0.4) return (info.why = 'few-inliers'), null;
+    return H;
+  }
+
   /** точки для потока: «уголки» (минимальное собственное число) в окрестности карты */
-  private features(q: Quad): Pt[] {
-    const g = this.prevPyr[0];
+  private features(q: Quad, grow = 1.6, max = 48): Pt[] {
     const { w, h } = this;
     const c = { x: (q[0].x + q[1].x + q[2].x + q[3].x) / 4, y: (q[0].y + q[1].y + q[2].y + q[3].y) / 4 };
     let x0 = w, y0 = h, x1 = 0, y1 = 0;
     for (const p of q) {
-      const ex = c.x + (p.x - c.x) * 1.6, ey = c.y + (p.y - c.y) * 1.6;
+      const ex = c.x + (p.x - c.x) * grow, ey = c.y + (p.y - c.y) * grow;
       x0 = Math.min(x0, ex);
       y0 = Math.min(y0, ey);
       x1 = Math.max(x1, ex);
       y1 = Math.max(y1, ey);
     }
-    x0 = Math.max(6, Math.floor(x0));
-    y0 = Math.max(6, Math.floor(y0));
-    x1 = Math.min(w - 7, Math.ceil(x1));
-    y1 = Math.min(h - 7, Math.ceil(y1));
-    const cell = Math.max(6, Math.round(Math.sqrt(((x1 - x0) * (y1 - y0)) / 64)));
+    return this.featuresRect(Math.max(6, Math.floor(x0)), Math.max(6, Math.floor(y0)), Math.min(w - 7, Math.ceil(x1)), Math.min(h - 7, Math.ceil(y1)), max);
+  }
+
+  private featuresRect(x0: number, y0: number, x1: number, y1: number, max: number): Pt[] {
+    const g = this.prevPyr[0];
+    const { w } = this;
+    if (x1 - x0 < 8 || y1 - y0 < 8) return [];
+    const cell = Math.max(6, Math.round(Math.sqrt(((x1 - x0) * (y1 - y0)) / (max * 1.35))));
     const out: { p: Pt; e: number }[] = [];
     for (let cy = y0; cy < y1; cy += cell)
       for (let cx = x0; cx < x1; cx += cell) {
@@ -810,9 +906,12 @@ export class CardDetector {
         if (be > 25) out.push({ p: { x: bx, y: by }, e: be });
       }
     out.sort((a, b) => b.e - a.e);
-    return out.slice(0, 48).map((o) => o.p);
+    return out.slice(0, max).map((o) => o.p);
   }
 }
+
+/** сколько кадров подряд можно вести карту только по столу (~15 кадров/с → 40 с), дальше нужен повторный захват */
+const MAX_PLANE_FRAMES = 600;
 
 // ───────────── вспомогательное ─────────────
 
@@ -938,9 +1037,11 @@ function sample(img: Float32Array, w: number, h: number, x: number, y: number): 
 }
 
 /** пирамидальный Лукас–Канаде для одной точки; окно 9×9, null — потеряна */
-function lk(A: Float32Array[], B: Float32Array[], dims: [number, number][], p: Pt): Pt | null {
+/** guess — ожидаемое смещение (px полного размера): движение прошлого кадра; без него повторяющийся узор стола «ловит» не тот период */
+function lk(A: Float32Array[], B: Float32Array[], dims: [number, number][], p: Pt, guess?: Pt): Pt | null {
   const R = 4;
-  let gx = 0, gy = 0; // смещение на текущем уровне
+  const top = 1 << (A.length - 1);
+  let gx = guess ? guess.x / top : 0, gy = guess ? guess.y / top : 0; // смещение на текущем уровне
   for (let l = A.length - 1; l >= 0; l--) {
     const [w, h] = dims[l];
     const s = 1 / (1 << l);
