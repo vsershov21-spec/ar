@@ -6,6 +6,7 @@
  */
 import { roundedCardOutline, type Pt } from './geometry';
 import type { CardView } from '../cardTracker';
+import type { Hint, TrackState } from './fsm';
 
 type State = 'search' | 'snap' | 'glow' | 'locked';
 /**
@@ -19,6 +20,18 @@ const MSG: Partial<Record<CandidateKind, string[]>> = {
   other: ['Это карта другого банка —', 'я живу в картах Сбера'],
   back: ['Переверни карту', 'лицевой стороной'],
   notcard: ['Это не карта 🙂'],
+};
+/** одна подсказка ребёнку — по причине (fsm.ts), без мигания */
+export const HINT_TEXT: Record<Exclude<Hint, null>, string> = {
+  aim: 'Наведи камеру на карту',
+  closer: 'Поднеси телефон ближе',
+  farther: 'Чуть дальше — вся карта в кадре',
+  glare: 'Блик! Наклони карту чуть-чуть',
+  steady: 'Держи телефон ровно…',
+  checking: 'Смотрю на карту…',
+  other: 'Это карта другого банка',
+  back: 'Переверни карту',
+  notcard: 'Это не карта',
 };
 
 const MODEL = roundedCardOutline(85.6 / 53.98, 3.18 / 85.6, 6);
@@ -69,7 +82,7 @@ export class CardOverlay {
     if (this.state === 'search') {
       this.state = 'snap';
       this.t = 0;
-      this.from = this.guide();
+      this.from = this.aimShape();
     }
   }
 
@@ -95,7 +108,7 @@ export class CardOverlay {
   }
 
   /** контур-«прицел» по центру экрана, откуда прилетает рамка */
-  private guide(): Pt[] {
+  private aimShape(): Pt[] {
     const W = Math.min(this.w * 0.74, 340);
     const cx = this.w / 2, cy = this.h * 0.46;
     return MODEL.map((p) => ({ x: cx + p.x * W, y: cy - p.y * W }));
@@ -180,17 +193,32 @@ export class CardOverlay {
   /** «Это не карта» — тихо, не чаще раза в 5 с, на 1,5 с */
   private notCard: { pts: Pt[]; at: number } | null = null;
 
-  /** карта видна, но кот ещё не посажен: пунктир по карте + прогресс «держи ровно» (или подсказка, что это не та карта) */
-  private cand: { pts: Pt[]; k: number; at: number; kind: CandidateKind } | null = null;
-  candidate(v: CardView, k: number, kind: CandidateKind = 'sber') {
+  /** карта видна, но кот ещё не посажен: пунктир по карте + кольцо прогресса посадки (или подсказка, что это не та карта) */
+  private cand: { pts: Pt[]; at: number; kind: CandidateKind } | null = null;
+  /** прогресс посадки 0..1 и подсказка — каждый кадр из машины состояний (fsm.ts: гистерезис, без мигания) */
+  private progress = 0;
+  private hint: Hint = 'aim';
+  private trackState: TrackState = 'search';
+  private scanEl: HTMLElement | null = null;
+  candidate(pts: Pt[], kind: CandidateKind = 'sber') {
     if (this.state !== 'search') return;
     const now = performance.now();
     if (kind === 'notcard') {
       this.cand = null;
-      if (k >= 0.3 && (!this.notCard || now - this.notCard.at > 5000)) this.notCard = { pts: v.quad, at: now };
+      if (!this.notCard || now - this.notCard.at > 5000) this.notCard = { pts, at: now };
       return;
     }
-    this.cand = { pts: v.quad, k: Math.max(0, Math.min(1, k)), at: now, kind };
+    this.cand = { pts, at: now, kind };
+  }
+  guide(state: TrackState, progress: number, hint: Hint) {
+    this.trackState = state;
+    this.progress = progress;
+    this.hint = hint;
+    // нижняя подсказка «Наведи камеру…» не спорит с кольцом над картой: пока кандидат на экране — прячем
+    this.scanEl ??= document.querySelector('.scan');
+    const showCand = state === 'candidate' && !!this.cand && performance.now() - this.cand.at < 600;
+    const vis = showCand ? 'hidden' : '';
+    if (this.scanEl && this.scanEl.style.visibility !== vis) this.scanEl.style.visibility = vis;
   }
 
   private pill(lines: string[], cx: number, yTop: number, color = '#157a2c') {
@@ -242,11 +270,15 @@ export class CardOverlay {
 
   private drawCandidate() {
     const c = this.cand;
-    if (!c || this.state !== 'search' || performance.now() - c.at > 250) return;
+    if (!c || this.state !== 'search' || this.trackState !== 'candidate') return;
+    // короткий пропуск кадра — рамка гаснет плавно, а не мигает
+    const age = performance.now() - c.at;
+    if (age > 600) return;
     const g = this.g;
+    g.save();
+    g.globalAlpha = age < 250 ? 1 : 1 - (age - 250) / 350;
     if (c.kind === 'other' || c.kind === 'back') {
       // не та карта/сторона: тихий оранжевый пунктир и подсказка, без кольца
-      g.save();
       g.lineJoin = 'round';
       g.setLineDash([8, 8]);
       g.strokeStyle = c.kind === 'other' ? 'rgba(255,181,71,0.95)' : 'rgba(255,255,255,0.9)';
@@ -259,41 +291,32 @@ export class CardOverlay {
       g.restore();
       return;
     }
-    g.save();
     g.lineJoin = 'round';
     g.setLineDash([10, 8]);
     g.lineDashOffset = -performance.now() / 40;
-    g.strokeStyle = 'rgba(255,255,255,0.9)';
+    // пунктир зеленеет по мере прогресса
+    const k = Math.max(0, Math.min(1, this.progress));
+    g.strokeStyle = k > 0.6 ? 'rgba(181,227,106,0.95)' : 'rgba(255,255,255,0.9)';
     g.lineWidth = 2.5;
     path(g, c.pts);
     g.stroke();
     g.setLineDash([]);
-    // кольцо прогресса в центре карты
+    // кольцо прогресса в центре карты: одна шкала 0→100 % (карта в кадре → карта Сбера → ровно → посадка)
     const cx = c.pts.reduce((s, p) => s + p.x, 0) / 4, cy = c.pts.reduce((s, p) => s + p.y, 0) / 4;
-    g.lineWidth = 5;
-    g.strokeStyle = 'rgba(255,255,255,0.35)';
+    g.lineWidth = 6;
+    g.strokeStyle = 'rgba(255,255,255,0.4)';
     g.beginPath();
-    g.arc(cx, cy, 20, 0, Math.PI * 2);
+    g.arc(cx, cy, 22, 0, Math.PI * 2);
     g.stroke();
     g.strokeStyle = '#B5E36A';
     g.lineCap = 'round';
     g.beginPath();
-    g.arc(cx, cy, 20, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * c.k);
+    g.arc(cx, cy, 22, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.max(0.02, k));
     g.stroke();
-    // подпись
-    const text = 'Держи телефон ровно…';
-    g.font = '800 14px "SB Sans Text", system-ui, sans-serif';
-    const tw = g.measureText(text).width;
-    const top = c.pts.reduce((a, p) => (p.y < a.y ? p : a), c.pts[0]);
-    const y = Math.max(28, top.y - 22);
-    g.fillStyle = '#fff';
-    g.beginPath();
-    g.roundRect(cx - tw / 2 - 14, y - 14, tw + 28, 28, 14);
-    g.fill();
-    g.fillStyle = '#157a2c';
-    g.textAlign = 'center';
-    g.textBaseline = 'middle';
-    g.fillText(text, cx, y + 1);
+    // подпись — причина, почему ещё не сели (или «держи ровно»)
+    const h = this.hint && this.hint !== 'aim' ? this.hint : 'steady';
+    const top = Math.min(...c.pts.map((p) => p.y));
+    this.pill([HINT_TEXT[h]], cx, top - 8, h === 'glare' || h === 'closer' || h === 'farther' ? '#b35c00' : '#157a2c');
     g.restore();
   }
 

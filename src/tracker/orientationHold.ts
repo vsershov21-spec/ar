@@ -41,7 +41,16 @@ export class OrientationHold {
         this.speed += (w - this.speed) * 0.3;
       }
       this.lastT = now;
+      this.onSample?.(now, this.current);
     });
+  }
+
+  /** каждый отсчёт датчика (мс performance.now, ориентация камеры) — для истории ориентации трекера карты */
+  onSample: ((t: number, q: THREE.Quaternion) => void) | null = null;
+
+  /** текущая ориентация камеры в мире (null — датчика нет или нет разрешения) */
+  get quaternion(): THREE.Quaternion | null {
+    return this.current;
   }
 
   /** угловая скорость телефона, рад/с (сглаженная); NaN — гироскопа нет */

@@ -67,6 +67,13 @@ export abstract class TrackerBase {
     if (v) this.foundCbs.forEach((cb) => cb());
     else if (this.lostDebounceMs <= 0) this.fireLost();
   }
+  /** для трекеров со своей машиной состояний (cardTracker): события без логики удержания */
+  protected emitFound() {
+    this.foundCbs.forEach((cb) => cb());
+  }
+  protected emitLost() {
+    this.lostCbs.forEach((cb) => cb());
+  }
   private fireLost() {
     this.lostAt = null;
     this.lostCbs.forEach((cb) => cb());
