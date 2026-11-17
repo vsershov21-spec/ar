@@ -27,12 +27,16 @@ for (const p of personas) {
   await page.goto(`http://localhost:${port}/?debug${extra}`, { waitUntil: 'load' });
   await page.waitForFunction(() => window.__app?.director && window.__debugPanel && window.__cat, { timeout: 60000 });
   await page.evaluate(() => window.__debugPanel.open?.(false));
+  // стартовый экран (онбординг или «Разбудить кота») — нажимаем кнопку пробуждения, дальше debug-перемотка
+  await page.evaluate(() => (document.querySelector('[data-a="wake"]') ?? [...document.querySelectorAll('button')].find((b) => /Разбудить/.test(b.textContent)))?.click());
+  await wait(800);
   await page.evaluate(() => window.__debugPanel.fastForward());
-  await wait(1500);
+  await page.waitForFunction(() => window.__app.director.state.phase === 'play', { timeout: 30000 }).catch(() => console.warn('  фаза не play'));
+  await wait(800);
   await page.evaluate((id) => window.__cat.persona(id), p);
   // ждём, пока загрузится GLB этого характера
   await page.waitForFunction(() => window.__app.character?.kind === 'glb' && window.__app.character.mixer, { timeout: 90000 }).catch(() => {});
-  await wait(4000);
+  await wait(7000); // пузырь появления и первая реплика успевают закончиться
   // тишина: кот не говорит сам и не бегает по idle-набору
   await page.evaluate(() => {
     const d = window.__app.director;
@@ -72,6 +76,18 @@ for (const p of personas) {
     await mouth(null);
     await face('happy');
     await shot(`${mode}_happy`);
+    // речь: настоящий липсинк (cues «при-вет, как де-ла») — 6 кадров через 120 мс, рот и голова в движении
+    await face('neutral');
+    await page.evaluate(() => {
+      const seq = 'BDXBCDXAEDBFDXCDBEX'.repeat(4).split('');
+      const cues = seq.map((v, i) => ({ start: i * 0.13, end: (i + 1) * 0.13, value: v }));
+      window.__app.voice.lip.playCues(cues, () => performance.now() / 1000);
+    });
+    for (let i = 0; i < 6; i++) {
+      await wait(i ? 120 : 250);
+      await page.screenshot({ path: path.join(outDir, `${prefix}_${p}_${mode}_talk${i}.png`) });
+    }
+    await page.evaluate(() => window.__app.voice.lip.stop());
   }
   await page.close();
 }
