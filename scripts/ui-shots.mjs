@@ -55,7 +55,7 @@ const shot = async (page, state, vp) => {
   console.log('  ✓', state, vp.name);
 };
 const wake = async (page) => {
-  await page.evaluate(() => [...document.querySelectorAll('button')].find((b) => /Разбудить/.test(b.textContent))?.click());
+  await page.evaluate(() => document.querySelector('[data-a="wake"]')?.click());
 };
 
 const STATES = {

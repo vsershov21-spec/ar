@@ -55,6 +55,8 @@ const ICON = {
   muted: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor"/><path d="M16 9.5l5 5M21 9.5l-5 5"/></svg>',
   hints: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5.5h16v10H10l-4.5 4v-4H4z"/><path d="M8 10.5h.01M12 10.5h.01M16 10.5h.01" stroke-width="3"/></svg>',
   lock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="10.5" width="14" height="10" rx="2.5"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/></svg>',
+  cam: '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8h3.5l2-2.5h7l2 2.5H21v11H3z"/><circle cx="12" cy="13" r="3.5"/></svg>',
+  paw: '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><ellipse cx="12" cy="16" rx="5" ry="4.2"/><ellipse cx="5.5" cy="10.5" rx="2.1" ry="2.6"/><ellipse cx="9.5" cy="6.5" rx="2.1" ry="2.7"/><ellipse cx="14.5" cy="6.5" rx="2.1" ry="2.7"/><ellipse cx="18.5" cy="10.5" rx="2.1" ry="2.6"/></svg>',
   camoff: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7.5h3l2-2.5h8l2 2.5h3v11H3z"/><circle cx="12" cy="13" r="3.5"/><path d="M3 3l18 18"/></svg>',
 };
 
@@ -88,26 +90,44 @@ export class UI {
     const root = document.createElement('div');
     root.className = 'ui';
     root.innerHTML = `
-      <div class="screen start">
-        <div class="screen-body">
-          <div class="hero" aria-hidden="true">
-            <div class="kidcard"></div>
-            ${opts.posterUrl ? `<img class="sleeper" src="${opts.posterUrl}" alt="">` : ''}
-            <div class="zzz"><span>z</span><span>z</span><span>z</span></div>
-          </div>
-          <div class="screen-col">
-            <div class="screen-text">
-              <h1>Кот спит в&nbsp;твоей карте</h1>
-              <p>Положи карту на стол, нажми кнопку и наведи на неё камеру.</p>
+      <div class="screen start ob" data-step="0">
+        <div class="ob-sky" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="ob-track">
+          <section class="ob-slide" aria-label="Шаг 1 из 3">
+            <div class="ob-art art-mystery" aria-hidden="true">
+              <div class="kc">
+                <div class="kc-chip"></div><div class="kc-logo">СБЕР KIDS</div>
+                <div class="kc-portal"><div class="m-ears"><b></b><b></b></div><span class="eye"></span><span class="eye"></span></div>
+              </div>
+              <span class="spk s1"></span><span class="spk s2"></span><span class="spk s3"></span><span class="spk s4"></span>
+              <div class="m-q">?</div>
             </div>
-            <div class="screen-actions">
-              <button class="btn btn-primary btn-block" data-a="wake">Разбудить кота</button>
-              <div class="fine">${ICON.lock}<span>Нужна камера. Микрофон спросим, только если захочешь поговорить. Видео и голос никуда не сохраняются.</span></div>
+            <div class="screen-text"><h1>Привет! В&nbsp;твоей карте кто-то живёт</h1><p>Он давно ждёт, когда ты заглянешь. Познакомимся?</p></div>
+          </section>
+          <section class="ob-slide" aria-label="Шаг 2 из 3">
+            <div class="ob-art art-table" aria-hidden="true">
+              <div class="tbl"></div>
+              <div class="tc-shadow"></div>
+              <div class="tc"><div class="kc-chip"></div><div class="kc-logo">СБЕР KIDS</div></div>
             </div>
-          </div>
+            <div class="screen-text"><h1>Положи карту на&nbsp;стол</h1><p>Подойдёт любая карта Сбера. На&nbsp;столе с&nbsp;рисунком другу будет проще держаться.</p></div>
+          </section>
+          <section class="ob-slide" aria-label="Шаг 3 из 3">
+            <div class="ob-art art-phone" aria-hidden="true">
+              <div class="ph"><div class="ph-scr"><div class="ph-tbl"></div><div class="ph-card"></div><div class="ph-frame"></div></div><div class="ph-notch"></div></div>
+              <div class="ph-perm">${ICON.cam}<span>Разрешить камеру</span></div>
+            </div>
+            <div class="screen-text"><h1>Разреши камеру и&nbsp;наведи на&nbsp;карту</h1><p>Дальше твой новый друг сам всё расскажет и&nbsp;покажет!</p></div>
+          </section>
+        </div>
+        <div class="ob-foot">
+          <div class="ob-dots" aria-hidden="true"><i class="on"></i><i></i><i></i></div>
+          <button class="btn btn-primary btn-block ob-next" data-a="ob-next" type="button">Познакомиться</button>
+          <button class="btn btn-primary btn-block ob-wake hidden" data-a="wake" type="button">${ICON.cam}<span>Открыть камеру</span></button>
+          <div class="fine">${ICON.lock}<span>Видео и голос остаются в телефоне и никуда не отправляются. Микрофон спросим отдельно.</span></div>
         </div>
       </div>
-      <div class="scan hidden"><span>Наведи камеру на карту</span></div>
+      <div class="scan hidden"><span>${ICON.paw}<em>Наведи камеру на карту</em></span></div>
       <div class="bubble" role="status" aria-live="polite"><span class="who"></span><span class="txt"></span></div>
       <div class="stack">
         <div class="sheet name-sheet namebox hidden">
@@ -161,6 +181,7 @@ export class UI {
       const btn = (e.target as HTMLElement).closest('[data-a]') as HTMLElement | null;
       const a = btn?.getAttribute('data-a');
       if (a === 'wake') h.onWake();
+      if (a === 'ob-next') this.obGo(this.obStep + 1);
       if (a === 'kids') h.onKids();
       if (a === 'shake') h.onShakeButton();
       if (a === 'skip') h.onSkipName();
@@ -202,6 +223,7 @@ export class UI {
     this.mic.addEventListener('contextmenu', (e) => e.preventDefault());
     if (!opts.micSupported) this.mic.dataset.unsupported = '1';
     this.watchKeyboard();
+    this.obSwipe();
   }
 
   /** клавиатура: лист имени поднимается к ней (iOS не сжимает layout viewport) */
@@ -228,12 +250,37 @@ export class UI {
     this.h.onName(v);
   }
 
+  /** онбординг: три шага, свайп и кнопка «дальше»; на последнем — «Открыть камеру» (жест для iOS) */
+  private obStep = 0;
+  private obGo(i: number) {
+    const n = 3;
+    i = Math.max(0, Math.min(n - 1, i));
+    this.obStep = i;
+    this.start.dataset.step = String(i);
+    (this.start.querySelector('.ob-track') as HTMLElement).style.transform = `translateX(${-i * 100}%)`;
+    this.start.querySelectorAll('.ob-dots i').forEach((d, k) => d.classList.toggle('on', k === i));
+    const next = this.start.querySelector('.ob-next') as HTMLElement;
+    next.textContent = ['Познакомиться', 'Готово, лежит', ''][i];
+    next.classList.toggle('hidden', i === n - 1);
+    this.start.querySelector('.ob-wake')!.classList.toggle('hidden', i !== n - 1);
+  }
+  private obSwipe() {
+    let x0 = 0, y0 = 0, on = false;
+    this.start.addEventListener('pointerdown', (e) => ((x0 = e.clientX), (y0 = e.clientY), (on = true)));
+    this.start.addEventListener('pointerup', (e) => {
+      if (!on) return;
+      on = false;
+      const dx = e.clientX - x0, dy = e.clientY - y0;
+      if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) this.obGo(this.obStep + (dx < 0 ? 1 : -1));
+    });
+  }
+
   hideStart() {
     this.start.classList.add('leaving');
     setTimeout(() => this.start.classList.add('hidden'), 300);
   }
   setStartBusy(text: string) {
-    const b = this.start.querySelector('button') as HTMLButtonElement;
+    const b = this.start.querySelector('.ob-wake') as HTMLButtonElement;
     b.innerHTML = `<span class="spinner" aria-hidden="true"></span><span></span>`;
     (b.lastChild as HTMLElement).textContent = text;
     b.disabled = true;
