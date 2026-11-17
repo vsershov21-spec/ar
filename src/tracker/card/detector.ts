@@ -17,7 +17,9 @@
 import {
   type Pt, type Quad, type Intrinsics, type Line, CARD_ASPECT,
   intersect, isConvex, orderClockwise, signedArea, metricShape, applyH, homography, quadDiag, quadDistance, pointInQuad, alignQuad,
+  mul3, invert3, type Mat3,
 } from './geometry';
+import { KeyframeTracker, type AlignResult } from './keyframe';
 
 export interface CardDetectorParams {
   /** порог края не ниже этого (единицы Собеля по 0..255 после размытия) */
@@ -57,6 +59,8 @@ export interface CardDetectorParams {
   detectEvery: number;
   /** трекинг включён */
   track: boolean;
+  /** после посадки — ведение по ключевому кадру (keyframe.ts); false — как до ноября 2026 (стенд «до») */
+  keyframe: boolean;
 }
 
 export const defaultDetectorParams: CardDetectorParams = {
@@ -80,6 +84,7 @@ export const defaultDetectorParams: CardDetectorParams = {
   refineRange: 3,
   detectEvery: 6,
   track: true,
+  keyframe: true,
 };
 
 export interface Segment {
@@ -110,7 +115,7 @@ export interface DetectResult {
   /** 0..1 */
   score: number;
   /** plane — карту ведём по поверхности стола (края карты не подтверждены: размыта, закрыта, ушла из кадра) */
-  mode: 'detect' | 'track' | 'plane' | 'none';
+  mode: 'detect' | 'track' | 'key' | 'plane' | 'none';
   /** время обработки, мс */
   ms: number;
   edgeThreshold: number;
@@ -164,8 +169,10 @@ export class CardDetector {
   /** движение прошлого кадра (гомография кадр→кадр) — начальное приближение для потока */
   private lastH: number[] | null = null;
   private guess(a: Pt): Pt | undefined {
-    if (!this.lastH) return undefined;
-    const b = applyH(this.lastH, a);
+    // гироскоп знает поворот телефона между кадрами точнее, чем «как в прошлый раз»
+    const G = this.gyroG ?? this.lastH;
+    if (!G) return undefined;
+    const b = applyH(G, a);
     const g = { x: b.x - a.x, y: b.y - a.y };
     return Number.isFinite(g.x) && Number.isFinite(g.y) && Math.hypot(g.x, g.y) < 80 ? g : undefined;
   }
@@ -184,6 +191,14 @@ export class CardDetector {
    *  (hint — где карта должна быть по гироскопу), пересадка — только явно (reset). */
   locked = false;
   hint: Quad | null = null;
+  /** радиус поиска той же карты вокруг hint, доли диагонали */
+  hintRadius = 0.6;
+  /** поворот камеры с прошлого кадра (гироскоп), 3×3 в осях изображения; null — нет данных */
+  gyroRot: number[] | null = null;
+  /** сверка с ключевым кадром в этом кадре (null — не было) */
+  keyInfo: { zncc: number; inl: number } | null = null;
+  /** почему в этом кадре так (debug) */
+  why = '';
   /** кандидаты последнего полного поиска (лучшие первыми) — для проверки «это карта?» (verify.ts) */
   lastCandidates: Candidate[] = [];
   /** в этом кадре был полный поиск (lastCandidates — свежие) */
@@ -209,6 +224,10 @@ export class CardDetector {
     this.planeFrames = 0;
   }
   reset() {
+    this.key.reset();
+    this.keyH = null;
+    this.keyVel = null;
+    this.keyQuad = null;
     this.locked = false;
     this.hint = null;
     this.lastH = null;
@@ -244,6 +263,58 @@ export class CardDetector {
     this.prevQuad = null;
   }
 
+  // ───────────── ключевой кадр (после посадки) ─────────────
+  /** шаблон карты, снятый при посадке: выравнивание по нему убирает дрейф и дрожание (keyframe.ts) */
+  readonly key = new KeyframeTracker();
+  /** гомография шаблон → кадр в прошлом кадре (null — в прошлом кадре не выровнялись) */
+  private keyH: Mat3 | null = null;
+  /** движение кадр→кадр по шаблону (прогноз без гироскопа) */
+  private keyVel: Mat3 | null = null;
+  /** углы по шаблону в нумерации детектора (для сопоставления с hint и потоком) */
+  private keyQuad: Quad | null = null;
+  private frameNo = 0;
+  private keyFrame = -1e9;
+  /** кадров подряд без выравнивания по ключевому кадру */
+  private keyFails = 0;
+  /** гомография поворота камеры между кадрами по гироскопу (K·R·K⁻¹) в этом кадре */
+  private gyroG: Mat3 | null = null;
+
+  private gyroHomography(): Mat3 | null {
+    const R = this.gyroRot;
+    if (!R || R.length !== 9) return null;
+    const { f, cx, cy } = this.K;
+    const Kc: Mat3 = [f, 0, cx, 0, f, cy, 0, 0, 1];
+    const Ki: Mat3 = [1 / f, 0, -cx / f, 0, 1 / f, -cy / f, 0, 0, 1];
+    const G = mul3(Kc, mul3(R, Ki));
+    return G.every(Number.isFinite) ? G.map((x) => x / G[8]) : null;
+  }
+
+  /** выравнивание по ключевому кадру от начального приближения H0; null — не сошлось или не та картинка */
+  private tryKey(H0: Mat3, ref: Quad | null): AlignResult | null {
+    const r = this.key.align(this.pyr, this.pyrDims, H0);
+    if (!r) return null;
+    this.keyInfo = { zncc: r.zncc, inl: r.inl };
+    if (r.vis < 0.3 || r.inl < 0.45 || r.zncc < 0.75) return null;
+    // форма — по-прежнему карта (на однотонном участке выравнивание может «растянуть» угол)
+    const m = metricShape(r.quad, this.K);
+    if (!m) return null;
+    const asp = m.aspect >= 1 ? m.aspect : 1 / m.aspect;
+    if (Math.abs(Math.log(asp / CARD_ASPECT)) > 0.3 || Math.abs(m.cos) > 0.5) return (this.keyInfo = { ...this.keyInfo!, zncc: -1 }), null;
+    if (ref) {
+      const a0 = Math.abs(signedArea(ref)), a1 = Math.abs(signedArea(r.quad));
+      if (a1 < a0 * 0.5 || a1 > a0 * 2) return null;
+    }
+    const diag = quadDiag(r.quad);
+    const c = { x: (r.quad[0].x + r.quad[2].x) / 2, y: (r.quad[0].y + r.quad[2].y) / 2 };
+    if (diag < 10 || c.x < -this.w || c.x > 2 * this.w || c.y < -this.h || c.y > 2 * this.h) return null;
+    return r;
+  }
+
+  private keyCandidate(r: AlignResult, ref: Quad | null): Candidate {
+    const quad = ref ? alignQuad(r.quad, ref) : r.quad;
+    return { quad, score: Math.min(1, 0.55 + 0.45 * r.zncc * Math.min(1, r.inl / 0.8)), support: [0, 0, 0, 0], aspect: 0, cos: 0 };
+  }
+
   /** Обработать кадр RGBA (w × h). */
   process(rgba: Uint8ClampedArray | Uint8Array, w: number, h: number, opts: ProcessOptions = {}): DetectResult {
     const t0 = now();
@@ -251,7 +322,11 @@ export class CardDetector {
     const p = this.params;
     this.K = { f: opts.focal ?? focalFromFov(w, h), cx: w / 2, cy: h / 2 };
     [this.pyr, this.prevPyr] = [this.prevPyr, this.pyr];
-    this.edges(rgba);
+    // серый кадр и пирамида — всегда (поток, ключевой кадр); карта краёв — только если понадобится
+    // (полный поиск, ведение по краям): в ведении по ключевому кадру её не считаем (≈ −40 % времени кадра)
+    this.frameRgba = rgba;
+    this.edgesReady = false;
+    this.grayOnly(rgba);
     this.buildPyramid();
 
     let best: Candidate | null = null;
@@ -259,8 +334,37 @@ export class CardDetector {
     let flow: DetectResult['flow'];
     let detectOut: { segments: Segment[]; candidates: Candidate[] } | null = null;
     this.ranDetect = false;
+    this.keyInfo = null;
+    this.why = '';
+    this.frameNo++;
+    this.gyroG = this.gyroHomography();
+    if (!this.locked && this.key.ready) {
+      this.key.reset();
+      this.keyH = this.keyVel = this.keyQuad = null;
+    }
+    const useKey = this.locked && this.key.ready && p.track && p.keyframe && !opts.forceDetect;
+    let keyRes: AlignResult | null = null;
 
-    if (p.track && this.prevQuad && !opts.forceDetect) {
+    // 1. после посадки — прежде всего выравнивание по ключевому кадру (прогноз: прошлая поза × гироскоп)
+    if (useKey) {
+      let H0: Mat3 | null = null;
+      if (this.keyH) H0 = this.gyroG ? mul3(this.gyroG, this.keyH) : this.keyVel ? mul3(this.keyVel, this.keyH) : this.keyH;
+      else if (this.prevQuad && this.keyQuad) {
+        const h = this.key.homographyFor(alignQuad(this.prevQuad, this.keyQuad));
+        H0 = h && this.gyroG ? mul3(this.gyroG, h) : h;
+      } else if (this.hint && this.keyQuad) H0 = this.key.homographyFor(alignQuad(this.hint, this.keyQuad));
+      if (H0) keyRes = this.tryKey(H0, this.prevQuad);
+      if (keyRes) {
+        best = this.keyCandidate(keyRes, this.prevQuad ?? this.keyQuad);
+        mode = 'key';
+        this.sinceDetect++;
+      } else {
+        const ki = this.keyInfo as { zncc: number; inl: number } | null;
+        this.why = ki ? `key✗ z${ki.zncc.toFixed(2)} i${ki.inl.toFixed(2)}` : 'key✗';
+      }
+    }
+
+    if (!best && p.track && this.prevQuad && !opts.forceDetect) {
       const tr = this.trackStep(this.prevQuad, opts.debug);
       flow = tr.flow;
       if (tr.cand) {
@@ -275,6 +379,16 @@ export class CardDetector {
         }
       }
       this.sinceDetect++;
+      // поток/поверхность нашли карту — уточняем по ключевому кадру (снова без дрейфа)
+      if (best && useKey && this.keyQuad) {
+        const h = this.key.homographyFor(alignQuad(best.quad, this.keyQuad));
+        const r = h ? this.tryKey(h, best.quad) : null;
+        if (r) {
+          keyRes = r;
+          best = this.keyCandidate(r, best.quad);
+          mode = 'key';
+        }
+      }
     }
     if (!best || this.sinceDetect >= p.detectEvery) {
       detectOut = this.detect();
@@ -286,11 +400,36 @@ export class CardDetector {
         // посаженный кот: принимаем только «ту же» карту — рядом с текущей/ожидаемой позицией и того же размера
         const ref = best ? best.quad : this.hint;
         if (!ref) d = undefined;
+        else if (mode === 'key') d = undefined; // ведём по ключевому кадру — полный поиск только для проверки «карта Сбера»
         else {
-          const dq = alignQuad(d.quad, ref);
-          const a0 = Math.abs(signedArea(ref)), a1 = Math.abs(signedArea(dq));
-          const near = quadDistance(dq, ref) < (best ? 0.35 : 0.6) * quadDiag(ref);
-          if (!near || a1 < a0 * 0.5 || a1 > a0 * 2) d = undefined;
+          // ищем ту же карту: среди кандидатов рядом с ожидаемым местом; дальше 0,6 диагонали — только если
+          // её подтверждает ключевой кадр (та же картинка), иначе чужой прямоугольник утащил бы кота
+          d = undefined;
+          for (const c of detectOut.candidates.slice(0, 4)) {
+            const dq = alignQuad(c.quad, ref);
+            const a0 = Math.abs(signedArea(ref)), a1 = Math.abs(signedArea(dq));
+            const dist = quadDistance(dq, ref) / quadDiag(ref);
+            const lim = best ? 0.35 : this.hintRadius;
+            if (dist > lim || a1 < a0 * 0.4 || a1 > a0 * 2.5) continue;
+            if (this.key.ready && this.keyQuad) {
+              const h = this.key.homographyFor(alignQuad(c.quad, this.keyQuad));
+              const r = h ? this.tryKey(h, null) : null;
+              if (r) {
+                keyRes = r;
+                d = this.keyCandidate(r, ref);
+                break;
+              }
+              if (dist > 0.6 || best) continue;
+            }
+            if (a1 < a0 * 0.5 || a1 > a0 * 2) continue;
+            d = { ...c, quad: dq };
+            break;
+          }
+          if (d && keyRes && !best) {
+            best = d;
+            mode = 'key';
+            d = undefined;
+          }
         }
       }
       // карта ведётся по поверхности — чужой прямоугольник (книга, телефон) кота не утащит: только рядом с ожидаемым местом
@@ -309,6 +448,38 @@ export class CardDetector {
       }
     }
     this.prevQuad = best ? best.quad : null;
+    // ключевой кадр: состояние выравнивания; съёмка при посадке; редкое обновление при сильной смене масштаба/вида
+    if (mode === 'key' && keyRes) {
+      this.keyFails = 0;
+      this.keyVel = this.keyH ? (() => {
+        const inv = invert3(this.keyH!);
+        return inv ? mul3(keyRes!.H, inv) : null;
+      })() : null;
+      this.keyH = keyRes.H;
+      this.keyQuad = keyRes.quad;
+      const q = keyRes.quad;
+      const wPx = (Math.hypot(q[0].x - q[1].x, q[0].y - q[1].y) + Math.hypot(q[2].x - q[3].x, q[2].y - q[3].y)) / 2;
+      const want = Math.max(20, Math.min(56, wPx / 2)) / this.key.scale;
+      const scaleOff = (want < 0.7 || want > 1.45) && keyRes.inl > 0.75;
+      const lookOff = keyRes.zncc < 0.88 && keyRes.inl > 0.88 && keyRes.vis > 0.9;
+      if ((scaleOff || lookOff) && this.frameNo - this.keyFrame > 15 && this.key.capture(this.gray, this.w, this.h, q, this.frameNo, keyRes.H)) this.keyFrame = this.frameNo;
+    } else {
+      this.keyH = null;
+      this.keyVel = null;
+      if (useKey) this.keyFails++;
+      // ключевой кадр устарел (карта сильно приблизилась/наклонилась, сменился свет) — а края карты её
+      // уверенно подтверждают: новый ключевой кадр с этой позы
+      const stale = useKey && this.keyFails >= 4 && best && mode === 'track' && best.score >= 0.62 && this.frameNo - this.keyFrame > 8;
+      if (stale) this.key.reset();
+      if (this.locked && p.keyframe && best && !this.key.ready && (mode === 'detect' || mode === 'track') && best.score >= 0.5) {
+        if (this.key.capture(this.gray, this.w, this.h, best.quad, this.frameNo)) {
+          this.keyFrame = this.frameNo;
+          this.keyFails = 0;
+          this.keyH = this.key.homographyFor(best.quad);
+          this.keyQuad = best.quad;
+        }
+      } else if (best && mode !== 'plane' && this.keyQuad) this.keyQuad = alignQuad(best.quad, this.keyQuad);
+    }
     if (best && mode !== 'plane') {
       this.anchored = true;
       this.planeFrames = 0;
@@ -317,6 +488,7 @@ export class CardDetector {
 
     const res: DetectResult = { quad: best ? best.quad : null, score: best ? best.score : 0, mode: best ? mode : 'none', ms: now() - t0, edgeThreshold: this.thr };
     if (opts.debug) {
+      this.ensureEdges();
       res.edges = this.edge.slice();
       res.flow = flow;
       if (detectOut) {
@@ -329,6 +501,22 @@ export class CardDetector {
 
   // ───────────── края ─────────────
 
+  private frameRgba: Uint8ClampedArray | Uint8Array | null = null;
+  private edgesReady = false;
+  /** карта краёв текущего кадра (лениво) */
+  private ensureEdges() {
+    if (this.edgesReady || !this.frameRgba) return;
+    this.edgesReady = true;
+    this.edges(this.frameRgba);
+  }
+
+  /** серый = размытие [1 4 6 4 1] яркости (то же, что яркость размытых каналов: обе операции линейны) */
+  private grayOnly(rgba: Uint8ClampedArray | Uint8Array) {
+    const n = this.w * this.h, g = this.gray;
+    for (let i = 0, j = 0; i < n; i++, j += 4) g[i] = 0.299 * rgba[j] + 0.587 * rgba[j + 1] + 0.114 * rgba[j + 2];
+    this.blur5(g);
+  }
+
   private edges(rgba: Uint8ClampedArray | Uint8Array) {
     const { w, h } = this;
     const n = w * h;
@@ -339,8 +527,6 @@ export class CardDetector {
       B[i] = rgba[j + 2];
     }
     for (const c of this.ch) this.blur5(c);
-    const gray = this.gray;
-    for (let i = 0; i < n; i++) gray[i] = 0.299 * R[i] + 0.587 * G[i] + 0.114 * B[i];
 
     const { jxx, jxy, jyy, mag, theta } = this;
     jxx.fill(0);
@@ -424,6 +610,7 @@ export class CardDetector {
   // ───────────── отрезки ─────────────
 
   segments(): Segment[] {
+    this.ensureEdges();
     const { w, h, edge, mag, theta, used } = this;
     const p = this.params;
     used.fill(0);
@@ -662,6 +849,7 @@ export class CardDetector {
 
   /** Оценка четырёхугольника: подтверждение сторон краем × метрика × размер. null — не карта. */
   evaluate(q: Quad): Candidate | null {
+    this.ensureEdges();
     const p = this.params;
     if (!isConvex(q)) return null;
     const m = metricShape(q, this.K);
@@ -757,6 +945,7 @@ export class CardDetector {
 
   /** Уточнение сторон: максимум градиента по нормали в ±range px, робастная прямая; углы — пересечения. */
   refine(q: Quad, range: number): Quad | null {
+    this.ensureEdges();
     const lines: Line[] = [];
     const thr = this.thr * 0.6;
     for (let k = 0; k < 4; k++) {

@@ -38,6 +38,15 @@ export interface SynthOptions {
   noiseSeed?: number;
   /** без карты (негативный пример) */
   noCard?: boolean;
+  /**
+   * Поворот камеры (телефона) от исходного положения, градусы: [вокруг X (кивок), вокруг Y (поворот), вокруг Z (крен)]
+   * в осях камеры three.js. Сцена (карта и стол на её плоскости) неподвижна в мире — для гироскопа на стенде.
+   */
+  camRot?: [number, number, number];
+  /** сдвиг камеры в мире (в ширинах карты), оси камеры в исходном положении */
+  camPos?: [number, number, number];
+  /** положение пальца/ладони (доли кадра) и радиус (доля длинной стороны) — вместо случайного */
+  fingerAt?: { x: number; y: number; r?: number };
 }
 
 export interface Tex {
@@ -91,6 +100,21 @@ function rotZ(v: V3, a: number): V3 {
   return [c * v[0] - s * v[1], s * v[0] + c * v[1], v[2]];
 }
 
+/** матрица поворота камеры (построчно 3×3) по углам [x, y, z] в градусах: R = Ry · Rx · Rz */
+export function camMatrix(a: [number, number, number]): number[] {
+  const d = Math.PI / 180;
+  const [x, y, z] = [a[0] * d, a[1] * d, a[2] * d];
+  const cx = Math.cos(x), sx = Math.sin(x), cy = Math.cos(y), sy = Math.sin(y), cz = Math.cos(z), sz = Math.sin(z);
+  const Rx = [1, 0, 0, 0, cx, -sx, 0, sx, cx], Ry = [cy, 0, sy, 0, 1, 0, -sy, 0, cy], Rz = [cz, -sz, 0, sz, cz, 0, 0, 0, 1];
+  const m = (A: number[], B: number[]) => [0, 1, 2].flatMap((i) => [0, 1, 2].map((j) => A[i * 3] * B[j] + A[i * 3 + 1] * B[3 + j] + A[i * 3 + 2] * B[6 + j]));
+  return m(Ry, m(Rx, Rz));
+}
+
+/** только углы карты (без рендера) — эталон на любой момент времени */
+export function sceneCorners(o: SynthOptions): { x: number; y: number }[] {
+  return renderCardScene({ ...o, w: o.w ?? 320, h: o.h ?? 240, cornersOnly: true } as SynthOptions).corners;
+}
+
 export function renderCardScene(o: SynthOptions = {}): SynthFrame {
   const w = o.w ?? 320, h = o.h ?? 240;
   const R = rng(o.seed ?? 1);
@@ -100,8 +124,18 @@ export function renderCardScene(o: SynthOptions = {}): SynthFrame {
   const D = o.dist ?? 2.2;
   // базис карты: X, Y в плоскости, N — нормаль к камере; камера смотрит в −Z (как three.js)
   const tr = (v: V3) => rotX(rotZ(v, yaw), -tilt);
-  const r1 = tr([1, 0, 0]), r2 = tr([0, 1, 0]), r3 = tr([0, 0, 1]);
-  const t: V3 = [(o.ox ?? 0) * D * (w / f), -(o.oy ?? 0) * D * (h / f), -D];
+  let r1 = tr([1, 0, 0]), r2 = tr([0, 1, 0]), r3 = tr([0, 0, 1]);
+  let t: V3 = [(o.ox ?? 0) * D * (w / f), -(o.oy ?? 0) * D * (h / f), -D];
+  if (o.camRot || o.camPos) {
+    // камера повернулась на Rc и сдвинулась на c: точка мира P в новых осях камеры — Rcᵀ (P − c)
+    const Rc = camMatrix(o.camRot ?? [0, 0, 0]);
+    const c = o.camPos ?? [0, 0, 0];
+    const inv = (v: V3): V3 => [Rc[0] * v[0] + Rc[3] * v[1] + Rc[6] * v[2], Rc[1] * v[0] + Rc[4] * v[1] + Rc[7] * v[2], Rc[2] * v[0] + Rc[5] * v[1] + Rc[8] * v[2]];
+    r1 = inv(r1);
+    r2 = inv(r2);
+    r3 = inv(r3);
+    t = inv([t[0] - c[0], t[1] - c[1], t[2] - c[2]]);
+  }
   const aspect = o.shape?.aspect ?? CARD_A;
   const radius = o.shape?.radius ?? CARD_R;
   const hh = 0.5 / aspect;
@@ -110,6 +144,7 @@ export function renderCardScene(o: SynthOptions = {}): SynthFrame {
     return { x: cx + (f * P[0]) / -P[2] - 0.5, y: cy - (f * P[1]) / -P[2] - 0.5 };
   };
   const corners = [proj(-0.5, hh), proj(0.5, hh), proj(0.5, -hh), proj(-0.5, -hh)];
+  if ((o as { cornersOnly?: boolean }).cornersOnly) return { w, h, rgba: new Uint8ClampedArray(0), corners, focal: f };
 
   // фон
   const bg = o.bg ?? 'wood';
@@ -196,9 +231,14 @@ export function renderCardScene(o: SynthOptions = {}): SynthFrame {
   };
   const N = dot(r3, t);
   // палец: капсула от края кадра к точке на стороне карты
-  const fingerAt = proj(-0.1 + R() * 0.3, -hh);
-  const fingerFrom = { x: fingerAt.x + (R() - 0.5) * w * 0.3, y: h + 20 };
-  const fingerR = Math.max(w, h) * 0.045;
+  let fingerAt = proj(-0.1 + R() * 0.3, -hh);
+  let fingerFrom = { x: fingerAt.x + (R() - 0.5) * w * 0.3, y: h + 20 };
+  let fingerR = Math.max(w, h) * 0.045;
+  if (o.fingerAt) {
+    fingerAt = { x: o.fingerAt.x * w, y: o.fingerAt.y * h };
+    fingerFrom = { x: fingerAt.x + w * 0.1, y: h + 40 };
+    fingerR = Math.max(w, h) * (o.fingerAt.r ?? 0.06);
+  }
   const inFinger = (x: number, y: number) => {
     if (!o.finger) return 0;
     const ax = fingerFrom.x, ay = fingerFrom.y, bx = fingerAt.x, by = fingerAt.y - fingerR * 0.6;

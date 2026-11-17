@@ -88,7 +88,7 @@ export class CardVerifier {
     // только кадры полного поиска: там углы точные (при ведении потоком углы могут «плыть» на несколько px,
     // а знак Сбера на карте — 5–10 px). Ведение по поверхности (plane) — края не подтверждены, тем более нет.
     let qv: Quad | null = r.mode === 'detect' ? q : null;
-    if (!qv && r.mode === 'track' && det.ranDetect) {
+    if (!qv && (r.mode === 'track' || r.mode === 'key') && det.ranDetect) {
       // полный поиск был, но победило ведение: берём тот же прямоугольник из полного поиска (точные углы)
       const c = det.lastCandidates.find((c) => quadDistance(alignQuad(c.quad, q), q) < 0.08 * quadDiag(q));
       if (c) qv = c.quad;

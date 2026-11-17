@@ -3,16 +3,14 @@
  * Web Worker детектора карты: кадр RGBA (уменьшенный) → углы карты. Один детектор на всё время:
  * он помнит прошлый кадр и между полными поисками ведёт карту оптическим потоком.
  */
-import { CardDetector } from './detector';
-import { CardVerifier, type CropIn, type VerifyReport } from './verifier';
+import { CardPipeline, type PipelineOut } from './pipeline';
+import type { CropIn } from './verifier';
 
-const det = new CardDetector();
-/** «это карта Сбера?» по содержимому кандидата (verify.ts) */
-const ver = new CardVerifier();
-/** полный поиск раз в N кадров (энергобюджет) */
-let detectEvery = det.params.detectEvery;
+const pipe = new CardPipeline();
 
 export interface CardWorkerIn {
+  /** номер кадра: ответ сопоставляется с ориентацией телефона в момент съёмки */
+  id?: number;
   rgba: ArrayBuffer;
   /** кадр камеры без копирования на главном потоке (WebCodecs VideoFrame): уменьшаем и читаем пиксели здесь */
   frame?: VideoFrame;
@@ -25,6 +23,10 @@ export interface CardWorkerIn {
   lock?: boolean;
   /** где карта должна быть (кадр детектора), пока её не видно */
   hint?: { x: number; y: number }[] | null;
+  /** радиус поиска той же карты вокруг hint, доли диагонали */
+  hintRadius?: number;
+  /** поворот камеры с прошлого отправленного кадра (гироскоп), 3×3 в осях изображения */
+  rot?: number[] | null;
   /** энергобюджет: полный поиск раз в N кадров (кот посажен, телефон неподвижен — реже) */
   detectEvery?: number;
   /** проверять «это карта Сбера?» (false — ?anycard: любой прямоугольник) */
@@ -36,50 +38,29 @@ export interface CardWorkerIn {
    */
   crop?: { x0: number; y0: number; w: number; h: number; cw: number; ch: number; rgba?: ArrayBuffer } | null;
 }
-export interface CardWorkerOut {
-  quad: { x: number; y: number }[] | null;
-  score: number;
-  mode: string;
-  ms: number;
+export interface CardWorkerOut extends PipelineOut {
   buf: ArrayBuffer;
-  /** проверка по содержимому (нет — проверка выключена) */
-  ver?: VerifyReport;
 }
 
 self.onmessage = (e: MessageEvent<CardWorkerIn>) => {
   const m = e.data;
-  if (m.reset) {
-    det.reset();
-    ver.reset();
-    if (m.w <= 1) return; // только сброс (сменился размер кадра) — без ответа
-  }
-  if (m.lock !== undefined) det.locked = m.lock;
-  if (m.hint !== undefined) det.hint = (m.hint as never) ?? null;
-  if (m.detectEvery) detectEvery = m.detectEvery;
-  // пока кот не посажен и идёт проверка «это карта Сбера?» — полный поиск через кадр: проверяем только кадры
-  // полного поиска (точные углы). По времени полный поиск ≈ ведению потоком (края считаются в каждом кадре)
-  det.params.detectEvery = !det.locked && m.verify !== false ? Math.min(2, detectEvery) : detectEvery;
-  let out: CardWorkerOut;
   let crop: CropIn | null = null;
   if (m.frame) {
     const px = readFrame(m.frame, m.w, m.h, m.crop ?? null);
     if (!px) {
-      (self as unknown as Worker).postMessage({ quad: null, score: 0, mode: 'no-frame', ms: 0, buf: new ArrayBuffer(4) } satisfies CardWorkerOut);
+      (self as unknown as Worker).postMessage({ id: m.id, quad: null, score: 0, mode: 'no-frame', ms: 0, buf: new ArrayBuffer(4) } satisfies CardWorkerOut);
       return;
     }
     m.rgba = px.buffer as ArrayBuffer;
     if (cropPx && m.crop) crop = { img: { rgba: cropPx, w: m.crop.cw, h: m.crop.ch }, x0: m.crop.x0, y0: m.crop.y0, w: m.crop.w, h: m.crop.h };
   } else if (m.crop?.rgba) crop = { img: { rgba: new Uint8ClampedArray(m.crop.rgba), w: m.crop.cw, h: m.crop.ch }, x0: m.crop.x0, y0: m.crop.y0, w: m.crop.w, h: m.crop.h };
+  let out: CardWorkerOut;
   try {
-    const lo = new Uint8ClampedArray(m.rgba);
-    const r = det.process(lo, m.w, m.h, { focal: m.focal });
-    out = { quad: r.quad, score: r.score, mode: r.mode, ms: r.ms, buf: m.rgba };
-    if (m.verify !== false) {
-      out.ver = ver.step(det, r, { rgba: lo, w: m.w, h: m.h }, { f: m.focal, cx: m.w / 2, cy: m.h / 2 }, performance.now(), crop);
-      out.ms += out.ver.ms;
-    }
+    const r = pipe.process({ ...m, rgba: new Uint8ClampedArray(m.rgba), crop });
+    if (!r) return; // только сброс
+    out = { ...r, buf: m.rgba };
   } catch (err) {
-    out = { quad: null, score: 0, mode: 'error:' + String(err), ms: 0, buf: m.rgba };
+    out = { id: m.id, quad: null, score: 0, mode: 'error:' + String(err), ms: 0, buf: m.rgba };
   }
   (self as unknown as Worker).postMessage(out, [m.rgba]);
 };
