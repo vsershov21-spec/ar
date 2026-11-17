@@ -55,6 +55,11 @@ export class MicInput {
     return this.open();
   }
 
+  /** микрофон кому-то нужен, но закрыт (iOS закрыла дорожку при звонке/сворачивании) — открыть снова */
+  ensureOpen(): Promise<boolean> {
+    return this.users > 0 ? this.open() : Promise.resolve(false);
+  }
+
   /** Отпустить; когда пользователей нет — закрыть через idleCloseMs */
   release() {
     this.users = Math.max(0, this.users - 1);
@@ -66,41 +71,57 @@ export class MicInput {
 
   private open(): Promise<boolean> {
     if (this.node) return Promise.resolve(true);
-    this.opening ??= (async () => {
-      const ctx = this.audio.ctx;
-      if (!this.supported || !ctx) {
-        this.error = 'unsupported';
-        return false;
-      }
-      try {
-        if (ctx.state !== 'running') await ctx.resume().catch(() => undefined);
-        this.audio.setSession('play-and-record');
-        this.stream = await navigator.mediaDevices.getUserMedia({
-          audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: false, channelCount: 1 },
-        });
-        this.src = ctx.createMediaStreamSource(this.stream);
-        const node = ctx.createScriptProcessor(2048, 1, 1);
-        node.onaudioprocess = (e) => this.process(e.inputBuffer.getChannelData(0), ctx.sampleRate);
-        // ScriptProcessor работает, только если подключён к выходу — через нулевую громкость
-        this.sink = ctx.createGain();
-        this.sink.gain.value = 0;
-        this.src.connect(node);
-        node.connect(this.sink);
-        this.sink.connect(ctx.destination);
-        this.node = node;
-        this.floor.reset(true); // калибровка шума 2 с после включения
-        this.error = null;
-        return true;
-      } catch (e: any) {
-        this.error = e?.name === 'NotAllowedError' ? 'not-allowed' : e?.name === 'NotFoundError' ? 'no-device' : String(e?.message ?? e);
-        this.audio.setSession('playback');
-        this.cleanup();
-        return false;
-      } finally {
-        this.opening = null;
-      }
-    })();
-    return this.opening;
+    if (this.opening) return this.opening;
+    // Сначала присваиваем, потом очищаем по завершении. Раньше было `opening ??= (async () => {… finally opening = null})()`:
+    // если открыть было нельзя сразу (AudioContext ещё не создан — «слушаю всегда» до жеста), finally срабатывал
+    // синхронно ДО присваивания, и в opening навсегда оставался готовый false — микрофон больше не открывался никогда.
+    const p = this.doOpen();
+    this.opening = p;
+    void p.then(() => {
+      if (this.opening === p) this.opening = null;
+    });
+    return p;
+  }
+
+  private async doOpen(): Promise<boolean> {
+    const ctx = this.audio.ctx;
+    if (!this.supported || !ctx) {
+      this.error = 'unsupported';
+      return false;
+    }
+    try {
+      if (ctx.state !== 'running') await ctx.resume().catch(() => undefined);
+      this.audio.setSession('play-and-record');
+      this.stream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: false, channelCount: 1 },
+      });
+      this.src = ctx.createMediaStreamSource(this.stream);
+      const node = ctx.createScriptProcessor(2048, 1, 1);
+      node.onaudioprocess = (e) => this.process(e.inputBuffer.getChannelData(0), ctx.sampleRate);
+      // ScriptProcessor работает, только если подключён к выходу — через нулевую громкость
+      this.sink = ctx.createGain();
+      this.sink.gain.value = 0;
+      this.src.connect(node);
+      node.connect(this.sink);
+      this.sink.connect(ctx.destination);
+      this.node = node;
+      // iOS: звонок/Siri/сворачивание может завершить дорожку — тогда микрофон считаем закрытым (откроется заново)
+      const track = this.stream.getAudioTracks()[0];
+      if (track) track.onended = () => {
+        if (this.node === node) {
+          this.error = 'ended';
+          this.cleanup();
+        }
+      };
+      this.floor.reset(true); // калибровка шума 2 с после включения
+      this.error = null;
+      return true;
+    } catch (e: any) {
+      this.error = e?.name === 'NotAllowedError' ? 'not-allowed' : e?.name === 'NotFoundError' ? 'no-device' : String(e?.message ?? e);
+      this.audio.setSession('playback');
+      this.cleanup();
+      return false;
+    }
   }
 
   private process(x: Float32Array, sr: number) {

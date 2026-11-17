@@ -386,6 +386,9 @@
       "clip": "laugh",
       "sound": "giggle"
     },
+    "help": {
+      "clip": "talk_casual"
+    },
     "thanks": {},
     "echo_start": {
       "clip": "listen",
@@ -1111,13 +1114,13 @@
         "id": "kind.sleep.01",
         "text": "Я немножко подремлю... совсем чуть-чуть...",
         "emotion": "sleepy",
-        "face": "sleep"
+        "face": "sleepy"
       },
       {
         "id": "kind.sleep.02",
         "text": "Сладких снов мне... мур...",
         "emotion": "sleepy",
-        "face": "sleep"
+        "face": "sleepy"
       }
     ],
     "wake_up": [
@@ -1766,6 +1769,26 @@
         "face": "neutral"
       }
     ],
+    "help": [
+      {
+        "id": "kind.help.01",
+        "text": "Я умею петь, танцевать и загадывать загадки. Скажи «спой».",
+        "emotion": "caring",
+        "face": "caring"
+      },
+      {
+        "id": "kind.help.02",
+        "text": "Попроси «расскажи шутку» или «загадай загадку». Я с радостью.",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "kind.help.03",
+        "text": "Я пока знаю немного слов. Скажи «танцуй» или «повторяй за мной».",
+        "emotion": "neutral",
+        "face": "neutral"
+      }
+    ],
     "thanks": [
       {
         "id": "kind.thanks.01",
@@ -1913,7 +1936,7 @@
         "id": "kind.evening.01",
         "text": "Уже вечер. Немножко поиграем — и отдыхать.",
         "emotion": "sleepy",
-        "face": "sleep"
+        "face": "sleepy"
       },
       {
         "id": "kind.evening.02",

@@ -31,6 +31,8 @@ import { makeAsr, VoskAsr, type Asr, type AsrState } from './asr';
 import { EchoMode, type EchoPreset } from './echo';
 import { SoundEvents, Vad, db, type Frame } from './vad';
 import { grammarPhrases, intentContext, matchIntent, setIntentContext, type IntentMatch } from './intents';
+import { classifyUtterance, type ListenReason } from './utterance';
+import { turn } from './turn';
 
 export type MicMode = 'ptt' | 'auto';
 export type VoiceEventId = 'echo_start' | 'echo_done' | 'echo_stop' | 'loud' | 'whisper' | 'clap' | 'barge_in' | 'listen_timeout';
@@ -72,6 +74,10 @@ export interface ListenOpts {
 }
 
 const SELF_MUTE_TAIL_MS = 250;
+/** окно ответа после реплики-вопроса в «слушаю всегда» (ребёнку 6–13 лет нужно время подумать) */
+export const QUESTION_WINDOW_MS = 8000;
+/** ребёнок заговорил — новые реплики кота ждут (release — когда фраза разобрана) */
+const USER_HOLD_MS = 5000;
 /** заглушка текста для сценария: «ребёнок что-то сказал» в режиме повтора (распознавания нет) */
 export const ECHO_HEARD = '…';
 
@@ -94,6 +100,9 @@ export class VoiceEngine extends Emitter<EngineEvents> {
   private ring: Float32Array[] = [];
   private ringLen = 0;
   private autoMicHeld = false;
+  /** текущая фраза: почему слушали, сколько длился голос (VAD), — для classifyUtterance */
+  private utter = { reason: null as ListenReason, speechMs: 0 };
+  private lastUnknownAt = -1e9;
   private st = { asrState: 'idle' as AsrState, modelProgress: 0, lastText: '', lastIntent: '', lastConfidence: 0, lastEvent: '' };
   /** пресет повтора текущего характера (app.ts: из persona.voice) */
   echoPreset: () => EchoPreset = () => ({ echoPitchSemitones: 5, echoRate: 1.05 });
@@ -145,21 +154,7 @@ export class VoiceEngine extends Emitter<EngineEvents> {
       this.fire('echo_done', { count: this.echo.count });
     };
     voice.onSpeaking = (on) => this.onCatSpeaking(on);
-    this.asr.onResult = (t) => {
-      // «слушаю всегда»: фраза, начатая самим ребёнком (не ответ на вопрос и не кнопка), — реагируем только на понятое.
-      // Шум, телевизор, разговор взрослых не должны превращаться в «не расслышал» каждые 10 секунд.
-      if (this.listenReason === 'vad' && !intentContext().question) {
-        const m = matchIntent(t, intentContext());
-        if (!t.trim() || m.intent === 'unknown' || m.confidence < 0.5) {
-          this.st.lastText = t;
-          this.st.lastIntent = 'ignored:' + m.intent;
-          this.pushState();
-          setTimeout(() => !this.listening && this.voice.release(), 50);
-          return;
-        }
-      }
-      this.handleText(t, 'asr');
-    };
+    this.asr.onResult = (t) => this.onAsrResult(t);
     this.asr.onInterim = (t) => this.emit('interim', t);
     this.asr.onState = (s, m) => {
       this.st.asrState = s;
@@ -167,6 +162,7 @@ export class VoiceEngine extends Emitter<EngineEvents> {
         this.listening = false;
         this.listenReason = null;
         this.audio.duck(false, 'mic');
+        turn.userEnd();
         // ребёнок замолчал — коту можно продолжать
         setTimeout(() => !this.listening && this.voice.release(), 400);
       }
@@ -179,6 +175,12 @@ export class VoiceEngine extends Emitter<EngineEvents> {
     };
     this.mic.on((buf, frames, sr) => this.onAudio(buf, frames, sr));
     if (opts.mode === 'auto') this.setMode('auto');
+    // iOS: после звонка/сворачивания дорожка микрофона закрыта — «слушаю всегда» открывает её снова
+    if (typeof document !== 'undefined')
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible' && this.mode === 'auto' && this.autoMicHeld && !this.mic.isOpen)
+          setTimeout(() => void this.mic.ensureOpen().then(() => this.pushState()), 300);
+      });
     if (typeof window !== 'undefined') (window as any).__voice = this.api();
   }
 
@@ -204,6 +206,8 @@ export class VoiceEngine extends Emitter<EngineEvents> {
     }
     this.listening = true;
     this.listenReason = reason;
+    // VAD уже насчитал начало фразы (120 мс) до старта распознавания
+    this.utter = { reason, speechMs: reason === 'vad' || reason === 'barge' ? this.vad.durMs : 0 };
     this.asr.paused = this.selfMuted;
     this.audio.duck(true, 'mic');
     this.asr.start(reason === 'barge' || reason === 'vad' ? this.ring.slice() : undefined);
@@ -289,7 +293,9 @@ export class VoiceEngine extends Emitter<EngineEvents> {
       setTimeout(() => (this.asr.paused = this.selfMuted), SELF_MUTE_TAIL_MS + 5);
       // «слушаю сам»: реплика кончилась вопросом — окно ответа (в 'ptt' окна открывает director)
       const t = this.voice.last?.text ?? '';
-      if (this.mode === 'auto' && !this.echo.active && /\?\s*[»"]?\s*$/.test(t) && !this.listening) this.listen({ windowMs: 5000 });
+      const question = /\?\s*[»"]?\s*$/.test(t);
+      if (question) turn.catQuestion();
+      if (this.mode === 'auto' && !this.echo.active && question && !this.listening) this.listen({ windowMs: QUESTION_WINDOW_MS });
     }
     this.pushState();
   }
@@ -326,20 +332,53 @@ export class VoiceEngine extends Emitter<EngineEvents> {
       if (this.selfMuted) continue;
       this.mic.floor.push(f, this.vad.speaking);
       const ev = this.vad.push(f);
-      // «слушаю всегда»: заговорили — сразу распознаём (начало фразы — из кольца)
-      if (ev?.type === 'start' && this.mode === 'auto' && !this.listening && !this.echo.active) this.startListening('vad');
+      if (ev?.type === 'start' && !this.echo.active) {
+        turn.userStart();
+        // ребёнок заговорил — кот не начинает новую реплику, пока фраза не разобрана
+        if (this.mode === 'auto' || this.listening) this.voice.hold(USER_HOLD_MS);
+        // «слушаю всегда»: заговорили — сразу распознаём (начало фразы — из кольца)
+        if (this.mode === 'auto' && !this.listening) this.startListening('vad');
+      }
       if (ev?.type === 'end') {
+        turn.userEnd();
+        if (this.listening) this.utter.speechMs = Math.max(this.utter.speechMs, ev.durMs);
         const w = this.sound.phraseEnded(ev.durMs, this.vad.stats);
         if (w && !this.echo.active) this.fire('whisper', { meanDb: +(this.vad.stats.sumDb / Math.max(1, this.vad.stats.n)).toFixed(1) });
         if (this.listenReason === 'window' || this.listenReason === 'barge' || this.listenReason === 'vad') this.asr.stop(); // фраза кончилась — не ждём таймаута
       }
       const s = this.sound.push(f);
       // в повторе громкость — часть игры (кот повторит и крик), хлопки/шёпот не отвлекают; в окне ответа — без хлопков
-      if (s && !this.echo.active && !(this.listening && s === 'clap')) this.fire(s, { db: +db(f.rms).toFixed(1) });
+      // тап пальцем по телефону микрофон слышит как хлопок — сразу после касания «хлопки» не считаем
+      const tapNoise = s === 'clap' && performance.now() - turn.get().lastTouchAt < 1000;
+      if (s && !this.echo.active && !tapNoise && !(this.listening && s === 'clap')) this.fire(s, { db: +db(f.rms).toFixed(1) });
     }
   }
 
   // ───────────── текст ─────────────
+  /**
+   * Результат распознавания → ответ кота. Каждая настоящая фраза получает ответ (команда или «не понял»),
+   * шум и обрывки — нет (правила — utterance.ts). Важно: Vosk сообщает «idle» раньше результата, поэтому
+   * причина слушания берётся из this.utter, а не из listenReason (тот уже сброшен).
+   */
+  private onAsrResult(t: string) {
+    const now = performance.now();
+    const unk = this.asr.lastUnk ?? 0;
+    const v = classifyUtterance({ text: t, unk, speechMs: this.utter.speechMs, reason: this.utter.reason, ctx: intentContext(), now, lastUnknownAt: this.lastUnknownAt });
+    this.st.lastText = t || (unk ? '[unk]' : '');
+    if (v.kind === 'noise') {
+      this.st.lastIntent = `ignored:${v.why}`;
+      this.st.lastEvent = `шум/обрывок (${v.why}, голос ${Math.round(this.utter.speechMs)} мс)`;
+      if (this.utter.reason === 'ptt' || this.utter.reason === 'window') this.emit('interim', 'Не расслышал — скажи ещё раз');
+      this.pushState();
+      setTimeout(() => !this.listening && this.voice.release(), 50);
+      return;
+    }
+    if (v.kind === 'unknown') this.lastUnknownAt = now;
+    // слова вне словаря: в подсказке «…», затем честно — «слышу, но не разобрал»
+    this.handleText(t || ECHO_HEARD, 'asr');
+    if (!t) this.emit('interim', 'Слышу тебя, но слова не разобрал');
+  }
+
   /** распознанный текст или чип → событие text (app → director.text) */
   handleText(text: string, source: 'asr' | 'chip' | 'api' | 'echo' = 'api') {
     const ctx = intentContext();

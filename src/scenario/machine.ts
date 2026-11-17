@@ -145,6 +145,9 @@ export const nextPersona = (cur: PersonaId | null): PersonaId => PERSONA_IDS[(cu
 
 const isPlay = (p: Phase) => p === 'play' || p === 'free';
 
+/** ответ на n-ю непонятую фразу подряд: unknown (переспросить) или help («я пока умею…») */
+export const unknownReply = (n: number): 'unknown' | 'help' => (n % 2 === 0 ? 'help' : 'unknown');
+
 /* ───────── переходы ───────── */
 
 function enterPlay(s: ScenarioState, cfg: ScenarioConfig, a: Action[]): ScenarioState {
@@ -291,12 +294,18 @@ function onHeard(s: ScenarioState, h: Heard, cfg: ScenarioConfig, a: Action[]): 
     return { ...s, name: h.known ? h.name : s.name };
   }
   if (t === 'unknown') {
+    // не понял: 1-й раз — переспросить, 2-й — «я пока умею…» с 2–3 командами и кнопками-подсказками,
+    // дальше по очереди (варианты реплик не повторяются — picker), чтобы не звучало одно и то же
     const n = s.unknownStreak + 1;
-    a.push({ type: 'react', event: 'unknown' });
+    a.push({ type: 'react', event: unknownReply(n) });
     if (n >= 2) a.push({ type: 'ui', ui: 'chips', show: true });
     return { ...s, unknownStreak: n };
   }
-  if (t === 'yes' || t === 'no' || t === 'giveup') return s; // вне вопроса — молчим
+  // «да»/«нет» на реплику-вопрос вне диалога («Может, постучать тебе в экран?» — «давай») — короткий ответ
+  if (t === 'yes' || t === 'no' || t === 'giveup') {
+    a.push({ type: 'react', event: t === 'yes' ? 'yes' : 'no' });
+    return { ...s, unknownStreak: 0 };
+  }
   a.push({ type: 'react', event: t });
   return { ...s, unknownStreak: 0, boredCount: 0 };
 }

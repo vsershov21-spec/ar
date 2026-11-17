@@ -137,7 +137,7 @@ export const SOUND_DEFAULTS: SoundEventOpts = {
   clapMarginDb: 28, clapPeakDb: -12, clapMaxMs: 80,
   whisperDb: -38, whisperZcr: 0.12, whisperMinMs: 500,
   // как в content/events.json
-  cooldownMs: { loud: 5000, whisper: 8000, clap: 3000 },
+  cooldownMs: { loud: 15000, whisper: 8000, clap: 20000 },
 };
 
 export class SoundEvents {

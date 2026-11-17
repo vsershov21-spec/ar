@@ -396,6 +396,9 @@
       "clip": "laugh",
       "sound": "giggle"
     },
+    "help": {
+      "clip": "talk_excited"
+    },
     "thanks": {},
     "echo_start": {
       "clip": "listen",
@@ -1158,13 +1161,13 @@
         "id": "glitter.sleep.01",
         "text": "Пойду посмотрю красивый сон...",
         "emotion": "sleepy",
-        "face": "sleep"
+        "face": "sleepy"
       },
       {
         "id": "glitter.sleep.02",
         "text": "Тихо... Я дремлю... мур...",
         "emotion": "sleepy",
-        "face": "sleep"
+        "face": "sleepy"
       }
     ],
     "wake_up": [
@@ -1849,6 +1852,26 @@
         "face": "proud"
       }
     ],
+    "help": [
+      {
+        "id": "glitter.help.01",
+        "text": "Я умею танцевать, петь и блестеть! Скажи «танцуй».",
+        "emotion": "excited",
+        "face": "excited"
+      },
+      {
+        "id": "glitter.help.02",
+        "text": "Скажи «загадку» или «шутку» — и начнём шоу!",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "glitter.help.03",
+        "text": "Я пока учусь новым словам. Скажи «сальто» или «повторяй за мной».",
+        "emotion": "neutral",
+        "face": "neutral"
+      }
+    ],
     "thanks": [
       {
         "id": "glitter.thanks.01",
@@ -1996,7 +2019,7 @@
         "id": "glitter.evening.01",
         "text": "Уже вечер... скоро красивые сны.",
         "emotion": "sleepy",
-        "face": "sleep"
+        "face": "sleepy"
       },
       {
         "id": "glitter.evening.02",

@@ -32,6 +32,8 @@ export interface Asr {
   /** заранее загрузить модель (без микрофона) */
   preload?(): Promise<boolean>;
   setGrammar?(phrases: string[] | null): void;
+  /** сколько слов вне грамматики ([unk]) было в последней фразе — «речь есть, но не из словаря» */
+  lastUnk?: number;
 }
 
 const MAX_HOLD_MS = 8000;
@@ -167,6 +169,9 @@ export class VoskAsr implements Asr {
   private listening = false;
   private aborted = false;
   private grammar: string[] | null = null;
+  private unkFinal = 0;
+  private unkPartial = 0;
+  lastUnk = 0;
   paused = false;
   onResult = (_: string) => {};
   onInterim = (_: string) => {};
@@ -208,6 +213,7 @@ export class VoskAsr implements Asr {
     this.aborted = false;
     this.final = '';
     this.partial = '';
+    this.unkFinal = this.unkPartial = this.lastUnk = 0;
     const micOk = this.mic.acquire();
     const ok = await this.preload();
     if (!(await micOk) || !ok) {
@@ -223,11 +229,17 @@ export class VoskAsr implements Asr {
     const sr = this.mic.sampleRate;
     const rec = this.grammar ? new this.model.KaldiRecognizer(sr, JSON.stringify(this.grammar)) : new this.model.KaldiRecognizer(sr);
     rec.on('result', (m: any) => {
-      const t = m.result?.text ?? '';
-      if (t && t !== '[unk]') this.final += t.replace(/\[unk\]/g, '').trim() + ' ';
+      const t: string = m.result?.text ?? '';
+      this.unkFinal += (t.match(/\[unk\]/g) ?? []).length;
+      this.unkPartial = 0;
+      this.partial = ''; // итог сегмента пришёл — его частичный вариант не дублируем
+      const clean = t.replace(/\[unk\]/g, '').trim();
+      if (clean) this.final += clean + ' ';
     });
     rec.on('partialresult', (m: any) => {
-      this.partial = (m.result?.partial ?? '').replace(/\[unk\]/g, '').trim();
+      const raw: string = m.result?.partial ?? '';
+      this.unkPartial = (raw.match(/\[unk\]/g) ?? []).length;
+      this.partial = raw.replace(/\[unk\]/g, '').trim();
       this.onInterim((this.final + this.partial).trim());
     });
     this.rec = rec;
@@ -258,10 +270,12 @@ export class VoskAsr implements Asr {
       }
       setTimeout(() => {
         const text = (this.final + this.partial).replace(/\s+/g, ' ').trim();
+        this.lastUnk = this.unkFinal + this.unkPartial;
         this.cleanup();
         this.onLevel(0);
         this.onState('idle');
-        if (text && !this.aborted) this.onResult(text);
+        // пусто, но были слова вне грамматики — тоже результат: ребёнок что-то сказал (ответим «не понял»)
+        if ((text || this.lastUnk) && !this.aborted) this.onResult(text);
       }, 250);
     }, 300);
   }

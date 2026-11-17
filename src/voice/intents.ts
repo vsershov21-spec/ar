@@ -13,12 +13,13 @@
  * Имя из словаря names.ru.txt помечается known=true (кот произносит вслух только такие).
  */
 import data from '../../content/intents.ru.json';
+import dialogsData from '../../content/dialogs.json';
 import namesRaw from '../../content/names.ru.txt?raw';
 
 export type IntentId =
   | 'sad' | 'scared' | 'echo_stop' | 'echo_start' | 'bye' | 'hello' | 'money' | 'sberkids' | 'brother_ask' | 'name_ask'
   | 'age_ask' | 'choose_hooligan' | 'choose_kind' | 'choose_glitter' | 'switch' | 'flip' | 'jump' | 'dance' | 'sit'
-  | 'wave' | 'sing' | 'gum' | 'stickers' | 'riddle' | 'joke' | 'bored' | 'compliment' | 'rude' | 'thanks' | 'yes' | 'no' | 'skip';
+  | 'wave' | 'sing' | 'gum' | 'stickers' | 'riddle' | 'joke' | 'help' | 'bored' | 'compliment' | 'rude' | 'thanks' | 'yes' | 'no' | 'skip';
 
 /** Совместимый с автоматом сценария тип: change_persona из словаря → 'switch' */
 export type Intent =
@@ -223,18 +224,72 @@ export function parseIntent(raw: string, opts: IntentContext = {}): Intent {
 }
 
 /**
+ * То, что дети 6–13 лет говорят коту чаще всего, но что не команда: без этих фраз в грамматике Vosk
+ * всё сказанное становится [unk] — и ребёнок не видит, что его услышали. Интента у них нет: кот отвечает
+ * «не понял / я пока умею…», а распознанный текст показывается в подсказке.
+ */
+export const CHAT_PHRASES = [
+  'как дела', 'как ты', 'что делаешь', 'ты где', 'где ты', 'ты меня слышишь', 'слышишь', 'ты слышишь', 'ау',
+  'мяу', 'мур', 'смотри', 'посмотри', 'смотри на меня', 'а ты', 'почему', 'зачем', 'что это', 'это кто',
+  'я тебя люблю', 'ты мой друг', 'давай дружить', 'мой кот', 'котик', 'котенок', 'киса', 'кис кис',
+  'ты умеешь', 'ты можешь', 'покажи', 'сделай', 'расскажи', 'еще', 'еще раз', 'снова', 'опять', 'ну',
+  'а', 'ой', 'ура', 'круто', 'класс', 'прикольно', 'смешно', 'вау', 'ого', 'супер', 'хорошо', 'плохо',
+  'я', 'ты', 'мы', 'мама', 'папа', 'мне', 'тебе', 'меня', 'тебя', 'что', 'кто', 'как', 'где', 'когда',
+  'давай', 'хочу', 'не хочу', 'можно', 'пожалуйста', 'можешь', 'ещё', 'хватит', 'кот', 'кошка',
+];
+
+/** «огурец», «елка»/«ёлка», «мишка» — слова-ответы загадок всех характеров (content/dialogs.json → riddles) */
+export function riddleWords(riddles: Record<string, { answer: string; keywords: string[] }[]> = (dialogsData as any).riddles ?? {}): string[] {
+  const out = new Set<string>();
+  const add = (w: string) => {
+    const t = w.toLowerCase().trim();
+    if (!t) return;
+    out.add(t);
+    out.add(normalize(t));
+  };
+  for (const list of Object.values(riddles))
+    for (const r of list) {
+      add(r.answer);
+      for (const k of r.keywords) {
+        if (!k.endsWith('*')) {
+          add(k);
+          continue;
+        }
+        // основа «мишк*» → самые частые формы; слов, которых нет в словаре модели, Vosk просто не учтёт
+        const b = k.slice(0, -1).toLowerCase();
+        if (/[бвгджзклмнпрстфхцчшщ]$/.test(b)) for (const e of ['а', 'и', 'у', 'ы']) out.add(b + e);
+      }
+    }
+  return [...out].filter((w) => !w.endsWith('*'));
+}
+
+/**
  * Фразы для грамматики Vosk: все фразы словаря (основы вроде «жвачк» пропускаем — их нет в словаре модели),
- * имена, связки. Ограниченный словарь заметно повышает точность на детской речи.
+ * имена, ответы загадок, частые детские фразы, связки. Ограниченный словарь заметно повышает точность
+ * на детской речи. Слова с «ё» — и с «е», и с «ё» (как записано в модели, не знаем; лишнее Vosk пропустит).
  */
 export function grammarPhrases(): string[] {
   const set = new Set<string>();
   // основа в словаре — слово без окончания, оканчивается на «согласная + к» (жвачк, наклейк) или это «рубл»
   const isWord = (w: string) => !/[бвгджзклмнпрстфхцчшщй]к$/.test(w) && w !== 'рубл';
-  for (const r of [...RULES, ...EXTRA]) for (const p of r.phrases) if (p.every(isWord)) set.add(p.join(' '));
+  for (const r of [...RULES, ...EXTRA]) {
+    for (const p of r.phrases) if (p.every(isWord)) set.add(p.join(' '));
+    for (const raw of r.raw) if (/ё/i.test(raw) && !raw.includes('*')) set.add(raw.toLowerCase().replace(/[^а-яё\s]/g, ' ').replace(/\s+/g, ' ').trim());
+  }
   for (const p of REFUSALS) set.add(p.join(' '));
   for (const n of NAMES.keys()) set.add(n);
+  for (const w of riddleWords()) set.add(w);
+  for (const f of CHAT_PHRASES) set.add(normalize(f));
   for (const f of ['меня зовут', 'я', 'зови меня', 'мое имя', 'ну', 'а', 'котик', 'кот', 'пожалуйста', 'можешь', 'сделай', 'ещё', 'еще', 'хватит', 'покажи', 'расскажи', 'давай'])
     set.add(f);
   set.add('[unk]');
-  return [...set];
+  return [...set].filter(Boolean);
+}
+
+/** только связки и междометия («ну», «а», «я») — так Vosk часто «слышит» шум; это не фраза ребёнка */
+const FILLERS = new Set(['ну', 'а', 'я', 'ой', 'ой ой', 'э', 'мм', 'ты', 'мы', 'и', 'да ну', 'вот']);
+export function isFillerOnly(raw: string): boolean {
+  const t = normalize(raw);
+  if (!t) return true;
+  return t.split(' ').every((w) => FILLERS.has(w));
 }

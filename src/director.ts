@@ -10,6 +10,8 @@ import { loadMemory, saveMemory } from './scenario/memory';
 import { contextEvent } from './scenario/session';
 import { answerMatches } from './scenario/intentMatch';
 import { matchIntent } from './voice/intents';
+import { turn } from './voice/turn';
+import { InitiativeGate } from './scenario/initiative';
 import { resolveTrigger, type ListenMode } from './scenario/dialogs';
 import type { ContentBundle } from './persona/content';
 import { PersonaContext } from './persona/context';
@@ -60,7 +62,10 @@ export class Director extends Emitter<DirectorEvents> {
   readonly cfg: ScenarioConfig;
   private timers = new Map<string, number>();
   private listenTimer = 0;
-  private quietT = 0;
+  /** когда коту можно заговорить самому (filler, silence) — редко и не перебивая ребёнка */
+  readonly initiative = new InitiativeGate(undefined, Math.random, performance.now());
+  /** событие тишины от Input пришло, когда говорить было нельзя, — скажем, когда станет можно */
+  private pendingSilence = false;
   private idleT = 0;
   private blinkT = 0;
   private lostTimer = 0;
@@ -107,6 +112,15 @@ export class Director extends Emitter<DirectorEvents> {
 
   // ───────────── вход событий ─────────────
   dispatch(e: ScenarioEvent) {
+    // «ты тут?» — инициатива кота: только когда правила тишины разрешают (scenario/initiative.ts)
+    if (e.type === 'silence' && !this.initiativeAllowed()) {
+      this.pendingSilence = true;
+      return;
+    }
+    if (e.type === 'silence') {
+      this.pendingSilence = false;
+      this.initiative.fired(performance.now());
+    }
     const r = step(this.state, e, this.cfg);
     if (r.state.phase !== this.state.phase) this.emit('phase', r.state.phase);
     this.state = r.state;
@@ -354,7 +368,11 @@ export class Director extends Emitter<DirectorEvents> {
   private react(event: string) {
     if (this.paused && this.picker.event(event).priority < 3) return;
     this.emotion(event);
-    const pk = this.personas.line(event, { name: this.state.name });
+    let pk = this.personas.line(event, { name: this.state.name });
+    // не понял: «переспроси» и «я пока умею…» подменяют друг друга, если одно ещё остывает, — ребёнок всегда слышит ответ
+    // «что ты умеешь» — отвечаем всегда (без cooldown; варианты всё равно не повторяются подряд)
+    if (!pk && event === 'unknown') pk = this.personas.line('help', { name: this.state.name }) ?? this.personas.line('unknown', { name: this.state.name, force: true });
+    else if (!pk && event === 'help') pk = this.personas.line('help', { name: this.state.name, force: true });
     if (!pk) {
       if (this.picker.coolingDown(event)) return;
       const def = this.persona.reactions[event];
@@ -425,6 +443,7 @@ export class Director extends Emitter<DirectorEvents> {
       lineId: pk.line.id, piperVoice: v.piperVoice, pitchSemitones: v.pitchSemitones, emotion: pk.line.emotion,
     };
     await this.d.voice.speak(req);
+    this.initiative.catLine(performance.now());
     if (talk && this.character.currentClip === 'talk') this.character.play('idle');
   }
 
@@ -596,19 +615,28 @@ export class Director extends Emitter<DirectorEvents> {
         if (clip && clip !== 'idle') this.character.play(clip);
       }
     } else this.idleT = 0;
-    // «заполнитель» паузы: в свободной игре, если давно тихо и никто не ждёт ответа
-    if (playing && !this.paused && !this.state.dialog && !this.queue.busy && !this.d.stage.walking) {
-      this.quietT += dt;
-      if (this.quietT > 7 + Math.random() * 3) {
-        this.quietT = -6;
-        this.speakEvent('filler');
-      }
-    } else this.quietT = 0;
+    // инициатива кота: мысль вслух (filler) или отложенное «ты тут?» (silence) — не чаще раза в 15–20 с,
+    // не пока ребёнок говорит, не сразу после его фразы или вопроса кота (scenario/initiative.ts)
+    if (playing && this.initiativeAllowed()) {
+      if (this.pendingSilence) this.dispatch({ type: 'silence' });
+      else if (this.speakEvent('filler')) this.initiative.fired(performance.now());
+      else this.initiative.fired(performance.now() - 10_000); // реплика остывает — попробуем чуть позже
+    }
   }
 
-  /** любая активность пользователя сбрасывает таймер «заполнителя» */
+  private initiativeAllowed(): boolean {
+    const t = turn.get();
+    const playing = this.state.phase === 'play' || this.state.phase === 'free';
+    return this.initiative.allowed({
+      now: performance.now(), userSpeaking: t.userSpeaking, lastUserAt: t.lastUserAt, lastQuestionAt: t.lastQuestionAt,
+      busy: this.queue.busy || this.d.voice.speaking || this.d.stage.walking,
+      blocked: !playing || this.paused || this.state.paused || !!this.state.dialog,
+    });
+  }
+
+  /** любая активность пользователя (касание, голос) откладывает инициативу кота */
   activity() {
-    this.quietT = 0;
+    turn.userActivity();
   }
 
   static readonly kidsUrl = ASSETS.sberKidsUrl;

@@ -396,6 +396,9 @@
       "clip": "laugh",
       "sound": "giggle"
     },
+    "help": {
+      "clip": "talk_excited"
+    },
     "thanks": {},
     "echo_start": {
       "clip": "listen",
@@ -1215,13 +1218,13 @@
         "id": "hooligan.sleep.01",
         "text": "Ладно... я... чуть-чуть... посплю...",
         "emotion": "sleepy",
-        "face": "sleep"
+        "face": "sleepy"
       },
       {
         "id": "hooligan.sleep.02",
         "text": "Разбуди, если что... хр-р...",
         "emotion": "sleepy",
-        "face": "sleep"
+        "face": "sleepy"
       }
     ],
     "wake_up": [
@@ -1900,6 +1903,26 @@
         "face": "smirk"
       }
     ],
+    "help": [
+      {
+        "id": "hooligan.help.01",
+        "text": "Я умею сальто, танцы и загадки. Скажи «сальто» — покажу.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.help.02",
+        "text": "Скажи «танцуй», «загадку» или «шутку». Остальному я пока учусь.",
+        "emotion": "excited",
+        "face": "excited"
+      },
+      {
+        "id": "hooligan.help.03",
+        "text": "Пока я понимаю простые слова: «прыгай», «спой», «повторяй за мной».",
+        "emotion": "neutral",
+        "face": "neutral"
+      }
+    ],
     "thanks": [
       {
         "id": "hooligan.thanks.01",
@@ -2047,7 +2070,7 @@
         "id": "hooligan.evening.01",
         "text": "Уже вечер... Скоро спать. Но пару трюков успеем.",
         "emotion": "sleepy",
-        "face": "sleep"
+        "face": "sleepy"
       },
       {
         "id": "hooligan.evening.02",
