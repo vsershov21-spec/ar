@@ -1,0 +1,611 @@
+{
+ "persona": "hooligan",
+ "extra": "&anim=raw",
+ "clips": [
+  {
+   "id": "idle_breathe",
+   "pop": 0.5,
+   "popBone": "RightLeg",
+   "wMax": 0.7,
+   "bind": 0,
+   "footMin": 0,
+   "footMax": 0.001
+  },
+  {
+   "id": "idle_look_around",
+   "pop": 7.1,
+   "popBone": "LeftLeg",
+   "wMax": 7.1,
+   "bind": 0,
+   "footMin": -0.01,
+   "footMax": 0.006
+  },
+  {
+   "id": "idle_stretch",
+   "pop": 4.9,
+   "popBone": "RightHand",
+   "wMax": 4.9,
+   "bind": 0,
+   "footMin": -0.006,
+   "footMax": -0.002
+  },
+  {
+   "id": "idle_yawn",
+   "pop": 4.7,
+   "popBone": "RightArm",
+   "wMax": 4.7,
+   "bind": 0,
+   "footMin": -0.003,
+   "footMax": -0.002
+  },
+  {
+   "id": "idle_tail_play",
+   "pop": 10.9,
+   "popBone": "Neck",
+   "wMax": 27.4,
+   "bind": 0.8,
+   "footMin": -0.013,
+   "footMax": 0.005
+  },
+  {
+   "id": "idle_hooligan_skate",
+   "pop": 11.5,
+   "popBone": "LeftForeArm",
+   "wMax": 11.5,
+   "bind": 0,
+   "footMin": -0.023,
+   "footMax": 0.011
+  },
+  {
+   "id": "idle_hooligan_headphones",
+   "pop": 9.2,
+   "popBone": "LeftForeArm",
+   "wMax": 9.2,
+   "bind": 0,
+   "footMin": -0.003,
+   "footMax": 0
+  },
+  {
+   "id": "idle_kind_hug_self",
+   "pop": 6.2,
+   "popBone": "LeftHand",
+   "wMax": 6.2,
+   "bind": 0,
+   "footMin": -0.004,
+   "footMax": 0.002
+  },
+  {
+   "id": "idle_kind_cocoa",
+   "pop": 12,
+   "popBone": "LeftForeArm",
+   "wMax": 12,
+   "bind": 0,
+   "footMin": -0.012,
+   "footMax": -0.002
+  },
+  {
+   "id": "idle_glitter_mirror",
+   "pop": 7.6,
+   "popBone": "LeftForeArm",
+   "wMax": 8.9,
+   "bind": 0,
+   "footMin": -0.001,
+   "footMax": 0
+  },
+  {
+   "id": "idle_glitter_twirl",
+   "pop": 13.1,
+   "popBone": "RightLeg",
+   "wMax": 13.5,
+   "bind": 0,
+   "footMin": -0.003,
+   "footMax": 0.012
+  },
+  {
+   "id": "appear_jump_in",
+   "pop": 79.2,
+   "popBone": "RightForeArm",
+   "wMax": 79.2,
+   "bind": 0,
+   "footMin": -0.006,
+   "footMax": 0.335
+  },
+  {
+   "id": "dive_out",
+   "pop": 10.4,
+   "popBone": "LeftUpLeg",
+   "wMax": 37.8,
+   "bind": 0,
+   "footMin": -0.054,
+   "footMax": 0.221
+  },
+  {
+   "id": "fall_off_card",
+   "pop": 18.5,
+   "popBone": "LeftForeArm",
+   "wMax": 24.4,
+   "bind": 0,
+   "footMin": -0.06,
+   "footMax": 0.039
+  },
+  {
+   "id": "peek_from_edge",
+   "pop": 9.2,
+   "popBone": "LeftUpLeg",
+   "wMax": 9.2,
+   "bind": 0,
+   "footMin": -0.02,
+   "footMax": 0.005
+  },
+  {
+   "id": "walk",
+   "pop": 9.8,
+   "popBone": "LeftHand",
+   "wMax": 9.8,
+   "bind": 0,
+   "footMin": -0.004,
+   "footMax": 0.007
+  },
+  {
+   "id": "run",
+   "pop": 15.8,
+   "popBone": "RightForeArm",
+   "wMax": 28.9,
+   "bind": 0,
+   "footMin": -0.013,
+   "footMax": 0.021
+  },
+  {
+   "id": "turn_left",
+   "pop": 13.7,
+   "popBone": "RightForeArm",
+   "wMax": 13.7,
+   "bind": 0,
+   "footMin": -0.014,
+   "footMax": -0.005
+  },
+  {
+   "id": "turn_right",
+   "pop": 20.3,
+   "popBone": "LeftForeArm",
+   "wMax": 20.3,
+   "bind": 0,
+   "footMin": -0.015,
+   "footMax": -0.005
+  },
+  {
+   "id": "jump",
+   "pop": 8.8,
+   "popBone": "LeftHand",
+   "wMax": 8.8,
+   "bind": 0,
+   "footMin": -0.016,
+   "footMax": 0.029
+  },
+  {
+   "id": "flip",
+   "pop": 32.7,
+   "popBone": "LeftForeArm",
+   "wMax": 32.7,
+   "bind": 0,
+   "footMin": 0.004,
+   "footMax": 0.371
+  },
+  {
+   "id": "tumble",
+   "pop": 34,
+   "popBone": "LeftForeArm",
+   "wMax": 34,
+   "bind": 0,
+   "footMin": 0,
+   "footMax": 0.014
+  },
+  {
+   "id": "dizzy",
+   "pop": 20.1,
+   "popBone": "Neck",
+   "wMax": 20.1,
+   "bind": 0.8,
+   "footMin": -0.002,
+   "footMax": 0
+  },
+  {
+   "id": "sit_down",
+   "pop": 15.8,
+   "popBone": "LeftForeArm",
+   "wMax": 15.8,
+   "bind": 0.05,
+   "footMin": -0.029,
+   "footMax": -0.011
+  },
+  {
+   "id": "sit_idle",
+   "pop": 3,
+   "popBone": "LeftArm",
+   "wMax": 3,
+   "bind": 0,
+   "footMin": -0.002,
+   "footMax": 0
+  },
+  {
+   "id": "stand_up",
+   "pop": 34.6,
+   "popBone": "LeftArm",
+   "wMax": 41.4,
+   "bind": 0.75,
+   "footMin": 0,
+   "footMax": 0
+  },
+  {
+   "id": "sleep_loop",
+   "pop": 20.1,
+   "popBone": "LeftArm",
+   "wMax": 38.6,
+   "bind": 0.75,
+   "footMin": 0,
+   "footMax": 0
+  },
+  {
+   "id": "wake_startle",
+   "pop": 30.1,
+   "popBone": "Neck",
+   "wMax": 30.1,
+   "bind": 0.75,
+   "footMin": -0.002,
+   "footMax": 0
+  },
+  {
+   "id": "wave",
+   "pop": 26.2,
+   "popBone": "LeftForeArm",
+   "wMax": 26.2,
+   "bind": 0,
+   "footMin": -0.002,
+   "footMax": 0.005
+  },
+  {
+   "id": "point_button",
+   "pop": 7.4,
+   "popBone": "LeftArm",
+   "wMax": 7.4,
+   "bind": 0,
+   "footMin": -0.003,
+   "footMax": 0
+  },
+  {
+   "id": "talk_casual",
+   "pop": 7.1,
+   "popBone": "LeftLeg",
+   "wMax": 7.1,
+   "bind": 0,
+   "footMin": -0.01,
+   "footMax": 0.005
+  },
+  {
+   "id": "talk_excited",
+   "pop": 12.8,
+   "popBone": "Neck",
+   "wMax": 23.4,
+   "bind": 0.75,
+   "footMin": -0.011,
+   "footMax": 0.005
+  },
+  {
+   "id": "listen",
+   "pop": 3.5,
+   "popBone": "LeftHand",
+   "wMax": 6.3,
+   "bind": 0,
+   "footMin": -0.016,
+   "footMax": 0
+  },
+  {
+   "id": "think",
+   "pop": 7.1,
+   "popBone": "LeftForeArm",
+   "wMax": 7.1,
+   "bind": 0,
+   "footMin": -0.002,
+   "footMax": 0
+  },
+  {
+   "id": "laugh",
+   "pop": 4.2,
+   "popBone": "RightLeg",
+   "wMax": 6.3,
+   "bind": 0,
+   "footMin": -0.007,
+   "footMax": 0.001
+  },
+  {
+   "id": "shy",
+   "pop": 155.1,
+   "popBone": "Neck",
+   "wMax": 155.1,
+   "bind": 0,
+   "footMin": -0.004,
+   "footMax": 0
+  },
+  {
+   "id": "surprised",
+   "pop": 19,
+   "popBone": "LeftForeArm",
+   "wMax": 19,
+   "bind": 0.05,
+   "footMin": -0.013,
+   "footMax": 0.005
+  },
+  {
+   "id": "offended",
+   "pop": 3.3,
+   "popBone": "RightFoot",
+   "wMax": 25.3,
+   "bind": 0.05,
+   "footMin": -0.002,
+   "footMax": -0.001
+  },
+  {
+   "id": "proud",
+   "pop": 5.6,
+   "popBone": "LeftArm",
+   "wMax": 5.6,
+   "bind": 0,
+   "footMin": -0.003,
+   "footMax": 0
+  },
+  {
+   "id": "comfort",
+   "pop": 6.2,
+   "popBone": "LeftHand",
+   "wMax": 6.2,
+   "bind": 0,
+   "footMin": -0.004,
+   "footMax": 0.002
+  },
+  {
+   "id": "cover_ears",
+   "pop": 9.3,
+   "popBone": "RightForeArm",
+   "wMax": 9.3,
+   "bind": 0,
+   "footMin": -0.004,
+   "footMax": -0.001
+  },
+  {
+   "id": "lean_in",
+   "pop": 10,
+   "popBone": "RightForeArm",
+   "wMax": 10,
+   "bind": 0,
+   "footMin": -0.02,
+   "footMax": -0.006
+  },
+  {
+   "id": "celebrate",
+   "pop": 27.8,
+   "popBone": "LeftForeArm",
+   "wMax": 39.7,
+   "bind": 0.75,
+   "footMin": 0,
+   "footMax": 0
+  },
+  {
+   "id": "sing",
+   "pop": 136.9,
+   "popBone": "Head",
+   "wMax": 136.9,
+   "bind": 0,
+   "footMin": -0.008,
+   "footMax": -0.001
+  },
+  {
+   "id": "knock_glass",
+   "pop": 7.8,
+   "popBone": "RightHand",
+   "wMax": 9.5,
+   "bind": 0,
+   "footMin": -0.016,
+   "footMax": 0.002
+  },
+  {
+   "id": "press_glass",
+   "pop": 10.4,
+   "popBone": "LeftForeArm",
+   "wMax": 10.4,
+   "bind": 0,
+   "footMin": -0.003,
+   "footMax": -0.001
+  },
+  {
+   "id": "scratch_glass",
+   "pop": 11.6,
+   "popBone": "RightForeArm",
+   "wMax": 11.6,
+   "bind": 0,
+   "footMin": -0.009,
+   "footMax": 0
+  },
+  {
+   "id": "slide_down_glass",
+   "pop": 8.9,
+   "popBone": "LeftArm",
+   "wMax": 9.2,
+   "bind": 0,
+   "footMin": -0.014,
+   "footMax": -0.001
+  },
+  {
+   "id": "breath_draw",
+   "pop": 10.9,
+   "popBone": "LeftForeArm",
+   "wMax": 10.9,
+   "bind": 0,
+   "footMin": -0.003,
+   "footMax": -0.001
+  },
+  {
+   "id": "hug_screen",
+   "pop": 27.8,
+   "popBone": "LeftForeArm",
+   "wMax": 27.8,
+   "bind": 0.75,
+   "footMin": -0.002,
+   "footMax": 0
+  },
+  {
+   "id": "sticker_slap",
+   "pop": 16.7,
+   "popBone": "LeftLeg",
+   "wMax": 16.7,
+   "bind": 0,
+   "footMin": -0.002,
+   "footMax": 0.003
+  },
+  {
+   "id": "sticker_react",
+   "pop": 33.8,
+   "popBone": "LeftForeArm",
+   "wMax": 33.8,
+   "bind": 0,
+   "footMin": -0.007,
+   "footMax": 0.001
+  },
+  {
+   "id": "gum_blow",
+   "pop": 29.6,
+   "popBone": "LeftForeArm",
+   "wMax": 29.6,
+   "bind": 0,
+   "footMin": -0.002,
+   "footMax": -0.001
+  },
+  {
+   "id": "kind_bubbles",
+   "pop": 7.3,
+   "popBone": "RightHand",
+   "wMax": 7.3,
+   "bind": 0,
+   "footMin": -0.002,
+   "footMax": -0.001
+  },
+  {
+   "id": "glitter_throw",
+   "pop": 144.3,
+   "popBone": "Neck",
+   "wMax": 144.3,
+   "bind": 0,
+   "footMin": -0.003,
+   "footMax": -0.001
+  },
+  {
+   "id": "snowglobe_shake",
+   "pop": 25,
+   "popBone": "Neck",
+   "wMax": 25,
+   "bind": 0.75,
+   "footMin": 0,
+   "footMax": 0
+  },
+  {
+   "id": "purr_stroke",
+   "pop": 7.8,
+   "popBone": "RightArm",
+   "wMax": 7.8,
+   "bind": 0,
+   "footMin": -0.003,
+   "footMax": -0.001
+  },
+  {
+   "id": "poke_head",
+   "pop": 22.9,
+   "popBone": "RightHand",
+   "wMax": 35.8,
+   "bind": 0,
+   "footMin": -0.004,
+   "footMax": -0.001
+  },
+  {
+   "id": "poke_cheek",
+   "pop": 22.6,
+   "popBone": "LeftLeg",
+   "wMax": 43.4,
+   "bind": 0,
+   "footMin": -0.006,
+   "footMax": 0.001
+  },
+  {
+   "id": "poke_belly",
+   "pop": 11.7,
+   "popBone": "LeftHand",
+   "wMax": 11.7,
+   "bind": 0,
+   "footMin": -0.006,
+   "footMax": -0.001
+  },
+  {
+   "id": "poke_paw",
+   "pop": 14,
+   "popBone": "LeftForeArm",
+   "wMax": 14,
+   "bind": 0,
+   "footMin": -0.004,
+   "footMax": -0.002
+  },
+  {
+   "id": "poke_tail",
+   "pop": 15.5,
+   "popBone": "LeftHand",
+   "wMax": 96.6,
+   "bind": 0,
+   "footMin": -0.007,
+   "footMax": 0
+  },
+  {
+   "id": "flinch",
+   "pop": 22.3,
+   "popBone": "LeftLeg",
+   "wMax": 22.3,
+   "bind": 0.05,
+   "footMin": -0.017,
+   "footMax": 0.043
+  },
+  {
+   "id": "dance_hooligan",
+   "pop": 4,
+   "popBone": "RightLeg",
+   "wMax": 7.4,
+   "bind": 0,
+   "footMin": -0.001,
+   "footMax": 0.016
+  },
+  {
+   "id": "dance_kind",
+   "pop": 20.4,
+   "popBone": "RightLeg",
+   "wMax": 20.4,
+   "bind": 0,
+   "footMin": -0.003,
+   "footMax": 0.011
+  },
+  {
+   "id": "dance_glitter",
+   "pop": 13.3,
+   "popBone": "RightLeg",
+   "wMax": 13.5,
+   "bind": 0,
+   "footMin": -0.001,
+   "footMax": 0.012
+  },
+  {
+   "id": "echo_speak",
+   "pop": 27.8,
+   "popBone": "LeftForeArm",
+   "wMax": 34.7,
+   "bind": 0.75,
+   "footMin": -0.002,
+   "footMax": 0
+  }
+ ],
+ "prep": [],
+ "log": []
+}

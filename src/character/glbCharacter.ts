@@ -15,6 +15,9 @@ import { asset, clamp } from '../core/util';
 import { type MouthShape, type Viseme } from '../lipsync/visemes';
 import { FaceLife } from './faceLife';
 import { ClipState } from './clipState';
+import { clipDef } from './clips';
+import { prepareClips, type ClipPrepInfo } from './animPrep';
+import { AnimBlender } from './animBlend';
 import { TailRig, type TailOutput } from './tailRig';
 import { PropRig } from './props';
 import { BodyCollider } from './bodyCollide';
@@ -137,6 +140,9 @@ export class GlbCharacter implements Character {
   private bones = new Map<string, THREE.Bone>();
   private rest = new Map<string, THREE.Quaternion>();
   readonly clips = new ClipState();
+  /** переходы, темп и слой покоя (animBlend.ts); подготовка клипов — animPrep.ts */
+  anim: AnimBlender | null = null;
+  animInfo = new Map<THREE.AnimationClip, ClipPrepInfo>();
   readonly faceMix = new FaceMixer();
   private playing = '';
   private mouth = 0;
@@ -226,9 +232,19 @@ export class GlbCharacter implements Character {
     }
     if (anims.length) {
       this.mixer = new THREE.AnimationMixer(model);
+      // перепривязка, сглаживание, обрезка, швы петель, высота корня, темп (animPrep.ts)
+      // ?anim=raw — как было (для сравнения в debug)
+      const raw = typeof location !== 'undefined' && /[?&]anim=raw/.test(location.search);
+      if (!raw) {
+        this.animInfo = prepareClips(model, this.inner, anims, {
+          isLoop: (n) => GlbCharacter.aliasIds(n).some((id) => clipDef(id)?.loop),
+          keepSpeed: (n) => /dance|run|jump|flip|dive|fall|tumble|celebrate|cheer/.test(n),
+        });
+      }
       for (const clip of anims) this.addClip(clip);
+      if (!raw) this.anim = new AnimBlender(model, (a) => this.animInfo.get(a.getClip()));
       // одноразовые клипы играют до конца движения, а не по ориентиру каталога
-      this.actions.forEach((a, id) => this.clips.realDuration.set(id, a.getClip().duration));
+      this.actions.forEach((a, id) => this.clips.realDuration.set(id, this.anim?.realDuration(a) ?? a.getClip().duration));
     }
     this.setFaceObj('usual');
     this.eyes = EyeRig.find(model);
@@ -292,6 +308,12 @@ export class GlbCharacter implements Character {
     }
   }
 
+  /** имя клипа GLB → id каталога (своё имя + TRIPO_ALIAS) */
+  static aliasIds(name: string) {
+    const key = name.toLowerCase().replace(/^.*\|/, '');
+    return [key, ...(TRIPO_ALIAS[key] ?? [])];
+  }
+
   /** у Hips оставляем только вертикаль (прыжки, приседания) */
   private keepY(t: THREE.KeyframeTrack) {
     const v = t.values;
@@ -311,7 +333,10 @@ export class GlbCharacter implements Character {
     if (!this.mixer) return;
     const cs = this.clips;
     const id = cs.cur.id;
-    if (id !== this.playing) {
+    if (this.anim) {
+      this.anim.sync(cs, this.actions, (this.object.userData.moveSpeed as number) ?? 0);
+      this.playing = id;
+    } else if (id !== this.playing) {
       const next = this.actions.get(id);
       const prev = this.actions.get(this.playing);
       const fade = cs.cur.def.blendInMs / 1000;
@@ -418,6 +443,7 @@ export class GlbCharacter implements Character {
 
     if (this.mixer && this.actions.has(cs.cur.id)) {
       this.mixer.update(dt);
+      this.anim?.post(dt, cs, this.model ?? this.object);
     } else {
       this.mixer?.update(dt);
       this.rest.forEach((q, n) => this.bones.get(n)!.quaternion.copy(q));
