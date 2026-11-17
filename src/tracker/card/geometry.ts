@@ -331,7 +331,27 @@ export function labelCard(q: Pt[], K: Intrinsics, prev?: Pt[] | null): Quad {
   // c0→c1 короткая сторона → начинаем со следующей вершины
   const base = m && m.aspect < 1 ? rotateQuad(c, 1) : c;
   const alt = rotateQuad(base, 2);
-  if (prev) return quadDistance(prev, base) <= quadDistance(prev, alt) ? base : alt;
+  if (prev) {
+    // непрерывность ориентации: из нумераций, которые дают правдоподобную позу, берём ту, у которой
+    // первая сторона повёрнута меньше всего относительно прошлой. Так кот не крутится на 90°/180°,
+    // когда соотношение сторон под углом или у края кадра определяется неуверенно.
+    const cands: { r: Quad; err: number }[] = [];
+    for (let k = 0; k < 4; k++) {
+      const r = rotateQuad(c, k);
+      const p = poseFromQuad(r, K, CARD_ASPECT);
+      cands.push({ r, err: p ? p.err : Infinity });
+    }
+    const best = Math.min(...cands.map((x) => x.err));
+    const ok = cands.filter((x) => x.err <= best * 1.6 + 1.5);
+    const dir = (r: Pt[]) => Math.atan2(r[1].y - r[0].y + r[2].y - r[3].y, r[1].x - r[0].x + r[2].x - r[3].x);
+    const d0 = dir(prev);
+    let pick = ok[0]?.r ?? base, bestD = Infinity;
+    for (const x of ok) {
+      const d = Math.abs(Math.atan2(Math.sin(dir(x.r) - d0), Math.cos(dir(x.r) - d0)));
+      if (d < bestD) (bestD = d), (pick = x.r);
+    }
+    return pick;
+  }
   const top = (r: Quad) => r[0].y + r[1].y - r[2].y - r[3].y;
   return top(base) <= top(alt) ? base : alt;
 }

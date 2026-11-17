@@ -32,6 +32,9 @@ export class CardTracker extends TrackerBase implements Tracker {
   /** последнее, что видел детектор (для оверлея и debug) */
   view: CardView | null = null;
   stats = { ms: 0, fps: 0, score: 0, mode: 'none' };
+  /** последняя нумерация углов: держим ориентацию кота и после короткой потери карты */
+  private orientRef: Quad | null = null;
+  private orientAt = -1e9;
 
   private worker: Worker | null = null;
   private busy = false;
@@ -54,6 +57,8 @@ export class CardTracker extends TrackerBase implements Tracker {
 
   constructor(private container: HTMLElement) {
     super();
+    // кот держится по поверхности и гироскопу; «карта потеряна» (кот спрашивает, где карта) — только после 2,5 с
+    this.lostDebounceMs = 2500;
     this.overlay = new CardOverlay(container);
   }
 
@@ -163,12 +168,14 @@ export class CardTracker extends TrackerBase implements Tracker {
     let pose: Pose | null = null;
     let quad: Quad | null = null;
     if (r.quad && r.score >= 0.5) {
-      quad = labelCard(r.quad, this.K, this.prevQuad);
+      quad = labelCard(r.quad, this.K, this.prevQuad ?? (performance.now() - this.orientAt < 8000 ? this.orientRef : null));
       pose = poseFromQuad(quad, this.K, CARD_ASPECT);
       if (pose && (pose.err > 4 || pose.t[2] > -0.5)) pose = null; // перепроецирование плохое или «карта за камерой»
     }
     if (pose && quad) {
       this.prevQuad = quad;
+      this.orientRef = quad;
+      this.orientAt = performance.now();
       this.misses = 0;
       this.hits++;
       this.target = poseMatrix(pose);
@@ -178,7 +185,7 @@ export class CardTracker extends TrackerBase implements Tracker {
     } else {
       this.hits = 0;
       this.misses++;
-      if (this.misses >= 5) {
+      if (this.misses >= 8) {
         this.prevQuad = null;
         this.view = null;
         if (this.isTracking) this.setFound(false);

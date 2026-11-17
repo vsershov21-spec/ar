@@ -48,6 +48,12 @@ export class CardOverlay {
   /** детектор видит карту (уже подтверждённую трекером) */
   track(v: CardView) {
     this.view = v;
+    // карта вернулась через пару секунд — без повторной анимации «нашёл» и искр, кот просто стоит дальше
+    if (this.state === 'search' && performance.now() - this.lostAt < 5000) {
+      this.state = 'locked';
+      this.t = FADE_S;
+      return;
+    }
     if (this.state === 'search') {
       this.state = 'snap';
       this.t = 0;
@@ -55,7 +61,9 @@ export class CardOverlay {
     }
   }
 
+  private lostAt = -1e9;
   lost() {
+    if (this.state !== 'search') this.lostAt = performance.now();
     this.view = null;
     if (this.state !== 'search') {
       this.state = 'search';
