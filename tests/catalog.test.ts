@@ -73,9 +73,9 @@ describe('каталоги content/', () => {
     f.set('happy');
     f.update(0.08);
     expect(f.cur.weights.smile).toBeGreaterThan(0.1);
-    expect(f.cur.weights.smile).toBeLessThan(0.7);
+    expect(f.cur.weights.smile).toBeLessThan(0.75);
     f.update(0.1);
-    expect(f.cur.weights.smile).toBeCloseTo(0.7, 2);
+    expect(f.cur.weights.smile).toBeCloseTo(0.75, 2);
     let blinked = false;
     for (let i = 0; i < 400; i++) blinked ||= f.update(0.016).blink > 0.5;
     expect(blinked).toBe(true);

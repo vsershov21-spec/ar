@@ -56,6 +56,7 @@ for (const p of personas) {
       const c = window.__app.character;
       c.play('idle');
       c.clips.setIdles?.(['idle'], c.personaId);
+      c.clearEmotion?.(); // эмоции событий (сонный после тишины и т.п.) не мешают кадру
     });
     await wait(700);
     await page.screenshot({ path: path.join(outDir, `${prefix}_${p}_${name}.png`) });

@@ -110,6 +110,8 @@ export class FaceLife {
         this.microT = 0;
       }
     }
+    // брови «подпрыгивают» на ударных слогах (как у Тома): от пружины кивка
+    if (k > 0.05) this.out.brow_up = Math.max(this.out.brow_up ?? 0, k * Math.min(0.55, Math.max(0, this.nod) * 5));
     return this.out;
   }
 }

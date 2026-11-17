@@ -5,7 +5,7 @@
  */
 import faceJson from '../../content/face.json';
 
-export interface FacePreset { id: string; weights: Record<string, number>; ears: number; pupils: number; noBlink?: boolean }
+export interface FacePreset { id: string; weights: Record<string, number>; ears: number; pupils: number; noBlink?: boolean; gaze?: [number, number] }
 
 const PRESETS = new Map<string, FacePreset>();
 for (const p of (faceJson as unknown as { presets: FacePreset[] }).presets) PRESETS.set(p.id, p);

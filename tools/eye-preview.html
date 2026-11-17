@@ -1,0 +1,52 @@
+<!doctype html><html><head><meta charset="utf-8"><title>eye preview</title>
+<style>html,body{margin:0;background:#e8e8ea;color:#222;font:13px sans-serif}canvas{display:block}</style></head>
+<body><script type="module">
+// Контактный лист эмоций с настоящими 3D-глазами (рантайм src/character/eyeRig.ts + пресеты content/face.json):
+// ?m=/models/kind_v1.glb&s=neutral,happy,laugh,blink_L+blink_R,smile:0.8&cols=4&tile=320&zoom=1&yaw=0&pitch=0&dy=0&bg=e8e8ea
+// Состояние — имя пресета или «ключ:вес+ключ:вес»; «@x,y» в конце — взгляд в сторону (доли роста на экране).
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { EyeRig } from '/src/character/eyeRig.ts';
+import face from '/content/face.json';
+const q = new URLSearchParams(location.search);
+const url = q.get('m') || '/models/kind_v1.glb';
+const states = (q.get('s') || 'neutral').split(',');
+const cols = +(q.get('cols') || Math.min(4, states.length));
+const T = +(q.get('tile') || 320), yaw = +(q.get('yaw') || 0) * Math.PI / 180, pitch = +(q.get('pitch') || 0) * Math.PI / 180, zoom = +(q.get('zoom') || 1);
+const rows = Math.ceil(states.length / cols);
+const r = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+r.setPixelRatio(1); r.setSize(cols * T, rows * T); r.setScissorTest(true); document.body.appendChild(r.domElement);
+r.outputColorSpace = THREE.SRGBColorSpace;
+const sc = new THREE.Scene(); sc.background = new THREE.Color('#' + (q.get('bg') || 'e8e8ea'));
+sc.add(new THREE.HemisphereLight(0xffffff, 0x667788, 1.8));
+const dl = new THREE.DirectionalLight(0xffffff, 1.7); dl.position.set(0.6, 1.2, 2); sc.add(dl);
+const gltf = await new GLTFLoader().loadAsync(url);
+const model = gltf.scene; sc.add(model); model.updateMatrixWorld(true);
+const meshes = []; model.traverse((o) => { if (o.isMesh) { o.frustumCulled = false; if (o.morphTargetDictionary) meshes.push(o); } });
+let head = null, top = null; model.traverse((o) => { if (/Head$/.test(o.name)) head = o; if (/HeadTop_End$/.test(o.name)) top = o; });
+const hp = head.getWorldPosition(new THREE.Vector3()), tp = top.getWorldPosition(new THREE.Vector3());
+const hl = tp.distanceTo(hp);
+const c = hp.clone().lerp(tp, 0.55 + +(q.get('dy') || 0));
+const cam = new THREE.PerspectiveCamera(22 / zoom, 1, 0.01, 50);
+const d = hl * 8.5;
+cam.position.set(c.x + Math.sin(yaw) * Math.cos(pitch) * d, c.y + Math.sin(pitch) * d, c.z + Math.cos(yaw) * Math.cos(pitch) * d); cam.lookAt(c);
+const rig = EyeRig.find(model, () => 0.5);
+const presets = Object.fromEntries(face.presets.map((p) => [p.id, p]));
+const camPos = cam.position.clone();
+states.forEach((st, i) => {
+  for (const m of meshes) m.morphTargetInfluences.fill(0);
+  const [body, look] = st.split('@');
+  let w = {}, pupils = 1;
+  if (presets[body]) { w = { ...presets[body].weights }; pupils = presets[body].pupils; }
+  else if (body !== 'neutral') for (const part of body.split('+')) { const [k, v] = part.split(':'); w[k] = v === undefined ? 1 : +v; }
+  w.cheek_up = Math.max(w.cheek_up ?? 0, 0.5 * (w.smile ?? 0));
+  for (const m of meshes) for (const [k, v] of Object.entries(w)) { const j = m.morphTargetDictionary[k]; if (j !== undefined) m.morphTargetInfluences[j] = v; }
+  if (rig) {
+    if (look) { const [gx, gy] = look.split(';').map(Number); rig.glanceAt(gx, gy, 10); }
+    for (let k = 0; k < 30; k++) rig.update(1 / 30, { weights: w, pupils, target: camPos, idle: false });
+  }
+  const x = (i % cols) * T, y = (rows - 1 - Math.floor(i / cols)) * T;
+  r.setViewport(x, y, T, T); r.setScissor(x, y, T, T); r.render(sc, cam);
+});
+window.__labels = states; window.__morphs = meshes.length ? Object.keys(meshes.at(-1).morphTargetDictionary) : []; window.__ready = true;
+</script></body></html>

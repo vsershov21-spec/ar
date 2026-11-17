@@ -18,7 +18,8 @@ import { ClipState } from './clipState';
 import { TailRig, type TailOutput } from './tailRig';
 import { PropRig } from './props';
 import { BodyCollider } from './bodyCollide';
-import { FaceMixer, EMOTE_FACE, MORPH_TARGETS } from './face';
+import { FaceMixer, EMOTE_FACE, MORPH_TARGETS, facePreset, type FacePreset } from './face';
+import { EyeRig } from './eyeRig';
 import { personaMeta } from './personaMeta';
 import type { AnchorName } from '../fx/core';
 
@@ -147,6 +148,13 @@ export class GlbCharacter implements Character {
   private visemeW: Record<string, number> = {};
   /** живость: микромимика в покое, движения головы во время речи, дыхание (faceLife.ts) */
   readonly life = new FaceLife();
+  /** 3D-глаза и веки (модели после scripts/models/face_detail.py); null — старая модель с нарисованными глазами */
+  eyes: EyeRig | null = null;
+  /** эмоция поверх пресета реплики (setEmotion) */
+  private emo: { p: FacePreset; w: number; t: number; dur: number } | null = null;
+  /** итоговые веса лица за кадр (для глаз, debug и тестов) */
+  readonly W: Record<string, number> = {};
+  private gazeV = new THREE.Vector3();
 
   constructor(private url = 'models/character.glb', private animsUrl?: string) {
     this.object.name = 'character-glb';
@@ -217,6 +225,8 @@ export class GlbCharacter implements Character {
       this.actions.forEach((a, id) => this.clips.realDuration.set(id, a.getClip().duration));
     }
     this.setFaceObj('usual');
+    this.eyes = EyeRig.find(model);
+    if (this.eyes) console.info('[glb] 3D-глаза');
     this.collider = new BodyCollider(this.object, (n) => this.bones.get(n) ?? model.getObjectByName('mixamorig' + n) ?? undefined);
     console.info('[glb] объёмы тела', this.collider.build(model));
     const propLoader = new GLTFLoader();
@@ -333,6 +343,31 @@ export class GlbCharacter implements Character {
     this.setFaceObj(/happy|smile|excited|proud|celebr/.test(preset) ? 'happy' : /annoyed|offended/.test(preset) ? 'angry' : 'usual');
   }
 
+  /**
+   * Эмоция поверх текущего пресета лица: пресет content/face.json (happy, laugh, smug, wink_l, wink_r, surprised, pout,
+   * shy, sad, sleepy, dizzy, sleep…), сила 0..1, длительность мс (0 — пока не сменят). Плавно входит и уходит.
+   */
+  setEmotion(name: string, weight = 1, durationMs = 1500) {
+    const p = facePreset(name);
+    if (!p) return;
+    const keep = this.emo && this.emo.p.id === name ? Math.min(this.emo.t, 0.15) : 0;
+    this.emo = { p, w: clamp(weight, 0, 1), t: keep, dur: durationMs / 1000 };
+  }
+
+  clearEmotion() {
+    if (this.emo) this.emo.dur = Math.min(this.emo.dur || Infinity, this.emo.t + 0.01);
+  }
+
+  /** текущая эмоция (id) или null */
+  get emotion() {
+    return this.emo?.p.id ?? null;
+  }
+
+  /** «стук в стекло»: в 3D лапа не тянется, но глаза быстро глядят на точку тапа */
+  reach(target: { dx: number; dy: number } | null) {
+    if (target) this.eyes?.glanceAt(target.dx, target.dy);
+  }
+
   emote(e: Emote, ms = 1200) {
     if (e === 'blink') return this.faceMix.blink();
     this.face(EMOTE_FACE[e] ?? 'neutral', ms);
@@ -393,24 +428,51 @@ export class GlbCharacter implements Character {
       if (rot.x) this.inner.position.y += 0.5 - 0.5 * Math.cos(rot.x);
     }
 
-    // лицо: блендшейпы пресета + микромимика + моргание + липсинк (mouth_* поверх)
-    const lw = this.life.update(dt, { persona: this.personaId, preset: this.faceMix.preset, open: this.mouth, idle: cs.idleMode });
+    // лицо: пресет + микромимика → эмоция поверх → моргание → липсинк (mouth_* поверх, рот при речи виден всегда)
+    const emo = this.emo;
+    let ee = 0;
+    if (emo) {
+      emo.t += dt;
+      ee = Math.min(1, emo.t / 0.15) * (emo.dur ? clamp((emo.dur - emo.t) / 0.35, 0, 1) : 1) * emo.w;
+      if (emo.dur && emo.t >= emo.dur) this.emo = null;
+    }
+    const facePresetId = emo && ee > 0.4 ? emo.p.id : this.faceMix.preset;
+    const lw = this.life.update(dt, { persona: this.personaId, preset: facePresetId, open: this.mouth, idle: cs.idleMode });
+    const W = this.W;
+    for (const k in W) W[k] = 0;
+    for (const k in f.weights) W[k] = f.weights[k];
+    for (const k in lw) W[k] = Math.max(W[k] ?? 0, lw[k]);
+    let pupils = f.pupils, ears = f.ears;
+    if (emo && ee > 0) {
+      const ew = emo.p.weights;
+      for (const k in W) W[k] += ((ew[k] ?? 0) - W[k]) * ee;
+      for (const k in ew) if (!(k in W)) W[k] = ew[k] * ee;
+      pupils += (emo.p.pupils - pupils) * ee;
+      ears += (emo.p.ears - ears) * ee;
+    }
+    const noBlink = emo && ee > 0.4 ? !!emo.p.noBlink : false;
+    if (!noBlink) {
+      W.blink_L = Math.max(W.blink_L ?? 0, f.blink);
+      W.blink_R = Math.max(W.blink_R ?? 0, f.blink);
+    }
+    // складки и мягкость: щёки поднимаются при улыбке, морщинка у носа при хмурых бровях
+    W.cheek_up = Math.max(W.cheek_up ?? 0, 0.5 * (W.smile ?? 0), 0.3 * (W.smirk ?? 0));
+    W.nose_wrinkle = Math.max(W.nose_wrinkle ?? 0, 0.35 * (W.brow_down ?? 0));
+    for (const k in this.visemeW) W[k] = Math.max((W[k] ?? 0) * 0.5, this.visemeW[k]);
     for (const m of this.morphMeshes) {
       const d = m.morphTargetDictionary!;
       const inf = m.morphTargetInfluences!;
       for (const key of MORPH_TARGETS) {
         const i = d[key];
         if (i === undefined) continue;
-        let v = Math.max(f.weights[key] ?? 0, lw[key] ?? 0);
-        if (key === 'blink_L' || key === 'blink_R') v = Math.max(v, f.blink);
-        if (key in this.visemeW) v = Math.max(v * 0.5, this.visemeW[key]);
-        inf[i] = v;
+        // старые веки-накладки не нужны, когда есть 3D-глаза
+        inf[i] = W[key] ?? 0;
       }
     }
     this.collider?.apply();
-    this.applyTailEars(dt, f.ears);
+    this.applyTailEars(dt, ears, facePresetId);
     this.props?.update(this.clips.cur.id);
-    for (const E of ['LeftEye', 'RightEye']) this.bones.get(E)?.scale.setScalar(f.pupils);
+    for (const E of ['LeftEye', 'RightEye']) this.bones.get(E)?.scale.setScalar(pupils);
 
     const head = this.bones.get('Head');
     if (head) {
@@ -437,10 +499,16 @@ export class GlbCharacter implements Character {
       const chest = this.bones.get('Spine2');
       if (chest) this.rotWorld(chest, side, h.breath);
     }
+    // глаза — после головы: взгляд на зрителя (или на точку lookAt), веки, зрачки
+    if (this.eyes) {
+      const tgt = this.look ?? camera.getWorldPosition(this.gazeV);
+      const gz = (emo && ee > 0.4 ? emo.p.gaze : facePreset(this.faceMix.preset)?.gaze) ?? null;
+      this.eyes.update(dt, { weights: W, pupils, target: tgt, idle: cs.idleMode && this.life.talk < 0.1, bias: gz });
+    }
   }
 
   /** хвост и уши: сброс к покою и вторичная анимация TailRig поверх тела */
-  private applyTailEars(dt: number, faceEars: number) {
+  private applyTailEars(dt: number, faceEars: number, facePresetId = this.faceMix.preset) {
     const names = ['Tail1', 'Tail2', 'Tail3', 'Tail4', 'LeftEar1', 'RightEar1'];
     for (const n of names) {
       const b = this.bones.get(n);
@@ -470,7 +538,7 @@ export class GlbCharacter implements Character {
     }
     const out = this.tailRig.update(dt, {
       clip: this.clips.cur.id,
-      face: this.faceMix.preset,
+      face: facePresetId,
       faceEars: faceEars,
       additive: this.clips.additive.map((a) => a.id),
       persona: this.personaId,

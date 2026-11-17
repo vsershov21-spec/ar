@@ -27,6 +27,7 @@ import type { UI } from './ui/ui';
 import type { Tracker } from './tracker/types';
 import { ASSETS } from './config';
 import { rand } from './core/util';
+import { emotionFor } from './character/emotions';
 
 export type DirectorEvents = { log: string; phase: string; persona: PersonaId };
 
@@ -352,6 +353,7 @@ export class Director extends Emitter<DirectorEvents> {
   /** реакция на ввод: эффект/звук/клип сразу, реплика — через очередь */
   private react(event: string) {
     if (this.paused && this.picker.event(event).priority < 3) return;
+    this.emotion(event);
     const pk = this.personas.line(event, { name: this.state.name });
     if (!pk) {
       if (this.picker.coolingDown(event)) return;
@@ -370,6 +372,7 @@ export class Director extends Emitter<DirectorEvents> {
 
   /** реплика сценария/диалога: визуал вместе с речью */
   speakEvent(event: string, o: { force?: boolean; visuals?: boolean } = {}): boolean {
+    this.emotion(event);
     const r = this.currentRiddle();
     const pk = this.personas.line(event, { name: this.state.name, vars: r ? { answer: r.answer } : {}, force: o.force });
     if (!pk) {
@@ -458,6 +461,13 @@ export class Director extends Emitter<DirectorEvents> {
       };
       tick();
     });
+  }
+
+  /** эмоция события поверх лица реплики (src/character/emotions.ts): радость при тапе, удивление при находке карты… */
+  private emotion(event: string) {
+    const cue = emotionFor(event, this.persona.id);
+    const ch = this.character as Character & { setEmotion?: (n: string, w?: number, ms?: number) => void };
+    if (cue && ch?.setEmotion) ch.setEmotion(cue[0], cue[1], cue[2]);
   }
 
   private face(preset: string | undefined) {
