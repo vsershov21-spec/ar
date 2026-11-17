@@ -20,6 +20,12 @@ export interface SynthOptions {
   ox?: number;
   oy?: number;
   card?: { rgb: [number, number, number]; design?: 'plain' | 'doodle' | 'gradient' | 'stripes' };
+  /** картинка на «карте» (дизайн карты или поверхность предмета), растягивается на весь прямоугольник */
+  tex?: Tex;
+  /** форма предмета: соотношение сторон и радиус скругления (доля ширины). По умолчанию — карта ID-1 */
+  shape?: { aspect: number; radius: number };
+  /** фон — картинка (растягивается на кадр) вместо процедурного стола */
+  bgImage?: Tex;
   bg?: 'wood' | 'plain' | 'dark' | 'clutter' | 'paper' | 'white';
   finger?: boolean;
   glare?: boolean;
@@ -32,6 +38,22 @@ export interface SynthOptions {
   noiseSeed?: number;
   /** без карты (негативный пример) */
   noCard?: boolean;
+}
+
+export interface Tex {
+  rgba: Uint8ClampedArray | Uint8Array;
+  w: number;
+  h: number;
+}
+
+/** билинейная выборка из текстуры, u, v ∈ [0, 1] */
+export function texAt(t: Tex, u: number, v: number): [number, number, number] {
+  const x = Math.min(t.w - 1.001, Math.max(0, u * t.w - 0.5)), y = Math.min(t.h - 1.001, Math.max(0, v * t.h - 0.5));
+  const x0 = x | 0, y0 = y | 0, fx = x - x0, fy = y - y0;
+  const a = (y0 * t.w + x0) * 4, b = a + 4, c = a + t.w * 4, d = c + 4;
+  const out: [number, number, number] = [0, 0, 0];
+  for (let k = 0; k < 3; k++) out[k] = (t.rgba[a + k] * (1 - fx) + t.rgba[b + k] * fx) * (1 - fy) + (t.rgba[c + k] * (1 - fx) + t.rgba[d + k] * fx) * fy;
+  return out;
 }
 
 export interface SynthFrame {
@@ -80,7 +102,9 @@ export function renderCardScene(o: SynthOptions = {}): SynthFrame {
   const tr = (v: V3) => rotX(rotZ(v, yaw), -tilt);
   const r1 = tr([1, 0, 0]), r2 = tr([0, 1, 0]), r3 = tr([0, 0, 1]);
   const t: V3 = [(o.ox ?? 0) * D * (w / f), -(o.oy ?? 0) * D * (h / f), -D];
-  const hh = 0.5 / CARD_A;
+  const aspect = o.shape?.aspect ?? CARD_A;
+  const radius = o.shape?.radius ?? CARD_R;
+  const hh = 0.5 / aspect;
   const proj = (X: number, Y: number) => {
     const P: V3 = [X * r1[0] + Y * r2[0] + t[0], X * r1[1] + Y * r2[1] + t[1], X * r1[2] + Y * r2[2] + t[2]];
     return { x: cx + (f * P[0]) / -P[2] - 0.5, y: cy - (f * P[1]) / -P[2] - 0.5 };
@@ -113,6 +137,7 @@ export function renderCardScene(o: SynthOptions = {}): SynthFrame {
       const k = 0.78 + 0.22 * g + 0.06 * Math.sin(u * 0.9 + v * 0.05);
       c = [woodBase[0] * k, woodBase[1] * k, woodBase[2] * k];
     }
+    if (o.bgImage) c = texAt(o.bgImage, x / w, y / h);
     if (paperLines && Math.abs(((y + 3) % 14) - 7) < 0.8 && x > 20 && x < w - 30) c = [60, 60, 70];
     for (const k of clutter) {
       const dx = x - k.x, dy = y - k.y;
@@ -143,6 +168,7 @@ export function renderCardScene(o: SynthOptions = {}): SynthFrame {
   const doodles: { x: number; y: number; r: number }[] = [];
   for (let i = 0; i < 14; i++) doodles.push({ x: (R() - 0.5) * 0.9, y: (R() - 0.5) * 0.55, r: 0.02 + R() * 0.06 });
   const cardColor = (X: number, Y: number): V3 => {
+    if (o.tex) return texAt(o.tex, X + 0.5, (hh - Y) / (2 * hh));
     let [r, g, b] = card.rgb;
     if (design === 'gradient') {
       const k = 0.6 + 0.8 * (X + 0.5) / 1;
@@ -164,8 +190,8 @@ export function renderCardScene(o: SynthOptions = {}): SynthFrame {
   const inCard = (X: number, Y: number) => {
     const ax = Math.abs(X), ay = Math.abs(Y);
     if (ax > 0.5 || ay > hh) return false;
-    const qx = ax - (0.5 - CARD_R), qy = ay - (hh - CARD_R);
-    if (qx > 0 && qy > 0) return qx * qx + qy * qy <= CARD_R * CARD_R;
+    const qx = ax - (0.5 - radius), qy = ay - (hh - radius);
+    if (qx > 0 && qy > 0) return qx * qx + qy * qy <= radius * radius;
     return true;
   };
   const N = dot(r3, t);

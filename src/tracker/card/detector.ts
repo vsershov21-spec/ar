@@ -184,6 +184,30 @@ export class CardDetector {
    *  (hint — где карта должна быть по гироскопу), пересадка — только явно (reset). */
   locked = false;
   hint: Quad | null = null;
+  /** кандидаты последнего полного поиска (лучшие первыми) — для проверки «это карта?» (verify.ts) */
+  lastCandidates: Candidate[] = [];
+  /** в этом кадре был полный поиск (lastCandidates — свежие) */
+  ranDetect = false;
+  /**
+   * Кот не посажен, а ведём не карту (проверка по содержимому: книга, бутылка) — перейти на другого кандидата.
+   * Логику посаженного кота (locked/hint) не трогает.
+   */
+  adopt(q: Quad) {
+    if (this.locked) return;
+    this.prevQuad = q;
+    this.lastH = null;
+    this.anchored = true;
+    this.planeFrames = 0;
+    this.sinceDetect = 0;
+  }
+  /** забыть текущую «дорожку» (ведём не карту) — следующий кадр начнётся с полного поиска */
+  drop() {
+    if (this.locked) return;
+    this.prevQuad = null;
+    this.lastH = null;
+    this.anchored = false;
+    this.planeFrames = 0;
+  }
   reset() {
     this.locked = false;
     this.hint = null;
@@ -234,6 +258,7 @@ export class CardDetector {
     let mode: DetectResult['mode'] = 'none';
     let flow: DetectResult['flow'];
     let detectOut: { segments: Segment[]; candidates: Candidate[] } | null = null;
+    this.ranDetect = false;
 
     if (p.track && this.prevQuad && !opts.forceDetect) {
       const tr = this.trackStep(this.prevQuad, opts.debug);
@@ -253,6 +278,8 @@ export class CardDetector {
     }
     if (!best || this.sinceDetect >= p.detectEvery) {
       detectOut = this.detect();
+      this.lastCandidates = detectOut.candidates;
+      this.ranDetect = true;
       this.sinceDetect = 0;
       let d: Candidate | undefined = detectOut.candidates[0];
       if (d && this.locked) {
