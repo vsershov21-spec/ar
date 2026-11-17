@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { FX_IDS, resolveFx, setFxCatalogLogger } from '../src/fx/catalog';
 import { CLIP_IDS, resolveClip, IdlePicker, knownClip } from '../src/character/clips';
 import { ClipState } from '../src/character/clipState';
-import { FaceMixer, FACE_IDS } from '../src/character/face';
+import { FaceMixer, facePreset, FACE_IDS } from '../src/character/face';
 import { RIG_CLIPS } from '../src/character/rigClips';
 import { PERSONA_META, nextPersona } from '../src/character/personaMeta';
 
@@ -73,9 +73,10 @@ describe('каталоги content/', () => {
     f.set('happy');
     f.update(0.08);
     expect(f.cur.weights.smile).toBeGreaterThan(0.1);
-    expect(f.cur.weights.smile).toBeLessThan(0.75);
+    const target = facePreset('happy')!.weights.smile;
+    expect(f.cur.weights.smile).toBeLessThan(target);
     f.update(0.1);
-    expect(f.cur.weights.smile).toBeCloseTo(0.75, 2);
+    expect(f.cur.weights.smile).toBeCloseTo(target, 2);
     let blinked = false;
     for (let i = 0; i < 400; i++) blinked ||= f.update(0.016).blink > 0.5;
     expect(blinked).toBe(true);

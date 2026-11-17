@@ -170,7 +170,7 @@ vec3 wrPerturb(vec3 surfPos, vec3 n, float fd, float hh) {
       vec2 c = (vWrP.xy - (bc.xy + vec2((i == 0 ? 1.0 : -1.0) * 0.012 * s, -0.026 * s))) / s;
       bl += exp(-pow(c.x / 0.03, 2.0) - pow(c.y / 0.018, 2.0));
     }
-    diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.98, 0.42, 0.5) * 0.95, clamp(bl, 0.0, 1.0) * 0.55 * uWrB.z * step(0.0, vWrP.z - uWrMouthL.z + 0.04));
+    diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.98, 0.42, 0.5) * 0.95, clamp(bl, 0.0, 1.0) * 0.75 * uWrB.z * step(0.0, vWrP.z - uWrMouthL.z + 0.04));
   }`,
         ).replace(
           '#include <normal_fragment_maps>',

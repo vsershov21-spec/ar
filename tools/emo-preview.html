@@ -1,0 +1,78 @@
+<!doctype html><html><head><meta charset="utf-8"><title>emotion preview</title>
+<style>html,body{margin:0;background:#e6e6ea;color:#222;font:13px sans-serif}canvas{display:block}</style></head>
+<body><script type="module">
+// Эмоции и рот через НАСТОЯЩИЙ рантайм (GlbCharacter: setEmotion, липсинк setMouth, 3D-глаза, складки, тон меха,
+// мех-оболочки) и свет приложения (src/app.ts: полусфера 2.2 + направленный 1.6, без тонмаппинга).
+// ?p=glitter&m=/models/glitter_v1.glb&s=neutral,happy,laugh,talk:A&cols=4&tile=360&yaw=0&pitch=0&zoom=1&t=1.2
+// Состояние: id пресета (setEmotion), «talk:A|O|E|U|M|F» — рот липсинка, «emo>emo2@0.2» — кадр перехода через 0.2 с.
+import * as THREE from 'three';
+// детерминированный Math.random (моргание, саккады, микромимика)
+let seed = 12345; Math.random = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+const { GlbCharacter } = await import('../src/character/glbCharacter.ts');
+const q = new URLSearchParams(location.search);
+const persona = q.get('p') || 'glitter';
+const url = q.get('m') || `/models/${persona}_v1.glb`;
+const states = (q.get('s') || 'neutral').split(',');
+const cols = +(q.get('cols') || Math.min(4, states.length));
+const T = +(q.get('tile') || 360), zoom = +(q.get('zoom') || 1);
+const yaw = +(q.get('yaw') || 0) * Math.PI / 180, pitch = +(q.get('pitch') || 0) * Math.PI / 180;
+const rows = Math.ceil(states.length / cols);
+const r = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+r.setPixelRatio(1); r.setSize(cols * T, rows * T); r.setScissorTest(true); document.body.appendChild(r.domElement);
+r.outputColorSpace = THREE.SRGBColorSpace;
+const sc = new THREE.Scene(); sc.background = new THREE.Color('#' + (q.get('bg') || 'e6e6ea'));
+sc.add(new THREE.HemisphereLight(0xffffff, 0x8899aa, 2.2));
+const dl = new THREE.DirectionalLight(0xffffff, 1.6); dl.position.set(0.5, 1, 1); sc.add(dl);
+const ch = new GlbCharacter(url, q.get('anims') === '0' ? undefined : '/models/anims_v1.glb');
+await ch.load();
+ch.setPersona?.({ id: persona });
+ch.clips.setIdles(['idle'], persona);
+sc.add(ch.object);
+ch.play('idle');
+if (q.get('mdt') === '0' && ch.mouthRig) ch.mouthRig.mesh.material.depthTest = false;
+if (q.get('hide')) ch.object.traverse((o) => { if (new RegExp(q.get('hide')).test(o.name)) o.visible = false; });
+ch.faceMix.nextBlink = 1e9;
+ch.life.nextMicro = 1e9;
+const bone = (n) => { let b = null; ch.object.traverse((o) => { if (!b && o.name.replace(/^mixamorig:?/, '') === n) b = o; }); return b; };
+const cam = new THREE.PerspectiveCamera(22 / zoom, 1, 0.01, 50);
+const camAt = () => {
+  ch.object.updateMatrixWorld(true);
+  const o = ch.object.getWorldPosition(new THREE.Vector3());
+  const hp = bone('Head').getWorldPosition(new THREE.Vector3()), tp = bone('HeadTop_End').getWorldPosition(new THREE.Vector3());
+  const c = hp.clone().lerp(tp, 0.62 + +(q.get('dy') || 0));
+  const d = hp.distanceTo(tp) * (+(q.get("dist") || 10.5));
+  cam.position.set(c.x + Math.sin(yaw) * Math.cos(pitch) * d, c.y + Math.sin(pitch) * d, c.z + Math.cos(yaw) * Math.cos(pitch) * d);
+  cam.lookAt(c);
+};
+for (let k = 0; k < 20; k++) ch.update(1 / 30, cam);
+camAt();
+const SH = {
+  A: { open: 0.9, wide: 0.4, round: 0 }, O: { open: 0.6, wide: 0, round: 0.85 }, E: { open: 0.35, wide: 0.9, round: 0 },
+  U: { open: 0.12, wide: 0, round: 0.9 }, M: { open: 0, wide: 0, round: 0 }, F: { open: 0.15, wide: 0.3, round: 0 },
+};
+const hold = +(q.get('t') || 1.2);
+const run = (sec) => { for (let k = 0; k < Math.round(sec * 30); k++) ch.update(1 / 30, cam); };
+states.forEach((st, i) => {
+  ch.clearEmotion(); ch.setMouth('X', 0, { open: 0, wide: 0, round: 0 }); run(0.8);
+  if (st.startsWith('talk:')) {
+    const v = st.slice(5);
+    ch.setMouth(v === 'M' ? 'A' : 'D', 1, SH[v] ?? SH.A);
+    run(0.4);
+  } else if (st.includes('>')) {
+    const [a, rest] = st.split('>'); const [b, at] = rest.split('@');
+    if (a !== 'neutral') ch.setEmotion(a, 1, 0);
+    run(hold);
+    ch.setEmotion(b, 1, 0);
+    run(+at || 0.15);
+  } else if (st !== 'neutral') {
+    const [e, mouth] = st.split('+');
+    ch.setEmotion(e, 1, 0);
+    if (mouth) ch.setMouth('D', 1, SH[mouth]);
+    run(hold);
+  } else run(0.5);
+  camAt();
+  const x = (i % cols) * T, y = (rows - 1 - Math.floor(i / cols)) * T;
+  r.setViewport(x, y, T, T); r.setScissor(x, y, T, T); r.render(sc, cam);
+});
+window.__labels = states; window.__morphs = { W: { ...ch.W }, u: ch.mouthRig && ch.mouthRig.uniforms.uMA.value.toArray() }; window.__ready = true;
+</script></body></html>

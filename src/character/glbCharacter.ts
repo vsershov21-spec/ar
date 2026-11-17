@@ -7,11 +7,12 @@
  * Модуль грузится лениво (?char=glb): GLTFLoader и Draco не попадают в основной бандл.
  */
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import type { Character, ClipName, Emote, PlayOptions, TouchZone } from './types';
 import { procFor, type ProcPose } from './procedural';
 import type { Persona } from '../persona/types';
 import { asset, clamp } from '../core/util';
+import { fetchModel, modelUrl } from '../core/modelUrl';
+import { makeGltfLoader } from './gltfLoad';
 import { type MouthShape, type Viseme } from '../lipsync/visemes';
 import { FaceLife } from './faceLife';
 import { ClipState } from './clipState';
@@ -25,6 +26,8 @@ import { buildFurShells } from './furShell';
 import { FaceMixer, EMOTE_FACE, MORPH_TARGETS, facePreset, type FacePreset } from './face';
 import { EyeRig } from './eyeRig';
 import { FaceWrinkles } from './faceWrinkles';
+import { FurTone } from './furTone';
+import { MouthRig } from './mouthRig';
 import { personaMeta } from './personaMeta';
 import type { AnchorName } from '../fx/core';
 
@@ -160,8 +163,14 @@ export class GlbCharacter implements Character {
   eyes: EyeRig | null = null;
   /** складки лица в шейдере тела (по весам эмоции) */
   wrinkles: FaceWrinkles | null = null;
+  /** тон меха под референс (светлый серо-лавандовый, furTone.ts) */
+  readonly furTone = new FurTone();
+  /** рот-накладка с шейдером (модели после face_detail v3); null — старая полость Mouth */
+  mouthRig: MouthRig | null = null;
   /** эмоция поверх пресета реплики (setEmotion) */
-  private emo: { p: FacePreset; w: number; t: number; dur: number } | null = null;
+  private emo: { p: FacePreset; w: number; t: number; dur: number; from: number } | null = null;
+  /** слой эмоции: сглаженные веса пресета (смена эмоции — перетекание весов, а не провал в нейтраль) и его сила */
+  private emoL: { w: Record<string, number>; pupils: number; ears: number; s: number } = { w: {}, pupils: 1, ears: 0, s: 0 };
   /** итоговые веса лица за кадр (для глаз, debug и тестов) */
   readonly W: Record<string, number> = {};
   private gazeV = new THREE.Vector3();
@@ -177,14 +186,15 @@ export class GlbCharacter implements Character {
   }
 
   async load() {
-    const loader = new GLTFLoader();
-    // Draco — только если GLB реально сжат (финальная модель ≤5 МБ): декодер грузится по требованию
-    const raw = await fetch(asset(this.url)).then((r) => r.arrayBuffer());
+    // meshopt + KTX2 (сжатие при сборке, src/character/gltfLoad.ts); Draco — только если GLB реально сжат им
+    const loader = makeGltfLoader();
+    const url = modelUrl(this.url);
+    const raw = await fetchModel(this.url);
     if (new TextDecoder().decode(new Uint8Array(raw, 0, Math.min(raw.byteLength, 4096))).includes('KHR_draco_mesh_compression')) {
       const { DRACOLoader } = await import('three/examples/jsm/loaders/DRACOLoader.js');
       loader.setDRACOLoader(new DRACOLoader());
     }
-    const gltf = await loader.parseAsync(raw, asset(this.url).replace(/[^/]*$/, ''));
+    const gltf = await loader.parseAsync(raw, asset(url).replace(/[^/]*$/, ''));
     const model = gltf.scene;
     this.model = model;
     model.updateMatrixWorld(true);
@@ -212,6 +222,8 @@ export class GlbCharacter implements Character {
         if (mat?.isMeshStandardMaterial) {
           mat.envMap = softEnv();
           mat.envMapIntensity = 0.4;
+          // карточки меха щёк: край по alphaToCoverage (MSAA) — мягкий контур вместо «пилы» alphaTest
+          if (/^Tuft/.test(mat.name)) mat.alphaToCoverage = true;
         }
         if (m.morphTargetDictionary) this.morphMeshes.push(m);
       }
@@ -221,10 +233,8 @@ export class GlbCharacter implements Character {
     // общая библиотека движений (тот же скелет Mixamo): Добряк и Блёстка берут клипы Хулигана
     if (this.animsUrl && this.animsUrl !== this.url) {
       try {
-        const libLoader = new GLTFLoader();
-        const { MeshoptDecoder } = await import('three/examples/jsm/libs/meshopt_decoder.module.js');
-        libLoader.setMeshoptDecoder(MeshoptDecoder);
-        const lib = await libLoader.loadAsync(asset(this.animsUrl));
+        const libUrl = modelUrl(this.animsUrl);
+        const lib = await makeGltfLoader().parseAsync(await fetchModel(this.animsUrl), asset(libUrl).replace(/[^/]*$/, ''));
         anims = [...anims, ...lib.animations];
       } catch (e) {
         console.warn('[glb] библиотека анимаций не загрузилась', e);
@@ -247,14 +257,16 @@ export class GlbCharacter implements Character {
       this.actions.forEach((a, id) => this.clips.realDuration.set(id, this.anim?.realDuration(a) ?? a.getClip().duration));
     }
     this.setFaceObj('usual');
+    this.furTone.attach(model);
+    this.mouthRig = MouthRig.find(model);
     this.eyes = EyeRig.find(model);
     this.wrinkles = FaceWrinkles.attach(model);
     if (this.eyes) console.info('[glb] 3D-глаза');
     this.collider = new BodyCollider(this.object, (n) => this.bones.get(n) ?? model.getObjectByName('mixamorig' + n) ?? undefined);
     console.info('[glb] объёмы тела', this.collider.build(model));
-    const propLoader = new GLTFLoader();
+    const propLoader = makeGltfLoader();
     this.props = new PropRig(
-      async (u) => (await propLoader.loadAsync(asset(u))).scene,
+      async (u) => (await propLoader.loadAsync(asset(modelUrl(u)))).scene,
       (n) => this.bones.get(n) ?? model.getObjectByName('mixamorig' + n) ?? undefined,
       this.inner,
     );
@@ -262,6 +274,7 @@ export class GlbCharacter implements Character {
 
   setPersona(p: Persona) {
     this.personaId = p.id;
+    this.furTone.setPersona(p.id);
     const meta = personaMeta(p.id);
     this.clips.setIdles(meta.idles, p.id);
     if (!this.model) return;
@@ -382,12 +395,12 @@ export class GlbCharacter implements Character {
   setEmotion(name: string, weight = 1, durationMs = 1500) {
     const p = facePreset(name);
     if (!p) return;
-    const keep = this.emo && this.emo.p.id === name ? Math.min(this.emo.t, 0.15) : 0;
-    this.emo = { p, w: clamp(weight, 0, 1), t: keep, dur: durationMs / 1000 };
+    // сила стартует с текущей (смена эмоции на ходу — без провала), веса перетекают в слое emoL
+    this.emo = { p, w: clamp(weight, 0, 1), t: 0, dur: durationMs / 1000, from: this.emoL.s };
   }
 
   clearEmotion() {
-    if (this.emo) this.emo.dur = Math.min(this.emo.dur || Infinity, this.emo.t + 0.01);
+    if (this.emo) this.emo.dur = Math.min(this.emo.dur || Infinity, this.emo.t + 0.5); // гаснет за 0.5 с
   }
 
   /** текущая эмоция (id) или null */
@@ -464,11 +477,23 @@ export class GlbCharacter implements Character {
     // лицо: пресет + микромимика → эмоция поверх → моргание → липсинк (mouth_* поверх, рот при речи виден всегда)
     const emo = this.emo;
     let ee = 0;
+    const L = this.emoL;
     if (emo) {
       emo.t += dt;
-      ee = Math.min(1, emo.t / 0.15) * (emo.dur ? clamp((emo.dur - emo.t) / 0.35, 0, 1) : 1) * emo.w;
+      // вход ~0.3 с и выход ~0.5 с по smoothstep: эмоция «наплывает», а не щёлкает
+      const kin = clamp(emo.t / 0.3, 0, 1), kout = emo.dur ? clamp((emo.dur - emo.t) / 0.5, 0, 1) : 1;
+      const sin = kin * kin * (3 - 2 * kin);
+      ee = (emo.from + (emo.w - emo.from) * sin) * kout * kout * (3 - 2 * kout);
+      // веса слоя тянутся к пресету (~0.12 с): из смеха в удивление лицо перетекает, а не перескакивает
+      const a = 1 - Math.exp(-dt / 0.12);
+      const ew = emo.p.weights;
+      for (const k in L.w) L.w[k] += ((ew[k] ?? 0) - L.w[k]) * a;
+      for (const k in ew) if (!(k in L.w)) L.w[k] = L.s > 0.02 ? ew[k] * a : ew[k];
+      L.pupils += (emo.p.pupils - L.pupils) * (L.s > 0.02 ? a : 1);
+      L.ears += (emo.p.ears - L.ears) * (L.s > 0.02 ? a : 1);
       if (emo.dur && emo.t >= emo.dur) this.emo = null;
     }
+    L.s = ee;
     const facePresetId = emo && ee > 0.4 ? emo.p.id : this.faceMix.preset;
     const lw = this.life.update(dt, { persona: this.personaId, preset: facePresetId, open: this.mouth, idle: cs.idleMode });
     const W = this.W;
@@ -476,12 +501,12 @@ export class GlbCharacter implements Character {
     for (const k in f.weights) W[k] = f.weights[k];
     for (const k in lw) W[k] = Math.max(W[k] ?? 0, lw[k]);
     let pupils = f.pupils, ears = f.ears;
-    if (emo && ee > 0) {
-      const ew = emo.p.weights;
+    if (ee > 0) {
+      const ew = L.w;
       for (const k in W) W[k] += ((ew[k] ?? 0) - W[k]) * ee;
       for (const k in ew) if (!(k in W)) W[k] = ew[k] * ee;
-      pupils += (emo.p.pupils - pupils) * ee;
-      ears += (emo.p.ears - ears) * ee;
+      pupils += (L.pupils - pupils) * ee;
+      ears += (L.ears - ears) * ee;
     }
     const noBlink = emo && ee > 0.4 ? !!emo.p.noBlink : false;
     if (!noBlink) {
@@ -493,6 +518,7 @@ export class GlbCharacter implements Character {
     W.nose_wrinkle = Math.max(W.nose_wrinkle ?? 0, 0.35 * (W.brow_down ?? 0));
     for (const k in this.visemeW) W[k] = Math.max((W[k] ?? 0) * 0.5, this.visemeW[k]);
     this.wrinkles?.update(W);
+    this.mouthRig?.update(W);
     for (const m of this.morphMeshes) {
       const d = m.morphTargetDictionary!;
       const inf = m.morphTargetInfluences!;

@@ -32,6 +32,8 @@ export interface LidPose {
   lo: number;
   /** наклон: > 0 — внутренний уголок вниз (злость), < 0 — вверх (грусть) */
   tilt: number;
+  /** «дуга» 0..1 (смех, подмигивание): глаз закрывает нижнее веко, видна линия верхнего — «^», как на референсе */
+  arc: number;
 }
 
 const clamp = (v: number, a: number, b: number) => (v < a ? a : v > b ? b : v);
@@ -52,7 +54,8 @@ export function lidPose(w: Record<string, number>, side: 'L' | 'R', rest = 0.05)
   const shut = Math.max(blink, laugh);
   up += (1 - up) * shut;
   lo += (1 - lo) * Math.max(blink, laugh * 0.85);
-  return { up: clamp(up, -0.5, 1), lo: clamp(lo, 0, 1), tilt: clamp(0.3 * angry - 0.34 * sad, -0.4, 0.4) };
+  const arc = clamp(Math.max(laugh, g(`wink_${side}`)), 0, 1);
+  return { up: clamp(up, -0.5, 1), lo: clamp(lo, 0, 1), tilt: clamp(0.3 * angry - 0.42 * sad, -0.45, 0.45), arc };
 }
 
 interface Eye {
@@ -62,6 +65,8 @@ interface Eye {
   up: THREE.Object3D;
   lo: THREE.Object3D;
   ex: EyeExtras;
+  /** слёзка (грусть), может отсутствовать */
+  tear: THREE.Object3D | null;
   yaw: number;
   pitch: number;
 }
@@ -98,6 +103,7 @@ export class EyeRig {
   private glanceLeft = 0;
   private glance = { x: 0, y: 0 };
   private pupil = 1;
+  private tearS = 0;
   private biasS = { x: 0, y: 0 };
   private v = new THREE.Vector3();
   private qa = new THREE.Quaternion();
@@ -118,7 +124,9 @@ export class EyeRig {
       const lo = root.getObjectByName(`LidLo_${side}`);
       if (!pivot || !ball || !up || !lo) return null;
       const ex = pivot.userData as EyeExtras;
-      rig.eyes.push({ side, pivot, ball, up, lo, ex: { ...ex, side }, yaw: 0, pitch: 0 });
+      const tear = root.getObjectByName(`Tear_${side}`) ?? null;
+      if (tear) tear.visible = false;
+      rig.eyes.push({ side, pivot, ball, up, lo, ex: { ...ex, side }, tear, yaw: 0, pitch: 0 });
     }
     const ex = rig.eyes[0].ex;
     rig.uniforms.uIris.value.set(ex.irisUV?.[0] ?? 0.2, ex.irisUV?.[1] ?? 0.2);
@@ -222,8 +230,18 @@ export class EyeRig {
       ox += this.away.x;
       oy += this.away.y;
     }
+    // слёзка: набухает за ~0.4 с, чуть стекает вниз и покачивается
+    const tw = clamp(i.weights.tear ?? 0, 0, 1);
+    this.tearS += (tw - this.tearS) * (1 - Math.exp(-dt / 0.25));
     for (const e of this.eyes) {
       const ex = e.ex;
+      if (e.tear) {
+        const k = this.tearS;
+        e.tear.visible = k > 0.03;
+        if (e.tear.userData.y0 === undefined) e.tear.userData.y0 = e.tear.position.y;
+        e.tear.scale.setScalar(Math.max(0.001, k * (1 + 0.04 * Math.sin(this.t * 3))));
+        e.tear.position.y = e.tear.userData.y0 - ex.B * 0.12 * k;
+      }
       // цель в пространстве глаза → направление в «единичном» пространстве эллипсоида
       let yaw = 0, pitch = 0;
       if (i.target && spiral < 0.5) {
@@ -248,8 +266,14 @@ export class EyeRig {
       // веки: закрытие + слежение за взглядом по вертикали + наклон
       const lp = lidPose(i.weights, e.side, ex.restUp ?? 0.05);
       const follow = 1 - closed;
-      const upA = lp.up * ex.closeUp - e.pitch * (e.pitch > 0 ? 1.0 : 0.55) * follow;
-      const loA = lp.lo * ex.closeLo + e.pitch * 0.3 * follow;
+      let upA = lp.up * ex.closeUp - e.pitch * (e.pitch > 0 ? 1.0 : 0.55) * follow;
+      let loA = lp.lo * ex.closeLo + e.pitch * 0.3 * follow;
+      if (lp.arc > 0) {
+        // «^»: верхнее веко опускается на 40 %, нижнее поднимается до него — линия смыкания выгнута вверх
+        const k = lp.arc * lp.arc * (3 - 2 * lp.arc);
+        upA += (0.4 * ex.closeUp - upA) * k;
+        loA += (ex.closeUp * 0.6 + ex.closeLo + 0.4 - loA) * k; // с запасом: нижнее веко уходит под верхнее (оно снаружи)
+      }
       const sgn = e.side === 'L' ? 1 : -1;
       e.up.quaternion.setFromAxisAngle(EyeRig.AZ, lp.tilt * sgn).multiply(this.qa.setFromAxisAngle(EyeRig.AX, upA));
       e.lo.quaternion.setFromAxisAngle(EyeRig.AZ, lp.tilt * sgn * 0.35).multiply(this.qb.setFromAxisAngle(EyeRig.AX, -loA));

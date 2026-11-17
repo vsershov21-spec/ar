@@ -60,3 +60,40 @@ describe('3D-глаза и эмоции', () => {
     expect(rig.uniforms.uSpiral.value).toBe(1);
   });
 });
+
+describe('лицо v3: глаза «^», рот-накладка, тон меха', () => {
+  it('смех и подмигивание — дуга (закрывает нижнее веко), моргание — нет', () => {
+    expect(lidPose({ eyes_laugh: 1 }, 'L').arc).toBe(1);
+    expect(lidPose({ wink_R: 1 }, 'R').arc).toBe(1);
+    expect(lidPose({ wink_R: 1 }, 'L').arc).toBe(0);
+    expect(lidPose({ blink_L: 1 }, 'L').arc).toBe(0);
+  });
+
+  it('рот: челюсть открывает полость, «о» — округлость, покой — закрыт', async () => {
+    const { mouthParams } = await import('../src/character/mouthRig');
+    const jaw = { mouth_A: 0.4, mouth_O: 0.3 };
+    expect(mouthParams({}, jaw).drop).toBe(0);
+    const a = mouthParams({ mouth_A: 1 }, jaw);
+    expect(a.drop).toBeCloseTo(0.4, 5);
+    expect(a.round).toBeLessThan(0.1);
+    const o = mouthParams({ mouth_O: 1 }, jaw);
+    expect(o.round).toBeGreaterThan(0.9);
+    const pout = facePreset('pout')!.weights;
+    expect(mouthParams(pout, jaw).frown).toBe(1);
+    expect(mouthParams(pout, jaw).drop).toBe(0); // надулся — рот закрыт
+  });
+
+  it('эмоции по референсу заметны: надулся — щёки, грусть — слёзка, удивление — рот «о»', () => {
+    expect(facePreset('pout')!.weights.cheeks_gum).toBeGreaterThan(0.5);
+    expect(facePreset('sad')!.weights.tear).toBe(1);
+    expect(facePreset('surprised')!.weights.mouth_O).toBeGreaterThan(1);
+    expect(facePreset('shy')!.gaze).toBeTruthy();
+  });
+
+  it('тон меха не трогает глаза, рот, слёзку и румянец', async () => {
+    const { FurTone } = await import('../src/character/furTone');
+    expect(FurTone.isFur('tripo_node_x')).toBe(true);
+    expect(FurTone.isFur('FaceTufts')).toBe(true);
+    for (const n of ['EyeBall_L', 'MouthD', 'Tear_L', 'Blush', 'Whiskers', 'BD_Pads']) expect(FurTone.isFur(n), n).toBe(false);
+  });
+});

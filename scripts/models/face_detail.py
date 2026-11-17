@@ -32,9 +32,11 @@ TAG = 'faceStage'
 VERSION = 1
 
 # насколько открыть глаза относительно нарисованных (доля высоты разреза): Хулиган нарисован прищуренным
-OPEN = {'hooligan': 0.45, 'kind': 0.12, 'glitter': 0.12}
-# верхнее веко в покое (доля закрытия): Хулиган смотрит чуть свысока
-REST_UP = {'hooligan': 0.2, 'kind': 0.14, 'glitter': 0.12}
+OPEN = {'hooligan': 0.3, 'kind': 0.0, 'glitter': 0.0}
+# верхнее веко в покое (доля закрытия): по референсу веко чуть накрывает радужку (у Блёстки — с ресницами)
+REST_UP = {'hooligan': 0.26, 'kind': 0.2, 'glitter': 0.22}
+# разрез глаза меньше нарисованного Tripo (на референсах глаза мельче и миндалевидные): сжатие к центру по x и y
+EYE_SCALE = {'hooligan': (1.0, 0.9), 'kind': (0.98, 0.9), 'glitter': (1.02, 0.92)}
 # радужка: оттенки (sRGB) — обод, середина, светлая часть у зрачка
 IRIS = {
     'hooligan': ((22, 74, 34), (58, 150, 62), (150, 214, 92)),
@@ -42,8 +44,8 @@ IRIS = {
     'glitter': ((18, 70, 40), (46, 150, 78), (140, 220, 120)),
 }
 BROW = {'hooligan': {'dark': 0.42, 'thick': 1.0}, 'kind': {'dark': 0.46, 'thick': 0.9}, 'glitter': {'dark': 0.5, 'thick': 0.8}}
-# радужка: диаметр в долях высоты разреза (референс — радужка заметно меньше разреза, белок виден)
-IRIS_K = {'hooligan': 0.9, 'kind': 0.78, 'glitter': 0.8}
+# радужка: диаметр в долях высоты разреза (референс — крупная радужка почти на весь видимый глаз, белка мало)
+IRIS_K = {'hooligan': 1.12, 'kind': 1.12, 'glitter': 1.15}
 
 
 def norm(v):
@@ -106,7 +108,8 @@ def strip_stage(g):
     """убрать всё, что добавила прошлая стадия (и старую накладку EyeLids), затем собрать мусор"""
     j = g.j
     nodes = j['nodes']
-    drop = {i for i, n in enumerate(nodes) if tagged(n) or n.get('name') == 'EyeLids'}
+    # EyeLids — старые веки, Mouth — старая полость рта face_rig.py (рот теперь — накладка MouthD с шейдером)
+    drop = {i for i, n in enumerate(nodes) if tagged(n) or n.get('name') in ('EyeLids', 'Mouth')}
     # поддеревья
     stack = list(drop)
     while stack:
@@ -308,6 +311,36 @@ class Front:
         return pos, nrm, uv
 
 
+def front_tri(fr, xy):
+    """как Front.hit, но → (позиция, нормаль, индексы вершин треугольника (n,3), барицентрики (n,3)); промах — tri = -1"""
+    xy = np.atleast_2d(np.asarray(xy, np.float64))
+    n = len(xy)
+    pos = np.full((n, 3), np.nan); nrm = np.zeros((n, 3)); tri = -np.ones((n, 3), np.int64); bar = np.zeros((n, 3))
+    for k in range(n):
+        q = xy[k]
+        ti = np.where((q[0] >= fr.bmin[:, 0]) & (q[0] <= fr.bmax[:, 0]) & (q[1] >= fr.bmin[:, 1]) & (q[1] <= fr.bmax[:, 1]))[0]
+        if not len(ti):
+            continue
+        a, b, c = fr.a[ti], fr.b[ti], fr.c[ti]
+        v0 = b - a; v1 = c - a; v2 = q - a
+        den = v0[:, 0] * v1[:, 1] - v1[:, 0] * v0[:, 1]
+        den = np.where(np.abs(den) < 1e-14, 1e-14, den)
+        l1 = (v2[:, 0] * v1[:, 1] - v1[:, 0] * v2[:, 1]) / den
+        l2 = (v0[:, 0] * v2[:, 1] - v2[:, 0] * v0[:, 1]) / den
+        l0 = 1 - l1 - l2
+        ok = (l0 >= -1e-6) & (l1 >= -1e-6) & (l2 >= -1e-6)
+        if not ok.any():
+            continue
+        T = fr.T[ti[ok]]
+        L = np.stack([l0[ok], l1[ok], l2[ok]], 1)
+        zs = (L[:, :, None] * fr.P[T]).sum(1)
+        best = int(np.argmax(zs[:, 2]))
+        pos[k] = zs[best]; tri[k] = T[best]; bar[k] = L[best]
+        nn = (L[best][:, None] * fr.N[T[best]]).sum(0)
+        nrm[k] = nn / (np.linalg.norm(nn) + 1e-12)
+    return pos, nrm, tri, bar
+
+
 def bleed(img, painted, empty, n=4):
     """растянуть закраску на пустые тексели вокруг (поля островов атласа): иначе при фильтрации текстуры
     по краям островов проступает старый цвет тонкой линией"""
@@ -466,8 +499,9 @@ def eye_texture(persona, rx, ry, pr0, S=512):
 def lid_mesh(alphas, th_edge, upper, lashes=None):
     """оболочка века в единичном пространстве глаза: X = r·sinα, (Z, Y) = r·cosα·(cosθ, sinθ)"""
     sgn = 1 if upper else -1
-    R = 1.035 if upper else 1.015
-    r0 = 1.02 if upper else 1.0  # край верхнего века ложится поверх нижнего — линия ресниц видна и у закрытого глаза
+    # зазоры до яблока ≥ 3 %: при «^» (смех) нижнее веко поднимается высоко — при 1.5 % радужка мерцала сквозь него
+    R = 1.055 if upper else 1.032
+    r0 = 1.04 if upper else 1.016  # край верхнего века ложится поверх нижнего — линия ресниц видна и у закрытого глаза
     rows = [(0.0, r0), (0.05, R - (0.006 if upper else 0.006)), (0.12, R), (0.26, R)] + [(x, R) for x in np.linspace(0.44, 2.75, 7)]
     V, N, C = [], [], []
     for (dth, r) in rows:
@@ -489,6 +523,33 @@ def lid_mesh(alphas, th_edge, upper, lashes=None):
     return V, N, F
 
 
+_TEAR = {}
+
+
+def tear_mesh(g, A):
+    """капля (острым концом вверх), радиус ≈ 0.17 ширины глаза; один меш на модель"""
+    if 'mi' in _TEAR and _TEAR.get('g') is g:
+        return _TEAR['mi']
+    V, Nn = [], []
+    NA, NP = 14, 10
+    for i in range(NP + 1):
+        ph = math.pi * i / NP
+        for k in range(NA):
+            la = 2 * math.pi * k / NA
+            x, y, z = math.sin(ph) * math.cos(la), math.cos(ph), math.sin(ph) * math.sin(la)
+            if y > 0:
+                sq = (1 - y) ** 0.9
+                x, z, y = x * sq, z * sq, y * 1.6
+            V.append((x, y, z * 0.6)); Nn.append(norm(np.array([x, y * 0.6, z])))
+    V = np.array(V) * 0.17 * A; Nn = np.array(Nn)
+    Fs = orient(V, grid_faces(NA, NP + 1, wrap_u=True), Nn)
+    mat = add_material(g, 'Tear_mat', rough=0.06)
+    g.j['materials'][mat]['pbrMetallicRoughness']['baseColorFactor'] = [0.55, 0.8, 1.0, 1.0]
+    mi = add_mesh(g, 'Tear', V, Nn, Fs, mat)
+    _TEAR.update(g=g, mi=mi)
+    return mi
+
+
 def build_eyes(g, persona, F, fr, base_lin, head_node, IBM):
     out = {}
     tex_cache = None
@@ -507,6 +568,13 @@ def build_eyes(g, persona, F, fr, base_lin, head_node, IBM):
         ok = ~np.isnan(T3[:, 0]) & ~np.isnan(B3[:, 0])
         T3, B3 = T3[ok], B3[ok]
         qt = (T3 - p0) @ R; qb = (B3 - p0) @ R
+        # разрез меньше нарисованного: сжать контур к центру (по высоте сильнее — миндалевидный)
+        sx_, sy_ = EYE_SCALE.get(persona, (1.0, 1.0))
+        allq = np.concatenate([qt, qb])
+        cxq = (allq[:, 0].min() + allq[:, 0].max()) / 2; cyq = (qt[:, 1].mean() + qb[:, 1].mean()) / 2
+        for q_ in (qt, qb):
+            q_[:, 0] = cxq + (q_[:, 0] - cxq) * sx_
+            q_[:, 1] = cyq + (q_[:, 1] - cyq) * sy_
         H = qt[:, 1] - qb[:, 1]
         # открыть шире нарисованного: верх поднимается больше низа, по профилю sin
         prof = np.sin(np.pi * np.clip((qt[:, 0] - qt[0, 0]) / (qt[-1, 0] - qt[0, 0]), 0, 1)) ** 0.8
@@ -518,11 +586,11 @@ def build_eyes(g, persona, F, fr, base_lin, head_node, IBM):
         W = xs.max() - xs.min()
         midm = np.abs(qt[:, 0] - x0) < W * 0.2
         z0 = ((qt[midm, 1] + qb[midm, 1]) / 2).mean()
-        A = 0.5 * W * 1.18
-        B = max(0.5 * H.max() * 1.3, 0.74 * A)
+        A = 0.5 * W * 1.12
+        B = max(0.5 * H.max() * 1.3, 0.68 * A)
         # глубина яблока C и выступ P: средняя часть разреза должна лежать на яблоке (иначе видна глазница);
         # самые уголки (по 12 %) прячет мех — выступ не больше 0.3·B, иначе глаза навыкате
-        C = 0.62 * A
+        C = 0.5 * A  # мельче купол: закрытое веко не торчит диском
         need = []
         span = qt[-1, 0] - qt[0, 0]
         for q in list(qt) + list(qb):
@@ -531,7 +599,7 @@ def build_eyes(g, persona, F, fr, base_lin, head_node, IBM):
                 continue
             s = min(((q[0] - x0) / A) ** 2 + ((q[1] - z0) / B) ** 2, 0.97)
             need.append(q[2] + 0.001 + C * (1 - math.sqrt(1 - s)))
-        P = float(np.clip(max(need), 0.16 * B, 0.3 * B))
+        P = float(np.clip(max(need), 0.03 * B, 0.12 * B))  # яблоко утоплено в глазницу
         Ol = np.array([x0, z0, P - C])
         O = p0 + R @ Ol
         # углы края век
@@ -564,8 +632,8 @@ def build_eyes(g, persona, F, fr, base_lin, head_node, IBM):
         close_lo = 0.32 * gap + 0.07
         # радужка: физический радиус ~ 0.47 высоты разреза у центра, не меньше 0.4·A
         Hc = H[midm].mean()
-        Ri = max(0.5 * Hc * IRIS_K.get(persona, 0.85), 0.36 * A)
-        Ri = min(Ri, 0.58 * B)
+        Ri = max(0.5 * Hc * IRIS_K.get(persona, 0.85), 0.44 * A)
+        Ri = min(Ri, 0.7 * B)
         eyes[side] = dict(O=O, R=R, A=A, B=B, C=C, ag=ag, th_t=th_t, th_b=th_b, close_up=close_up, close_lo=close_lo,
                           Ri=Ri, p0=p0, P=P, top3=T3, bot3=B3, W=W, H=Hc)
     # общие для пары: текстура глаза
@@ -608,7 +676,8 @@ def build_eyes(g, persona, F, fr, base_lin, head_node, IBM):
         nu = len(E['ag'])
         col = np.zeros((len(V), 3))
         for j in range(len(V) // nu):
-            k = [1.0, 0.92, 0.45, 0.0][j] if j < 4 else 0.0
+            # линия ресниц: у Блёстки толще (подводка, как на референсе)
+            k = ([1.0, 1.0, 0.85, 0.12] if persona == 'glitter' else [1.0, 0.95, 0.55, 0.0])[j] if j < 4 else 0.0
             col[j * nu:(j + 1) * nu] = lash * k + cu * (1 - k) * 0.97
         extraV, extraF, extraC, extraN = [], [], [], []
         if persona == 'glitter':
@@ -659,6 +728,13 @@ def build_eyes(g, persona, F, fr, base_lin, head_node, IBM):
         add_node(g, ns, f'EyeBall_{side}', mesh=m_ball)
         add_node(g, ns, f'LidUp_{side}', mesh=m_up)
         add_node(g, ns, f'LidLo_{side}', mesh=m_lo)
+        # слёзка (грусть): капля у нижнего века со стороны внешнего уголка; рантайм (eyeRig) показывает её по весу «tear»
+        outer = 1 if side == 'L' else -1
+        ai = int(np.argmin(np.abs(E['ag'] - outer * 0.3)))
+        a_, th_ = E['ag'][ai], E['th_b'][ai] - 0.2
+        pt = np.array([math.sin(a_), math.cos(a_) * math.sin(th_), math.cos(a_) * math.cos(th_)]) * 1.06 * np.array([E['A'], E['B'], E['C']])
+        pt[2] += 0.45 * E['C']  # над мехом щеки (яблоко утоплено)
+        add_node(g, ne, f'Tear_{side}', mesh=tear_mesh(g, E['A']), t=pt, extras={'tear': True})
         print(f'  глаз {side}: P={E["P"]/E["B"]:.2f}B A={E["A"]:.4f} B={E["B"]:.4f} C={E["C"]:.4f} закрытие {E["close_up"]:.2f}/{E["close_lo"]:.2f} радужка {E["Ri"]:.4f}')
     return eyes
 
@@ -753,23 +829,29 @@ def face_marks(F, eyes, fr):
 
 # ───────────────────────── пушистые щёки (карточки меха по силуэту) ─────────────────────────
 def tuft_texture(S=128):
-    """пучок шерсти: пряди от основания (u=0) к кончику (u=1), альфа по прядям; цвет — белый (оттенок из вершин)"""
+    """пучок шерсти: несколько мягких прядей-«клочков» от основания (u=0) к закруглённым кончикам; альфа с мягким краем
+    (рантайм включает alphaToCoverage — край сглажен MSAA, без пилы); цвет — белый с прожилками (оттенок из вершин)"""
     yy, xx = np.mgrid[0:S, 0:S].astype(np.float64)
     u = (xx + 0.5) / S; v = (yy + 0.5) / S * 2 - 1
     rng = np.random.default_rng(3)
     a = np.zeros((S, S)); shade = np.ones((S, S))
-    for _ in range(26):
-        v0 = rng.uniform(-0.55, 0.55); spread = rng.uniform(-0.5, 0.5); ln = rng.uniform(0.55, 1.0)
-        curve = rng.uniform(-0.25, 0.25)
+    for _ in range(5):
+        v0 = rng.uniform(-0.35, 0.35); spread = rng.uniform(-0.35, 0.35); ln = rng.uniform(0.6, 0.95)
+        curve = rng.uniform(-0.2, 0.2)
         center = v0 * (1 - u * 0.3) + spread * u + curve * u * u
-        wdt = 0.09 * (1 - np.clip(u / ln, 0, 1)) ** 0.7 + 0.004
-        k = np.clip(1 - np.abs(v - center) / wdt, 0, 1) * (u < ln)
+        t = np.clip(u / ln, 0, 1)
+        wdt = 0.26 * np.sqrt(np.clip(1 - t ** 2.2, 0, 1)) + 1e-3  # толстая прядь, кончик округлый
+        d = np.abs(v - center) / wdt
+        k = (1 - smooth(0.55, 1.0, d)) * (u < ln)
         a = np.maximum(a, k)
-        shade = np.minimum(shade, 1 - 0.15 * k * rng.uniform(0, 1))
-    a *= smooth(0.0, 0.12, u)  # у основания мягче (уходит в мех)
-    root = 0.72 + 0.28 * smooth(0.0, 0.6, u)
+    # прожилки (только цвет)
+    for _ in range(40):
+        c = rng.uniform(-0.8, 0.8) + rng.uniform(-0.3, 0.3) * u
+        shade = np.minimum(shade, 1 - 0.1 * np.exp(-((v - c) / 0.02) ** 2))
+    a *= smooth(0.0, 0.2, u)  # у основания уходит в мех
+    root = 0.8 + 0.2 * smooth(0.0, 0.7, u)
     col = np.stack([root * shade] * 3, -1) * 255
-    img = np.concatenate([col, (np.clip(a * 1.6, 0, 1) * 255)[..., None]], -1)
+    img = np.concatenate([col, (np.clip(a, 0, 1) * 255)[..., None]], -1)
     return Image.fromarray(np.clip(img, 0, 255).astype(np.uint8), 'RGBA')
 
 
@@ -808,7 +890,7 @@ def build_tufts(g, persona, F, fr, base_lin, P, hw, head_node, IBM):
                 ang = (-0.55 + 0.75 * low) + rng.uniform(-0.15, 0.15) + layer * 0.25
                 d = norm(np.array([sg * math.cos(ang), math.sin(ang), 0.15 + 0.1 * layer]))
                 base = p - np.array([sg, 0, 0]) * 0.007 * s + np.array([0, 0, -0.004 * layer])
-                card(base, d, (0.022 + 0.008 * rng.uniform()) * s * (1.1 - 0.3 * low), 0.02 * s, col * (0.97 + 0.06 * layer))
+                card(base, d, (0.017 + 0.006 * rng.uniform()) * s * (1.1 - 0.3 * low), 0.024 * s, col * (0.97 + 0.06 * layer))
     if persona == 'kind':  # макушка без шапки — пара вихров
         top = head & (np.abs(P[:, 0]) < 0.05) & (P[:, 2] > -0.02)
         idx = np.where(top)[0]
@@ -1043,7 +1125,7 @@ def paint_eyes(g, persona, F, eyes, P, N, UV, I, fr):
         w = 1 / (d2 + 1e-6) ** 1.5
         fill[s0:s0 + 2048] = (w[..., None] * ring_c[None]).sum(1) / w.sum(1, keepdims=True)
     sk = socket[yy, xx]
-    fill *= (1 - 0.3 * sk)[:, None]
+    fill *= (1 - 0.15 * sk)[:, None]
     k = region[yy, xx][:, None]
     base[yy, xx] = base[yy, xx] * (1 - k) + fill * k
     painted = np.zeros(base.shape[:2], bool); painted[yy, xx] = region[yy, xx] > 0.5
@@ -1129,7 +1211,10 @@ def merge_bake(g, persona, prefix, P, N, UV, I, hw_v):
 
 
 # рот нарисован Tripo приоткрытым (у Блёстки): закрасить мехом и провести тонкую линию рта — полость открывает накладка Mouth
-PAINT_MOUTH = {'glitter': {'below': 0.03, 'above': 0.004, 'line': (84, 56, 80)}}
+# v3: рот рисует накладка MouthD — нарисованный рот Tripo закрашивается мехом целиком у всех (line=None)
+PAINT_MOUTH = {'glitter': {'below': 0.03, 'above': 0.014, 'line': None},
+               'hooligan': {'below': 0.016, 'above': 0.012, 'line': None},
+               'kind': {'below': 0.016, 'above': 0.012, 'line': None}}
 
 
 def paint_mouth(g, persona, F, P, N, UV, I, fr):
@@ -1176,13 +1261,150 @@ def paint_mouth(g, persona, F, P, N, UV, I, fr):
     # тонкая линия рта по нарисованной линии (кривая «ω» Tripo)
     dl = np.abs(Y[inside] - ly[inside]) + np.maximum(dx[inside], 0)
     lk = (1 - smooth(0.0005, 0.0013, dl))[:, None] * ((X[inside] > ML[0, 0] - 0.001) & (X[inside] < ML[-1, 0] + 0.001))[:, None]
-    col = col * (1 - lk * 0.85) + np.array(cfg['line'], np.float32) * lk * 0.85
+    if cfg['line'] is not None:
+        col = col * (1 - lk * 0.85) + np.array(cfg['line'], np.float32) * lk * 0.85
     base[yi, xi] = col
     painted = np.zeros(base.shape[:2], bool); painted[yi, xi] = True
     base = bleed(base, painted, tid < 0)
     g.set_image(i_base, Image.fromarray(np.clip(base, 0, 255).astype(np.uint8)))
     g.jpeg_q[i_base] = 92
+    # нормали: складка нарисованного рта в карте нормалей Tripo даёт тёмную полосу под новой линией — ровный мех
+    i_n = g.j['textures'][mat['normalTexture']['index']]['source'] if 'normalTexture' in mat else None
+    if i_n is not None:
+        nm = np.asarray(g.image(i_n).convert('RGB')).astype(np.float32)
+        sy, sx = nm.shape[0] / S, nm.shape[1] / S
+        ny_, nx_ = (yi * sy).astype(int), (xi * sx).astype(int)
+        kk = k * 0.85
+        nm[ny_, nx_] = nm[ny_, nx_] * (1 - kk) + np.array([128, 128, 255.0]) * kk
+        g.set_image(i_n, Image.fromarray(nm.astype(np.uint8)))
     print(f'  закраска нарисованного рта: {int(inside.sum())} текселей')
+
+
+# ───────────────────────── рот: накладка с шейдером (src/character/mouthRig.ts) ─────────────────────────
+def acc_dense(g, ai, n):
+    """accessor (обычный или sparse) → плотный массив (n, k)"""
+    a = g.j['accessors'][ai]
+    if 'sparse' not in a:
+        return g.acc(ai).astype(np.float64)
+    k = {'SCALAR': 1, 'VEC2': 2, 'VEC3': 3, 'VEC4': 4}[a['type']]
+    out = np.zeros((n, k))
+    sp = a['sparse']
+    it = {5121: np.uint8, 5123: np.uint16, 5125: np.uint32}[sp['indices']['componentType']]
+    vi = sp['indices']; vv = sp['values']
+    idx = np.frombuffer(g.view(vi['bufferView']), it, sp['count'], vi.get('byteOffset', 0))
+    val = np.frombuffer(g.view(vv['bufferView']), np.float32, sp['count'] * k, vv.get('byteOffset', 0)).reshape(-1, k)
+    out[idx.astype(np.int64)] = val
+    return out
+
+
+# ключи тела, за которыми накладка рта повторяет поверхность (челюсть, уголки, щёки)
+MOUTH_FOLLOW = ['mouth_A', 'mouth_E', 'mouth_O', 'mouth_U', 'tongue_out', 'smile', 'cheeks_gum', 'cheek_up', 'frown', 'nose_wrinkle']
+
+
+# опускание челюсти по ключам рта (доли ширины рта) — как в face_rig.py
+JAW_AMT = {'mouth_A': 0.42, 'mouth_E': 0.2, 'mouth_O': 0.34, 'mouth_U': 0.16, 'tongue_out': 0.12}
+
+
+def smooth_jaw(g, F, P, hw):
+    """ключи челюсти тела (face_rig.py) заменить на плавные: там смещение шло ступенькой по линии рта — треугольники
+    морды на линии растягивались «пилой». Теперь подъём к линии мягкий (рамп ~0.13 ширины рта), без ступеньки."""
+    m = F['mouth']
+    ML = np.array(m['line']); ML = ML[np.argsort(ML[:, 0])]
+    W = abs(m['left'][0] - m['right'][0])
+    cx = (ML[0, 0] + ML[-1, 0]) / 2
+    lz = np.interp(P[:, 0], ML[:, 0], ML[:, 1])
+    front = np.clip((P[:, 2] - 0.02) / 0.06, 0, 1) * np.clip((hw - 0.3) / 0.3, 0, 1)
+    dx = (P[:, 0] - cx) / (W * 0.85)
+    dz = (lz - P[:, 1]) / (W * 0.9)
+    w = np.exp(-dx ** 2 * 1.6) * np.clip(1 - np.maximum(0, dz - 0.6) / 0.9, 0, 1)
+    ramp = smooth(0.03, -0.1, (P[:, 1] - lz) / W)
+    mi, pr = g.main_mesh()
+    names = g.j['meshes'][mi].get('extras', {}).get('targetNames', [])
+    done = []
+    for k, amt in JAW_AMT.items():
+        if k not in names:
+            continue
+        d = np.zeros_like(P)
+        d[:, 1] = -amt * W * w * ramp * front
+        pr['targets'][names.index(k)]['POSITION'] = g.add_sparse(len(P), d)
+        done.append(k)
+    print(f'  челюсть без ступеньки: {done}')
+
+
+def build_mouth(g, persona, F, fr, P, head_node, IBM):
+    """MouthD — сетка-накладка на морду вокруг рта (от подбородка до носа), повторяет поверхность и ключи челюсти тела.
+    Форму рта (линия «ω», полость, язык, клычки, губы) рисует шейдер по весам лица — без швов атласа и рваных краёв."""
+    m = F['mouth']; nose = F['nose']
+    ML = np.array(m['line']); ML = ML[np.argsort(ML[:, 0])]
+    W = abs(m['left'][0] - m['right'][0])
+    cx = (m['left'][0] + m['right'][0]) / 2
+    cy = float(np.interp(m['center'][0], ML[:, 0], ML[:, 1]))
+    ny = nose['bottom'][1]
+    # сетка: по x ±0.8W, по y от 0.8W ниже линии до низа носа; гуще у линии рта
+    xs = cx + np.linspace(-0.8, 0.8, 33) * W
+    nu = len(xs)
+    # шаг рядов ровный (≈ 0.05 ширины рта): слишком частые ряды у линии перехлёстывались при открытии челюсти
+    t = np.linspace(-1, 1, 37)
+    ys_lo = cy - 0.8 * W * (np.abs(t[t < 0]) ** 1.15)
+    ys_hi = cy + (ny - 0.004 - cy) * (t[t >= 0] ** 1.1)
+    ys = np.concatenate([ys_lo, ys_hi])
+    XY = np.array([(x, y) for y in ys for x in xs])
+    pos, nrm, tri, bar = front_tri(fr, XY)
+    ok = tri[:, 0] >= 0
+    if not ok.all():  # промахи (край морды) — ближайшая удачная точка
+        good = np.where(ok)[0]
+        for i in np.where(~ok)[0]:
+            j_ = good[np.argmin(((XY[good] - XY[i]) ** 2).sum(1))]
+            pos[i], nrm[i], tri[i], bar[i] = pos[j_], nrm[j_], tri[j_], bar[j_]
+    s = W / 0.13
+    off = 0.0011 * s
+    # гладкая «простыня» без складок: под нависающими подушечками морды луч спереди попадает глубоко на подбородок —
+    # накладка складывалась, и линия рта двоилась. Глубина = огибающая сверху (максимум + размытие), не глубже поверхности
+    Z = pos[:, 2].reshape(len(ys), nu)
+    E_ = Z.copy()
+    for _ in range(3):
+        P_ = np.pad(E_, 1, mode='edge')
+        E_ = np.max([P_[1 + dy:1 + dy + Z.shape[0], 1 + dx:1 + dx + Z.shape[1]] for dy in (-1, 0, 1) for dx in (-1, 0, 1)], 0)
+    for _ in range(4):
+        P_ = np.pad(E_, 1, mode='edge')
+        E_ = (P_[:-2, 1:-1] + P_[2:, 1:-1] + P_[1:-1, :-2] + P_[1:-1, 2:] + 4 * P_[1:-1, 1:-1]) / 8
+    pos[:, 2] = np.maximum(Z, E_).reshape(-1)
+    V = pos + nrm * off
+    # нормали накладки сглажены к средней по рту: складки морды (фильтрум, подбородок) не режут язык тенью
+    nrm = norm(0.35 * nrm + 0.65 * norm(nrm.mean(0)))
+    nu = len(xs)
+    Fs = orient(V, grid_faces(nu, len(ys)), nrm)
+    # ключи тела → смещения накладки (барицентрическая интерполяция по тому же треугольнику)
+    mi, pr = g.main_mesh()
+    mesh = g.j['meshes'][mi]
+    names = mesh.get('extras', {}).get('targetNames', [])
+    nP = len(P)
+    IR = IBM[:3, :3]; It = IBM[:3, 3]
+    targets = {}
+    jaw = {}
+    for k in MOUTH_FOLLOW:
+        if k not in names:
+            continue
+        D = acc_dense(g, pr['targets'][names.index(k)]['POSITION'], nP)
+        d = (bar[:, :, None] * D[tri]).sum(1)
+        targets[k] = d @ IR.T
+        if k.startswith('mouth_') or k == 'tongue_out':
+            # насколько опускается подбородок под центром рта (в долях ширины рта) — шейдер рисует нижнюю губу там же
+            below = np.where((np.abs(XY[:, 0] - cx) < 0.08 * W) & (XY[:, 1] < cy - 0.05 * W) & (XY[:, 1] > cy - 0.3 * W))[0]
+            jaw[k] = float(-d[below, 1].mean() / W) if len(below) else 0.0
+    # рамка рта в пространстве кости Head: начало — центр линии рта на поверхности, оси x/y модели, масштаб W
+    o3, n3, _, _ = front_tri(fr, np.array([[cx, cy]]))
+    O = IR @ (o3[0] + n3[0] * off) + It
+    ex = IR @ np.array([1.0, 0, 0]); ey = IR @ np.array([0, 1.0, 0])
+    line = [[round(float((x - cx) / W), 4), round(float((y - cy) / W), 4)] for x, y in ML[::max(1, len(ML) // 24)]]
+    mat = add_material(g, 'MouthD_mat', rough=0.5, double=True)
+    g.j['materials'][mat]['alphaMode'] = 'BLEND'
+    g.j['materials'][mat]['pbrMetallicRoughness']['baseColorFactor'] = [1, 1, 1, 0]
+    mi2 = add_mesh(g, 'MouthD', V @ IR.T + It, nrm @ IR.T, Fs, mat, targets=targets)
+    ex_ = {'mouth': {'o': O.round(6).tolist(), 'ex': ex.round(6).tolist(), 'ey': ey.round(6).tolist(), 'W': float(W),
+                     'nose': round(float((ny - cy) / W), 4), 'jaw': {k: round(v, 4) for k, v in jaw.items()}, 'line': line, 'persona': persona}}
+    add_node(g, head_node, 'MouthD', mesh=mi2, extras=ex_)
+    print(f'  рот-накладка: {len(V)} вершин, ключи {list(targets)}, челюсть {ex_["mouth"]["jaw"]}')
 
 
 def main():
@@ -1215,11 +1437,14 @@ def main():
     Jt = g.acc(A['JOINTS_0']); Wt = g.acc(A['WEIGHTS_0']).astype(np.float64)
     build_tufts(g, persona, F, fr, base_lin, P, (Wt * (Jt == head_j)).sum(1), head_node, IBM)
     add_body_keys(g, fields(F, eyes), head_j)
+    smooth_jaw(g, F, P, (Wt * (Jt == head_j)).sum(1))
+    build_mouth(g, persona, F, fr, P, head_node, IBM)
     if bake:
         merge_bake(g, persona, bake, P, N, UV, I, (Wt * (Jt == head_j)).sum(1))
     paint_eyes(g, persona, F, eyes, P, N, UV, I, fr)
     paint_mouth(g, persona, F, P, N, UV, I, fr)
     j.setdefault('asset', {}).setdefault('extras', {})[TAG] = VERSION
+    gc(g)
     total = g.save(dst)
     print(f'{persona}: → {dst} {total / 1e6:.2f} MB')
 
