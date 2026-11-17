@@ -14,6 +14,9 @@ export interface CardWorkerIn {
   rgba: ArrayBuffer;
   /** кадр камеры без копирования на главном потоке (WebCodecs VideoFrame): уменьшаем и читаем пиксели здесь */
   frame?: VideoFrame;
+  /** ?grab=bitmap: кадр, уже уменьшенный createImageBitmap, и фрагмент под проверку */
+  bitmap?: ImageBitmap;
+  cropBitmap?: ImageBitmap;
   w: number;
   h: number;
   focal: number;
@@ -45,7 +48,16 @@ export interface CardWorkerOut extends PipelineOut {
 self.onmessage = (e: MessageEvent<CardWorkerIn>) => {
   const m = e.data;
   let crop: CropIn | null = null;
-  if (m.frame) {
+  if (m.bitmap) {
+    const px = readBitmap(m.bitmap, m.w, m.h);
+    const cpx = m.cropBitmap && m.crop ? readBitmap(m.cropBitmap, m.crop.cw, m.crop.ch, true) : null;
+    if (!px) {
+      (self as unknown as Worker).postMessage({ id: m.id, quad: null, score: 0, mode: 'no-frame', ms: 0, buf: new ArrayBuffer(4) } satisfies CardWorkerOut);
+      return;
+    }
+    m.rgba = px.buffer as ArrayBuffer;
+    if (cpx && m.crop) crop = { img: { rgba: cpx, w: m.crop.cw, h: m.crop.ch }, x0: m.crop.x0, y0: m.crop.y0, w: m.crop.w, h: m.crop.h };
+  } else if (m.frame) {
     const px = readFrame(m.frame, m.w, m.h, m.crop ?? null);
     if (!px) {
       (self as unknown as Worker).postMessage({ id: m.id, quad: null, score: 0, mode: 'no-frame', ms: 0, buf: new ArrayBuffer(4) } satisfies CardWorkerOut);
@@ -64,6 +76,35 @@ self.onmessage = (e: MessageEvent<CardWorkerIn>) => {
   }
   (self as unknown as Worker).postMessage(out, [m.rgba]);
 };
+
+/** ImageBitmap (уже нужного размера) → RGBA; битмап закрываем всегда */
+let bc: OffscreenCanvas | null = null;
+let bg: OffscreenCanvasRenderingContext2D | null = null;
+let bc2: OffscreenCanvas | null = null;
+let bg2: OffscreenCanvasRenderingContext2D | null = null;
+function readBitmap(b: ImageBitmap, w: number, h: number, second = false): Uint8ClampedArray | null {
+  try {
+    if (typeof OffscreenCanvas === 'undefined') return null;
+    let c = second ? bc2 : bc, g = second ? bg2 : bg;
+    if (!c) {
+      c = new OffscreenCanvas(w, h);
+      g = c.getContext('2d', { willReadFrequently: true });
+      if (second) (bc2 = c), (bg2 = g);
+      else (bc = c), (bg = g);
+    }
+    if (!g) return null;
+    if (c.width !== w || c.height !== h) {
+      c.width = w;
+      c.height = h;
+    }
+    g.drawImage(b, 0, 0, w, h);
+    return g.getImageData(0, 0, w, h).data;
+  } catch {
+    return null;
+  } finally {
+    b.close();
+  }
+}
 
 /**
  * VideoFrame → RGBA w×h (OffscreenCanvas 2D, холст переиспользуется). Кадр закрываем всегда — иначе камера встанет.

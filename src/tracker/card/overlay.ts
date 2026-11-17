@@ -46,7 +46,10 @@ export class CardOverlay {
   private t = 0;
   private w = 1;
   private h = 1;
-  private dpr = Math.min(2, typeof devicePixelRatio === 'number' ? devicePixelRatio : 1);
+  /** плотность холста: на телефоне 1,5 (пунктир и кольцо не теряют вида, а пикселей вдвое меньше, чем при 2) */
+  private dpr = Math.min(isTouch() ? 1.5 : 2, typeof devicePixelRatio === 'number' ? devicePixelRatio : 1);
+  /** прошлый кадр был пустым — холст уже чист, не трогаем его (после посадки рисовать нечего почти всегда) */
+  private wasEmpty = false;
   private view: CardView | null = null;
   private from: Pt[] = [];
   private shown = 0;
@@ -68,6 +71,7 @@ export class CardOverlay {
     this.h = h;
     this.canvas.width = Math.round(w * this.dpr);
     this.canvas.height = Math.round(h * this.dpr);
+    this.wasEmpty = false;
   }
 
   /** детектор видит карту (уже подтверждённую трекером) */
@@ -320,11 +324,27 @@ export class CardOverlay {
     g.restore();
   }
 
+  /** есть ли что рисовать в этом кадре */
+  private busy(): boolean {
+    const now = performance.now();
+    if (this.flash || this.sparks.length || this.debugLine) return true;
+    if (this.state === 'snap' || this.state === 'glow') return true;
+    if (this.state === 'locked' && this.t < FADE_S) return true;
+    if (this.state === 'search' && this.shown > 0.01) return true;
+    if (this.cand && this.trackState === 'candidate' && now - this.cand.at < 600) return true;
+    if (this.notCard && now - this.notCard.at < 1500) return true;
+    return false;
+  }
+
   update(dt: number) {
     this.t += dt;
     const g = this.g;
+    const busy = this.busy();
+    if (!busy && this.wasEmpty) return;
+    this.wasEmpty = !busy;
     g.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     g.clearRect(0, 0, this.w, this.h);
+    if (!busy) return;
     if (this.state === 'snap' && this.t >= SNAP_S) {
       this.state = 'glow';
       this.t = 0;
@@ -395,6 +415,10 @@ export class CardOverlay {
     }
     g.restore();
   }
+}
+
+function isTouch() {
+  return typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
 }
 
 const SPARK_COLORS = ['#ffffff', '#B5E36A', '#FFE27A', '#7EE2A8', '#ffffff'];

@@ -41,6 +41,8 @@ export interface PipelineOut {
   key?: { zncc: number; inl: number } | null;
   /** почему карты нет / почему ведём так (debug) */
   why?: string;
+  /** средняя яркость кадра 0..255 (подсказка «темно» без отдельного чтения кадра) */
+  luma?: number;
 }
 
 export class CardPipeline {
@@ -72,6 +74,9 @@ export class CardPipeline {
       out.ms += now() - t0;
     }
     if (r.quad) out.glare = glareOn(m.rgba, m.w, m.h, r.quad);
+    let ls = 0, ln = 0;
+    for (let i = 0; i < m.rgba.length; i += 4 * 37) (ls += 0.299 * m.rgba[i] + 0.587 * m.rgba[i + 1] + 0.114 * m.rgba[i + 2]), ln++;
+    out.luma = ln ? ls / ln : undefined;
     return out;
   }
 }

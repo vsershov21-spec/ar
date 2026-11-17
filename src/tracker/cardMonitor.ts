@@ -84,6 +84,9 @@ export function cardScreenFrac(tracker: Tracker): number | null {
 }
 
 /** средняя яркость видео на уменьшенном кадре 32×24 (дёшево: ~0,1 мс) */
+/** средняя яркость кадра от трекера карты (серый кадр детектора в воркере — даром); NaN — нет */
+export const trackerLuma = { value: NaN, at: -1e9 };
+
 export class LumaSampler {
   private c = document.createElement('canvas');
   private g: CanvasRenderingContext2D;
@@ -93,6 +96,8 @@ export class LumaSampler {
     this.g = this.c.getContext('2d', { willReadFrequently: true })!;
   }
   sample(video: HTMLVideoElement | null | undefined): number | null {
+    // трекер карты уже знает яркость (без второго чтения кадра камеры с GPU)
+    if (Number.isFinite(trackerLuma.value) && performance.now() - trackerLuma.at < 1500) return trackerLuma.value;
     if (!video || video.readyState < 2 || !video.videoWidth) return null;
     this.g.drawImage(video, 0, 0, 32, 24);
     const d = this.g.getImageData(0, 0, 32, 24).data;

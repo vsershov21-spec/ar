@@ -21,6 +21,7 @@ import type { CardKind } from './card/verify';
 import { CardSession, OrientationHistory } from './card/session';
 import type { TrackState } from './card/fsm';
 import { perf } from '../core/perf';
+import { trackerLuma } from './cardMonitor';
 
 export interface CardView {
   /** углы карты (TL, TR, BR, BL) в px экрана */
@@ -129,7 +130,10 @@ export class CardTracker extends TrackerBase implements Tracker {
 
   private async openCamera(video: HTMLVideoElement, withAudio = false) {
     // 720p и 30 к/с: больше трекеру (320 px) и экрану не нужно, а камера 60 к/с / 4K греет телефон
-    const vc: MediaTrackConstraints = { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } };
+    // 960×540: детектору нужно 320 px, фрагменту под проверку знака — карта ≈ 280 px (при карте на полкадра хватает);
+    // чтение кадра в главном потоке (iOS) дешевле, чем с 1280×720 (?cam=720 — как раньше)
+    const hd = new URLSearchParams(location.search).get('cam') === '720';
+    const vc: MediaTrackConstraints = { facingMode: 'environment', width: { ideal: hd ? 1280 : 960 }, height: { ideal: hd ? 720 : 540 }, frameRate: { ideal: 30 } };
     let stream: MediaStream | null = null;
     if (withAudio) {
       const aec = new URLSearchParams(location.search).get('aec') !== '0';
@@ -159,6 +163,9 @@ export class CardTracker extends TrackerBase implements Tracker {
    * Сторож: нет новых кадров дольше 1,5 с при видимой вкладке или дорожка завершилась → тихо переоткрываем камеру.
    */
   private camTimer = 0;
+  private lastCt = -1;
+  private staleRun = 0;
+  private mutedRun = 0;
   private rvfcGen = 0;
   private reviving = false;
   private watchCamera() {
@@ -168,8 +175,16 @@ export class CardTracker extends TrackerBase implements Tracker {
       if (!v || !this.running || document.visibilityState !== 'visible') return;
       const s = v.srcObject as MediaStream | null;
       const t = s?.getVideoTracks()[0];
-      const stale = this.rvfc && performance.now() - this.rvfcAt > 1500;
-      if (!t || t.readyState === 'ended' || t.muted || v.paused || stale) void this.reviveCamera(stale ? 'stale' : 'track');
+      // «кадры не идут»: requestVideoFrameCallback молчит > 1,5 с И время видео не движется — две проверки подряд.
+      // (rVFC может пропускать вызовы при нагрузке/троттлинге, а ложное переоткрытие камеры на iPhone = чёрный кадр)
+      const ct = v.currentTime;
+      const frozen = ct === this.lastCt;
+      this.lastCt = ct;
+      const stale = this.rvfc && performance.now() - this.rvfcAt > 1500 && frozen;
+      this.staleRun = stale ? this.staleRun + 1 : 0;
+      // muted (iOS: звонок/Siri) обычно снимается сам — переоткрываем, только если держится 3 с
+      this.mutedRun = t?.muted ? this.mutedRun + 1 : 0;
+      if (!t || t.readyState === 'ended' || v.paused || this.staleRun >= 2 || this.mutedRun >= 3) void this.reviveCamera(this.staleRun >= 2 ? 'stale' : this.mutedRun >= 3 ? 'muted' : t?.readyState ?? 'no-track');
     }, 1000);
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible' && this.video?.paused) void this.video.play().catch(() => undefined);
@@ -184,7 +199,8 @@ export class CardTracker extends TrackerBase implements Tracker {
       // сначала просто «пнуть» видео — часто этого хватает после паузы iOS
       if (v.paused) await v.play().catch(() => undefined);
       const t = (v.srcObject as MediaStream | null)?.getVideoTracks()[0];
-      if (t && t.readyState === 'live' && !t.muted && !v.paused && !(this.rvfc && performance.now() - this.rvfcAt > 1500)) return;
+      if (t && t.readyState === 'live' && !v.paused && why !== 'stale' && why !== 'muted') return;
+      this.staleRun = this.mutedRun = 0;
       console.warn('[card] камера переоткрывается:', why);
       // только видео: микрофон (дорожка из общего запроса) живёт своей жизнью в MicInput
       (v.srcObject as MediaStream | null)?.getVideoTracks().forEach((x) => x.stop());
@@ -278,6 +294,8 @@ export class CardTracker extends TrackerBase implements Tracker {
   private sentAt = 0;
   /** кадр в воркер как VideoFrame (Chrome/Android); Safari и отказ воркера — по-старому, ?grab=main|frame — вручную */
   private frameGrab = useFrameGrab();
+  /** ?grab=bitmap — кадр уменьшает createImageBitmap, читает воркер (на iPhone не проверено — по умолчанию выключено) */
+  private bitmapGrab = !this.frameGrab && typeof createImageBitmap === 'function' && typeof OffscreenCanvas !== 'undefined' && new URLSearchParams(location.search).get('grab') === 'bitmap';
 
   private watchFrames(v: HTMLVideoElement) {
     const vv = v as HTMLVideoElement & { requestVideoFrameCallback?: (cb: () => void) => number };
@@ -315,6 +333,34 @@ export class CardTracker extends TrackerBase implements Tracker {
         if (this.detectEvery > 0) msg.detectEvery = this.detectEvery;
         return msg;
       };
+      if (!frame && this.bitmapGrab) {
+        // ?grab=bitmap: уменьшение кадра — createImageBitmap (вне главного потока), пиксели читает воркер
+        const k = (v.videoWidth || this.dw) / this.dw;
+        const w = this.worker;
+        Promise.all([
+          createImageBitmap(v, { resizeWidth: this.dw, resizeHeight: this.dh, resizeQuality: 'low' }),
+          crop ? createImageBitmap(v, crop.x0 * k, crop.y0 * k, crop.w * k, crop.h * k, { resizeWidth: crop.cw, resizeHeight: crop.ch }) : Promise.resolve(null),
+        ])
+          .then(([b, cb]) => {
+            const msg = base(new ArrayBuffer(0));
+            msg.bitmap = b;
+            const tr: Transferable[] = [b];
+            if (cb && crop) {
+              msg.cropBitmap = cb;
+              msg.crop = crop;
+              tr.push(cb);
+            }
+            w.postMessage(msg, tr);
+          })
+          .catch((e) => {
+            this.debug('createImageBitmap не вышел (' + String(e) + ') — кадры читаем на главном потоке');
+            this.bitmapGrab = false;
+            this.busy = false;
+          });
+        perf.add('tracker.grab', performance.now() - t0);
+        requestAnimationFrame(this.pump);
+        return;
+      }
       if (frame) {
         // кадр уходит в воркер без копирования: уменьшение и чтение пикселей там (на главном потоке ~0,1 мс вместо 4–17)
         const msg = base(new ArrayBuffer(0));
@@ -396,13 +442,15 @@ export class CardTracker extends TrackerBase implements Tracker {
   private onResult(r: CardWorkerOut) {
     this.busy = false;
     if (r.mode === 'no-frame') {
-      this.frameGrab = false; // воркер не смог прочитать VideoFrame — дальше кадры читаем на главном потоке
+      this.frameGrab = false; // воркер не смог прочитать VideoFrame/ImageBitmap — дальше кадры читаем на главном потоке
+      this.bitmapGrab = false;
       this.debug('воркер не читает VideoFrame — кадры читаем на главном потоке');
       return;
     }
     const now = performance.now();
     perf.add('tracker.worker', r.ms);
     perf.count('tracker');
+    if (r.luma !== undefined) (trackerLuma.value = r.luma), (trackerLuma.at = now);
     this.stats.ms = r.ms;
     this.stats.score = r.score;
     this.stats.mode = r.mode;
@@ -573,7 +621,7 @@ function quadSide(q: Quad, i: number) {
 
 function useFrameGrab(): boolean {
   const q = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('grab') : null;
-  if (q === 'main') return false;
+  if (q === 'main' || q === 'bitmap') return false;
   if (typeof VideoFrame === 'undefined' || typeof OffscreenCanvas === 'undefined') return false;
   if (q === 'frame') return true;
   // WebKit (iPhone): поворот кадра камеры в VideoFrame не проверен на устройствах — оставляем проверенный путь
