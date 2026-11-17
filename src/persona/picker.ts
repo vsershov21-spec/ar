@@ -37,6 +37,8 @@ export interface PickOptions {
   now?: number;
   /** вариант прозвучит записью (template, готовый текст) — такие в приоритете */
   prefer?: (line: ContentLine, text: string) => boolean;
+  /** только озвученные: если ни один вариант не озвучен — реплики нет (кот промолчит), а не текст/робот-голос */
+  strict?: boolean;
 }
 
 const DEFAULT_EVENT: Omit<EventDef, 'id'> = { group: 'dialog', priority: 1, cooldownMs: 0, interruptible: true, trigger: '' };
@@ -80,6 +82,7 @@ export class LinePicker {
     if (o.prefer) {
       const voiced = cands.filter((l) => o.prefer!(l, fill(l.text, { ...(okName0 ? { name: okName0 } : {}), ...(o.vars ?? {}) }).replace(/\s+/g, ' ').trim()));
       if (voiced.length) cands = voiced;
+      else if (o.strict) return null;
     }
     const key = `${p.id}:${event}`;
     const hist = this.history.get(key) ?? [];

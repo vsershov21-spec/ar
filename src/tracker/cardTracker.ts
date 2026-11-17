@@ -95,6 +95,11 @@ export class CardTracker extends TrackerBase implements Tracker {
     this.video = video;
     this.watchFrames(video);
     if (!navigator.mediaDevices?.getUserMedia) throw new Error('no-getusermedia');
+    await this.openCamera(video);
+    this.watchCamera();
+  }
+
+  private async openCamera(video: HTMLVideoElement) {
     const stream = await navigator.mediaDevices.getUserMedia({
       audio: false,
       // 720p и 30 к/с: больше трекеру (320 px) и экрану не нужно, а камера 60 к/с / 4K греет телефон
@@ -105,6 +110,51 @@ export class CardTracker extends TrackerBase implements Tracker {
       video.srcObject = stream;
     });
     await video.play().catch(() => undefined);
+    const track = stream.getVideoTracks()[0];
+    if (track) track.onended = () => this.reviveCamera('ended');
+  }
+
+  /**
+   * iOS иногда обрывает камеру (звонок, Siri, уведомление, смена аудиосессии) — фон становится чёрным, кот висит на нём.
+   * Сторож: нет новых кадров дольше 1,5 с при видимой вкладке или дорожка завершилась → тихо переоткрываем камеру.
+   */
+  private camTimer = 0;
+  private rvfcGen = 0;
+  private reviving = false;
+  private watchCamera() {
+    clearInterval(this.camTimer);
+    this.camTimer = window.setInterval(() => {
+      const v = this.video;
+      if (!v || !this.running || document.visibilityState !== 'visible') return;
+      const s = v.srcObject as MediaStream | null;
+      const t = s?.getVideoTracks()[0];
+      const stale = this.rvfc && performance.now() - this.rvfcAt > 1500;
+      if (!t || t.readyState === 'ended' || t.muted || v.paused || stale) void this.reviveCamera(stale ? 'stale' : 'track');
+    }, 1000);
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && this.video?.paused) void this.video.play().catch(() => undefined);
+    });
+  }
+
+  private async reviveCamera(why: string) {
+    const v = this.video;
+    if (!v || this.reviving || document.visibilityState !== 'visible') return;
+    this.reviving = true;
+    try {
+      // сначала просто «пнуть» видео — часто этого хватает после паузы iOS
+      if (v.paused) await v.play().catch(() => undefined);
+      const t = (v.srcObject as MediaStream | null)?.getVideoTracks()[0];
+      if (t && t.readyState === 'live' && !t.muted && !v.paused && !(this.rvfc && performance.now() - this.rvfcAt > 1500)) return;
+      console.warn('[card] камера переоткрывается:', why);
+      (v.srcObject as MediaStream | null)?.getTracks().forEach((x) => x.stop());
+      await this.openCamera(v);
+      this.rvfcAt = performance.now();
+      this.watchFrames(v);
+    } catch (e) {
+      console.warn('[card] камеру не переоткрыть', e);
+    } finally {
+      this.reviving = false;
+    }
   }
 
   async start(): Promise<void> {
@@ -121,6 +171,7 @@ export class CardTracker extends TrackerBase implements Tracker {
   }
 
   stop() {
+    clearInterval(this.camTimer);
     this.running = false;
     this.worker?.terminate();
     this.worker = null;
@@ -209,7 +260,9 @@ export class CardTracker extends TrackerBase implements Tracker {
     const vv = v as HTMLVideoElement & { requestVideoFrameCallback?: (cb: () => void) => number };
     if (typeof vv.requestVideoFrameCallback !== 'function') return;
     this.rvfc = true;
+    const gen = ++this.rvfcGen;
     const cb = () => {
+      if (gen !== this.rvfcGen) return; // цепочка заменена (после переоткрытия камеры)
       this.frameSeq++;
       this.rvfcAt = performance.now();
       if (this.video === v) vv.requestVideoFrameCallback!(cb);
@@ -363,12 +416,19 @@ export class CardTracker extends TrackerBase implements Tracker {
         this.stable = pose.err < 2.5 && jitter < 0.04 && still ? this.stable + 1 : Math.max(0, this.stable - 2);
         // посадка — только на карту Сбера (несколько кадров подряд с признаками, см. CardEvidence)
         const kind = this.candidateKind();
-        const ok = kind === 'sber';
+        // «проверяем» не должно тянуться вечно (на iPhone знак иногда не ловится из-за бликов/угла): если прямоугольник
+        // стабилен 2,5 с, и он не опознан как чужая карта/оборот/не карта — сажаем (ребёнок не ждёт 15 с с кольцом на половине)
+        if (kind === 'checking' && this.stable >= LOCK_FRAMES) this.checkingSince ||= performance.now();
+        else if (kind !== 'checking' || this.stable < LOCK_FRAMES / 2) this.checkingSince = 0;
+        const patient = kind === 'checking' && this.checkingSince > 0 && performance.now() - this.checkingSince > CHECK_PATIENCE_MS;
+        const ok = kind === 'sber' || patient;
         // пока проверяем — кольцо заполняется только наполовину; «не карта» — ничего не рисуем
-        const k = ok ? this.stable / LOCK_FRAMES : Math.min(this.stable / LOCK_FRAMES, 0.5);
+        const k = kind === 'sber' ? this.stable / LOCK_FRAMES : kind === 'checking' && this.checkingSince ? 0.5 + (0.5 * (performance.now() - this.checkingSince)) / CHECK_PATIENCE_MS : Math.min(this.stable / LOCK_FRAMES, 0.5);
         this.overlay.candidate({ quad: quad.map((p) => this.toScreen(p)) as Quad, pose, project: () => null }, k, kind);
         if (this.stable < LOCK_FRAMES || !ok) return;
+        if (patient) console.info('[card] знак Сбера не пойман за 2,5 с — сажаем по форме карты');
         this.locked = true;
+        this.checkingSince = 0;
       }
       this.hits++;
       this.target = poseMatrix(pose);
@@ -378,6 +438,7 @@ export class CardTracker extends TrackerBase implements Tracker {
     } else {
       this.hits = 0;
       this.stable = 0;
+      this.checkingSince = 0;
       this.misses++;
       if (this.misses >= 8) {
         this.prevQuad = null;
@@ -401,6 +462,7 @@ export class CardTracker extends TrackerBase implements Tracker {
   /** кот посажен на карту — новые прямоугольники его не утаскивают */
   private locked = false;
   private stable = 0;
+  private checkingSince = 0;
   get isLocked() {
     return this.locked;
   }
@@ -506,6 +568,8 @@ function grabFrame(v: HTMLVideoElement): VideoFrame | null {
 /** сколько устойчивых кадров подряд нужно, чтобы посадить кота (~0,3 с) */
 const LOCK_FRAMES = 10;
 const FOCAL_KEY = 'ar.focal.v1';
+/** сколько ждём знак Сбера на стабильной карте, прежде чем посадить кота по форме */
+const CHECK_PATIENCE_MS = 2500;
 
 export function poseMatrix(p: Pose): THREE.Matrix4 {
   const R = p.R, t = p.t;

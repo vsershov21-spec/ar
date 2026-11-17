@@ -90,6 +90,14 @@ describe('выбор реплик', () => {
     expect(pk.pick(p, 'joke', { now: 1000 + 2 * cd })).not.toBeNull();
   });
 
+  it('strict: без озвученных вариантов реплики нет; с озвученными — только они', () => {
+    const pk = new LinePicker(content, seeded(5));
+    expect(pk.pick(p, 'tap_screen', { force: true, prefer: () => false, strict: true })).toBeNull();
+    const first = p.lines.tap_screen[0].id;
+    for (let i = 0; i < 5; i++) expect(pk.pick(p, 'tap_screen', { force: true, prefer: (l) => l.id === first, strict: true })!.line.id).toBe(first);
+    expect(pk.pick(p, 'tap_screen', { force: true, prefer: () => false })).not.toBeNull();
+  });
+
   it('приоритет и interruptible берутся из events.json', () => {
     const pk = new LinePicker(content);
     const sad = pk.pick(p, 'sad', { force: true })!;

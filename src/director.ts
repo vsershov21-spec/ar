@@ -493,7 +493,7 @@ export class Director extends Emitter<DirectorEvents> {
   speakEvent(event: string, o: { force?: boolean; visuals?: boolean } = {}): boolean {
     this.emotion(event);
     const r = this.currentRiddle();
-    const pk = this.personas.line(event, { name: this.state.name, vars: r ? { answer: r.answer } : {}, force: o.force, prefer: this.prefer });
+    const pk = this.personas.line(event, { name: this.state.name, vars: r ? { answer: r.answer } : {}, force: o.force, prefer: this.prefer, strict: this.strictVoice });
     if (!pk) {
       this.log(`реплика «${event}» не выбрана (${this.picker.coolingDown(event) ? 'cooldown' : 'нет подходящих'})`);
       return false;
@@ -503,13 +503,19 @@ export class Director extends Emitter<DirectorEvents> {
 
   /** вариант реплики прозвучит записью (а не синтезом) — такие picker выбирает в первую очередь */
   private prefer = (l: ContentLine, text: string): boolean => {
-    const v = this.d.voice as VoicePlayer & { recorded?: (p: string, id: string | undefined, t: string, x?: string) => boolean; hasRecordings?: boolean };
-    if (!v.recorded || !v.hasRecordings) return true;
+    const v = this.d.voice as VoicePlayer & { elRecorded?: (p: string, id: string | undefined, t: string, x?: string) => boolean; hasRecordings?: boolean };
+    if (!v.elRecorded || !v.hasRecordings) return true;
     const p = this.persona.id;
     const r = this.currentRiddle();
-    if (r && l.text.includes('{answer}') && v.recorded(p, `${l.id}@${r.id}`, text, text)) return true;
-    return v.recorded(p, l.id, l.text, text);
+    if (r && l.text.includes('{answer}') && v.elRecorded(p, `${l.id}@${r.id}`, text, text)) return true;
+    return v.elRecorded(p, l.id, l.text, text);
   };
+
+  /** на сайте есть живая озвучка — реплики без неё не произносим и не показываем (решение продакта) */
+  private get strictVoice(): boolean {
+    const v = this.d.voice as VoicePlayer & { hasRecordings?: boolean };
+    return !!v.hasRecordings && !this.allowSynth;
+  }
 
   private currentRiddle(): Riddle | null {
     const rs = this.persona.riddles;
@@ -557,14 +563,14 @@ export class Director extends Emitter<DirectorEvents> {
     const vp = this.d.voice as VoicePlayer & { recorded?: (p: string, id: string | undefined, t: string, x?: string) => boolean; hasRecordings?: boolean; usePersona?: (p: string) => Promise<unknown> };
     // ответ загадки целиком одной записью («Ответ — огурец.»), а не склейкой «Ответ —» + «огурец»
     const r = this.currentRiddle();
-    if (r && pk.line.text.includes('{answer}') && vp.recorded?.(p.id, `${pk.line.id}@${r.id}`, pk.text, pk.text)) {
+    if (r && pk.line.text.includes('{answer}') && (vp as typeof vp & { elRecorded?: typeof vp.recorded }).elRecorded?.(p.id, `${pk.line.id}@${r.id}`, pk.text, pk.text)) {
       req.lineId = `${pk.line.id}@${r.id}`;
       req.template = pk.text;
     }
     // записи нет, а озвучка на сайте есть — не говорим синтезом браузера («неозвученные фрагменты»): только пузырь
-    if (vp.recorded && vp.hasRecordings && !this.allowSynth) {
-      await vp.usePersona?.(p.id);
-      if (!vp.recorded(p.id, req.lineId, req.template, req.text)) {
+    const vel = vp as typeof vp & { elRecorded?: (p: string, id: string | undefined, t: string, x?: string) => boolean };
+    if (vel.elRecorded && vp.hasRecordings && !this.allowSynth) {
+      if (!vel.elRecorded(p.id, req.lineId, req.template, req.text)) {
         this.log(`🔇 нет записи ${req.lineId} — без синтеза, только текст`);
         await wait(Math.min(4500, 900 + pk.text.length * 45));
         this.initiative.catLine(performance.now());

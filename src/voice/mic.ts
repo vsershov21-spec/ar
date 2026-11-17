@@ -30,7 +30,9 @@ export class MicInput {
   lastDb = -120;
   /** ошибка последнего открытия: 'not-allowed' | 'no-device' | 'unsupported' | … */
   error: string | null = null;
-  idleCloseMs = 8000;
+  /** Не закрываем: на iOS повторный getUserMedia и смена аудиосессии (playback ↔ play-and-record) рвут камеру —
+   *  фон становится чёрным. Микрофон, раз открытый, живёт до ухода со страницы. */
+  idleCloseMs = Infinity;
 
   constructor(private audio: Audio) {}
 
@@ -66,7 +68,7 @@ export class MicInput {
     this.users = Math.max(0, this.users - 1);
     if (this.users === 0) {
       clearTimeout(this.idleTimer);
-      this.idleTimer = window.setTimeout(() => this.users === 0 && this.close(), this.idleCloseMs);
+      if (Number.isFinite(this.idleCloseMs)) this.idleTimer = window.setTimeout(() => this.users === 0 && this.close(), this.idleCloseMs);
     }
   }
 

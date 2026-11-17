@@ -244,6 +244,11 @@ export class VoicePlayer {
     return !!val && Object.keys(dict).some((k) => normName(k) === normName(val));
   }
 
+  /** есть ли запись ElevenLabs (живой голос) — Piper/синтез не в счёт */
+  elRecorded(persona: string, lineId: string | undefined, template: string, text = template): boolean {
+    return !!this.elFor({ persona, lineId, template, text, pitch: 1, rate: 1 });
+  }
+
   /** есть ли запись этой реплики (после usePersona) */
   has(persona: string, template: string, lineId?: string) {
     return !!this.lookup(persona, template, lineId);
