@@ -126,11 +126,11 @@ describe('сценарий первой встречи', () => {
     expect(has(r.actions, 'cover_stickers')).toBe(false);
   });
 
-  it('повторный визит: «с возвращением» без анкеты; из контекста — только «давно не виделись»', () => {
+  it('повторный визит: одна тёплая реплика — «давно не виделись» вместо «с возвращением», а не обе подряд', () => {
     const { s, all } = run(initialState({ name: 'Петя', persona: 'glitter', visits: 3, met: true }, 'long_absence'), toChoose);
     expect(s.phase).toBe('play');
     const keys = all.filter((x) => x.type === 'say').map((x) => (x as { key: string }).key);
-    expect(keys).toEqual(['long_absence', 'welcome_back']);
+    expect(keys).toEqual(['long_absence']);
     expect(has(all, 'set_persona', { persona: 'glitter' })).toBe(true);
     expect(has(all, 'signature', { silent: true })).toBe(true);
     const morning = run(initialState({ persona: 'glitter', visits: 3, met: true }, 'morning'), toChoose).all;

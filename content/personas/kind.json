@@ -429,6 +429,13 @@
       "clip": "lean_in",
       "face": "listen"
     },
+    "surprise": {
+      "clip": "surprised",
+      "sound": "gasp"
+    },
+    "tease": {
+      "clip": "shy"
+    },
     "clap": {
       "clip": "surprised",
       "sound": "gasp"
@@ -439,6 +446,15 @@
     },
     "long_absence": {},
     "first_time_today": {},
+    "offer_riddle": {
+      "clip": "talk_casual"
+    },
+    "offer_echo": {
+      "clip": "talk_casual"
+    },
+    "offer_dance": {
+      "clip": "talk_casual"
+    },
     "ask_name_again": {
       "clip": "listen"
     },
@@ -2018,6 +2034,34 @@
         "face": "listen"
       }
     ],
+    "surprise": [
+      {
+        "id": "kind.surprise.01",
+        "text": "Ой! Как неожиданно! Я даже ушки поднял.",
+        "emotion": "surprised",
+        "face": "surprised"
+      },
+      {
+        "id": "kind.surprise.02",
+        "text": "Ух ты, вот это сюрприз! Мне понравилось.",
+        "emotion": "happy",
+        "face": "happy"
+      }
+    ],
+    "tease": [
+      {
+        "id": "kind.tease.01",
+        "text": "Хи-хи, ты меня дразнишь? А я не обижаюсь.",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "kind.tease.02",
+        "text": "Дразнишься? Ну ничего, мне всё равно с тобой хорошо.",
+        "emotion": "shy",
+        "face": "shy"
+      }
+    ],
     "clap": [
       {
         "id": "kind.clap.01",
@@ -2098,6 +2142,66 @@
         "text": "Новый день — новая встреча. Привет!",
         "emotion": "neutral",
         "face": "neutral"
+      }
+    ],
+    "offer_riddle": [
+      {
+        "id": "kind.offer_riddle.01",
+        "text": "Хочешь, загадаю загадку? Скажи «да».",
+        "emotion": "caring",
+        "face": "caring"
+      },
+      {
+        "id": "kind.offer_riddle.02",
+        "text": "У меня есть добрая загадка. Загадать?",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "kind.offer_riddle.03",
+        "text": "Давай я загадаю, а ты отгадаешь? Скажи «да».",
+        "emotion": "caring",
+        "face": "caring"
+      }
+    ],
+    "offer_echo": [
+      {
+        "id": "kind.offer_echo.01",
+        "text": "Давай поиграем в повторялку? Ты скажешь — я повторю.",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "kind.offer_echo.02",
+        "text": "Хочешь, я буду повторять за тобой? Скажи «да».",
+        "emotion": "caring",
+        "face": "caring"
+      },
+      {
+        "id": "kind.offer_echo.03",
+        "text": "Скажи «да» — и я буду повторять за тобой.",
+        "emotion": "happy",
+        "face": "happy"
+      }
+    ],
+    "offer_dance": [
+      {
+        "id": "kind.offer_dance.01",
+        "text": "Хочешь, я станцую? Немножко, как умею.",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "kind.offer_dance.02",
+        "text": "Можно я потанцую для тебя? Скажи «да».",
+        "emotion": "caring",
+        "face": "caring"
+      },
+      {
+        "id": "kind.offer_dance.03",
+        "text": "Я разучил новый танец. Показать?",
+        "emotion": "happy",
+        "face": "happy"
       }
     ],
     "ask_name_again": [

@@ -111,10 +111,10 @@ describe('«пока?»', () => {
     expect(s.phase).toBe('play');
     expect(s.dialog).toBeNull();
   });
-  it('bye → тишина → молча остаёмся', () => {
+  it('bye → тишина → остаёмся и кот говорит это вслух (не обрывается на вопросе)', () => {
     let { s, all } = run(inPlay(), [heard('bye')]);
     ({ s, all } = run(s, [{ type: 'listen_timeout', token: lastListen(all)!.token }]));
-    expect(says(all)).toEqual([]);
+    expect(says(all)).toEqual(['bye_cancel']);
     expect(s.dialog).toBeNull();
   });
 });

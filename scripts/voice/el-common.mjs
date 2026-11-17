@@ -69,7 +69,9 @@ export function buildJobs(root, { model: modelOverride } = {}) {
   const answerTpl = [];
   for (const l of lines) {
     if (!voices[l.persona]?.elevenVoiceId) continue;
-    if (l.event === 'riddle_q' || l.event === 'riddle_hint') continue; // загадки — ниже, из dialogs.json (в CSV те же строки)
+    // строки загадок (<характер>.riddle.r01.q / .hint) — ниже, из dialogs.json (в CSV те же строки). Связки «Подсказка:»
+    // (событие riddle_hint, id <характер>.riddle_hint.NN) — обычные реплики: раньше выпадали из озвучки вместе со строками загадок
+    if (/\.riddle\.r\d+\.(q|hint)$/.test(l.id)) continue;
     const m = l.text.match(SLOT_RE);
     if (m?.[1] === 'answer') answerTpl.push(l);
     if (!m) {

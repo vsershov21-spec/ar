@@ -50,7 +50,7 @@ export function registerBuiltinTabs() {
       }, 'swipe');
       ui.btn(s, 'Встряска', () => app.input.simulateShake(), 'shake');
       ui.btn(s, 'Спам ×5', () => d.interaction('spam'), 'spam');
-      ui.btn(s, 'Тишина 10 с', () => d.dispatch({ type: 'silence' }), 'silence');
+      ui.btn(s, 'Тишина 10 с', () => d.dispatch({ type: 'silence', byCat: true }), 'silence');
 
       s = ui.section(el, 'Голос / текст');
       for (const t of ['Меня зовут Маша', 'Привет', 'Сделай сальто', 'Загадай загадку', 'Танцуй', 'Расскажи шутку', 'Сколько у меня денег?', 'Давай другого', 'абырвалг'])

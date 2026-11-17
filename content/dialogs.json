@@ -34,7 +34,7 @@
       "trigger": "Ребёнок сказал «пока» / «мне пора».",
       "start": "ask",
       "nodes": {
-        "ask": { "say": "bye", "listen": { "mode": "intent" }, "on": { "yes": "go", "bye": "go", "no": "stay", "timeout": "@end", "*": "stay" } },
+        "ask": { "say": "bye", "listen": { "mode": "intent" }, "on": { "yes": "go", "bye": "go", "no": "stay", "timeout": "stay", "*": "stay" } },
         "go": { "say": "goodbye", "next": "@goodbye" },
         "stay": { "say": "bye_cancel", "next": "@end" }
       }
@@ -62,7 +62,7 @@
         "hint": { "say": ["riddle_hint", "$riddle.hint"], "listen": { "mode": "riddle", "ms": 8000 }, "on": { "right": "right", "giveup": "answer", "wrong": "answer", "timeout": "answer" } },
         "right": { "say": "riddle_right", "next": "more" },
         "answer": { "say": "riddle_answer", "next": "more" },
-        "more": { "say": "riddle_more", "listen": { "mode": "intent" }, "on": { "yes": "ask", "riddle": "ask", "no": "bye", "timeout": "@end", "*": "@end" } },
+        "more": { "say": "riddle_more", "listen": { "mode": "intent" }, "on": { "yes": "ask", "riddle": "ask", "no": "bye", "timeout": "bye", "*": "@end" } },
         "bye": { "say": "riddle_bye", "next": "@end" }
       }
     },
@@ -75,6 +75,17 @@
         "listen": { "listen": { "mode": "echo", "ms": 20000 }, "on": { "echo_stop": "off", "timeout": "off", "*": "repeat" } },
         "repeat": { "do": ["echo"], "count": "echo", "say": "echo_done", "sayIf": { "counter": "echo", "first": true, "every": 4 }, "next": "listen" },
         "off": { "say": "echo_stop", "next": "@end" }
+      }
+    },
+    "offer": {
+      "title": "Кот сам предлагает занятие",
+      "trigger": "Лестница тишины режиссёра (docs/scenario/LOGIC.md): ребёнок давно ничего не делает — кот предлагает одно занятие, по кругу без повторов: загадка → повторялка → танец. «Да» — занятие начинается, «нет» — короткое «ладно», тишина — кот не настаивает.",
+      "start": "riddle",
+      "nodes": {
+        "riddle": { "say": "offer_riddle", "listen": { "mode": "intent" }, "on": { "yes": "@dialog:riddle:ask", "riddle": "@dialog:riddle:ask", "no": "decline", "timeout": "@end", "*": "@end" } },
+        "echo": { "say": "offer_echo", "listen": { "mode": "intent" }, "on": { "yes": "@dialog:echo", "echo_start": "@dialog:echo", "no": "decline", "timeout": "@end", "*": "@end" } },
+        "dance": { "say": "offer_dance", "listen": { "mode": "intent" }, "on": { "yes": "@react:dance", "dance": "@react:dance", "no": "decline", "timeout": "@end", "*": "@end" } },
+        "decline": { "say": "no", "next": "@end" }
       }
     },
     "support": {

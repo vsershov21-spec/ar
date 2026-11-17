@@ -702,6 +702,13 @@ export class UI {
     this.bubbleTimer = window.setTimeout(() => this.bubble.classList.remove('show'), ms || 2200 + text.length * 55);
   }
 
+  /** реплика договорена — пузырь уходит вместе с голосом (text: только если в пузыре всё ещё она) */
+  hideBubble(text?: string) {
+    if (text !== undefined && (this.bubble.querySelector('.txt') as HTMLElement).textContent !== text) return;
+    clearTimeout(this.bubbleTimer);
+    this.bubbleTimer = window.setTimeout(() => this.bubble.classList.remove('show'), 250);
+  }
+
   private following = false;
   /** пока пузырь виден — держим его над котом / сбоку от головы (кот ходит по карте, карта двигается) */
   private followCat() {

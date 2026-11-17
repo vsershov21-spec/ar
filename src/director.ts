@@ -6,12 +6,12 @@
 import * as THREE from 'three';
 import { Emitter } from './core/emitter';
 import { initialState, makeScenarioConfig, step, type Action, type Heard, type ScenarioConfig, type ScenarioEvent, type ScenarioState, type InteractionKind } from './scenario/machine';
-import { loadMemory, saveMemory } from './scenario/memory';
+import { clearMemory, loadMemory, saveMemory } from './scenario/memory';
 import { contextEvent } from './scenario/session';
 import { answerMatches } from './scenario/intentMatch';
 import { matchIntent } from './voice/intents';
 import { turn } from './voice/turn';
-import { InitiativeGate } from './scenario/initiative';
+import { IdleLadder, OFFERS, type IdleStep } from './scenario/initiative';
 import { resolveTrigger, type ListenMode } from './scenario/dialogs';
 import type { ContentBundle } from './persona/content';
 import { PersonaContext } from './persona/context';
@@ -57,7 +57,7 @@ const EXTRA_EMOTION: Record<string, [string, number, number]> = {
   meet_card: ['surprised', 1, 1500], meet_congrats: ['happy', 1, 1800], meet_self: ['happy', 0.9, 1500], meet_skills: ['happy', 0.8, 1500],
   treat: ['happy', 1, 2200], welcome_back: ['happy', 1, 1600], help: ['happy', 0.7, 1200],
   // каталог «Что умеет кот»: удивить (хлоп), подразнить, засмущать
-  clap: ['surprised', 1, 1300], compliment: ['shy', 1, 2600],
+  clap: ['surprised', 1, 1300], compliment: ['shy', 1, 2600], surprise: ['surprised', 1, 1500], tease: ['pout', 1, 1800],
 };
 
 /**
@@ -67,6 +67,7 @@ const EXTRA_EMOTION: Record<string, [string, number, number]> = {
 const COVER_FX = new Set(['snow_globe', 'steam', 'steam_draw', 'steam_heart', 'kiss_print', 'glass_cat', 'gum_splat', 'glitch', 'confetti', 'tag_spray', 'stickers_cover', 'holo_shine']);
 const COVER_GAP_MS = 10_000;
 const USER_ACT_MS = 2500;
+const CARD_LOST_SAY_MS = 1500;
 
 /** панель действий и каталог «Что умеет кот»: кнопка → событие режиссёра (таблица — scenario/actions.ts) */
 export { ACTIONS, type ActionId } from './scenario/actions';
@@ -82,10 +83,18 @@ export class Director extends Emitter<DirectorEvents> {
   readonly cfg: ScenarioConfig;
   private timers = new Map<string, number>();
   private listenTimer = 0;
-  /** когда коту можно заговорить самому (filler, silence) — редко и не перебивая ребёнка */
-  readonly initiative = new InitiativeGate(undefined, Math.random, performance.now());
-  /** событие тишины от Input пришло, когда говорить было нельзя, — скажем, когда станет можно */
-  private pendingSilence = false;
+  /** лестница тишины: что кот делает сам, пока ребёнок ничего не делает (scenario/initiative.ts, docs/scenario/LOGIC.md) */
+  readonly ladder = new IdleLadder(performance.now());
+  /** кот дремлет (сам после долгой тишины или кнопкой «Усыпи»): молчит, первое касание будит */
+  dozing = false;
+  /** какое занятие кот предложит следующим (по кругу OFFERS) */
+  private offerIdx = 0;
+  /** когда кот договорил последнюю реплику */
+  private lastCatEnd = -1e9;
+  private dialogStartedAt = 0;
+  /** карта пропала: «где карта?» — только если её нет дольше CARD_LOST_SAY_MS; «вот она» — только после «где карта?» */
+  private cardLostTimer = 0;
+  private cardLostSaid = false;
   private idleT = 0;
   private blinkT = 0;
   private lostTimer = 0;
@@ -106,6 +115,8 @@ export class Director extends Emitter<DirectorEvents> {
 
   constructor(private d: DirectorDeps) {
     super();
+    // ?fresh — для проверки продактом: знакомство с нуля (имя, характер, «уже знакомы» стираются)
+    if (typeof location !== 'undefined' && new URLSearchParams(location.search).has('fresh')) clearMemory();
     const mem = loadMemory();
     const ctxEv = contextEvent(new Date(), mem.lastVisitAt);
     this.state = initialState(mem, ctxEv);
@@ -140,18 +151,29 @@ export class Director extends Emitter<DirectorEvents> {
 
   // ───────────── вход событий ─────────────
   dispatch(e: ScenarioEvent) {
-    // «ты тут?» — инициатива кота: только когда правила тишины разрешают (scenario/initiative.ts)
-    if (e.type === 'silence' && !this.initiativeAllowed()) {
-      this.pendingSilence = true;
+    // «ты тут?» говорит только лестница тишины (byCat); таймер тишины Input — без слов, у лестницы свой отсчёт
+    if (e.type === 'silence' && !e.byCat) return;
+    const now = performance.now();
+    // конец сессии (4–6 мин) — тоже инициатива кота: не поверх реплики, действия ребёнка, мини-игры или дрёмы
+    if (e.type === 'timer' && e.id === 'outro' && (this.queue.busy || now - this.lastUserAct < 8000 || this.state.dialog || this.dozing || !this.state.cardVisible)) {
+      this.exec({ type: 'timer', id: 'outro', ms: 10_000 });
       return;
     }
-    if (e.type === 'silence') {
-      this.pendingSilence = false;
-      this.initiative.fired(performance.now());
+    const prev = this.state;
+    // ребёнок ответил на вопрос узла (или раньше, чем кот договорил вопрос): недоговорённый вопрос не звучит
+    const dl = prev.dialog;
+    if (dl?.listening && (e.type === 'intent' || e.type === 'answer' || e.type === 'name' || e.type === 'skip_name' || e.type === 'choose')) {
+      const tag = `${dl.id}.${dl.node}`;
+      if (this.queue.drop((it) => it.tag === tag)) this.log(`снят недоговорённый вопрос ${tag}`);
     }
     const r = step(this.state, e, this.cfg);
     if (r.state.phase !== this.state.phase) this.emit('phase', r.state.phase);
     this.state = r.state;
+    const playing = (p: string) => p === 'play' || p === 'free';
+    if (!prev.dialog && r.state.dialog) this.dialogStartedAt = now;
+    // вход в игру; конец мини-игры, в которой ребёнок участвовал, — тишина считается отсюда.
+    // Предложение кота, оставшееся без ответа, лестницу не сбрасывает (иначе «ты тут?» по кругу)
+    if ((playing(r.state.phase) && !playing(prev.phase)) || (prev.dialog && !r.state.dialog && this.lastUserAct >= this.dialogStartedAt)) this.ladder.reset(now);
     if (e.type !== 'timer' || e.id !== 'pause_end')
       this.log(`${e.type}${'kind' in e ? ':' + e.kind : ''}${'intent' in e ? ':' + e.intent.type : ''}${'result' in e ? ':' + e.result : ''} → ${r.state.phase}${r.state.dialog ? ` [${r.state.dialog.id}.${r.state.dialog.node}]` : ''}`);
     for (const a of r.actions) this.exec(a);
@@ -159,7 +181,7 @@ export class Director extends Emitter<DirectorEvents> {
 
   /** ввод голосом/чипом/текстом. Разбор — src/voice/intents.ts по content/intents.ru.json */
   text(t: string) {
-    this.lastUserAct = performance.now();
+    this.childAct();
     this.coachDone();
     const st = this.state;
     const listening: ListenMode | null = st.dialog?.listening ?? null;
@@ -184,8 +206,14 @@ export class Director extends Emitter<DirectorEvents> {
     if (kind === 'swipe' && ctx.from) this.lastSwipe = ctx.from;
     this.ctx = ctx;
     this.lastTouch = { kind, at: Date.now() };
-    if (!/^(card_|low_light|loud|whisper|clap|stickers_all_gone)/.test(kind)) {
-      this.lastUserAct = performance.now();
+    if (!/^(card_|low_light|loud|whisper|clap|stickers_all_gone|wake_up)/.test(kind)) {
+      // кот дремлет: касание будит — «А? Я не спал!» вместо обычной реакции
+      if (this.dozing && this.state.appeared && kind !== 'sleep') {
+        this.lastUserAct = performance.now();
+        this.ladder.reset(this.lastUserAct);
+        return this.dispatch({ type: 'interaction', kind: 'wake_up' });
+      }
+      this.childAct();
       if (/^(stroke|tap_cat|poke|double_tap|treat)/.test(kind)) this.coachDone();
     }
     // тап по поверхности карты (не по коту) → кот идёт в эту точку (локомоция)
@@ -219,12 +247,13 @@ export class Director extends Emitter<DirectorEvents> {
    */
   action(id: ActionId | string) {
     if (!isActionId(id)) return this.log(`нет действия «${id}»`);
-    this.lastUserAct = performance.now();
+    this.childAct();
     this.coachDone();
     this.activity();
     clearTimeout(this.sleepTimer);
     const r = ACTION_ROUTE[id];
-    if ('say' in r) return this.dispatch({ type: 'intent', intent: { type: r.say, text: r.text } });
+    // кнопка — явная команда: мини-игру заканчивает, а не считается «ответом» на загадку
+    if ('say' in r) return this.dispatch({ type: 'intent', intent: { type: r.say, text: r.text, button: true } });
     if (r.touch === 'swipe') {
       // «Порисуй на стекле»: палец как будто провёл по экрану рядом с котом
       const { w, h } = this.d.size();
@@ -241,6 +270,21 @@ export class Director extends Emitter<DirectorEvents> {
     }
   }
   private sleepTimer = 0;
+
+  /**
+   * Действие ребёнка: лестница тишины — с начала; кот дремал — просыпается молча (команда кнопкой/голосом
+   * выполняется сразу; касание будит отдельной реакцией — см. interaction).
+   */
+  private childAct() {
+    const now = performance.now();
+    this.lastUserAct = now;
+    this.ladder.reset(now);
+    if (this.dozing) {
+      this.dozing = false;
+      if (this.character && !this.d.stage.walking) this.character.play('idle');
+      this.log('проснулся (действие ребёнка)');
+    }
+  }
 
   private startCoach() {
     if (!this.coachPending) return;
@@ -271,13 +315,29 @@ export class Director extends Emitter<DirectorEvents> {
     const d = this.d;
     switch (a.type) {
       case 'say':
-        this.speakEvent(a.key, { force: a.force });
+        this.speakEvent(a.key, { force: a.force, node: a.node, scenario: true });
         break;
       case 'say_riddle':
-        this.sayRiddle(a.part);
+        this.sayRiddle(a.part, a.node);
         break;
       case 'react':
-        this.react(a.event);
+        if (a.event === 'card_lost') {
+          // карта мигнула (рука, блик) — кот молчит; пропала надолго — спрашивает, где она
+          clearTimeout(this.cardLostTimer);
+          this.cardLostTimer = window.setTimeout(() => {
+            if (this.state.cardVisible) return;
+            this.cardLostSaid = true;
+            this.react('card_lost');
+          }, CARD_LOST_SAY_MS);
+          break;
+        }
+        if (a.event === 'card_found') {
+          clearTimeout(this.cardLostTimer);
+          this.ladder.reset(performance.now()); // карту вернули — ребёнок снова здесь
+          if (!this.cardLostSaid) break;
+          this.cardLostSaid = false;
+        }
+        this.react(a.event, a.quiet);
         break;
       case 'ui':
         if (a.ui === 'chips' && a.show && this.coachPending) break; // панель покажет обучалка
@@ -465,15 +525,23 @@ export class Director extends Emitter<DirectorEvents> {
   }
 
   /** реакция на ввод: эффект/звук/клип сразу, реплика — через очередь */
-  private react(event: string) {
+  private react(event: string, quiet = false) {
     if (this.paused && this.picker.event(event).priority < 3) return;
+    if (event === 'sleep') this.dozing = true;
+    if (event === 'wake_up') this.dozing = false;
     this.emotion(event);
-    const prefer = this.prefer;
-    let pk = this.personas.line(event, { name: this.state.name, prefer });
+    if (quiet) {
+      // знакомство / мини-игра: касание видно (клип, эффект, эмоция), но слова не перебивают шаг
+      const def = this.persona.reactions[event];
+      if (def) this.playVisual({ clip: def.clip, fx: def.fx ? [def.fx] : [], sound: def.sound });
+      return;
+    }
+    const o = { name: this.state.name, prefer: this.prefer, strict: this.strictVoice };
+    let pk = this.personas.line(event, { ...o, force: event === 'sleep' || event === 'wake_up' });
     // не понял: «переспроси» и «я пока умею…» подменяют друг друга, если одно ещё остывает, — ребёнок всегда слышит ответ
     // «что ты умеешь» — отвечаем всегда (без cooldown; варианты всё равно не повторяются подряд)
-    if (!pk && event === 'unknown') pk = this.personas.line('help', { name: this.state.name, prefer }) ?? this.personas.line('unknown', { name: this.state.name, force: true, prefer });
-    else if (!pk && event === 'help') pk = this.personas.line('help', { name: this.state.name, force: true, prefer });
+    if (!pk && event === 'unknown') pk = this.personas.line('help', o) ?? this.personas.line('unknown', { ...o, force: true });
+    else if (!pk && event === 'help') pk = this.personas.line('help', { ...o, force: true });
     if (!pk) {
       if (this.picker.coolingDown(event)) return;
       const def = this.persona.reactions[event];
@@ -490,15 +558,25 @@ export class Director extends Emitter<DirectorEvents> {
   }
 
   /** реплика сценария/диалога: визуал вместе с речью */
-  speakEvent(event: string, o: { force?: boolean; visuals?: boolean } = {}): boolean {
+  speakEvent(event: string, o: { force?: boolean; visuals?: boolean; node?: string; scenario?: boolean } = {}): boolean {
     this.emotion(event);
     const r = this.currentRiddle();
     const pk = this.personas.line(event, { name: this.state.name, vars: r ? { answer: r.answer } : {}, force: o.force, prefer: this.prefer, strict: this.strictVoice });
     if (!pk) {
-      this.log(`реплика «${event}» не выбрана (${this.picker.coolingDown(event) ? 'cooldown' : 'нет подходящих'})`);
+      this.log(`реплика «${event}» не выбрана (${this.picker.coolingDown(event) ? 'cooldown' : 'нет озвученных'})`);
       return false;
     }
-    return this.enqueue(pk, o.visuals !== false);
+    // реплика сценария/диалога встаёт в очередь (не ниже 2), даже если событие само по себе — реакция («нет» в «Хочешь загадку?»)
+    const priority = (o.scenario ? Math.max(pk.priority, 2) : pk.priority) as PickedLine['priority'];
+    return this.enqueue({ ...pk, priority }, o.visuals !== false, o.node, r?.id);
+  }
+
+  /** есть ли у события хоть одна реплика, которая прозвучит живым голосом */
+  hasVoiced(event: string): boolean {
+    const p = this.persona;
+    const ls = this.picker.candidates(p, event, this.state.name);
+    if (!this.strictVoice) return ls.length > 0;
+    return ls.some((l) => this.prefer(l, l.text.replace('{name}', this.picker.nameAllowed(this.state.name) ?? '')));
   }
 
   /** вариант реплики прозвучит записью (а не синтезом) — такие picker выбирает в первую очередь */
@@ -523,64 +601,68 @@ export class Director extends Emitter<DirectorEvents> {
     return rs[(this.state.riddleSeq - 1) % rs.length];
   }
 
-  private sayRiddle(part: 'q' | 'hint') {
+  private sayRiddle(part: 'q' | 'hint', node?: string) {
     const r = this.currentRiddle();
     if (!r) return;
     const p = this.persona;
     const text = part === 'q' ? r.q : r.hint;
+    const vp = this.d.voice as VoicePlayer & { elRecorded?: (p: string, id: string | undefined, t: string, x?: string) => boolean };
+    if (this.strictVoice && vp.elRecorded && !vp.elRecorded(p.id, `${p.id}.riddle.${r.id}.${part}`, text, text)) {
+      this.log(`загадка ${p.id}.riddle.${r.id}.${part} не озвучена — пропуск`);
+      return;
+    }
     const pk: PickedLine = {
       persona: p.id, event: `riddle_${part}`, text, face: part === 'q' ? 'think' : 'caring',
       line: { id: `${p.id}.riddle.${r.id}.${part}`, text, emotion: 'neutral', face: 'neutral' },
       clip: 'think', priority: 2, interruptible: true,
     };
-    this.enqueue(pk, true);
+    this.enqueue(pk, true, node, r.id);
   }
 
-  private enqueue(pk: PickedLine, visuals: boolean): boolean {
+  private enqueue(pk: PickedLine, visuals: boolean, tag?: string, riddleId?: string): boolean {
     const ok = this.queue.say({
-      persona: pk.persona, event: pk.event, priority: pk.priority, interruptible: pk.interruptible,
-      run: () => this.perform(pk, visuals),
+      persona: pk.persona, event: pk.event, priority: pk.priority, interruptible: pk.interruptible, tag,
+      run: () => this.perform(pk, visuals, riddleId),
     });
     if (!ok) this.log(`реплика «${pk.line.id}» отброшена очередью`);
     return ok;
   }
 
-  private async perform(pk: PickedLine, visuals: boolean) {
+  private async perform(pk: PickedLine, visuals: boolean, riddleId?: string) {
     const p = this.personas.get(pk.persona)!;
+    const vp = this.d.voice as VoicePlayer & { recorded?: (p: string, id: string | undefined, t: string, x?: string) => boolean; elRecorded?: (p: string, id: string | undefined, t: string, x?: string) => boolean; hasRecordings?: boolean; usePersona?: (p: string) => Promise<unknown> };
+    // ответ загадки целиком одной записью («Ответ — огурец.»), а не склейкой «Ответ —» + «огурец»; загадка — та, что была при выборе
+    let lineId = pk.line.id, template = pk.line.text;
+    if (riddleId && pk.line.text.includes('{answer}') && vp.elRecorded?.(p.id, `${pk.line.id}@${riddleId}`, pk.text, pk.text)) {
+      lineId = `${pk.line.id}@${riddleId}`;
+      template = pk.text;
+    }
+    // записи нет, а озвучка на сайте есть — реплика не звучит и не показывается (ни робот-голоса, ни немого пузыря)
+    if (vp.elRecorded && vp.hasRecordings && !this.allowSynth && !vp.elRecorded(p.id, lineId, template, pk.text)) {
+      this.log(`🔇 нет записи ${lineId} — пропуск`);
+      return;
+    }
     if (visuals) this.playVisual({ clip: pk.clip, fx: pk.fx ? [pk.fx] : [], sound: pk.sound, face: pk.face });
     else this.face(pk.face);
-    this.d.ui.say(pk.text, p.name, p.id);
-    this.emit('log', `🗨 ${pk.line.id}: ${pk.text}`);
+    // пузырь живёт ровно столько, сколько звучит реплика (скрывается в конце, а не по таймеру длины текста)
+    this.d.ui.say(pk.text, p.name, p.id, 60_000);
+    this.emit('log', `🗨 ${lineId}: ${pk.text}`);
     if (pk.event === 'meet_skills') this.startCoach();
     const prevClip = this.character.currentClip;
     const talk = prevClip === 'idle' && !this.d.stage.walking;
     if (talk) this.character.play('talk', { loop: true });
     const v = p.voice;
     const req: SpeakRequest & { lineId: string; piperVoice: string; pitchSemitones: number; emotion: string } = {
-      persona: p.id, template: pk.line.text, text: pk.text, pitch: semis(v.pitchSemitones), rate: v.rate,
-      lineId: pk.line.id, piperVoice: v.piperVoice, pitchSemitones: v.pitchSemitones, emotion: pk.line.emotion,
+      persona: p.id, template, text: pk.text, pitch: semis(v.pitchSemitones), rate: v.rate,
+      lineId, piperVoice: v.piperVoice, pitchSemitones: v.pitchSemitones, emotion: pk.line.emotion,
     };
-    const vp = this.d.voice as VoicePlayer & { recorded?: (p: string, id: string | undefined, t: string, x?: string) => boolean; hasRecordings?: boolean; usePersona?: (p: string) => Promise<unknown> };
-    // ответ загадки целиком одной записью («Ответ — огурец.»), а не склейкой «Ответ —» + «огурец»
-    const r = this.currentRiddle();
-    if (r && pk.line.text.includes('{answer}') && (vp as typeof vp & { elRecorded?: typeof vp.recorded }).elRecorded?.(p.id, `${pk.line.id}@${r.id}`, pk.text, pk.text)) {
-      req.lineId = `${pk.line.id}@${r.id}`;
-      req.template = pk.text;
+    try {
+      await this.d.voice.speak(req);
+    } finally {
+      this.lastCatEnd = performance.now();
+      this.d.ui.hideBubble?.(pk.text);
+      if (talk && this.character.currentClip === 'talk') this.character.play('idle');
     }
-    // записи нет, а озвучка на сайте есть — не говорим синтезом браузера («неозвученные фрагменты»): только пузырь
-    const vel = vp as typeof vp & { elRecorded?: (p: string, id: string | undefined, t: string, x?: string) => boolean };
-    if (vel.elRecorded && vp.hasRecordings && !this.allowSynth) {
-      if (!vel.elRecorded(p.id, req.lineId, req.template, req.text)) {
-        this.log(`🔇 нет записи ${req.lineId} — без синтеза, только текст`);
-        await wait(Math.min(4500, 900 + pk.text.length * 45));
-        this.initiative.catLine(performance.now());
-        if (talk && this.character.currentClip === 'talk') this.character.play('idle');
-        return;
-      }
-    }
-    await this.d.voice.speak(req);
-    this.initiative.catLine(performance.now());
-    if (talk && this.character.currentClip === 'talk') this.character.play('idle');
   }
 
   /** повторялка: фраза ребёнка голосом характера (выше тоном) */
@@ -592,10 +674,15 @@ export class Director extends Emitter<DirectorEvents> {
     this.queue.say({
       persona: p.id, event: 'echo', priority: 2, interruptible: true,
       run: async () => {
-        this.d.ui.say(t, p.name, p.id);
+        this.d.ui.say(t, p.name, p.id, 60_000);
         const voice = this.d.voice as VoicePlayer & { echo?: (t: string, o: { persona: string; pitchSemitones: number; rate: number }) => Promise<void> };
-        if (voice.echo) return voice.echo(t, { persona: p.id, pitchSemitones: v.echoPitchSemitones, rate: v.echoRate });
-        await this.d.voice.speak({ persona: p.id, template: `echo:${t}`, text: t, pitch: semis(v.echoPitchSemitones), rate: v.echoRate });
+        try {
+          if (voice.echo) await voice.echo(t, { persona: p.id, pitchSemitones: v.echoPitchSemitones, rate: v.echoRate });
+          else await this.d.voice.speak({ persona: p.id, template: `echo:${t}`, text: t, pitch: semis(v.echoPitchSemitones), rate: v.echoRate });
+        } finally {
+          this.lastCatEnd = performance.now();
+          this.d.ui.hideBubble?.(t);
+        }
       },
     });
   }
@@ -765,31 +852,51 @@ export class Director extends Emitter<DirectorEvents> {
       this.character?.emote('blink', 150);
     }
     const playing = this.state.phase === 'play' || this.state.phase === 'free';
-    // idle-набор характера с весами
-    if (playing && !v.speaking && this.character?.currentClip === 'idle' && !this.d.stage.walking) {
+    // idle-набор характера с весами (в дрёме — нет)
+    if (playing && !this.dozing && !v.speaking && this.character?.currentClip === 'idle' && !this.d.stage.walking) {
       if ((this.idleT += dt) > 8 + Math.random() * 4) {
         this.idleT = 0;
         const clip = runtimeClip(this.personas.pickIdle());
         if (clip && clip !== 'idle') this.character.play(clip);
       }
     } else this.idleT = 0;
-    // инициатива кота: мысль вслух (filler) или отложенное «ты тут?» (silence) — не чаще раза в 15–20 с,
-    // не пока ребёнок говорит, не сразу после его фразы или вопроса кота (scenario/initiative.ts)
-    if (playing && this.initiativeAllowed()) {
-      if (this.pendingSilence) this.dispatch({ type: 'silence' });
-      else if (this.speakEvent('filler')) this.initiative.fired(performance.now());
-      else this.initiative.fired(performance.now() - 10_000); // реплика остывает — попробуем чуть позже
-    }
+    this.idleTick(playing);
   }
 
-  private initiativeAllowed(): boolean {
+  /** лестница тишины: «ты тут?» → предложить занятие → мысль вслух → другое занятие → дрёма (docs/scenario/LOGIC.md) */
+  private idleTick(playing: boolean) {
+    const now = performance.now();
     const t = turn.get();
-    const playing = this.state.phase === 'play' || this.state.phase === 'free';
-    return this.initiative.allowed({
-      now: performance.now(), userSpeaking: t.userSpeaking, lastUserAt: t.lastUserAt, lastQuestionAt: t.lastQuestionAt,
-      busy: this.queue.busy || this.d.voice.speaking || this.d.stage.walking,
-      blocked: !playing || this.paused || this.state.paused || !!this.state.dialog,
-    });
+    const quiet = playing && this.state.cardVisible && !this.dozing && !this.paused && !this.state.paused && !this.state.dialog && !this.queue.busy && !this.d.voice.speaking && !this.d.stage.walking && !t.userSpeaking;
+    const step = this.ladder.due(now, { quiet, lastCatEnd: this.lastCatEnd });
+    if (!step) return;
+    this.ladder.fired(now);
+    this.log(`тишина ${((now - (this.lastUserAct > 0 ? this.lastUserAct : now)) / 1000).toFixed(0)} с → ${step}`);
+    this.idleStep(step);
+  }
+
+  private idleStep(step: IdleStep) {
+    switch (step) {
+      case 'silence':
+        return this.dispatch({ type: 'silence', byCat: true });
+      case 'offer': {
+        // следующее по кругу занятие, у которого есть озвученный вопрос; нет ни одного — подсказка «скажи…» (bored)
+        for (let i = 0; i < OFFERS.length; i++) {
+          const what = OFFERS[(this.offerIdx + i) % OFFERS.length];
+          if (this.hasVoiced(`offer_${what}`)) {
+            this.offerIdx = (this.offerIdx + i + 1) % OFFERS.length;
+            return this.dispatch({ type: 'offer', what });
+          }
+        }
+        return this.react('bored');
+      }
+      case 'filler':
+        this.speakEvent('filler');
+        return;
+      case 'doze':
+        this.react('sleep');
+        return;
+    }
   }
 
   /** любая активность пользователя (касание, голос) откладывает инициативу кота */

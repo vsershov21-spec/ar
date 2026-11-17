@@ -29,8 +29,8 @@ export const ACTION_ROUTE = {
   other: { say: 'change_persona', text: 'давай другого' },
   // эмоции
   laugh: { say: 'joke', text: 'рассмеши' },
-  surprise: { touch: 'clap' },
-  tease: { touch: 'poke_combo' },
+  surprise: { touch: 'surprise' }, // не clap: «Кто хлопнул?» — только на настоящий хлопок в микрофон
+  tease: { touch: 'tease' }, // не poke_combo: «Три раза в одно место?» — только на три тапа подряд
   shy: { say: 'compliment', text: 'ты классный' },
   sleep: { touch: 'sleep' },
   dizzy: { touch: 'shake' },

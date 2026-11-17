@@ -15,6 +15,8 @@ export interface QueueItem {
   event: string;
   priority: number;
   interruptible: boolean;
+  /** «диалог.узел», чья это реплика (dialogs.json): ответ ребёнка снимает недоговорённый вопрос узла — drop() */
+  tag?: string;
   run: () => Promise<void>;
 }
 
@@ -23,7 +25,8 @@ export interface QueuePlayer {
   stop(soft: boolean): void | Promise<void>;
 }
 
-export const MAX_QUEUE = 4;
+/** очередь сценария: знакомство кладёт до 6 реплик подряд (карта, поздравление, имя, ответ, «я — …», «как играть») */
+export const MAX_QUEUE = 6;
 
 export class LineQueue {
   private cur: QueueItem | null = null;
@@ -103,6 +106,22 @@ export class LineQueue {
         if (!this.cur) this.next();
       });
     }
+  }
+
+  /**
+   * Снять реплики по условию: из очереди — молча, звучащую — оборвать (мягко, по границе слога).
+   * true — что-то сняли.
+   */
+  drop(pred: (it: Readonly<QueueItem>) => boolean): boolean {
+    const n = this.q.length;
+    this.q = this.q.filter((x) => !pred(x));
+    let hit = this.q.length !== n;
+    if (this.cur && pred(this.cur)) {
+      this.interrupt(true);
+      hit = true;
+      this.next();
+    }
+    return hit;
   }
 
   clear() {

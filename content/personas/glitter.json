@@ -440,6 +440,14 @@
       "clip": "lean_in",
       "face": "listen"
     },
+    "surprise": {
+      "clip": "surprised",
+      "sound": "gasp"
+    },
+    "tease": {
+      "clip": "offended",
+      "sound": "hmph"
+    },
     "clap": {
       "clip": "surprised",
       "sound": "gasp"
@@ -450,6 +458,15 @@
     },
     "long_absence": {},
     "first_time_today": {},
+    "offer_riddle": {
+      "clip": "talk_excited"
+    },
+    "offer_echo": {
+      "clip": "talk_excited"
+    },
+    "offer_dance": {
+      "clip": "talk_excited"
+    },
     "ask_name_again": {
       "clip": "listen"
     },
@@ -669,15 +686,15 @@
       },
       {
         "id": "glitter.no_name.02",
-        "text": "Ладно! Буду звать тебя «звёздочка».",
-        "emotion": "neutral",
-        "face": "neutral"
-      },
-      {
-        "id": "glitter.no_name.03",
         "text": "Ничего, имя потом. Главное — мы уже дружим!",
         "emotion": "happy",
         "face": "happy"
+      },
+      {
+        "id": "glitter.no_name.03",
+        "text": "Можно и без имени. Будем дружить просто так!",
+        "emotion": "neutral",
+        "face": "neutral"
       }
     ],
     "mic_hint": [
@@ -2102,6 +2119,34 @@
         "face": "listen"
       }
     ],
+    "surprise": [
+      {
+        "id": "glitter.surprise.01",
+        "text": "Ах! Вот это сюрприз! У меня даже блёстки подпрыгнули.",
+        "emotion": "surprised",
+        "face": "surprised"
+      },
+      {
+        "id": "glitter.surprise.02",
+        "text": "Ого! Ещё! Ещё так сделай!",
+        "emotion": "excited",
+        "face": "excited"
+      }
+    ],
+    "tease": [
+      {
+        "id": "glitter.tease.01",
+        "text": "Дразнишься? А я всё равно самая блестящая!",
+        "emotion": "offended",
+        "face": "neutral"
+      },
+      {
+        "id": "glitter.tease.02",
+        "text": "Бе-бе-бе! Я тоже умею дразниться.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      }
+    ],
     "clap": [
       {
         "id": "glitter.clap.01",
@@ -2182,6 +2227,66 @@
         "text": "Новый день — новый блеск. Привет!",
         "emotion": "neutral",
         "face": "neutral"
+      }
+    ],
+    "offer_riddle": [
+      {
+        "id": "glitter.offer_riddle.01",
+        "text": "Хочешь загадку? Она очень красивая! Скажи «да».",
+        "emotion": "excited",
+        "face": "excited"
+      },
+      {
+        "id": "glitter.offer_riddle.02",
+        "text": "А загадать тебе загадку? Блестящую!",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "glitter.offer_riddle.03",
+        "text": "У меня есть загадка с секретом! Загадать?",
+        "emotion": "excited",
+        "face": "excited"
+      }
+    ],
+    "offer_echo": [
+      {
+        "id": "glitter.offer_echo.01",
+        "text": "Поиграем в повторялку? Скажи что-нибудь — я повторю!",
+        "emotion": "excited",
+        "face": "excited"
+      },
+      {
+        "id": "glitter.offer_echo.02",
+        "text": "Хочешь, я буду повторять за тобой? Скажи «да»!",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "glitter.offer_echo.03",
+        "text": "Давай я буду твоим эхом? Скажи «да»!",
+        "emotion": "excited",
+        "face": "excited"
+      }
+    ],
+    "offer_dance": [
+      {
+        "id": "glitter.offer_dance.01",
+        "text": "Показать мой танец? Скажи «да»!",
+        "emotion": "excited",
+        "face": "excited"
+      },
+      {
+        "id": "glitter.offer_dance.02",
+        "text": "Хочешь, я покружусь? Я очень красиво кружусь.",
+        "emotion": "proud",
+        "face": "proud"
+      },
+      {
+        "id": "glitter.offer_dance.03",
+        "text": "Хочешь танец с блёстками? Скажи «да»!",
+        "emotion": "happy",
+        "face": "happy"
       }
     ],
     "ask_name_again": [

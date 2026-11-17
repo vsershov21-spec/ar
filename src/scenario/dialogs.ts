@@ -51,7 +51,8 @@ export interface DialogState {
 }
 
 export type DialogCmd =
-  | { type: 'say'; event: string }
+  /** node — «диалог.узел», чья это реплика: ответ ребёнка на вопрос узла снимает его недоговорённые реплики */
+  | { type: 'say'; event: string; node?: string }
   | { type: 'do'; action: string; arg?: string }
   | { type: 'listen'; mode: ListenMode; ms: number }
   | { type: 'end'; action?: string; arg?: string };
@@ -95,7 +96,7 @@ function enterNode(f: DialogsFile, st: DialogState, target: string, depth: numbe
     const c = counters[n.sayIf.counter] ?? 0;
     speak = (!!n.sayIf.first && c === 1) || (!!n.sayIf.every && c > 0 && c % n.sayIf.every === 0);
   }
-  if (speak) for (const s of Array.isArray(n.say) ? n.say : n.say ? [n.say] : []) cmds.push({ type: 'say', event: s });
+  if (speak) for (const s of Array.isArray(n.say) ? n.say : n.say ? [n.say] : []) cmds.push({ type: 'say', event: s, node: `${st.id}.${target}` });
   const state: DialogState = { ...st, node: target, counters, listening: null };
   if (n.listen) {
     cmds.push({ type: 'listen', mode: n.listen.mode, ms: n.listen.ms ?? f.answerWindowMs });

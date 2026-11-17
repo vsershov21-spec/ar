@@ -31,6 +31,8 @@ export interface Heard {
   name?: string;
   /** имя есть в словаре names.ru.txt */
   known?: boolean;
+  /** нажата кнопка (панель действий / каталог): явная команда — завершает мини-игру и выполняется */
+  button?: boolean;
 }
 
 export interface ScenarioState {
@@ -70,7 +72,10 @@ export type ScenarioEvent =
   | { type: 'interaction'; kind: InteractionKind }
   | { type: 'intent'; intent: Heard }
   | { type: 'answer'; result: 'right' | 'wrong' | 'giveup'; text?: string }
-  | { type: 'silence' }
+  /** тишина: кот сам заговаривает (лестница тишины режиссёра — scenario/initiative.ts) */
+  | { type: 'silence'; byCat?: boolean }
+  /** кот сам предлагает занятие (по кругу): riddle | echo | dance */
+  | { type: 'offer'; what: string }
   | { type: 'switch_request' }
   | { type: 'covered' }
   | { type: 'shake' }
@@ -79,9 +84,11 @@ export type ScenarioEvent =
 export type UiPart = 'scan_hint' | 'name_prompt' | 'chips' | 'sberkids' | 'shake_button' | 'mic';
 
 export type Action =
-  | { type: 'say'; key: string; force?: boolean }
-  | { type: 'say_riddle'; part: 'q' | 'hint' }
-  | { type: 'react'; event: string }
+  /** реплика сценария/диалога (приоритет не ниже 2); node — «диалог.узел» */
+  | { type: 'say'; key: string; force?: boolean; node?: string }
+  | { type: 'say_riddle'; part: 'q' | 'hint'; node?: string }
+  /** реакция на действие ребёнка; quiet — без слов (знакомство, мини-игра: только клип/эмоция) */
+  | { type: 'react'; event: string; quiet?: boolean }
   | { type: 'ui'; ui: UiPart; show: boolean }
   | { type: 'timer'; id: string; ms: number }
   | { type: 'cancel_timer'; id: string }
@@ -230,6 +237,15 @@ function doAction(s: ScenarioState, action: string, arg: string | undefined, hea
     case 'show_kids':
       a.push({ type: 'ui', ui: 'sberkids', show: true });
       return s;
+    case 'dialog': {
+      // «@dialog:riddle:ask» — кот предложил занятие, ребёнок согласился: запускаем мини-игру
+      const [id, node] = (arg ?? '').split(':');
+      if (!cfg.dialogs.dialogs[id]) return s;
+      return runDialog({ ...s, dialog: null }, startDialog(cfg.dialogs, id, node), cfg, a, heardText);
+    }
+    case 'react':
+      if (arg) a.push({ type: 'react', event: arg });
+      return s;
   }
   return s;
 }
@@ -238,9 +254,9 @@ function runDialog(s: ScenarioState, r: DialogStep, cfg: ScenarioConfig, a: Acti
   let st: ScenarioState = { ...s, dialog: r.state };
   for (const c of r.cmds as DialogCmd[]) {
     if (c.type === 'say') {
-      if (c.event === '$riddle.q') a.push({ type: 'say_riddle', part: 'q' });
-      else if (c.event === '$riddle.hint') a.push({ type: 'say_riddle', part: 'hint' });
-      else a.push({ type: 'say', key: c.event, force: true });
+      if (c.event === '$riddle.q') a.push({ type: 'say_riddle', part: 'q', node: c.node });
+      else if (c.event === '$riddle.hint') a.push({ type: 'say_riddle', part: 'hint', node: c.node });
+      else a.push({ type: 'say', key: c.event, force: true, node: c.node });
     } else if (c.type === 'listen') {
       const token = st.listenToken + 1;
       a.push({ type: 'listen', mode: c.mode, ms: c.ms, token });
@@ -278,6 +294,10 @@ function expects(cfg: ScenarioConfig, d: DialogState, key: string) {
 function onHeard(s: ScenarioState, h: Heard, cfg: ScenarioConfig, a: Action[]): ScenarioState {
   // безопасность — всегда первой, прерывает любой диалог
   if (cfg.dialogs.interrupts.includes(h.type)) return triggerDialog({ ...s, unknownStreak: 0 }, h.type, cfg, a) ?? s;
+  // кнопка — явная команда: мини-игра (загадка, повторялка, предложение кота) заканчивается, команда выполняется.
+  // Не «неверный ответ» загадке и не фраза для повторялки. Знакомство кнопками не прерывается.
+  if (h.button && s.dialog && s.dialog.id !== 'intro') s = stopDialog(s, a);
+  if (h.button && s.dialog?.id === 'intro') return s;
   if (s.dialog?.listening) {
     const dlg = s.dialog;
     const mode = dlg.listening!;
@@ -285,6 +305,13 @@ function onHeard(s: ScenarioState, h: Heard, cfg: ScenarioConfig, a: Action[]): 
     // другой диалог перебивает текущий, если текущий этого ответа явно не ждёт («пока» посреди загадки)
     if (mode !== 'echo' && !expects(cfg, dlg, key) && resolveTrigger(cfg.dialogs, h.type) && dlg.id !== 'intro') {
       return triggerDialog(s, h.type, cfg, a) ?? s;
+    }
+    // вопрос «да/нет» («Хочешь загадку?», «Ещё одну?»), а ребёнок сказал другое («танцуй») — вопрос снимается,
+    // фраза выполняется как обычно (а не теряется в «*» → конец диалога)
+    const star = cfg.dialogs.dialogs[dlg.id]?.nodes[dlg.node]?.on?.['*'];
+    if (mode === 'intent' && !expects(cfg, dlg, key) && (!star || star === '@end') && h.type !== 'unknown') {
+      s = stopDialog(s, a);
+      return onHeard(s, h, cfg, a);
     }
     if (h.type === 'name' && h.known) {
       a.push({ type: 'remember', patch: { name: h.name } });
@@ -394,8 +421,8 @@ export function step(s: ScenarioState, e: ScenarioEvent, cfg: ScenarioConfig): S
           // уже знакомы: короткое «с возвращением, <имя>!» и трюк без слов — сразу играть.
           // Из контекста — только «давно не виделись» (утро/вечер — лишняя реплика перед игрой)
           if (s.persona) a.push({ type: 'set_persona', persona: s.persona });
-          if (s.context === 'long_absence') a.push({ type: 'say', key: s.context, force: true });
-          a.push({ type: 'say', key: 'welcome_back', force: true }, { type: 'signature', silent: true });
+          // одна тёплая реплика: «давно не виделись» вместо «с возвращением», а не обе подряд
+          a.push({ type: 'say', key: s.context === 'long_absence' ? 'long_absence' : 'welcome_back', force: true }, { type: 'signature', silent: true });
           return done(enterPlay(st, cfg, a));
         }
         // первое знакомство (один раз): карта → поздравление и привет → имя → «я — …» → как играть (dialogs.json → intro)
@@ -409,7 +436,8 @@ export function step(s: ScenarioState, e: ScenarioEvent, cfg: ScenarioConfig): S
       if (e.type === 'name') return done(onHeard(s, { type: 'name', name: e.name, known: e.known ?? false, text: e.name }, cfg, a));
       if (e.type === 'skip_name') return done(onHeard(s, { type: 'skip' }, cfg, a));
       if (e.type === 'interaction') {
-        a.push({ type: 'react', event: e.kind });
+        // знакомство идёт по шагам: касание — клип и эмоция, без слов (иначе реакция перебьёт и потеряет шаг)
+        a.push({ type: 'react', event: e.kind, quiet: true });
         return done(s);
       }
       return done(s);
@@ -420,7 +448,9 @@ export function step(s: ScenarioState, e: ScenarioEvent, cfg: ScenarioConfig): S
       if (e.type === 'interaction' || e.type === 'shake') {
         const kind = e.type === 'shake' ? 'shake' : e.kind;
         if (s.paused) return done(s);
-        if (kind === 'double_tap') a.push({ type: 'signature' });
+        // мини-игра (загадка, повторялка, вопрос кота): касание не перебивает её словами — только клип и эмоция
+        if (s.dialog) a.push({ type: 'react', event: kind === 'double_tap' ? 'double_tap' : kind, quiet: true });
+        else if (kind === 'double_tap') a.push({ type: 'signature' });
         else a.push({ type: 'react', event: kind });
         return done({ ...s, boredCount: 0 });
       }
@@ -433,6 +463,12 @@ export function step(s: ScenarioState, e: ScenarioEvent, cfg: ScenarioConfig): S
         if (s.paused || s.dialog) return done(s);
         a.push({ type: 'react', event: s.boredCount >= 1 ? 'bored' : 'silence' }, { type: 'ui', ui: 'chips', show: true });
         return done({ ...s, boredCount: s.boredCount + 1 });
+      }
+      if (e.type === 'offer') {
+        // кот сам предлагает занятие: «Хочешь загадку?» → да — мини-игра, нет/тишина — дальше свободная игра
+        if (s.paused || s.dialog || !cfg.dialogs.dialogs.offer?.nodes[e.what]) return done(s);
+        a.push({ type: 'ui', ui: 'chips', show: true });
+        return done(runDialog(s, startDialog(cfg.dialogs, 'offer', e.what), cfg, a));
       }
       if ((e.type === 'timer' && e.id === 'outro') || e.type === 'outro_request') {
         if (s.outroShown && e.type === 'timer') return done(s);
@@ -458,7 +494,8 @@ export function step(s: ScenarioState, e: ScenarioEvent, cfg: ScenarioConfig): S
           { type: 'blow_stickers' },
           { type: 'set_persona', persona: p },
           { type: 'remember', patch: { persona: p } },
-          { type: 'signature' },
+          // трюк без слов: новый образ здоровается одной репликой, а не двумя подряд
+          { type: 'signature', silent: true },
           { type: 'say', key: 'hello_new', force: true },
         );
         const back = s.resumePhase && isPlay(s.resumePhase) ? s.resumePhase : 'play';

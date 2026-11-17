@@ -63,3 +63,57 @@ export class InitiativeGate {
     return this.waitMs(e) === 0;
   }
 }
+
+/**
+ * Лестница тишины (docs/scenario/LOGIC.md): что кот делает сам, пока ребёнок ничего не делает.
+ * Отсчёт — от последнего действия ребёнка (касание, кнопка, фраза) или конца мини-игры. Любое действие — с начала.
+ *   12 с  — «ты тут?» (silence);
+ *   30 с  — предлагает занятие (offer: загадка / повторялка / танец — по кругу, без повторов подряд);
+ *   55 с  — мысль вслух (filler);
+ *   80 с  — предлагает следующее занятие;
+ *   110 с — дремлет (doze): дальше молчит, пока ребёнок не разбудит.
+ * Между репликами кота сам по себе — не меньше minGapMs, и не раньше afterCatMs после любой его реплики.
+ */
+export type IdleStep = 'silence' | 'offer' | 'filler' | 'doze';
+export const IDLE_PLAN: readonly { at: number; step: IdleStep }[] = [
+  { at: 12_000, step: 'silence' },
+  { at: 30_000, step: 'offer' },
+  { at: 55_000, step: 'filler' },
+  { at: 80_000, step: 'offer' },
+  { at: 110_000, step: 'doze' },
+];
+/** что кот предлагает сам — по кругу (узлы диалога offer в content/dialogs.json) */
+export const OFFERS = ['riddle', 'echo', 'dance'] as const;
+
+export class IdleLadder {
+  private since: number;
+  private i = 0;
+  private lastFired = -1e9;
+  constructor(now = 0, private plan: readonly { at: number; step: IdleStep }[] = IDLE_PLAN, private minGapMs = 12_000, private afterCatMs = 4_000) {
+    this.since = now;
+  }
+  /** ребёнок что-то сделал (или мини-игра закончилась) — лестница с начала */
+  reset(now: number) {
+    this.since = now;
+    this.i = 0;
+  }
+  /** следующий шаг, если пора (env: кот молчит, диалога нет, ребёнок не говорит) */
+  due(now: number, env: { quiet: boolean; lastCatEnd: number }): IdleStep | null {
+    const p = this.plan[this.i];
+    if (!p || !env.quiet) return null;
+    if (now - this.since < p.at) return null;
+    if (now - this.lastFired < this.minGapMs || now - env.lastCatEnd < this.afterCatMs) return null;
+    return p.step;
+  }
+  /** шаг выполнен (или пропущен) — дальше по лестнице */
+  fired(now: number) {
+    this.i++;
+    this.lastFired = now;
+  }
+  get step() {
+    return this.i;
+  }
+  get finished() {
+    return this.i >= this.plan.length;
+  }
+}

@@ -439,6 +439,14 @@
       "clip": "lean_in",
       "face": "listen"
     },
+    "surprise": {
+      "clip": "surprised",
+      "sound": "gasp"
+    },
+    "tease": {
+      "clip": "offended",
+      "sound": "hmph"
+    },
     "clap": {
       "clip": "surprised",
       "sound": "gasp"
@@ -449,6 +457,15 @@
     },
     "long_absence": {},
     "first_time_today": {},
+    "offer_riddle": {
+      "clip": "talk_excited"
+    },
+    "offer_echo": {
+      "clip": "talk_excited"
+    },
+    "offer_dance": {
+      "clip": "talk_excited"
+    },
     "ask_name_again": {
       "clip": "listen"
     },
@@ -2152,6 +2169,34 @@
         "face": "listen"
       }
     ],
+    "surprise": [
+      {
+        "id": "hooligan.surprise.01",
+        "text": "Ого! Вот это сюрприз. Я аж кепку уронил.",
+        "emotion": "surprised",
+        "face": "surprised"
+      },
+      {
+        "id": "hooligan.surprise.02",
+        "text": "Воу! Не ожидал. А ну ещё раз!",
+        "emotion": "surprised",
+        "face": "surprised"
+      }
+    ],
+    "tease": [
+      {
+        "id": "hooligan.tease.01",
+        "text": "Дразнишься? Я тоже умею: бе-бе-бе!",
+        "emotion": "annoyed",
+        "face": "annoyed"
+      },
+      {
+        "id": "hooligan.tease.02",
+        "text": "Меня не проведёшь. Я самый спокойный кот. Почти.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      }
+    ],
     "clap": [
       {
         "id": "hooligan.clap.01",
@@ -2232,6 +2277,66 @@
         "text": "Без тебя тут скучно было. Привет!",
         "emotion": "neutral",
         "face": "neutral"
+      }
+    ],
+    "offer_riddle": [
+      {
+        "id": "hooligan.offer_riddle.01",
+        "text": "Слушай, загадку хочешь? Скажи «да».",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.offer_riddle.02",
+        "text": "Спорим, мою загадку не отгадаешь? Загадать?",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.offer_riddle.03",
+        "text": "Есть загадка — огонь. Загадать?",
+        "emotion": "happy",
+        "face": "happy"
+      }
+    ],
+    "offer_echo": [
+      {
+        "id": "hooligan.offer_echo.01",
+        "text": "Давай в повторялку? Ты говоришь — я повторяю. Играем?",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.offer_echo.02",
+        "text": "Хочешь, буду повторять за тобой? Скажи «да».",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "hooligan.offer_echo.03",
+        "text": "Скажи что-нибудь — повторю своим голосом. Попробуем?",
+        "emotion": "cheeky",
+        "face": "smirk"
+      }
+    ],
+    "offer_dance": [
+      {
+        "id": "hooligan.offer_dance.01",
+        "text": "Показать, как я танцую? Скажи «да».",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.offer_dance.02",
+        "text": "Хочешь танец? Я сегодня в форме.",
+        "emotion": "excited",
+        "face": "excited"
+      },
+      {
+        "id": "hooligan.offer_dance.03",
+        "text": "Скучно стоять. Станцевать тебе?",
+        "emotion": "cheeky",
+        "face": "smirk"
       }
     ],
     "ask_name_again": [
