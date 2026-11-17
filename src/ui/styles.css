@@ -195,7 +195,7 @@ canvas.gl.glitch { --gshift: 8px; animation: glitch .68s steps(1) infinite;
 .dock .side-l { justify-self: end; margin-right: var(--s-3); }
 .dock .side-r { justify-self: start; margin-left: var(--s-3); }
 .dock .mic-slot { width: var(--mic); height: var(--mic); position: relative; }
-.dock.no-mic .side-r { visibility: hidden; }
+.dock.no-play .side-r { visibility: hidden; }
 
 /* микрофон: держи и говори */
 .mic { appearance: none; position: absolute; inset: 0; width: var(--mic); height: var(--mic); border-radius: 50%; border: 0; display: grid; place-items: center;
@@ -335,108 +335,7 @@ body > .toast { position: fixed; }
   .hero .zzz span { opacity: 1; }
 }
 
-/* режим микрофона: пилюля над кнопкой (слушаю всегда ↔ по кнопке) */
-.mic-slot { position: relative; }
-.mic-mode { position: absolute; bottom: calc(100% + 10px); left: 50%; transform: translateX(-50%); white-space: nowrap;
-  font: 600 12px/1 var(--font, system-ui); padding: 7px 12px; border-radius: 999px; border: 0; color: #fff;
-  background: rgba(11, 94, 107, .72); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); box-shadow: 0 2px 10px rgba(0,0,0,.18); }
-.mic-mode.auto::before { content: ''; display: inline-block; width: 7px; height: 7px; margin-right: 7px; border-radius: 50%; background: var(--lime, #B5E36A); vertical-align: 1px; animation: scandot 1.4s ease-in-out 4; }
-.dock.no-mic .mic-mode { display: none; }
 .mic.auto:not(.listening) { box-shadow: 0 0 0 4px rgba(181, 227, 106, .35); }
-
-/* ═════════════════════ онбординг (3 шага) ═════════════════════
-   Сбер: бирюза → зелёный → лайм, SB Sans, много воздуха. Кот Том: пухлые «конфетные» кнопки с нижней гранью,
-   всё круглое и мягкое, иллюстрации живые. Карта на первом шаге — с секретом: из окошка смотрят глаза. */
-.screen.ob { justify-content: space-between; overflow: hidden; touch-action: pan-y;
-  padding: calc(var(--s-4) + var(--safe-t)) 0 calc(var(--s-4) + var(--safe-b));
-  background: radial-gradient(90% 55% at 50% 30%, rgba(181,227,106,.30), transparent 70%),
-    radial-gradient(60% 40% at 90% 100%, rgba(33,160,56,.45), transparent 70%),
-    linear-gradient(165deg, #0b5e6b 0%, #0a6b62 40%, #0e7c5a 75%, #1a8f45 100%); }
-.ob-sky { position: absolute; inset: 0; pointer-events: none; }
-.ob-sky::before, .ob-sky::after { content: ''; position: absolute; border-radius: 50%; border: 1.5px solid rgba(255,255,255,.08); }
-.ob-sky::before { width: 140vmax; height: 140vmax; left: 50%; top: 32%; transform: translate(-50%, -50%); }
-.ob-sky::after { width: 90vmax; height: 90vmax; left: 50%; top: 32%; transform: translate(-50%, -50%); border-color: rgba(181,227,106,.12); }
-.ob-sky i { position: absolute; width: 6px; height: 6px; border-radius: 50%; background: #fff; opacity: .0; animation: twinkle 3.6s ease-in-out infinite; }
-.ob-sky i:nth-child(1) { left: 12%; top: 14%; } .ob-sky i:nth-child(2) { left: 84%; top: 10%; animation-delay: .7s; }
-.ob-sky i:nth-child(3) { left: 72%; top: 34%; animation-delay: 1.4s; width: 4px; height: 4px; } .ob-sky i:nth-child(4) { left: 20%; top: 40%; animation-delay: 2.1s; width: 4px; height: 4px; }
-.ob-sky i:nth-child(5) { left: 46%; top: 6%; animation-delay: 2.8s; } .ob-sky i:nth-child(6) { left: 90%; top: 52%; animation-delay: 1s; width: 5px; height: 5px; background: var(--lime); }
-.ob-sky i:nth-child(7) { left: 6%; top: 60%; animation-delay: 1.9s; background: var(--lime); } .ob-sky i:nth-child(8) { left: 60%; top: 18%; animation-delay: 3.1s; width: 4px; height: 4px; }
-@keyframes twinkle { 0%, 100% { opacity: 0; transform: scale(.4); } 50% { opacity: .9; transform: scale(1); } }
-
-.ob-track { position: relative; flex: 1; width: 100%; display: flex; transition: transform .45s var(--ease); }
-.ob-slide { flex: 0 0 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--s-5);
-  padding: 0 calc(var(--s-5) + var(--safe-r)) 0 calc(var(--s-5) + var(--safe-l)); text-align: center; }
-.ob-slide .screen-text { max-width: 400px; }
-.ob-slide h1 { font-size: clamp(23px, 7vw, 30px); line-height: 1.12; text-wrap: balance; overflow-wrap: anywhere; }
-.ob-slide p { font-size: 17px; max-width: 30ch; }
-.ob-foot { position: relative; width: min(100%, 440px); padding: 0 calc(var(--s-5) + var(--safe-r)) 0 calc(var(--s-5) + var(--safe-l));
-  display: flex; flex-direction: column; align-items: center; gap: var(--s-3); }
-.ob-dots { display: flex; gap: 8px; margin-bottom: var(--s-1); }
-.ob-dots i { width: 8px; height: 8px; border-radius: 999px; background: rgba(255,255,255,.35); transition: width .3s var(--ease), background-color .3s; }
-.ob-dots i.on { width: 26px; background: var(--white); }
-.ob .fine { display: flex; gap: var(--s-2); align-items: flex-start; text-align: left; color: rgba(255,255,255,.7); font-size: var(--fs-xs); line-height: 1.45; max-width: 36ch; }
-.ob .fine svg { flex: none; width: 16px; height: 16px; margin-top: 1px; opacity: .8; }
-.ob .btn-primary { min-height: 60px; font-size: 19px; }
-
-/* общая детская карта */
-.kc, .tc { position: absolute; border-radius: 18px; overflow: hidden;
-  background: radial-gradient(90% 120% at 85% 8%, rgba(255,255,255,.4), transparent 55%), linear-gradient(135deg, #b5e36a 0%, #42c35b 48%, #21a038 100%);
-  box-shadow: inset 0 0 0 1.5px rgba(255,255,255,.3); }
-.kc-chip { position: absolute; left: 9%; top: 26%; width: 15%; aspect-ratio: 1.3; border-radius: 6px; background: linear-gradient(135deg, #f6ecbd, #cdb76a); box-shadow: inset 0 0 0 1px rgba(0,0,0,.12); }
-.kc-logo { position: absolute; left: 9%; bottom: 12%; font-size: 12px; font-weight: 800; letter-spacing: .14em; color: rgba(255,255,255,.95); }
-
-/* шаг 1: карта с секретом */
-.ob-art { position: relative; width: min(76vw, 300px); aspect-ratio: 1.25; flex: none; }
-.art-mystery .kc { left: 4%; right: 4%; top: 26%; aspect-ratio: 1.586; transform: rotate(-5deg); box-shadow: 0 26px 50px rgba(0,0,0,.35), inset 0 0 0 1.5px rgba(255,255,255,.3);
-  animation: kcfloat 3.4s ease-in-out infinite; }
-@keyframes kcfloat { 50% { transform: rotate(-3deg) translateY(-8px); } }
-.kc-portal { position: absolute; right: 12%; top: 50%; width: 34%; aspect-ratio: 1; transform: translateY(-50%); border-radius: 50%;
-  background: radial-gradient(circle at 50% 55%, #0d2b30 0%, #071a1d 62%, #0b5e6b 63%, #0b5e6b 70%, rgba(181,227,106,.9) 72%, rgba(181,227,106,0) 86%);
-  box-shadow: 0 0 22px 6px rgba(181,227,106,.55); display: flex; align-items: center; justify-content: center; gap: 14%; animation: portal 2.2s ease-in-out infinite; }
-@keyframes portal { 50% { box-shadow: 0 0 34px 12px rgba(181,227,106,.75); } }
-.kc-portal .eye { width: 17%; aspect-ratio: .72; border-radius: 50%; background: radial-gradient(circle at 40% 35%, #fff 0 22%, #d9ff8a 24% 60%, #8cd43a 62%);
-  box-shadow: 0 0 10px rgba(217,255,138,.9); animation: blink 4s infinite, peek 6s ease-in-out infinite; transform-origin: 50% 50%; }
-@keyframes blink { 0%, 44%, 50%, 100% { transform: scaleY(1); } 47% { transform: scaleY(.08); } }
-@keyframes peek { 0%, 30% { translate: 0 0; } 40%, 60% { translate: -3px 1px; } 70%, 100% { translate: 2px 0; } }
-.kc-portal { overflow: visible; }
-.m-ears { position: absolute; left: 14%; right: 14%; top: -14%; height: 34%; animation: ears 3.4s ease-in-out infinite; z-index: -1; }
-.m-ears b { position: absolute; bottom: 0; width: 36%; height: 100%; background: #0b2226; clip-path: polygon(50% 0, 100% 100%, 0 100%); border-radius: 4px; }
-.m-ears b::after { content: ''; position: absolute; inset: 30% 25% 0; background: #f2a3b4; clip-path: polygon(50% 0, 100% 100%, 0 100%); opacity: .8; }
-.m-ears b:first-child { left: 2%; transform: rotate(-12deg); } .m-ears b:last-child { right: 2%; transform: rotate(12deg); animation: earflick 5s ease-in-out infinite; transform-origin: 50% 100%; }
-@keyframes ears { 0%, 100% { translate: 0 3px; } 50% { translate: 0 -3px; } }
-@keyframes earflick { 0%, 80%, 100% { transform: rotate(12deg); } 85% { transform: rotate(26deg); } 90% { transform: rotate(8deg); } }
-.spk { position: absolute; width: 22px; aspect-ratio: 1; background: #fff; clip-path: polygon(50% 0, 61% 39%, 100% 50%, 61% 61%, 50% 100%, 39% 61%, 0 50%, 39% 39%);
-  animation: spark 2.4s ease-in-out infinite; filter: drop-shadow(0 0 6px rgba(255,255,255,.8)); }
-.spk.s1 { left: 2%; top: 12%; } .spk.s2 { right: 0; top: 4%; width: 16px; background: var(--lime); animation-delay: .6s; }
-.spk.s3 { right: 6%; bottom: 6%; width: 18px; animation-delay: 1.2s; } .spk.s4 { left: 10%; bottom: 2%; width: 14px; background: #ffe27a; animation-delay: 1.8s; }
-@keyframes spark { 0%, 100% { transform: scale(.3) rotate(0); opacity: .2; } 50% { transform: scale(1) rotate(45deg); opacity: 1; } }
-.m-q { position: absolute; left: 8%; top: 8%; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: #fff; color: var(--green);
-  font: 900 26px/1 var(--font-display); box-shadow: 0 4px 0 #c7d8cf, 0 10px 20px rgba(0,0,0,.2); transform: rotate(-10deg); animation: qbob 2.6s var(--ease) infinite; }
-@keyframes qbob { 50% { transform: rotate(6deg) translateY(-6px); } }
-
-/* шаг 2: карта ложится на стол */
-.art-table .tbl { position: absolute; left: -6%; right: -6%; bottom: 4%; height: 46%; border-radius: 50%;
-  background: radial-gradient(ellipse at 50% 40%, #c18a5a 0%, #9c6b40 55%, #6f4a2b 100%); box-shadow: 0 20px 40px rgba(0,0,0,.3);
-  -webkit-mask-image: radial-gradient(ellipse at 50% 50%, #000 62%, transparent 72%); mask-image: radial-gradient(ellipse at 50% 50%, #000 62%, transparent 72%); }
-.art-table .tbl::after { content: ''; position: absolute; inset: 0; opacity: .25; background: repeating-linear-gradient(176deg, rgba(0,0,0,.35) 0 2px, transparent 2px 14px); }
-.art-table .tc { left: 22%; width: 56%; aspect-ratio: 1.586; bottom: 18%; transform-origin: 50% 100%; animation: drop 3.2s var(--ease) infinite; }
-.art-table .tc-shadow { position: absolute; left: 24%; width: 52%; bottom: 17%; height: 9%; border-radius: 50%; background: rgba(0,0,0,.35); filter: blur(6px); animation: dropsh 3.2s var(--ease) infinite; }
-@keyframes drop { 0% { transform: translateY(-70%) perspective(500px) rotateX(10deg) rotate(-8deg); opacity: 0; }
-  12% { opacity: 1; } 45%, 85% { transform: translateY(0) perspective(500px) rotateX(58deg) rotate(0); opacity: 1; } 100% { transform: translateY(0) perspective(500px) rotateX(58deg); opacity: 0; } }
-@keyframes dropsh { 0% { transform: scale(.4); opacity: 0; } 45%, 85% { transform: scale(1); opacity: 1; } 100% { opacity: 0; } }
-
-/* шаг 3: телефон смотрит на карту */
-.art-phone .ph { position: absolute; left: 50%; top: 0; width: 38%; aspect-ratio: .5; transform: translateX(-50%) rotate(-4deg); border-radius: 28px;
-  background: #11262a; padding: 7px; box-shadow: 0 0 0 2px rgba(255,255,255,.18), 0 24px 44px rgba(0,0,0,.4); }
-.ph-scr { position: relative; width: 100%; height: 100%; border-radius: 22px; overflow: hidden; background: #3d2c1f; }
-.ph-tbl { position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 70%, #b07c4f, #6c4628); }
-.ph-tbl::after { content: ''; position: absolute; inset: 0; opacity: .25; background: repeating-linear-gradient(176deg, rgba(0,0,0,.35) 0 2px, transparent 2px 12px); }
-.ph-card { position: absolute; left: 16%; right: 16%; top: 48%; aspect-ratio: 1.586; border-radius: 6px; transform: perspective(240px) rotateX(48deg);
-  background: linear-gradient(135deg, #b5e36a, #21a038); }
-.ph-frame { position: absolute; left: 10%; right: 10%; top: 41%; aspect-ratio: 1.4; border-radius: 10px; border: 3px solid var(--lime);
-  box-shadow: 0 0 14px rgba(181,227,106,.9); animation: phlock 2.6s var(--ease) infinite; }
-@keyframes phlock { 0% { transform: scale(1.35); opacity: 0; } 40%, 80% { transform: scale(1); opacity: 1; } 100% { opacity: 0; } }
-.ph-notch { position: absolute; left: 50%; top: 13px; width: 30%; height: 12px; transform: translateX(-50%); border-radius: 8px; background: #11262a; }
 .ph-perm { position: absolute; right: 2%; bottom: 10%; display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-radius: 16px; background: #fff; color: var(--ink);
   font-size: 13px; font-weight: 700; box-shadow: 0 4px 0 #c7d8cf, 0 12px 24px rgba(0,0,0,.25); animation: permpop 2.6s var(--ease-back) infinite; }
 .ph-perm svg { width: 20px; height: 20px; color: var(--green); }
@@ -478,10 +377,6 @@ body > .toast { position: fixed; }
 .mic.on { transform: translateY(4px) scale(1.04); }
 .mic.auto:not(.listening) { box-shadow: 0 6px 0 rgba(0,0,0,.2), 0 12px 26px rgba(0,0,0,.25), 0 0 0 5px rgba(181,227,106,.55); }
 
-.mic-mode { padding: 8px 13px; font-weight: 800; color: var(--green-text); background: #fff; backdrop-filter: none; -webkit-backdrop-filter: none;
-  box-shadow: 0 3px 0 #c5d6cc, 0 6px 14px rgba(0,0,0,.2); }
-.mic-mode:active { transform: translateX(-50%) translateY(2px); box-shadow: 0 1px 0 #c5d6cc; }
-
 .chip { border: 0; background: linear-gradient(180deg, #fff, #f0f6f2); color: var(--green-text); font-weight: 800; backdrop-filter: none; -webkit-backdrop-filter: none;
   box-shadow: 0 4px 0 #c5d6cc, 0 8px 16px rgba(0,0,0,.18); margin-bottom: 6px; }
 .chip:active { transform: translateY(3px); background: #eaf3ee; box-shadow: 0 1px 0 #c5d6cc; }
@@ -502,14 +397,6 @@ body > .toast { position: fixed; }
 .choice.picked { box-shadow: inset 0 0 0 3px var(--pc), 0 4px 0 var(--pc); }
 .name-row .ok { border-radius: var(--r-m); }
 .toast { border-radius: 20px; }
-/* пилюля режима микрофона торчит над доком — стек поднимаем, чтобы подсказки её не накрывали */
-.ui:not(.kb):has(.dock:not(.no-mic)) .stack { bottom: calc(var(--dock-h) + 34px); }
-@media (orientation: landscape) and (max-height: 520px) { .ui:not(.kb):has(.dock:not(.no-mic)) .stack { bottom: 0; } }
-@media (orientation: landscape) and (max-height: 520px) {
-  .mic-mode { bottom: auto; left: auto; right: calc(100% + 12px); top: 50%; transform: translateY(-50%); }
-  .mic-mode:active { transform: translateY(-50%) translateY(2px); }
-}
-
 /* онбординг, шаг «Карта — только твоя»: карта под щитом, рядом ребёнок, мама и папа */
 .art-safe .sf-card { position: absolute; left: 10%; right: 26%; top: 12%; aspect-ratio: 1.586; border-radius: 18px; overflow: hidden; transform: rotate(-6deg);
   background: radial-gradient(90% 120% at 85% 8%, rgba(255,255,255,.4), transparent 55%), linear-gradient(135deg, #b5e36a 0%, #42c35b 48%, #21a038 100%);
@@ -539,12 +426,6 @@ body > .toast { position: fixed; }
 .terms-body b { color: var(--green-text); }
 .terms-body .terms-note { color: var(--ink-2); font-size: 12px; }
 @media (max-height: 700px) { .art-safe .ava { width: 34px; height: 34px; } .art-safe .a-kid { width: 28px; height: 28px; } .art-safe .sf-fam { padding: 6px 10px; } }
-
-/* «Пересадить кота»: маленькая конфетная кнопка слева сверху */
-.iconbtn.reanchor { position: absolute; left: var(--edge); top: calc(var(--s-3) + var(--safe-t)); width: auto; height: 40px; padding: 0 14px 0 10px; border-radius: 999px;
-  display: inline-flex; gap: 6px; align-items: center; font-size: 13px; font-weight: 800; color: var(--green-text); z-index: 3; }
-.iconbtn.reanchor svg { width: 20px; height: 20px; color: var(--green); }
-.ui:has(.bubble.show) .iconbtn.reanchor { opacity: 0; pointer-events: none; }
 
 /* ═════════════════════ панель действий (как у говорящего Тома) ═════════════════════
    Круглые белые «конфеты» с иконкой и подписью: сразу видно, что можно делать с котом. Ряд листается пальцем. */
@@ -597,7 +478,6 @@ body > .toast { position: fixed; }
   background: #ff5a4e; box-shadow: 0 0 0 2px #fff; }
 .act-more .act-ico { color: var(--teal); }
 .ui.cat-open:not(.kb) .stack { bottom: var(--dock-h); }
-.ui.cat-open .mic-mode { visibility: hidden; }
 .catalog { position: relative; width: min(100%, 460px); padding: 6px 6px 4px; border-radius: 26px; background: rgba(255, 255, 255, .95); color: var(--ink);
   box-shadow: 0 5px 0 rgba(0,0,0,.08), var(--sh-2); animation: rise var(--t-med) var(--ease); touch-action: none; transition: transform .18s var(--ease); }
 .cat-top { display: flex; align-items: center; gap: 6px; }
@@ -662,3 +542,111 @@ body > .toast { position: fixed; }
   .cat-sep { align-self: center; margin: 4px 0; }
   .cat-phrase { height: auto; min-height: 44px; white-space: normal; margin: 0 0 6px; padding: 6px 12px 6px 8px; font-size: 13px; text-align: left; }
 }
+
+/* ═════════════════════ упрощённый экран: «Кот подсказывает» (вариант А, docs/UI_AUDIT.md, «Упрощённый экран») ═════════════════════
+   Внизу только три кнопки: звук (маленькая, слева) · микрофон «скажи коту» (большая) · лапка «что умею» (маленькая, справа).
+   Над ними — не больше двух чипов-предложений от кота (scenario/suggest.ts). Каталог открывается лапкой на месте чипов. */
+.dock .side-l { width: var(--tap); height: var(--tap); }
+.dock .side-l svg { width: 22px; height: 22px; }
+.pawbtn { appearance: none; border: 0; padding: 0; background: none; display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 64px;
+  color: #fff; font: 800 11.5px/1.1 var(--font); text-shadow: 0 1px 3px rgba(0,0,0,.6); cursor: pointer; }
+.paw-ico { position: relative; width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center; color: #e0783c;
+  background: linear-gradient(180deg, #fff, #eef5f1); box-shadow: 0 4px 0 rgba(0,0,0,.18), 0 8px 18px rgba(0,0,0,.22); transition: transform var(--t-fast) var(--ease); }
+.paw-ico svg { width: 28px; height: 28px; }
+.pawbtn:active .paw-ico { transform: translateY(3px); box-shadow: 0 1px 0 rgba(0,0,0,.18), 0 3px 8px rgba(0,0,0,.2); }
+.pawbtn.on .paw-ico { background: linear-gradient(180deg, #34c252, #21a038); color: #fff; box-shadow: 0 4px 0 #13742a, 0 8px 18px rgba(0,0,0,.22); }
+.pawbtn.new:not(.on) .paw-ico::after { content: ''; position: absolute; top: 2px; right: 2px; width: 12px; height: 12px; border-radius: 50%; background: #ff5a4e; box-shadow: 0 0 0 2px #fff; }
+.pawbtn.attn .paw-ico { animation: actattn 1.2s var(--ease) 3; }
+.paw-l { white-space: nowrap; }
+
+/* чипы кота: 1–2 пухлые «конфеты» с иконкой и подписью; новый набор подпрыгивает */
+.chips.suggest { justify-content: center; flex-wrap: wrap; gap: 10px; overflow: visible; padding: 4px 0 2px; margin: 0; -webkit-mask-image: none; mask-image: none; }
+.sug { appearance: none; position: relative; flex: none; display: inline-flex; align-items: center; gap: 8px; min-height: 52px; max-width: 100%; padding: 0 18px 0 6px;
+  border: 0; border-radius: var(--r-pill); background: linear-gradient(180deg, #fff, #f0f6f2); color: var(--green-text); font: 800 16px/1.15 var(--font);
+  box-shadow: 0 4px 0 #c5d6cc, 0 8px 16px rgba(0,0,0,.22); margin-bottom: 4px; cursor: pointer; transition: transform var(--t-fast) var(--ease); }
+.sug:active { transform: translateY(3px); box-shadow: 0 1px 0 #c5d6cc, 0 3px 8px rgba(0,0,0,.2); }
+.sug-ico { flex: none; width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: #eef7f0; color: var(--green); }
+.sug-ico svg { width: 24px; height: 24px; }
+.sug-l { white-space: nowrap; }
+.sug[data-act="pet"] .sug-ico, .sug[data-act="hug"] .sug-ico { color: #e0783c; background: #fdeee4; }
+.sug[data-act="riddle"] .sug-ico, .sug[data-chip="more_riddle"] .sug-ico { color: #3f7fc4; background: #e7f0fa; }
+.sug[data-act="dance"] .sug-ico, .sug[data-act="echo"] .sug-ico { color: #8a5ad6; background: #f0eafc; }
+.sug[data-act="treat"] .sug-ico { color: #3f7fc4; background: #e7f0fa; }
+.sug[data-chip="no"] .sug-ico, .sug[data-chip="echo_stop"] .sug-ico, .sug[data-chip="giveup"] .sug-ico { color: var(--ink-2); background: #eef2f1; }
+.chips.suggest.swap .sug { animation: pop .42s var(--ease-back) both; }
+.chips.suggest.swap .sug:nth-child(2) { animation-delay: .07s; }
+.chips.suggest.swap .sug:nth-child(3) { animation-delay: .14s; }
+.sug.tapped { animation: acttap .45s var(--ease-back); }
+.chips.attn .sug { animation: actattn 1.6s var(--ease) 3; }
+.chips.attn .sug:nth-child(2) { animation-delay: .12s; }
+@media (max-width: 360px) { .sug { font-size: 15px; padding-right: 14px; } .chips.suggest { gap: 8px; } }
+@media (prefers-reduced-motion: reduce) { .chips.attn .sug, .pawbtn.attn .paw-ico { animation: none; } }
+
+/* подсказка от кота в пузыре: тот же пузырь, текст зелёный — «кот подсказывает», а не говорит */
+.bubble.hint .txt { color: var(--green-text); }
+
+/* меню долгого нажатия: один пункт «Пересадить на другую карту» над пальцем */
+.press-menu { position: absolute; z-index: 5; animation: pop .3s var(--ease-back); }
+.press-menu button { appearance: none; border: 0; display: inline-flex; align-items: center; gap: 8px; min-height: 52px; padding: 0 18px 0 12px; border-radius: var(--r-pill);
+  background: linear-gradient(180deg, #fff, #f0f6f2); color: var(--green-text); font: 800 16px/1.1 var(--font); white-space: nowrap; cursor: pointer;
+  box-shadow: 0 4px 0 #c5d6cc, 0 10px 22px rgba(0,0,0,.3); }
+.press-menu button:active { transform: translateY(3px); box-shadow: 0 1px 0 #c5d6cc, 0 3px 8px rgba(0,0,0,.2); }
+.press-menu svg { width: 24px; height: 24px; color: var(--green); }
+
+/* каталог: разделы — крупные иконки с подписью (без «N из M» и крестика: закрывает лапка, свайп вниз, тап мимо) */
+.catalog { padding: 8px 6px 4px; }
+.cat-tabs { gap: 2px; justify-content: space-between; padding: 0 2px 2px; }
+.cat-tab { flex: 1 1 0; min-width: 48px; height: auto; padding: 0 0 2px; flex-direction: column; gap: 3px; background: none; box-shadow: none; border-radius: 14px;
+  font: 800 10.5px/1.1 var(--font); color: var(--ink-2); }
+.cat-tab-ico { width: 44px; height: 44px; border-radius: 50%; background: #eef5f1; box-shadow: 0 3px 0 #d3e1d9; transition: transform var(--t-fast) var(--ease); }
+.cat-tab svg { width: 24px; height: 24px; }
+.cat-tab:active .cat-tab-ico { transform: translateY(2px); box-shadow: 0 1px 0 #d3e1d9; }
+.cat-tab.on { background: none; box-shadow: none; color: var(--green-text); }
+.cat-tab.on .cat-tab-ico { background: linear-gradient(180deg, #34c252, #21a038); color: #fff; box-shadow: inset 0 1px 0 rgba(255,255,255,.3), 0 3px 0 #13742a; }
+.cat-tab[data-sec="care"] .cat-tab-ico { color: #e0783c; }
+.cat-tab[data-sec="tricks"] .cat-tab-ico { color: var(--green); }
+.cat-tab[data-sec="games"] .cat-tab-ico { color: #3f7fc4; }
+.cat-tab[data-sec="emotions"] .cat-tab-ico { color: #9a7be8; }
+.cat-tab[data-sec="magic"] .cat-tab-ico { color: #e09a10; }
+.cat-tab[data-sec="say"] .cat-tab-ico, .cat-tab[data-sec="more"] .cat-tab-ico { color: var(--teal); }
+.cat-tab.on .cat-tab-ico { color: #fff; }
+.cat-tab.new::after { top: 0; right: calc(50% - 24px); }
+.cat-tab-l { white-space: nowrap; }
+.cat-row { gap: 8px; }
+.cat-item { width: 68px; }
+.cat-item .act-ico { width: 54px; height: 54px; }
+.cat-item .act-ico svg { width: 28px; height: 28px; }
+.cat-phrase { min-height: 48px; }
+.cat-ui { white-space: nowrap; }
+.cat-sep[data-sec="more"] { color: var(--teal); }
+@media (max-width: 380px) and (orientation: portrait) { .stack .catalog { width: calc(100% + 16px); margin: 0 -8px; } }
+@media (max-height: 700px) and (orientation: portrait) {
+  .cat-tab { height: auto; font-size: 10px; padding: 0 0 2px; }
+  .cat-tab-ico { width: 40px; height: 40px; }
+  .cat-tab svg { width: 22px; height: 22px; }
+  .cat-item { width: 62px; font-size: 10.5px; }
+  .cat-item .act-ico { width: 48px; height: 48px; }
+  .cat-item .act-ico svg { width: 25px; height: 25px; }
+  .cat-phrase { min-height: 44px; }
+}
+@media (orientation: landscape) and (max-height: 520px) {
+  .pawbtn { min-width: 56px; }
+  .paw-ico { width: 48px; height: 48px; }
+  .dock .side-r { margin-top: var(--s-2); }
+  .sug { min-height: 48px; font-size: 15px; }
+  .sug-ico { width: 36px; height: 36px; }
+  .chips.suggest { justify-content: flex-start; }
+  .cat-top { width: 64px; }
+  .cat-tabs { justify-content: flex-start; gap: 4px; }
+  .cat-tab { flex: none; min-width: 0; width: 60px; padding: 2px 0; font-size: 9.5px; background: none; }
+  .cat-tab-ico { width: 40px; height: 40px; }
+  .cat-tab svg { width: 22px; height: 22px; }
+  .cat-row .cat-item .act-ico { width: 48px; height: 48px; }
+  .cat-row[data-sec="more"] { width: 210px; align-items: stretch; }
+}
+
+/* варианты ответа мини-игры (до шести: эмоции) — компактнее, в два ряда */
+.chips.suggest.game { gap: 8px; }
+.chips.suggest.game .sug { min-height: 48px; font-size: 14.5px; padding: 0 14px 0 5px; gap: 6px; }
+.chips.suggest.game .sug-ico { width: 36px; height: 36px; }
+.chips.suggest.game .sug-ico svg { width: 21px; height: 21px; }

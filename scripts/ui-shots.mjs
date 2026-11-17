@@ -30,6 +30,8 @@ async function open(vp) {
   const page = await browser.newPage();
   await page.setViewport({ width: vp.w, height: vp.h, deviceScaleFactor: 1, isMobile: true, hasTouch: true });
   page.on('pageerror', (e) => console.warn(`  [${vp.name}] pageerror ${e.message}`));
+  // каждый снимок — с нуля: что ребёнок уже пробовал в каталоге (чипы кота зависят от этого)
+  await page.evaluateOnNewDocument(() => localStorage.removeItem('ar.catalog.tried'));
   await page.goto(`http://localhost:${port}/?debug`, { waitUntil: 'networkidle0' });
   await page.waitForFunction(() => window.__app?.director && window.__debugPanel && window.__cat, { timeout: 30000 });
   await page.evaluate(() => window.__debugPanel.open(false));
@@ -186,6 +188,72 @@ const STATES = {
     });
     await shot(page, 'catalog_low', vp);
   },
+  // ───── упрощённый экран «Кот подсказывает» (docs/UI_AUDIT.md, «Упрощённый экран»): prefix simple ─────
+  /** посадка: кот только что сел на карту — первые чипы («Погладь меня», игра) */
+  async s_land(page, vp) {
+    await window_fast(page);
+    await until(page, () => document.querySelector('.dock:not(.no-play)') && document.querySelector('.sug'), 12000);
+    await wait(600);
+    await shot(page, 'land', vp);
+  },
+  /** первая минута: ребёнок молчит 8 с — подсказка от кота в пузыре */
+  async s_hint(page, vp) {
+    await window_fast(page);
+    // фейковый микрофон Chrome пищит — кот слышит «хлопки» и отвечает; в снимке — только тишина
+    await page.evaluate(() => window.__voice?.mode?.('ptt'));
+    await until(page, () => document.querySelector('.bubble.hint.show'), 25000);
+    await shot(page, 'first_hint', vp);
+  },
+  /** после действия: погладили чипом — чипы сменились */
+  async s_after(page, vp) {
+    await window_fast(page);
+    await page.evaluate(() => document.querySelector('.sug[data-act="pet"]')?.click());
+    await wait(2500);
+    await page.evaluate(() => window.__app.director.queue?.clear?.());
+    await wait(600);
+    await shot(page, 'after_action', vp);
+  },
+  /** каталог по лапке (вкладка «Забота») и раздел «Ещё» в конце (пересадить, микрофон) */
+  async s_catalog(page, vp) {
+    await window_fast(page);
+    await page.evaluate(() => (window.__app.tracker.distance = 7.5, window.__app.ui.showReanchor(true)));
+    await wait(400);
+    await page.evaluate(() => document.querySelector('[data-a="paw"]').click());
+    await shot(page, 'catalog', vp);
+    await page.evaluate(() => document.querySelector('.cat-tab[data-tab="more"]')?.click());
+    await shot(page, 'catalog_more', vp);
+  },
+  /** долгое нажатие на кота: меню «Пересадить на другую карту» */
+  async s_press(page, vp) {
+    await window_fast(page);
+    await page.evaluate(() => {
+      const ui = window.__app.ui;
+      ui.showReanchor(true);
+      const r = ui.catRect();
+      ui.pressMenu(r ? r.cx : ui.root.clientWidth / 2, r ? (r.headY + r.bottom) / 2 : ui.root.clientHeight / 2);
+    });
+    await shot(page, 'longpress', vp);
+  },
+  /** мини-игра: загадка — «Сдаюсь»; после ответа — «Ещё загадку» / «Повторяй» */
+  async s_game(page, vp) {
+    await window_fast(page);
+    await page.evaluate(() => (document.querySelector('.sug[data-act="riddle"]') ?? null)?.click() ?? window.__app.director.action('riddle'));
+    await until(page, () => window.__app.director.state.dialog?.listening === 'riddle', 20000);
+    await wait(700);
+    await shot(page, 'game_riddle', vp);
+    await page.evaluate(() => document.querySelector('.sug[data-chip="giveup"]')?.click());
+    await until(page, () => window.__app.director.state.dialog?.node === 'more' && !!window.__app.director.state.dialog?.listening, 20000);
+    await wait(700);
+    await shot(page, 'game_more', vp);
+  },
+  /** мини-игра с вариантами (камень-ножницы-бумага): чипы — варианты ответа */
+  async s_rps(page, vp) {
+    await window_fast(page);
+    await page.evaluate(() => window.__app.director.action('rps'));
+    await until(page, () => !!window.__app.director.gameChoices?.() && document.querySelector('.chips.suggest.game'), 20000);
+    await wait(700);
+    await shot(page, 'game_rps', vp);
+  },
   async debug(page, vp) {
     await window_fast(page);
     await page.evaluate(() => window.__debugPanel.open(true));
@@ -209,7 +277,7 @@ for (const vp of VPS.filter((v) => !process.env.UI_VP || process.env.UI_VP.split
   for (const [name, fn] of Object.entries(STATES)) {
     if (onlyStates.length && !onlyStates.includes(name)) continue;
     // landscape — один проход по основным экранам
-    if (vp.name.startsWith('land') && !['start', 'ask_name', 'choose', 'play', 'chips', 'outro', 'no_camera', 'catalog', 'catalog_low'].includes(name)) continue;
+    if (vp.name.startsWith('land') && !name.startsWith('s_') && !['start', 'ask_name', 'choose', 'play', 'chips', 'outro', 'no_camera', 'catalog', 'catalog_low'].includes(name)) continue;
     const page = await open(vp);
     try {
       await fn(page, vp);

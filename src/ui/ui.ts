@@ -1,16 +1,23 @@
 /**
- * Интерфейс: стартовый экран, поиск карты, пузырь реплик, нижний док (звук · микрофон · подсказки),
- * листы «Как тебя зовут?» и «Каким мне быть?», кнопки СберKids / «Сдёрнуть наклейки», тосты, экран ошибки.
- * Стили и дизайн-токены — styles.css; правила — docs/UI_AUDIT.md.
+ * Интерфейс: стартовый экран, поиск карты, пузырь реплик, нижний док из трёх кнопок (звук · микрофон «скажи коту» ·
+ * лапка «что умеет кот»), над ним — до двух чипов-предложений от кота (scenario/suggest.ts), каталог «Что умеет кот»
+ * на месте чипов, меню долгого нажатия («Пересадить на другую карту»), листы «Как тебя зовут?» и «Каким мне быть?»,
+ * кнопки СберKids / «Сдёрнуть наклейки», тосты, экран ошибки.
+ * Стили и дизайн-токены — styles.css; правила — docs/UI_AUDIT.md, упрощённый экран — docs/UI_AUDIT.md, «Упрощённый экран».
  */
 import { asset } from '../core/util';
-import { TriedStore, type CatalogItem, type CatalogSection, type SectionId } from './actionCatalog';
+import { TriedStore, moreSection, type CatalogItem, type CatalogSection, type SectionId } from './actionCatalog';
+import type { Chip } from '../scenario/suggest';
 import { CAT_ICON } from './catalogIcons';
 
 export interface UiHandlers {
   onWake(): void;
   onMicDown(): void;
   onMicUp(): void;
+  /** «слушаю всегда»: короткое нажатие на микрофон — «я говорю»: слушаем фразу до конца (а не до отпускания) */
+  onMicTap?(): void;
+  /** чип-предложение кота (действие или фраза) */
+  onSuggest?(chip: Chip): void;
   onChip(text: string): void;
   onName(name: string): void;
   onSkipName(): void;
@@ -19,7 +26,7 @@ export interface UiHandlers {
   onMute(m: boolean): void;
   /** «слушаю всегда» ↔ «по кнопке» */
   onMicMode(m: 'auto' | 'ptt'): void;
-  /** «Пересадить кота» на карту, которая сейчас в кадре */
+  /** «Пересадить кота» на карту, которая сейчас в кадре (меню долгого нажатия, раздел «Ещё» каталога) */
   onReanchor?(): void;
   /** кнопка панели действий (погладить, угостить, танец…) */
   onAction?(id: string): void;
@@ -50,12 +57,12 @@ export interface CatRect {
   half: number;
 }
 
-/** подсказки-фразы (старый формат: чип = сказанная фраза); в игре вместо них — панель действий ACTION_BAR */
+/** подсказки-фразы (старый формат: чип = сказанная фраза) — только для сборок без onAction */
 export const CHIPS = ['Привет!', 'Сделай сальто', 'Загадай загадку', 'Танцуй', 'Повторяй за мной', 'Давай другого'];
 
 /**
- * Панель действий, как у говорящего Тома: иконка + короткая подпись, видно, что можно делать с котом.
- * id — Director.action(id). Порядок: сначала то, что вызывает эмоцию сразу (погладить, пощекотать, угостить).
+ * Быстрые действия (раньше — длинная панель из 10 кнопок; теперь на экране их нет: кот предлагает по два — suggest.ts,
+ * всё остальное — в каталоге «Что умеет кот»). Список держим: каждое из них обязано быть в каталоге (тест).
  */
 export const ACTION_BAR: { id: string; label: string; icon: string }[] = [
   { id: 'pet', label: 'Погладить', icon: 'hand' },
@@ -122,11 +129,11 @@ export class UI {
   private chips: HTMLDivElement;
   private mic: HTMLButtonElement;
   private micHint: HTMLDivElement;
-  private micMode!: HTMLButtonElement;
   private micSlot!: HTMLElement;
+  private micDownAt = 0;
   private micModeNow: 'auto' | 'ptt' = 'auto';
   private dock: HTMLDivElement;
-  private hintsBtn: HTMLButtonElement;
+  private pawBtn: HTMLButtonElement;
   private kids: HTMLButtonElement;
   private shakeBtn: HTMLButtonElement;
   private namebox: HTMLDivElement;
@@ -136,7 +143,11 @@ export class UI {
   private muted = false;
   private listening = false;
   private chipsByScenario = false;
-  private chipsByUser = false;
+  /** ключ текущих чипов (перерисовка — только при смене) */
+  private sugKey = '';
+  private sugCount = 0;
+  /** трекер умеет пересаживать кота (меню долгого нажатия и пункт каталога) */
+  canReanchor = false;
   private onPick: ((id: string) => void) | null = null;
   /** где кот на экране (ставит App); null — кота не видно */
   catRect: () => CatRect | null = () => null;
@@ -190,7 +201,7 @@ export class UI {
         </div>
       </div>
       <div class="scan hidden"><span>${ICON.paw}<em>Наведи камеру на карту</em></span></div>
-      <button class="iconbtn reanchor hidden" data-a="reanchor" type="button" aria-label="Пересадить кота">${ICON.repin}<span>Пересадить</span></button>
+      <div class="press-menu hidden" role="menu" aria-label="Кот"><button type="button" role="menuitem" data-a="press-reanchor">${ICON.repin}<span>Пересадить на другую карту</span></button></div>
       <div class="bubble" role="status" aria-live="polite"><span class="who"></span><span class="txt"></span></div>
       <div class="coach hidden" aria-hidden="true"><div class="coach-hand">${ICON.finger}</div><div class="coach-label">Погладь меня</div></div>
       <div class="stack">
@@ -214,17 +225,17 @@ export class UI {
           <button class="btn btn-text btn-block" type="button" data-a="kids-close">Потом</button>
         </div>
         <button class="btn btn-light shakebtn hidden" data-a="shake">Сдёрнуть наклейки</button>
-        <div class="chips actions hidden" role="toolbar" aria-label="Что можно делать с котом"></div>
+        <div class="chips suggest hidden" role="toolbar" aria-label="Кот предлагает"></div>
         <div class="catalog hidden" role="dialog" aria-label="Что умеет кот">
-          <div class="cat-top"><div class="cat-tabs" role="tablist"></div><span class="cat-count"></span><button class="cat-close" type="button" data-a="cat-close" aria-label="Закрыть">${CAT_ICON.close}</button></div>
+          <div class="cat-top"><div class="cat-tabs" role="tablist"></div></div>
           <div class="cat-row" role="list"></div>
         </div>
         <div class="mic-hint" aria-live="polite"></div>
       </div>
-      <div class="dock no-mic">
+      <div class="dock no-mic no-play">
         <button class="iconbtn side-l" data-a="mute" aria-label="Выключить звук">${ICON.sound}</button>
-        <div class="mic-slot">${EARS}<button class="mic-mode" type="button" aria-label="Режим микрофона"></button><button class="mic hidden" aria-label="Держи и говори">${ICON.mic}</button></div>
-        <button class="iconbtn side-r" data-a="hints" aria-label="Подсказки" aria-pressed="false">${ICON.hints}</button>
+        <div class="mic-slot">${EARS}<button class="mic hidden" aria-label="Скажи коту">${ICON.mic}</button></div>
+        <button class="pawbtn side-r" data-a="paw" type="button" aria-label="Что умеет кот" aria-haspopup="dialog" aria-expanded="false"><span class="paw-ico">${ICON.paw}</span><span class="paw-l">Что умею</span></button>
       </div>`;
     parent.appendChild(root);
     this.root = root;
@@ -234,46 +245,15 @@ export class UI {
     this.bubble = q('.bubble');
     this.chips = q('.chips');
     this.mic = q('.mic');
-    this.micMode = q('.mic-mode');
     this.micSlot = q('.mic-slot');
-    this.micMode.addEventListener('click', () => h.onMicMode(this.micModeNow === 'auto' ? 'ptt' : 'auto'));
     this.micHint = q('.mic-hint');
     this.dock = q('.dock');
-    this.hintsBtn = q('[data-a="hints"]');
+    this.pawBtn = q('[data-a="paw"]');
     this.kids = q('.kids');
     this.shakeBtn = q('.shakebtn');
     this.namebox = q('.namebox');
     this.choice = q('.choice-sheet');
 
-    // панель действий; без обработчика действий (старые сборки) — фразы-подсказки, как раньше
-    if (h.onAction)
-      for (const a of ACTION_BAR) {
-        const b = document.createElement('button');
-        b.className = 'act';
-        b.type = 'button';
-        b.dataset.act = a.id;
-        b.innerHTML = `<span class="act-ico">${(ICON as Record<string, string>)[a.icon] ?? ''}</span><span class="act-l"></span>`;
-        (b.querySelector('.act-l') as HTMLElement).textContent = a.label;
-        b.onclick = () => {
-          b.classList.remove('tapped');
-          void b.offsetWidth;
-          b.classList.add('tapped');
-          if (this.tried.mark(a.id)) this.syncMoreDot();
-          h.onAction!(a.id);
-        };
-        this.chips.appendChild(b);
-      }
-    if (h.onAction && h.catalog) {
-      // «Ещё» — последняя кнопка панели: каталог «Что умеет кот» (открывается вместо панели)
-      const b = document.createElement('button');
-      b.className = 'act act-more';
-      b.type = 'button';
-      b.dataset.act = 'more';
-      b.setAttribute('aria-haspopup', 'dialog');
-      b.innerHTML = `<span class="act-ico">${CAT_ICON.more}</span><span class="act-l">Ещё</span>`;
-      b.onclick = () => this.openCatalog();
-      this.chips.appendChild(b);
-    }
     if (!h.onAction)
       for (const t of CHIPS) {
         const b = document.createElement('button');
@@ -281,12 +261,20 @@ export class UI {
         b.textContent = t;
         b.onclick = () => h.onChip(t);
         this.chips.appendChild(b);
+        this.sugCount++;
       }
     root.addEventListener('click', (e) => {
       const btn = (e.target as HTMLElement).closest('[data-a]') as HTMLElement | null;
       const a = btn?.getAttribute('data-a');
       if (a === 'wake') h.onWake();
-      if (a === 'reanchor') h.onReanchor?.();
+      if (a === 'press-reanchor') {
+        this.hidePressMenu();
+        h.onReanchor?.();
+      }
+      if (a === 'paw') {
+        if (this.catalogOpen) this.closeCatalog();
+        else this.openCatalog();
+      }
       if (a === 'ob-next') this.obGo(this.obStep + 1);
       if (a === 'terms') this.start.querySelector('.terms')!.classList.remove('hidden');
       if (a === 'terms-close') this.start.querySelector('.terms')!.classList.add('hidden');
@@ -304,20 +292,16 @@ export class UI {
         btn!.setAttribute('aria-label', this.muted ? 'Включить звук' : 'Выключить звук');
         h.onMute(this.muted);
       }
-      if (a === 'hints') {
-        const on = !(this.chipsByScenario || this.chipsByUser);
-        this.chipsByUser = on;
-        if (!on) this.chipsByScenario = false;
-        this.syncChips();
-      }
     });
     q<HTMLFormElement>('.name-row').addEventListener('submit', (e) => {
       e.preventDefault();
       this.submitName();
     });
     // «держи и говори»
+    // «слушаю всегда»: нажал и отпустил — «я говорю» (слушаем фразу целиком); держишь — «держи и говори», как в режиме по кнопке
     const down = (e: Event) => {
       e.preventDefault();
+      this.micDownAt = performance.now();
       this.mic.classList.add('on');
       h.onMicDown();
     };
@@ -325,7 +309,8 @@ export class UI {
       e.preventDefault();
       if (!this.mic.classList.contains('on')) return;
       this.mic.classList.remove('on');
-      h.onMicUp();
+      if (this.micModeNow === 'auto' && h.onMicTap && performance.now() - this.micDownAt < 400) h.onMicTap();
+      else h.onMicUp();
     };
     this.mic.addEventListener('pointerdown', down);
     this.mic.addEventListener('pointerup', up);
@@ -395,7 +380,7 @@ export class UI {
     this.layoutBubble();
   }
 
-  /** обучалка первого знакомства: палец гладит кота + подпись «Погладь меня»; панель действий подсвечена */
+  /** обучалка первого знакомства: палец гладит кота + подпись «Погладь меня»; чипы кота подсвечены */
   coach(v: boolean) {
     const c = this.root.querySelector('.coach') as HTMLElement;
     this.chips.classList.toggle('attn', v);
@@ -423,9 +408,36 @@ export class UI {
     setTimeout(loop, 250);
   }
 
-  /** кнопка «Пересадить» видна, когда кот на карте */
+  /** трекер умеет пересаживать кота (кнопки на экране нет: долгое нажатие → меню, или «Ещё» в каталоге) */
   showReanchor(v: boolean) {
-    this.root.querySelector('.reanchor')?.classList.toggle('hidden', !v);
+    this.canReanchor = v;
+  }
+
+  // ───────────── меню долгого нажатия ─────────────
+  private pressTimer = 0;
+  get pressMenuEl() {
+    return this.root.querySelector('.press-menu') as HTMLDivElement;
+  }
+  /** долгое нажатие на кота / карту: маленькое меню из одного пункта «Пересадить на другую карту» у пальца */
+  pressMenu(x: number, y: number) {
+    if (!this.canReanchor) return false;
+    const m = this.pressMenuEl;
+    this.closeCatalog();
+    m.classList.remove('hidden');
+    const W = this.root.clientWidth, H = this.root.clientHeight;
+    const w = m.offsetWidth, h = m.offsetHeight;
+    // над пальцем (палец не закрывает пункт), не вылезая за края и не залезая в док
+    const left = Math.max(12, Math.min(W - w - 12, x - w / 2));
+    const top = Math.max(12, Math.min(H - h - 120, y - h - 28));
+    m.style.left = `${Math.round(left)}px`;
+    m.style.top = `${Math.round(top)}px`;
+    clearTimeout(this.pressTimer);
+    this.pressTimer = window.setTimeout(() => this.hidePressMenu(), 5000);
+    return true;
+  }
+  hidePressMenu() {
+    clearTimeout(this.pressTimer);
+    this.pressMenuEl.classList.add('hidden');
   }
 
   hideStart() {
@@ -453,7 +465,6 @@ export class UI {
   show(what: 'scan_hint' | 'name_prompt' | 'chips' | 'sberkids' | 'shake_button' | 'mic', v: boolean) {
     if (what === 'chips') {
       this.chipsByScenario = v;
-      if (!v) this.chipsByUser = false;
       this.syncChips();
       return;
     }
@@ -464,13 +475,77 @@ export class UI {
     if (what === 'name_prompt' && !v) this.root.classList.remove('kb');
     this.layoutBubble();
   }
+  /** игра идёт: видны лапка и чипы кота (если кот что-то предлагает и каталог закрыт) */
   private syncChips() {
-    const on = this.chipsByScenario || this.chipsByUser;
-    if (!on) this.closeCatalog();
-    this.chips.classList.toggle('hidden', !on || this.catalogOpen);
+    const on = this.chipsByScenario;
+    if (!on) {
+      this.closeCatalog();
+      this.hint(null);
+    }
+    this.chips.classList.toggle('hidden', !on || this.catalogOpen || !this.sugCount);
+    this.dock.classList.toggle('no-play', !on);
     if (on) this.syncMoreDot();
-    this.hintsBtn.classList.toggle('on', on);
-    this.hintsBtn.setAttribute('aria-pressed', String(on));
+  }
+
+  // ───────────── чипы-предложения кота ─────────────
+  /** до двух чипов от кота (scenario/suggest.ts); перерисовка — только когда набор сменился */
+  setSuggestions(chips: Chip[]) {
+    const key = chips.map((c) => `${c.id}:${c.label}`).join('|');
+    if (key === this.sugKey) return;
+    this.sugKey = key;
+    this.sugCount = chips.length;
+    const box = this.chips;
+    box.innerHTML = '';
+    for (const c of chips) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'sug';
+      b.dataset.chip = c.id;
+      if ('action' in c.run) b.dataset.act = c.run.action;
+      b.innerHTML = `<span class="sug-ico">${this.catIcon(c.icon) || this.catIcon('chat')}</span><span class="sug-l"></span>`;
+      (b.querySelector('.sug-l') as HTMLElement).textContent = c.label;
+      b.onclick = () => {
+        b.classList.remove('tapped');
+        void b.offsetWidth;
+        b.classList.add('tapped');
+        if ('action' in c.run && this.tried.mark(c.run.action)) this.syncMoreDot();
+        this.hint(null);
+        this.h.onSuggest?.(c);
+      };
+      box.appendChild(b);
+    }
+    // смена набора — чипы «подпрыгивают», чтобы ребёнок заметил новое предложение
+    box.classList.toggle('game', chips.some((c) => c.id.startsWith('game:')));
+    box.classList.remove('swap');
+    void box.offsetWidth;
+    box.classList.add('swap');
+    this.syncChips();
+  }
+  /** текущие чипы (для снимков и тестов) */
+  get suggestions() {
+    return [...this.chips.querySelectorAll<HTMLElement>('.sug')].map((b) => b.dataset.chip ?? '');
+  }
+
+  // ───────────── подсказка от кота в пузыре ─────────────
+  /** короткая подсказка («Погладь меня или скажи «танцуй»») в пузыре; null — убрать. Реплику кота не перебивает. */
+  hint(text: string | null, who = '', personaId = '') {
+    const b = this.bubble;
+    const mine = b.classList.contains('hint');
+    if (!text) {
+      if (mine) {
+        b.classList.remove('show', 'hint');
+      }
+      return;
+    }
+    if (this.catalogOpen) return;
+    if (b.classList.contains('show') && !mine) return; // кот говорит — его реплика важнее
+    if (mine && b.classList.contains('show') && (b.querySelector('.txt') as HTMLElement).textContent === text) return;
+    (b.querySelector('.who') as HTMLElement).textContent = who;
+    (b.querySelector('.txt') as HTMLElement).textContent = text;
+    clearTimeout(this.bubbleTimer);
+    b.className = `bubble show hint ${personaId}`;
+    this.layoutBubble();
+    this.followCat();
   }
 
   // ───────────── каталог «Что умеет кот» ─────────────
@@ -487,22 +562,24 @@ export class UI {
   private catIcon(id: string) {
     return CAT_ICON[id] ?? (ICON as Record<string, string>)[id] ?? '';
   }
-  /** точка на «Ещё», если в каталоге есть непробованное */
+  /** точка на лапке, если в каталоге есть непробованное */
   private syncMoreDot() {
-    const more = this.chips.querySelector('.act-more');
-    if (!more || !this.h.catalog) return;
+    if (!this.h.catalog) return;
     const c = this.h.catalog();
     const n = c ? this.tried.count(c.sections) : { tried: 0, total: 0 };
-    more.classList.toggle('new', n.tried < n.total);
+    this.pawBtn.classList.toggle('new', n.tried < n.total);
   }
   get isCatalogOpen() {
     return this.catalogOpen;
   }
-  /** каталог вместо панели действий: вкладки-разделы и один ряд иконок; кот и пузырь остаются видны */
+  /** каталог на месте чипов: крупные вкладки-разделы и один ряд иконок; кот и пузырь остаются видны. В конце — «Ещё» */
   openCatalog(tab?: SectionId) {
     const c = this.h.catalog?.();
     if (!c || !c.sections.length) return;
-    this.catSections = c.sections;
+    const more = moreSection({ reanchor: this.canReanchor && !!this.h.onReanchor, mic: this.mic.dataset.unsupported ? null : this.micModeNow });
+    this.catSections = more ? [...c.sections, more] : c.sections;
+    this.hidePressMenu();
+    this.hint(null);
     if (tab && c.sections.some((s) => s.id === tab)) this.catTab = tab;
     if (!c.sections.some((s) => s.id === this.catTab)) this.catTab = c.sections[0].id;
     const el = this.catalogEl;
@@ -510,6 +587,8 @@ export class UI {
     this.catalogOpen = true;
     this.root.classList.add('cat-open');
     this.chips.classList.add('hidden');
+    this.pawBtn.classList.add('on');
+    this.pawBtn.setAttribute('aria-expanded', 'true');
     el.classList.remove('hidden', 'compact', 'leaving');
     el.style.transform = '';
     this.catCompact = false;
@@ -531,9 +610,9 @@ export class UI {
     this.root.classList.remove('cat-open');
     this.catalogEl.classList.add('hidden');
     this.catalogEl.style.transform = '';
-    const on = this.chipsByScenario || this.chipsByUser;
-    this.chips.classList.toggle('hidden', !on);
-    this.syncMoreDot();
+    this.pawBtn.classList.remove('on');
+    this.pawBtn.setAttribute('aria-expanded', 'false');
+    this.syncChips();
   }
   private renderCatalog() {
     const el = this.catalogEl;
@@ -548,9 +627,11 @@ export class UI {
       t.setAttribute('role', 'tab');
       t.setAttribute('aria-selected', String(s.id === this.catTab));
       t.classList.toggle('on', s.id === this.catTab);
-      t.classList.toggle('new', s.items.some((i) => !this.tried.has(i.id)));
+      t.classList.toggle('new', s.id !== 'more' && s.items.some((i) => !this.tried.has(i.id)));
+      t.dataset.sec = s.id;
+      t.setAttribute('aria-label', s.title);
       t.innerHTML = `<span class="cat-tab-ico">${this.catIcon(s.icon)}</span><span class="cat-tab-l"></span>`;
-      (t.querySelector('.cat-tab-l') as HTMLElement).textContent = s.title;
+      (t.querySelector('.cat-tab-l') as HTMLElement).textContent = s.id === 'say' ? 'Скажи' : s.title;
       t.onclick = () => {
         this.catTab = s.id;
         this.renderCatalog();
@@ -578,7 +659,10 @@ export class UI {
       b.type = 'button';
       b.setAttribute('role', 'listitem');
       b.dataset.item = it.id;
-      if ('say' in it.run) {
+      if ('ui' in it.run) {
+        b.className = 'cat-phrase cat-ui';
+        b.innerHTML = `<span class="cat-phrase-ico">${this.catIcon(it.icon)}</span><span class="act-l"></span>`;
+      } else if ('say' in it.run) {
         b.className = 'cat-phrase';
         b.innerHTML = `<span class="cat-phrase-ico">${this.catIcon('chat')}</span><span class="act-l"></span>`;
       } else {
@@ -586,20 +670,15 @@ export class UI {
         b.innerHTML = `<span class="act-ico">${this.catIcon(it.icon)}</span><span class="act-l"></span>`;
       }
       (b.querySelector('.act-l') as HTMLElement).textContent = it.label;
-      b.classList.toggle('new', !this.tried.has(it.id));
+      b.classList.toggle('new', !('ui' in it.run) && !this.tried.has(it.id));
       b.onclick = () => this.pickCatalog(it);
       row.appendChild(b);
     }
-    const n = this.tried.count(this.catSections);
-    const cnt = el.querySelector('.cat-count') as HTMLElement;
-    cnt.textContent = `${n.tried} из ${n.total}`;
-    cnt.setAttribute('aria-label', `Открыто ${n.tried} из ${n.total}`);
-    cnt.title = `Открыто ${n.tried} из ${n.total}`;
   }
   /** выбор: лист закрывается сразу — ребёнок видит реакцию кота */
   private pickCatalog(it: CatalogItem) {
     if (this.catDragged) return;
-    this.tried.mark(it.id);
+    if (!('ui' in it.run)) this.tried.mark(it.id);
     this.closeCatalog();
     setTimeout(() => this.h.onCatalogPick?.(it), 60);
   }
@@ -667,8 +746,14 @@ export class UI {
     document.addEventListener('pointerdown', (e) => {
       if (!this.catalogOpen) return;
       const t = e.target as HTMLElement | null;
-      if (t?.closest?.('.catalog, .act-more, .dock')) return;
+      if (t?.closest?.('.catalog, .dock')) return;
       this.closeCatalog();
+    }, true);
+    // меню долгого нажатия: тап мимо — закрыть
+    document.addEventListener('pointerdown', (e) => {
+      const m = this.pressMenuEl;
+      if (m.classList.contains('hidden') || (e.target as HTMLElement | null)?.closest?.('.press-menu')) return;
+      this.hidePressMenu();
     }, true);
   }
 
@@ -706,6 +791,7 @@ export class UI {
   }
 
   say(text: string, who: string, personaId: string, ms = 0) {
+    this.hidePressMenu();
     (this.bubble.querySelector('.who') as HTMLElement).textContent = who;
     (this.bubble.querySelector('.txt') as HTMLElement).textContent = text;
     this.bubble.className = `bubble show ${personaId}`;
@@ -781,14 +867,14 @@ export class UI {
     st.setProperty('--tail-y', `${Math.max(20, Math.min(h2 - 20, cat.headY - y))}px`);
   }
 
-  /** режим микрофона: в «слушаю всегда» кнопка — для перебивания и как «держи и говори» */
+  /** режим микрофона (переключатель — в каталоге, раздел «Ещё»; ?mic=ptt): в «слушаю всегда» нажатие — «я говорю» */
   setMicMode(m: 'auto' | 'ptt') {
     this.micModeNow = m;
-    this.micMode.textContent = m === 'auto' ? 'Слушаю всегда' : 'По кнопке';
-    this.micMode.classList.toggle('auto', m === 'auto');
-    this.micMode.setAttribute('aria-pressed', String(m === 'auto'));
     this.mic.classList.toggle('auto', m === 'auto');
-    this.mic.setAttribute('aria-label', m === 'auto' ? 'Кот слушает. Можно нажать и говорить' : 'Держи и говори');
+    this.mic.setAttribute('aria-label', m === 'auto' ? 'Скажи коту: кот слушает, нажми и говори' : 'Скажи коту: держи и говори');
+  }
+  get micMode() {
+    return this.micModeNow;
   }
 
   micLevel(v: number) {
@@ -810,10 +896,10 @@ export class UI {
     this.micHint.textContent = t;
     this.micHint.classList.toggle('show', !!t);
     this.micHint.classList.toggle('warn', tone === 'warn');
-    if (tone === 'warn' && !this.hintsBtn.classList.contains('on')) {
-      this.hintsBtn.classList.remove('attn');
-      void this.hintsBtn.offsetWidth;
-      this.hintsBtn.classList.add('attn');
+    if (tone === 'warn' && !this.catalogOpen) {
+      this.pawBtn.classList.remove('attn');
+      void this.pawBtn.offsetWidth;
+      this.pawBtn.classList.add('attn');
     }
     this.hideHintSoon(tone === 'warn' ? 6000 : /100%$/.test(t) ? 900 : 3500);
   }

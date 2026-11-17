@@ -18,7 +18,9 @@ import { VoiceEngine } from './voice/engine';
 import { loadContent } from './persona/content';
 import { Input } from './input/input';
 import { UI, posterUrl } from './ui/ui';
-import { buildCatalog, catalogEnv, routeItem } from './ui/actionCatalog';
+import { buildCatalog, catalogEnv, routeItem, type CatalogItem } from './ui/actionCatalog';
+import { Suggester, VOICE_GATED, type Chip } from './scenario/suggest';
+import { turn } from './voice/turn';
 import { Director, type ActionId } from './director';
 import { NAMES, normalize } from './voice/intents';
 import { personaMeta } from './character/personaMeta';
@@ -158,13 +160,14 @@ export class App {
     const catEnv = catalogEnv(content.intents, content.dialogs.triggers);
     this.ui = new UI(this.root, {
       onWake: () => void this.wake(),
-      onMicDown: () => this.engine.pttDown(),
-      onMicUp: () => this.engine.pttUp(),
-      onReanchor: () => {
-        const t = this.tracker as unknown as { reanchor?: () => void };
-        t.reanchor?.();
-        this.ui.toast('Наведи камеру на карту и подержи телефон ровно — пересажу кота', 3000);
+      onMicDown: () => {
+        clearInterval(this.tapTimer);
+        this.engine.pttDown();
       },
+      onMicUp: () => this.engine.pttUp(),
+      onMicTap: () => this.tapListen(),
+      onSuggest: (c) => this.runChip(c),
+      onReanchor: () => this.reanchor(),
       onMicMode: (m) => {
         this.engine.setMode(m);
         if (m === 'auto') this.engine.resumeAuto();
@@ -182,14 +185,13 @@ export class App {
       },
       onAction: (id) => {
         this.input.activity();
+        this.suggest.note(id);
         this.director.action(id as ActionId);
       },
       // каталог «Что умеет кот»: только то, что работает у текущего характера; тап — как кнопка или как сказанная фраза
-      catalog: () => (this.director ? { who: this.director.persona.name, sections: buildCatalog(this.director.persona, catEnv) } : null),
-      onCatalogPick: (item) => {
-        this.input.activity();
-        routeItem(item, { action: (id) => this.director.action(id), say: (t) => this.engine.handleText(t, 'chip') });
-      },
+      // новые мини-игры — только когда их начало озвучено (иначе игра идёт молча: director.hasVoiced('rps_start'))
+      catalog: () => (this.director ? { who: this.director.persona.name, sections: this.voicedOnly(buildCatalog(this.director.persona, catEnv)) } : null),
+      onCatalogPick: (item) => this.runCatalogItem(item),
       onSkipName: () => this.director.dispatch({ type: 'skip_name' }),
       onShakeButton: () => this.input.simulateShake(),
       onKids: () => this.ui.showKids(true, ASSETS.sberKidsUrl),
@@ -210,6 +212,7 @@ export class App {
     }
     this.ui.setMicMode(this.engine.mode);
     if (typeof (this.tracker as unknown as { reanchor?: unknown }).reanchor === 'function') this.tracker.onFound(() => this.ui.showReanchor(true));
+    this.catEnv = catEnv;
 
     // пузырь реплик держится над котом / сбоку от головы, не закрывая морду
     this.ui.catRect = () => {
@@ -243,6 +246,8 @@ export class App {
       isChoiceSticker: (x, y) => !!this.fx.stickerAt(x, y)?.choice,
     });
     this.bindInput();
+    // чипы кота и подсказка в пузыре: 3 раза в секунду по состоянию режиссёра (scenario/suggest.ts)
+    setInterval(() => this.suggestTick(), 330);
     window.addEventListener('resize', () => this.resize());
     this.resize();
     this.renderer.setAnimationLoop(() => this.frame());
@@ -321,7 +326,7 @@ export class App {
       if (s.asrState === 'loading') this.ui.micHintText(`Загружаю распознавание… ${Math.round(s.modelProgress * 100)}%`);
       else if (s.asrState === 'listening') this.ui.micHintText(s.echo !== 'off' ? 'Говори — повторю!' : 'Слушаю…');
       else if (s.asrState === 'error')
-        this.ui.micHintText(s.micError === 'not-allowed' ? 'Нет доступа к микрофону — жми подсказки' : /no-model/.test(s.lastEvent) ? 'Офлайн-модель не найдена — жми подсказки' : 'Не расслышал, попробуй ещё', s.micError === 'not-allowed' || /no-model/.test(s.lastEvent) ? 'warn' : 'info');
+        this.ui.micHintText(s.micError === 'not-allowed' ? 'Нет доступа к микрофону — жми лапку' : /no-model/.test(s.lastEvent) ? 'Офлайн-модель не найдена — жми лапку' : 'Не расслышал, попробуй ещё', s.micError === 'not-allowed' || /no-model/.test(s.lastEvent) ? 'warn' : 'info');
       else if (s.echo === 'waiting') this.ui.micHintText('Говори — повторю!');
       if (s.asrState === 'idle' && !s.listening && s.echo === 'off') this.ui.micLevel(0);
     });
@@ -349,6 +354,98 @@ export class App {
       const v = this.director.persona.voice;
       return { echoPitchSemitones: v.echoPitchSemitones ?? 5, echoRate: v.echoRate ?? 1 };
     };
+  }
+
+  // ───────────── чипы кота, каталог, микрофон «я говорю» ─────────────
+  /** что кот предлагает (до двух чипов) и подсказка в пузыре */
+  readonly suggest = new Suggester((id) => this.ui?.tried.mark(id));
+  private catEnv: ReturnType<typeof catalogEnv> | null = null;
+  private availCache: { persona: string; map: Map<string, { label: string; icon: string }> } | null = null;
+  private available() {
+    const p = this.director.persona;
+    if (this.availCache?.persona !== p.id) {
+      const map = new Map<string, { label: string; icon: string }>();
+      if (this.catEnv) for (const s of buildCatalog(p, this.catEnv)) for (const it of s.items) if ('action' in it.run) map.set(it.id, { label: it.label, icon: it.icon });
+      this.availCache = { persona: p.id, map };
+    }
+    return this.availCache.map;
+  }
+  private voiced(ev: string) {
+    const d = this.director as unknown as { hasVoiced?: (e: string) => boolean };
+    return d.hasVoiced ? d.hasVoiced(ev) : true;
+  }
+  private voicedOnly(secs: ReturnType<typeof buildCatalog>) {
+    return secs
+      .map((s) => ({ ...s, items: s.items.filter((it) => !('action' in it.run) || !VOICE_GATED[it.run.action] || this.voiced(VOICE_GATED[it.run.action])) }))
+      .filter((s) => s.items.length);
+  }
+  private suggestTick() {
+    const d = this.director;
+    if (!d || !this.ui) return;
+    const st = d.state, now = performance.now();
+    const dlg = st.dialog;
+    const node = dlg ? d.cfg.dialogs.dialogs[dlg.id]?.nodes[dlg.node] : undefined;
+    // варианты ответа мини-игры (если режиссёр их знает: угадай эмоцию, камень-ножницы-бумага, повтори движение)
+    const gc = (d as unknown as { gameChoices?: () => { game: string; options: { id: string; label: string }[] } | null }).gameChoices?.() ?? null;
+    const r = this.suggest.update({
+      now, phase: st.phase, appeared: st.appeared, game: gc ? { id: gc.game, options: gc.options } : null,
+      dialog: dlg ? { id: dlg.id, node: dlg.node, listening: !!dlg.listening, expect: Object.keys(node?.on ?? {}) } : null,
+      paused: st.paused, dozing: d.dozing, speaking: d.queue.busy || this.voice.speaking,
+      quietMs: d.ladder.quietFor(now), visits: st.visits, available: this.available(), tried: (id) => this.ui.tried.has(id),
+      voiced: (ev) => this.voiced(ev),
+    });
+    this.ui.setSuggestions(r.chips);
+    if (r.hint && !this.ui.isCatalogOpen) this.ui.hint(r.hint, d.persona.name, d.persona.id);
+    else this.ui.hint(null);
+  }
+  /** чип кота: действие — как кнопка каталога, фраза — как сказанная голосом */
+  private runChip(c: Chip) {
+    this.input.activity();
+    if ('action' in c.run) {
+      this.suggest.note(c.run.action);
+      this.director.action(c.run.action);
+    } else this.engine.handleText(c.run.say, 'chip');
+  }
+  private runCatalogItem(item: CatalogItem) {
+    this.input.activity();
+    if ('action' in item.run) this.suggest.note(item.run.action);
+    routeItem(item, {
+      action: (id) => this.director.action(id),
+      say: (t) => this.engine.handleText(t, 'chip'),
+      ui: (id) => {
+        if (id === 'reanchor') this.reanchor();
+        else {
+          const m = this.engine.mode === 'auto' ? 'ptt' : 'auto';
+          this.engine.setMode(m);
+          if (m === 'auto') this.engine.resumeAuto();
+          this.ui.setMicMode(m);
+          this.ui.toast(m === 'auto' ? 'Кот слушает всё время — просто говори' : 'Держи микрофон и говори', 2200);
+        }
+      },
+    });
+  }
+  /**
+   * «Слушаю всегда» + короткое нажатие микрофона = «я говорю»: распознавание уже идёт (pttDown на нажатии, кот перебит),
+   * останавливаем его не на отпускании, а когда фраза кончилась (VAD), или через 6 с тишины.
+   */
+  private reanchor() {
+    const t = this.tracker as unknown as { reanchor?: () => void };
+    t.reanchor?.();
+    this.ui.toast('Наведи камеру на другую карту и подержи телефон ровно — пересажу кота', 3000);
+  }
+  private tapTimer = 0;
+  private tapListen() {
+    clearInterval(this.tapTimer);
+    const t0 = performance.now();
+    let spoke = false;
+    this.tapTimer = window.setInterval(() => {
+      const t = turn.get(), dt = performance.now() - t0;
+      if (t.userSpeaking) spoke = true;
+      if ((spoke && !t.userSpeaking) || (!spoke && dt > 6000) || dt > 15000) {
+        clearInterval(this.tapTimer);
+        this.engine.pttUp();
+      }
+    }, 120);
   }
 
   private async makeTracker(kind: TrackerKind): Promise<Tracker> {
@@ -556,8 +653,14 @@ export class App {
     const i = this.input, d = this.director;
     i.on('activity', () => this.energy.activity(performance.now()));
     i.on('tap_cat', (p) => this.touchCat(p.event, p));
-    i.on('poke_combo', (p) => this.touchCat('poke_combo', p));
-    i.on('poke_hard', (p) => this.touchCat('poke_hard', p));
+    i.on('poke_combo', (p) => {
+      this.suggest.upset(performance.now());
+      this.touchCat('poke_combo', p);
+    });
+    i.on('poke_hard', (p) => {
+      this.suggest.upset(performance.now());
+      this.touchCat('poke_hard', p);
+    });
     i.on('stroke', (p) => {
       this.purrT = 1.7; // первое «мрр» — звук реакции stroke
       this.touchCat('stroke', p);
@@ -580,9 +683,17 @@ export class App {
         this.character.reach?.({ dx: (p.x - h.x) / h.s, dy: (p.y - h.y) / h.s });
       }
     });
-    i.on('longpress', (p) => d.interaction('longpress', p));
+    // долгое нажатие на кота / карту: меню «Пересадить на другую карту» (эффект «к стеклу» — в каталоге, «Чудеса»);
+    // трекер не умеет пересаживать — как раньше, эффект на стекле
+    i.on('longpress', (p) => {
+      if (d.state.appeared && this.ui.pressMenu(p.x, p.y)) return;
+      d.interaction('longpress', p);
+    });
     i.on('swipe', (s) => d.interaction('swipe', { x: s.x, y: s.y, from: s.path[0], path: s.path }));
-    i.on('shake', () => d.interaction('shake'));
+    i.on('shake', () => {
+      if (d.state.phase !== 'switching') this.suggest.upset(performance.now());
+      d.interaction('shake');
+    });
     i.on('spam', () => d.interaction('spam'));
     i.on('silence', () => d.dispatch({ type: 'silence' }));
     i.on('activity', () => d.activity());

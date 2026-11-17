@@ -7,20 +7,21 @@ import type { Persona } from '../persona/types';
 import { ACTION_ROUTE, type ActionId } from '../scenario/actions';
 import { matchIntent } from '../voice/intents';
 
-export type SectionId = 'care' | 'tricks' | 'games' | 'emotions' | 'magic' | 'say';
+export type SectionId = 'care' | 'tricks' | 'games' | 'emotions' | 'magic' | 'say' | 'more';
 
 export interface CatalogItem {
   /** уникальный id (для точки «новое»): id действия или say:<интент> */
   id: string;
   label: string;
   icon: string;
-  run: { action: ActionId } | { say: string };
+  /** ui — пункт раздела «Ещё» (пересадить на другую карту, режим микрофона): не умение кота, в «открыто N из M» не считается */
+  run: { action: ActionId } | { say: string } | { ui: 'reanchor' | 'micmode' };
 }
 export interface CatalogSection { id: SectionId; title: string; icon: string; items: CatalogItem[] }
 
 interface ActionSpec { id: ActionId; label: string; icon: string; /** подпись и иконка по эффекту реакции характера */ byFx?: { event: string; map: Record<string, [string, string]> } }
 
-const ACT_SECTIONS: { id: Exclude<SectionId, 'say'>; title: string; icon: string; items: ActionSpec[] }[] = [
+const ACT_SECTIONS: { id: Exclude<SectionId, 'say' | 'more'>; title: string; icon: string; items: ActionSpec[] }[] = [
   {
     id: 'care', title: 'Забота', icon: 'heart', items: [
       { id: 'pet', label: 'Погладить', icon: 'hand' },
@@ -47,6 +48,10 @@ const ACT_SECTIONS: { id: Exclude<SectionId, 'say'>; title: string; icon: string
     id: 'games', title: 'Игры', icon: 'quest', items: [
       { id: 'riddle', label: 'Загадка', icon: 'quest' },
       { id: 'echo', label: 'Повторяй', icon: 'parrot' },
+      // мини-игры ночи 18.11 (content/dialogs.json): пока не озвучены — прячет app.ts (director.hasVoiced('<игра>_start'))
+      { id: 'rps', label: 'Камень-ножницы', icon: 'rps' },
+      { id: 'emo', label: 'Угадай рожицу', icon: 'wow' },
+      { id: 'simon', label: 'Делай как я', icon: 'jump' },
       { id: 'other', label: 'Другой кот', icon: 'swap' },
     ],
   },
@@ -152,9 +157,18 @@ export function catalogEnv(intents: { intent: string }[], triggers: Record<strin
 }
 
 /** тап по пункту → куда отправить: в режиссёр (действие) или в голосовой вход (фраза) */
-export function routeItem(item: CatalogItem, to: { action(id: ActionId): void; say(text: string): void }) {
+export function routeItem(item: CatalogItem, to: { action(id: ActionId): void; say(text: string): void; ui?(id: 'reanchor' | 'micmode'): void }) {
   if ('action' in item.run) to.action(item.run.action);
-  else to.say(item.run.say);
+  else if ('say' in item.run) to.say(item.run.say);
+  else to.ui?.(item.run.ui);
+}
+
+/** раздел «Ещё» в конце каталога: пересадить кота на другую карту, режим микрофона (спрятан с экрана) */
+export function moreSection(o: { reanchor: boolean; mic: 'auto' | 'ptt' | null }): CatalogSection | null {
+  const items: CatalogItem[] = [];
+  if (o.mic) items.push({ id: 'ui:micmode', label: o.mic === 'auto' ? 'Слушать по кнопке' : 'Слушать всегда', icon: 'mic', run: { ui: 'micmode' } });
+  if (o.reanchor) items.push({ id: 'ui:reanchor', label: 'Пересадить на другую карту', icon: 'repin', run: { ui: 'reanchor' } });
+  return items.length ? { id: 'more', title: 'Ещё', icon: 'gear', items } : null;
 }
 
 /** что ребёнок уже пробовал (точки «новое» и «открыто N из M»): localStorage, без него — только в памяти */
