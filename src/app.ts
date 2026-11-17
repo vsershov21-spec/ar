@@ -21,6 +21,11 @@ import { UI, posterUrl } from './ui/ui';
 import { Director } from './director';
 import { personaMeta } from './character/personaMeta';
 import { CardMonitor, LumaSampler, cardScreenFrac, type CardEvent } from './tracker/cardMonitor';
+import { perf, AdaptiveQuality, type QualityLevel } from './core/perf';
+import { prefetchModel, warmModel } from './core/modelUrl';
+import { loadMemory } from './scenario/memory';
+import { PERSONA_IDS } from './persona/types';
+import { setGlRenderer } from './core/glRenderer';
 
 export type CharacterMode = 'sprite' | 'rig' | 'glb';
 export type TrackerKind = 'card' | 'mindar' | 'debug' | '8thwall' | 'webxr';
@@ -90,6 +95,8 @@ export class App {
   private frames = 0;
   private fpsT = 0;
   onFrame: (dt: number) => void = () => {};
+  /** адаптивное качество (src/core/perf.ts): ?q=0..3 — зафиксировать уровень */
+  readonly quality = new AdaptiveQuality(new URLSearchParams(location.search).get('q'));
 
   constructor(root: HTMLElement, readonly params: AppParams) {
     this.root = root;
@@ -97,10 +104,22 @@ export class App {
     this.renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
     this.renderer.setClearColor(0x000000, 0);
     this.renderer.domElement.className = 'gl';
+    setGlRenderer(this.renderer);
   }
 
   async init() {
     const p = this.params;
+    // быстрый старт: модель выбранного характера, библиотека движений и код 3D-персонажа качаются сразу,
+    // параллельно с контентом и звуками (раньше — только после них)
+    if (p.character === 'glb' && !new URLSearchParams(location.search).get('glb')) {
+      const pid = loadMemory().persona ?? PERSONA_IDS[0];
+      const own = (ASSETS.glbByPersona as Record<string, string>)[pid];
+      // низкий приоритет: онбординг (контент, звуки) не ждёт модель, модель забирает оставшуюся полосу
+      if (own) prefetchModel(own, 'low');
+      prefetchModel(ASSETS.glbAnims, 'low');
+    }
+    this.quality.onChange = (lvl, i) => this.applyQuality(lvl, i);
+    document.addEventListener('visibilitychange', () => this.quality.pause());
     if (p.debug) {
       const bg = document.createElement('div');
       bg.className = 'debug-bg';
@@ -152,6 +171,7 @@ export class App {
         if (m) this.voice.cancel();
       },
     }, { micSupported: this.engine.asr.supported, posterUrl: posterUrl() });
+    perf.mark('ui');
     this.ui.setMicMode(this.engine.mode);
     if (typeof (this.tracker as unknown as { reanchor?: unknown }).reanchor === 'function') this.tracker.onFound(() => this.ui.showReanchor(true));
 
@@ -172,6 +192,7 @@ export class App {
       stopListen: () => this.engine.stopListen(),
     });
     await this.setCharacterMode(p.character);
+    perf.mark('char');
     this.wireFx();
     // озвучка: манифест текущего характера и первые реплики сценария — заранее
     this.voice.preloadEvents(this.director.persona.id, ['point_camera', 'intro', 'ask_name', 'nice_name', 'no_name']);
@@ -328,6 +349,57 @@ export class App {
     this.character?.dispose();
     this.character = ch;
     this.director.setCharacter(ch);
+    this.applyQuality(this.quality.current, this.quality.level);
+    this.quality.pause();
+    this.precompile();
+  }
+
+  /**
+   * Шейдеры кота — заранее, пока ребёнок на онбординге (KHR_parallel_shader_compile — без блокировки):
+   * иначе первый кадр с котом ждёт компиляции 0,1–0,5 с на телефоне. Кот на сцене ещё скрыт — показываем
+   * его только на время вызова (компиляция обходит видимые объекты).
+   */
+  private precompile() {
+    const root = this.stage.root;
+    if (root.visible) return;
+    root.visible = true;
+    try {
+      void this.renderer.compileAsync(this.scene, this.tracker.camera).catch(() => undefined);
+    } catch {
+      /* старый браузер — скомпилирует при первом кадре, как раньше */
+    } finally {
+      root.visible = false;
+    }
+  }
+
+  /** адаптивное качество: чёткость рендера, слои меха, частота трекера */
+  private applyQuality(lvl: QualityLevel, i: number) {
+    const pr = Math.min(Math.min(2, window.devicePixelRatio || 1), lvl.dprCap);
+    if (Math.abs(this.renderer.getPixelRatio() - pr) > 1e-3) {
+      this.renderer.setPixelRatio(pr);
+      if (this.tracker) this.resize();
+    }
+    if (this.character) void import('./character/furShell').then((m) => m.setFurQuality(this.character.object, lvl.fur));
+    const t = this.tracker as unknown as { maxHz?: number } | undefined;
+    if (t && 'maxHz' in t) t.maxHz = lvl.trackerHz;
+    if (i > 0 || this.loggedQ) {
+      this.loggedQ = true;
+      this.director?.log(`качество: уровень ${i} (pixelRatio ${pr.toFixed(2)}, мех ×${lvl.fur}, трекер ${lvl.trackerHz || '—'} Гц)`);
+    }
+  }
+  private loggedQ = false;
+
+  /** модели других характеров — в HTTP-кэш, когда кот уже на экране и сеть свободна (смена образа без ожидания) */
+  private warmed = false;
+  private warmOthers() {
+    if (this.warmed || this.charMode !== 'glb' || (navigator as any).connection?.saveData) return;
+    this.warmed = true;
+    const cur = this.director.persona.id;
+    const run = () => {
+      for (const [id, url] of Object.entries(ASSETS.glbByPersona as Record<string, string>)) if (id !== cur) warmModel(url);
+    };
+    const ric = (window as any).requestIdleCallback as ((cb: () => void, o?: { timeout: number }) => void) | undefined;
+    setTimeout(() => (ric ? ric(run, { timeout: 5000 }) : run()), 20000);
   }
 
   /** зона кота под пальцем (head, cheek, belly, paw, tail, body) или null — мимо кота */
@@ -423,7 +495,12 @@ export class App {
     try {
       const tv = this.tracker as unknown as { startVideo?: () => Promise<void> };
       if (typeof tv.startVideo === 'function') await tv.startVideo();
-      void sensors.then((ok) => this.director.log(`датчики: ${ok ? 'да' : 'нет'}`));
+      void sensors.then((ok) => {
+        this.director.log(`датчики: ${ok ? 'да' : 'нет'}`);
+        // без гироскопа кот, когда карты не видно, «едет» вместе с телефоном — скажем, как включить
+        if (!ok && (window as any).DeviceOrientationEvent?.requestPermission)
+          setTimeout(() => this.ui.toast('Чтобы кот стоял на месте, когда карта вне кадра, разреши «Движение и ориентация»: закрой вкладку, открой снова и нажми «Разрешить»', 7000), 6000);
+      });
       this.ui.hideStart();
       this.director.dispatch({ type: 'wake' });
       await this.tracker.start();
@@ -443,7 +520,11 @@ export class App {
   }
 
   private frame() {
-    const dt = Math.min(0.05, this.clock.getDelta());
+    perf.beginFrame();
+    perf.section('tracker');
+    const raw = this.clock.getDelta();
+    const dt = Math.min(0.05, raw);
+    this.quality.tick(raw);
     this.elapsed += dt;
     this.frames++;
     this.fpsT += dt;
@@ -461,19 +542,31 @@ export class App {
         this.lumaT = 0;
       }
     }
+    perf.section('input');
     this.input.tick();
     // мурчание-петля, пока гладят
     if (this.input.touch.isStroking && (this.purrT -= dt) <= 0) {
       this.purrT = 1.7;
       this.audio.play('purr', 0.8);
     }
+    perf.section('stage');
     this.stage.update(dt);
     this.syncPersona();
+    perf.section('director');
     this.director.update(dt);
+    perf.section('character');
     this.character.update(dt, this.tracker.camera);
+    perf.section('fx');
     this.fx.update(dt);
     this.fx.draw();
     this.onFrame(dt);
+    perf.section('render');
     this.renderer.render(this.scene, this.tracker.camera);
+    perf.endFrame();
+    perf.mark('loop');
+    if (this.stage.root.visible && !this.warmed) {
+      perf.mark('cat');
+      this.warmOthers();
+    }
   }
 }
