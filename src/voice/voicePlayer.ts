@@ -694,6 +694,13 @@ export class VoicePlayer {
       const delay = startAt - ctx.currentTime + p.offset;
       this.lip.playCues(delay ? p.cues.map((c) => ({ start: c.start + delay, end: c.end + delay, value: c.value })) : p.cues, () => ctx.currentTime);
       s.onended = () => {
+        // узлы реплики — из графа (иначе на iOS копятся подключёнными к выходу голоса)
+        try {
+          s.disconnect();
+          g.disconnect();
+        } catch {
+          /* ignore */
+        }
         if (gen === this.gen) {
           this.src = null;
           this.gain = null;

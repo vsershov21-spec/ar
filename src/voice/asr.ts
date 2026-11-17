@@ -3,7 +3,8 @@
  *  - VoskAsr (ПО УМОЛЧАНИЮ): vosk-browser (Kaldi в WebAssembly), маленькая русская модель — полностью офлайн,
  *    звук не покидает телефон. Словарь ограничен грамматикой (фразы intents.ru.json + имена) — точнее
  *    на детской речи и не «додумывает» лишнего. ?grammar=0 — свободный словарь (для отладки).
- *    Модель (~45 МБ) грузится лениво при первом нажатии микрофона, с прогрессом; кладётся в Cache Storage.
+ *    Модель (~45 МБ) грузится лениво (через 3 с после «Разбудить» или при первом нажатии), с прогрессом;
+ *    воркер vosk-browser хранит её распакованной в IndexedDB (повторно — без сети).
  *  - WebSpeechAsr (только ?asr=web): webkitSpeechRecognition. В Chrome звук уходит на серверы Google —
  *    на пилоте с детьми нельзя, поэтому только по флагу.
  * Звук для Vosk берётся из общего MicInput (тот же поток, что VAD/громкость/повтор) — уже 16 кГц и в шкале int16
@@ -125,45 +126,54 @@ export class WebSpeechAsr implements Asr {
 }
 
 export const VOSK_MODEL_URL = 'models/vosk-ru-small-0.22/model.tar.gz';
-const CACHE = 'ar-cat-vosk-v1';
+/** старый кэш (Cache Storage, 45 МБ копии архива) — больше не нужен: удаляем */
+const OLD_CACHE = 'ar-cat-vosk-v1';
+const READY_KEY = 'ar.vosk.ready';
 
-/** Скачать модель с прогрессом и положить в Cache Storage (повторно — из кэша, без сети) */
+/**
+ * Прогресс загрузки модели для подсказки «Загружаю распознавание… N%».
+ * Архив качает и распаковывает сам воркер Vosk (vosk-browser) и хранит распакованным в IndexedDB; этот запрос лишь
+ * прогревает HTTP-кэш (/models — immutable, воркер берёт оттуда же) и считает байты. Раньше архив ещё и копился
+ * в главном потоке (45 МБ кусков + 45 МБ Blob) и клался второй копией в Cache Storage, которую никто не читал.
+ * Модель уже разворачивалась на этом телефоне (метка в localStorage) — не качаем вовсе.
+ */
 export async function fetchModelWithProgress(url: string, onProgress: (p: number) => void): Promise<boolean> {
   const full = new URL(asset(url), location.href).href;
-  let cache: Cache | null = null;
+  void globalThis.caches?.delete(OLD_CACHE).catch(() => undefined);
   try {
-    cache = await caches.open(CACHE);
-    const hit = await cache.match(full);
-    if (hit) {
+    if (localStorage.getItem(READY_KEY) === full) {
       onProgress(1);
       return true;
     }
   } catch {
-    cache = null; // Cache Storage недоступен (http, приватный режим) — просто качаем
+    /* приватный режим */
   }
   const r = await fetch(full);
   if (!r.ok) throw new Error(`no-model ${r.status}`);
   const total = Number(r.headers.get('content-length') || 0) || 46_000_000;
   if (!r.body) {
-    const b = await r.blob();
-    await cache?.put(full, new Response(b, { headers: r.headers })).catch(() => undefined);
+    await r.arrayBuffer();
     onProgress(1);
     return true;
   }
   const reader = r.body.getReader();
-  const chunks: Uint8Array[] = [];
   let got = 0;
   for (;;) {
     const { done, value } = await reader.read();
     if (done) break;
-    chunks.push(value);
-    got += value.length;
+    got += value.length; // байты не держим
     onProgress(Math.min(0.99, got / total));
   }
-  const blob = new Blob(chunks as BlobPart[], { type: r.headers.get('content-type') ?? 'application/gzip' });
-  await cache?.put(full, new Response(blob, { headers: { 'content-type': blob.type, 'content-length': String(blob.size) } })).catch(() => undefined);
   onProgress(1);
   return true;
+}
+
+function markModelReady(url: string) {
+  try {
+    localStorage.setItem(READY_KEY, new URL(asset(url), location.href).href);
+  } catch {
+    /* ignore */
+  }
 }
 
 export class VoskAsr implements Asr {
@@ -208,6 +218,7 @@ export class VoskAsr implements Asr {
         // модель (сеть или Cache Storage) и сам движок (≈2.4 МБ gzip) — параллельно
         const [, vosk] = await Promise.all([fetchModelWithProgress(this.modelUrl, (p) => this.onProgress(p)), import('vosk-browser')]);
         this.model = await vosk.createModel(new URL(asset(this.modelUrl), location.href).href);
+        markModelReady(this.modelUrl);
         this.onState('idle');
         return true;
       } catch (e) {
