@@ -98,7 +98,7 @@ const STATES = {
   },
   async chips(page, vp) {
     await window_fast(page);
-    await page.evaluate(() => window.__app.ui.show('chips', true));
+    await page.evaluate(() => (window.__app.ui.show('chips', true), window.__app.ui.show('mic', true)));
     await say(page, 'Не расслышал. Нажми подсказку!');
     await shot(page, 'chips', vp);
   },
@@ -148,6 +148,44 @@ const STATES = {
     });
     await shot(page, 'no_camera', vp);
   },
+  /** каталог «Что умеет кот»: каждая вкладка, реакция после выбора действия и фразы */
+  async catalog(page, vp) {
+    await window_fast(page);
+    // карта дальше — кот ближе к центру экрана (как обычно держат телефон), панель с вкладками
+    await page.evaluate(() => (window.__app.tracker.distance = 5.2));
+    await wait(400);
+    await page.evaluate(() => (window.__app.ui.show('chips', true), window.__app.ui.show('mic', true)));
+    await wait(300);
+    await page.evaluate(() => document.querySelector('[data-act="more"]').click());
+    const tabs = await page.evaluate(() => [...document.querySelectorAll('.cat-tab')].map((t) => t.dataset.tab));
+    for (const t of tabs) {
+      await page.evaluate((id) => document.querySelector(`.cat-tab[data-tab="${id}"]`).click(), t);
+      await shot(page, `catalog_${t}`, vp);
+    }
+    // выбор: «Эмоции» → «Удиви»; панель закрывается, видна реакция
+    await page.evaluate(() => document.querySelector('.cat-tab[data-tab="emotions"]').click());
+    await page.evaluate(() => (window.__app.director.queue?.clear?.(), document.querySelector('.cat-row [data-item="surprise"]').click()));
+    await wait(1500);
+    await shot(page, 'catalog_picked', vp);
+    // фраза «Скажи мне» — как будто сказали голосом
+    await page.evaluate(() => document.querySelector('[data-act="more"]').click());
+    await page.evaluate(() => document.querySelector('.cat-tab[data-tab="say"]').click());
+    await page.evaluate(() => document.querySelector('.cat-row [data-item="say:sing"]')?.click());
+    await wait(1500);
+    await shot(page, 'catalog_said', vp);
+  },
+  /** кот низко на экране (в альбомной — у левого края): панель без вкладок */
+  async catalog_low(page, vp) {
+    await window_fast(page);
+    await page.evaluate(() => (window.__app.ui.show('chips', true), window.__app.ui.show('mic', true)));
+    await page.evaluate(() => {
+      const ui = window.__app.ui;
+      const w = ui.root.clientWidth, h = ui.root.clientHeight;
+      ui.catRect = () => (w > h ? { top: h * 0.25, bottom: h * 0.8, cx: w * 0.24, headY: h * 0.35, half: 70 } : { top: h * 0.5, bottom: h * 0.82, cx: w / 2, headY: h * 0.58, half: 70 });
+      document.querySelector('[data-act="more"]').click();
+    });
+    await shot(page, 'catalog_low', vp);
+  },
   async debug(page, vp) {
     await window_fast(page);
     await page.evaluate(() => window.__debugPanel.open(true));
@@ -171,7 +209,7 @@ for (const vp of VPS.filter((v) => !process.env.UI_VP || process.env.UI_VP.split
   for (const [name, fn] of Object.entries(STATES)) {
     if (onlyStates.length && !onlyStates.includes(name)) continue;
     // landscape — один проход по основным экранам
-    if (vp.name.startsWith('land') && !['start', 'ask_name', 'choose', 'play', 'chips', 'outro', 'no_camera'].includes(name)) continue;
+    if (vp.name.startsWith('land') && !['start', 'ask_name', 'choose', 'play', 'chips', 'outro', 'no_camera', 'catalog', 'catalog_low'].includes(name)) continue;
     const page = await open(vp);
     try {
       await fn(page, vp);

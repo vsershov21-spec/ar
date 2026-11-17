@@ -18,6 +18,7 @@ import { VoiceEngine } from './voice/engine';
 import { loadContent } from './persona/content';
 import { Input } from './input/input';
 import { UI, posterUrl } from './ui/ui';
+import { buildCatalog, catalogEnv, routeItem } from './ui/actionCatalog';
 import { Director, type ActionId } from './director';
 import { NAMES, normalize } from './voice/intents';
 import { personaMeta } from './character/personaMeta';
@@ -154,6 +155,7 @@ export class App {
     sfx.catch(() => undefined);
     const [content] = await Promise.all([loadContent(), this.voice.load(ASSETS.voice)]);
 
+    const catEnv = catalogEnv(content.intents, content.dialogs.triggers);
     this.ui = new UI(this.root, {
       onWake: () => void this.wake(),
       onMicDown: () => this.engine.pttDown(),
@@ -181,6 +183,12 @@ export class App {
       onAction: (id) => {
         this.input.activity();
         this.director.action(id as ActionId);
+      },
+      // каталог «Что умеет кот»: только то, что работает у текущего характера; тап — как кнопка или как сказанная фраза
+      catalog: () => (this.director ? { who: this.director.persona.name, sections: buildCatalog(this.director.persona, catEnv) } : null),
+      onCatalogPick: (item) => {
+        this.input.activity();
+        routeItem(item, { action: (id) => this.director.action(id), say: (t) => this.engine.handleText(t, 'chip') });
       },
       onSkipName: () => this.director.dispatch({ type: 'skip_name' }),
       onShakeButton: () => this.input.simulateShake(),

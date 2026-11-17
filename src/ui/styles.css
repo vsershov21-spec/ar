@@ -571,3 +571,78 @@ body > .toast { position: fixed; }
 @media (orientation: landscape) and (max-height: 520px) { .act { width: 56px; } .act-ico { width: 46px; height: 46px; } .act-ico svg { width: 24px; height: 24px; } }
 .stack:has(.kids-sheet:not(.hidden)) .kids, .stack:has(.kids-sheet:not(.hidden)) .chips { display: none; }
 @media (max-height: 700px) and (orientation: portrait) { .act { width: 56px; font-size: 11px; } .act-ico { width: 46px; height: 46px; } .act-ico svg { width: 24px; height: 24px; } }
+
+/* ═════════════════════ каталог «Что умеет кот» ═════════════════════
+   Открывается кнопкой «Ещё» в конце панели действий и на время заменяет её: компактная белая панель над доком —
+   вкладки-разделы и ОДИН ряд «конфет» с прокруткой. Фон не затемняется, кот и пузырь видны. Кот низко — без вкладок
+   (.compact). В альбомной — узкая колонка у левого края. Точка — ещё не пробовали. */
+.act-ico { position: relative; }
+.act.new .act-ico::after, .cat-phrase.new::after, .cat-tab.new::after { content: ''; position: absolute; top: 1px; right: 1px; z-index: 1; width: 11px; height: 11px; border-radius: 50%;
+  background: #ff5a4e; box-shadow: 0 0 0 2px #fff; }
+.act-more .act-ico { color: var(--teal); }
+.ui.cat-open:not(.kb) .stack { bottom: var(--dock-h); }
+.ui.cat-open .mic-mode { visibility: hidden; }
+.catalog { position: relative; width: min(100%, 460px); padding: 6px 6px 4px; border-radius: 26px; background: rgba(255, 255, 255, .95); color: var(--ink);
+  box-shadow: 0 5px 0 rgba(0,0,0,.08), var(--sh-2); animation: rise var(--t-med) var(--ease); touch-action: none; transition: transform .18s var(--ease); }
+.cat-top { display: flex; align-items: center; gap: 6px; }
+.cat-tabs { flex: 1; min-width: 0; display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; touch-action: pan-x; padding: 2px 2px 3px; }
+.cat-tabs::-webkit-scrollbar, .cat-row::-webkit-scrollbar { display: none; }
+.cat-tab { appearance: none; position: relative; flex: none; display: inline-flex; align-items: center; gap: 5px; height: 32px; padding: 0 12px 0 8px; border: 0; border-radius: var(--r-pill);
+  background: #eef5f1; color: var(--green-text); font: 800 13px/1 var(--font); cursor: pointer; transition: background-color var(--t-fast), color var(--t-fast); }
+.cat-tab-ico { display: grid; place-items: center; }
+.cat-tab svg { width: 18px; height: 18px; }
+.cat-tab.on { background: linear-gradient(180deg, #34c252, #21a038); color: #fff; box-shadow: inset 0 1px 0 rgba(255,255,255,.3), 0 3px 0 #13742a; }
+.cat-tab.new::after { top: -1px; right: -1px; width: 9px; height: 9px; }
+.cat-phrase.new::after { top: -3px; right: 2px; }
+.cat-count { flex: none; font: 800 12px/1 var(--font); color: var(--ink-2); padding: 0 2px; white-space: nowrap; }
+.cat-close { appearance: none; flex: none; width: 32px; height: 32px; border-radius: 50%; border: 0; display: grid; place-items: center; background: #eef5f1; color: var(--ink-2); cursor: pointer; }
+.cat-close svg { width: 15px; height: 15px; }
+.cat-row { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; touch-action: pan-x; padding: 8px 4px 2px; scroll-snap-type: x proximity; }
+.cat-item { width: 64px; color: var(--ink); text-shadow: none; }
+.cat-item .act-l { max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cat-item .act-ico { width: 50px; height: 50px; }
+.cat-item .act-ico svg { width: 26px; height: 26px; }
+.cat-row [data-sec="care"] .act-ico, .cat-sep[data-sec="care"] { color: #e0783c; }
+.cat-row [data-sec="tricks"] .act-ico, .cat-sep[data-sec="tricks"] { color: var(--green); }
+.cat-row [data-sec="games"] .act-ico, .cat-sep[data-sec="games"] { color: #3f7fc4; }
+.cat-row [data-sec="emotions"] .act-ico, .cat-sep[data-sec="emotions"] { color: #9a7be8; }
+.cat-row [data-sec="magic"] .act-ico, .cat-sep[data-sec="magic"] { color: #e09a10; }
+.cat-phrase { appearance: none; position: relative; flex: none; display: inline-flex; align-items: center; gap: 7px; height: 46px; margin: 6px 0 12px; padding: 0 16px 0 10px;
+  border: 0; border-radius: var(--r-pill); background: linear-gradient(180deg, #fff, #f0f6f2); color: var(--ink); font: 800 15px/1.15 var(--font); white-space: nowrap;
+  box-shadow: inset 0 0 0 1.5px #dfe9e3, 0 4px 0 #c5d6cc; scroll-snap-align: start; cursor: pointer; }
+.cat-phrase:active { transform: translateY(3px); box-shadow: inset 0 0 0 1.5px #dfe9e3, 0 1px 0 #c5d6cc; }
+.cat-phrase-ico { display: grid; place-items: center; color: var(--teal); }
+.cat-phrase-ico svg { width: 22px; height: 22px; }
+.catalog.compact .cat-top { display: none; }
+.cat-sep { flex: none; scroll-snap-align: start; align-self: center; display: grid; place-items: center; width: 26px; height: 26px; margin: 0 -2px 18px 4px; border-radius: 50%; background: #eef5f1; color: var(--teal); }
+.cat-sep:first-child { margin-left: 0; }
+.cat-sep svg { width: 15px; height: 15px; }
+.cat-sep[data-sec="say"] { color: var(--teal); }
+.catalog.compact .cat-phrase { align-self: flex-start; margin-top: 8px; }
+.catalog.compact .cat-row { padding-top: 4px; }
+@media (max-height: 700px) and (orientation: portrait) {
+  .cat-tab { height: 28px; font-size: 12px; padding: 0 10px 0 7px; }
+  .cat-close { width: 28px; height: 28px; }
+  .cat-item { width: 58px; }
+  .cat-item .act-ico { width: 44px; height: 44px; }
+  .cat-item .act-ico svg { width: 23px; height: 23px; }
+  .cat-row { padding-top: 6px; }
+  .cat-phrase { height: 40px; font-size: 14px; margin: 4px 0 8px; }
+}
+@media (orientation: landscape) and (max-height: 520px) {
+  .catalog { position: fixed; left: var(--edge); top: calc(var(--safe-t) + 60px); bottom: calc(var(--s-3) + var(--safe-b)); width: auto; display: flex; gap: 4px; padding: 6px; border-radius: 24px; }
+  .cat-top { flex-direction: column; align-items: center; width: 62px; gap: 4px; }
+  .cat-close { order: -1; }
+  .cat-count { font-size: 11px; }
+  .cat-tabs { flex-direction: column; overflow-x: hidden; overflow-y: auto; touch-action: pan-y; padding: 2px; width: 100%; }
+  .cat-tab { flex-direction: column; height: auto; padding: 5px 2px 4px; gap: 2px; border-radius: 14px; font-size: 10px; }
+  .cat-tab svg { width: 18px; height: 18px; }
+  .cat-row { flex-direction: column; align-items: center; overflow-x: hidden; overflow-y: auto; touch-action: pan-y; width: 72px; padding: 2px 2px 4px; scroll-snap-type: y proximity; }
+  .cat-row .cat-item { width: 62px; }
+  .cat-row .cat-item .act-ico { width: 44px; height: 44px; }
+  .cat-row .cat-item { font-size: 10.5px; }
+  .cat-row[data-sec="say"] { width: 168px; align-items: stretch; }
+  .catalog.compact .cat-row .cat-phrase { width: 66px; flex-direction: column; gap: 2px; padding: 6px 4px; border-radius: 16px; font-size: 11px; text-align: center; margin: 2px 0 6px; }
+  .cat-sep { align-self: center; margin: 4px 0; }
+  .cat-phrase { height: auto; min-height: 44px; white-space: normal; margin: 0 0 6px; padding: 6px 12px 6px 8px; font-size: 13px; text-align: left; }
+}

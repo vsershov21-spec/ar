@@ -4,6 +4,8 @@
  * Стили и дизайн-токены — styles.css; правила — docs/UI_AUDIT.md.
  */
 import { asset } from '../core/util';
+import { TriedStore, type CatalogItem, type CatalogSection, type SectionId } from './actionCatalog';
+import { CAT_ICON } from './catalogIcons';
 
 export interface UiHandlers {
   onWake(): void;
@@ -21,6 +23,10 @@ export interface UiHandlers {
   onReanchor?(): void;
   /** кнопка панели действий (погладить, угостить, танец…) */
   onAction?(id: string): void;
+  /** каталог «Что умеет кот»: разделы для текущего характера (только работающие действия) */
+  catalog?(): { who: string; sections: CatalogSection[] } | null;
+  /** выбор в каталоге (лист уже закрыт — ребёнок видит реакцию) */
+  onCatalogPick?(item: CatalogItem): void;
 }
 
 /** вариант в листе выбора характера */
@@ -197,6 +203,10 @@ export class UI {
         </div>
         <button class="btn btn-light shakebtn hidden" data-a="shake">Сдёрнуть наклейки</button>
         <div class="chips actions hidden" role="toolbar" aria-label="Что можно делать с котом"></div>
+        <div class="catalog hidden" role="dialog" aria-label="Что умеет кот">
+          <div class="cat-top"><div class="cat-tabs" role="tablist"></div><span class="cat-count"></span><button class="cat-close" type="button" data-a="cat-close" aria-label="Закрыть">${CAT_ICON.close}</button></div>
+          <div class="cat-row" role="list"></div>
+        </div>
         <div class="mic-hint" aria-live="polite"></div>
       </div>
       <div class="dock no-mic">
@@ -235,11 +245,23 @@ export class UI {
           b.classList.remove('tapped');
           void b.offsetWidth;
           b.classList.add('tapped');
+          if (this.tried.mark(a.id)) this.syncMoreDot();
           h.onAction!(a.id);
         };
         this.chips.appendChild(b);
       }
-    else
+    if (h.onAction && h.catalog) {
+      // «Ещё» — последняя кнопка панели: каталог «Что умеет кот» (открывается вместо панели)
+      const b = document.createElement('button');
+      b.className = 'act act-more';
+      b.type = 'button';
+      b.dataset.act = 'more';
+      b.setAttribute('aria-haspopup', 'dialog');
+      b.innerHTML = `<span class="act-ico">${CAT_ICON.more}</span><span class="act-l">Ещё</span>`;
+      b.onclick = () => this.openCatalog();
+      this.chips.appendChild(b);
+    }
+    if (!h.onAction)
       for (const t of CHIPS) {
         const b = document.createElement('button');
         b.className = 'chip';
@@ -260,6 +282,7 @@ export class UI {
       if (a === 'kids-go') setTimeout(() => this.showKids(false), 300);
       if (a === 'shake') h.onShakeButton();
       if (a === 'skip') h.onSkipName();
+      if (a === 'cat-close') this.closeCatalog();
       if (a === 'reload') location.reload();
       if (a === 'mute') {
         this.muted = !this.muted;
@@ -299,6 +322,7 @@ export class UI {
     if (!opts.micSupported) this.mic.dataset.unsupported = '1';
     this.watchKeyboard();
     this.obSwipe();
+    this.catalogGestures();
   }
 
   /** клавиатура: лист имени поднимается к ней (iOS не сжимает layout viewport) */
@@ -429,9 +453,210 @@ export class UI {
   }
   private syncChips() {
     const on = this.chipsByScenario || this.chipsByUser;
-    this.chips.classList.toggle('hidden', !on);
+    if (!on) this.closeCatalog();
+    this.chips.classList.toggle('hidden', !on || this.catalogOpen);
+    if (on) this.syncMoreDot();
     this.hintsBtn.classList.toggle('on', on);
     this.hintsBtn.setAttribute('aria-pressed', String(on));
+  }
+
+  // ───────────── каталог «Что умеет кот» ─────────────
+  /** что ребёнок уже пробовал: точки «новое» и «открыто N из M» */
+  readonly tried = new TriedStore();
+  private catalogOpen = false;
+  private catTab: SectionId = 'care';
+  private catSections: CatalogSection[] = [];
+  private catCompact = false;
+  private catFullH = 0;
+  private get catalogEl() {
+    return this.root.querySelector('.catalog') as HTMLDivElement;
+  }
+  private catIcon(id: string) {
+    return CAT_ICON[id] ?? (ICON as Record<string, string>)[id] ?? '';
+  }
+  /** точка на «Ещё», если в каталоге есть непробованное */
+  private syncMoreDot() {
+    const more = this.chips.querySelector('.act-more');
+    if (!more || !this.h.catalog) return;
+    const c = this.h.catalog();
+    const n = c ? this.tried.count(c.sections) : { tried: 0, total: 0 };
+    more.classList.toggle('new', n.tried < n.total);
+  }
+  get isCatalogOpen() {
+    return this.catalogOpen;
+  }
+  /** каталог вместо панели действий: вкладки-разделы и один ряд иконок; кот и пузырь остаются видны */
+  openCatalog(tab?: SectionId) {
+    const c = this.h.catalog?.();
+    if (!c || !c.sections.length) return;
+    this.catSections = c.sections;
+    if (tab && c.sections.some((s) => s.id === tab)) this.catTab = tab;
+    if (!c.sections.some((s) => s.id === this.catTab)) this.catTab = c.sections[0].id;
+    const el = this.catalogEl;
+    el.setAttribute('aria-label', `Что умеет ${c.who}`);
+    this.catalogOpen = true;
+    this.root.classList.add('cat-open');
+    this.chips.classList.add('hidden');
+    el.classList.remove('hidden', 'compact', 'leaving');
+    el.style.transform = '';
+    this.catCompact = false;
+    this.root.querySelector('.coach')?.classList.add('hidden');
+    this.renderCatalog();
+    this.catFullH = el.offsetHeight;
+    this.fitCatalog();
+    const loop = () => {
+      if (!this.catalogOpen) return;
+      this.fitCatalog();
+      setTimeout(loop, 300);
+    };
+    setTimeout(loop, 300);
+    this.layoutBubble();
+  }
+  closeCatalog() {
+    if (!this.catalogOpen) return;
+    this.catalogOpen = false;
+    this.root.classList.remove('cat-open');
+    this.catalogEl.classList.add('hidden');
+    this.catalogEl.style.transform = '';
+    const on = this.chipsByScenario || this.chipsByUser;
+    this.chips.classList.toggle('hidden', !on);
+    this.syncMoreDot();
+  }
+  private renderCatalog() {
+    const el = this.catalogEl;
+    const tabs = el.querySelector('.cat-tabs') as HTMLDivElement;
+    const row = el.querySelector('.cat-row') as HTMLDivElement;
+    tabs.innerHTML = '';
+    for (const s of this.catSections) {
+      const t = document.createElement('button');
+      t.type = 'button';
+      t.className = 'cat-tab';
+      t.dataset.tab = s.id;
+      t.setAttribute('role', 'tab');
+      t.setAttribute('aria-selected', String(s.id === this.catTab));
+      t.classList.toggle('on', s.id === this.catTab);
+      t.classList.toggle('new', s.items.some((i) => !this.tried.has(i.id)));
+      t.innerHTML = `<span class="cat-tab-ico">${this.catIcon(s.icon)}</span><span class="cat-tab-l"></span>`;
+      (t.querySelector('.cat-tab-l') as HTMLElement).textContent = s.title;
+      t.onclick = () => {
+        this.catTab = s.id;
+        this.renderCatalog();
+        (el.querySelector('.cat-row') as HTMLElement).scrollTo?.({ left: 0, top: 0 });
+      };
+      tabs.appendChild(t);
+    }
+    const sec = this.catSections.find((s) => s.id === this.catTab)!;
+    row.innerHTML = '';
+    row.dataset.sec = this.catCompact ? 'all' : sec.id;
+    // поджатая панель (кот низко): без вкладок — все разделы одним рядом, с текущего, между разделами — значок раздела
+    const secs = this.catCompact ? [sec, ...this.catSections.filter((s) => s !== sec)] : [sec];
+    for (const it of secs.flatMap((s) => s.items.map((it, k) => ({ ...it, sec: s, first: k === 0 })))) {
+      if (this.catCompact && it.first) {
+        const sep = document.createElement('span');
+        sep.className = 'cat-sep';
+        sep.dataset.sec = it.sec.id;
+        sep.title = it.sec.title;
+        sep.setAttribute('aria-label', it.sec.title);
+        sep.innerHTML = this.catIcon(it.sec.icon);
+        row.appendChild(sep);
+      }
+      const b = document.createElement('button');
+      b.dataset.sec = it.sec.id;
+      b.type = 'button';
+      b.setAttribute('role', 'listitem');
+      b.dataset.item = it.id;
+      if ('say' in it.run) {
+        b.className = 'cat-phrase';
+        b.innerHTML = `<span class="cat-phrase-ico">${this.catIcon('chat')}</span><span class="act-l"></span>`;
+      } else {
+        b.className = 'act cat-item';
+        b.innerHTML = `<span class="act-ico">${this.catIcon(it.icon)}</span><span class="act-l"></span>`;
+      }
+      (b.querySelector('.act-l') as HTMLElement).textContent = it.label;
+      b.classList.toggle('new', !this.tried.has(it.id));
+      b.onclick = () => this.pickCatalog(it);
+      row.appendChild(b);
+    }
+    const n = this.tried.count(this.catSections);
+    const cnt = el.querySelector('.cat-count') as HTMLElement;
+    cnt.textContent = `${n.tried} из ${n.total}`;
+    cnt.setAttribute('aria-label', `Открыто ${n.tried} из ${n.total}`);
+    cnt.title = `Открыто ${n.tried} из ${n.total}`;
+  }
+  /** выбор: лист закрывается сразу — ребёнок видит реакцию кота */
+  private pickCatalog(it: CatalogItem) {
+    if (this.catDragged) return;
+    this.tried.mark(it.id);
+    this.closeCatalog();
+    setTimeout(() => this.h.onCatalogPick?.(it), 60);
+  }
+  /** кот низко на экране (или у края в альбомной) — панель поджимается до одного ряда без вкладок */
+  private fitCatalog() {
+    if (!this.catalogOpen) return;
+    const el = this.catalogEl;
+    const r = this.catRect();
+    const box = el.getBoundingClientRect(), rootBox = this.root.getBoundingClientRect();
+    const land = this.root.clientWidth > this.root.clientHeight && this.root.clientHeight <= 520;
+    let overlap = false;
+    if (r) {
+      if (land) {
+        // колонка у левого края: полная ширина (с вкладками) против левого края кота
+        const full = this.catCompact ? box.width + 64 : box.width;
+        overlap = r.cx - r.half < box.left - rootBox.left + full + 6 && r.bottom > box.top - rootBox.top && r.top < box.bottom - rootBox.top;
+      } else {
+        const top = box.bottom - rootBox.top - (this.catFullH || box.height);
+        overlap = r.bottom > top - 4 && r.top < box.bottom - rootBox.top;
+      }
+    }
+    if (overlap !== this.catCompact) {
+      this.catCompact = overlap;
+      el.classList.toggle('compact', overlap);
+      this.renderCatalog();
+    }
+  }
+  /** свайп вниз (в альбомной — к краю) закрывает; тап вне панели — тоже */
+  private catDragged = false;
+  private catalogGestures() {
+    const el = this.catalogEl;
+    let x0 = 0, y0 = 0, on = false;
+    const land = () => this.root.clientWidth > this.root.clientHeight && this.root.clientHeight <= 520;
+    el.addEventListener('pointerdown', (e) => {
+      x0 = e.clientX;
+      y0 = e.clientY;
+      on = true;
+      this.catDragged = false;
+    });
+    el.addEventListener('pointermove', (e) => {
+      if (!on) return;
+      const dx = e.clientX - x0, dy = e.clientY - y0;
+      if (!land() && dy > 8 && dy > Math.abs(dx) * 1.2) {
+        this.catDragged = true;
+        el.style.transform = `translateY(${dy}px)`;
+      } else if (land() && dx < -8 && -dx > Math.abs(dy) * 1.2) {
+        this.catDragged = true;
+        el.style.transform = `translateX(${dx}px)`;
+      }
+    });
+    const end = (e: PointerEvent) => {
+      if (!on) return;
+      on = false;
+      const dx = e.clientX - x0, dy = e.clientY - y0;
+      el.style.transform = '';
+      if (this.catDragged && ((!land() && dy > 50) || (land() && dx < -50))) this.closeCatalog();
+      // клик после перетаскивания не выбирает действие
+      setTimeout(() => (this.catDragged = false), 0);
+    };
+    el.addEventListener('pointerup', end);
+    el.addEventListener('pointercancel', () => {
+      on = false;
+      el.style.transform = '';
+    });
+    document.addEventListener('pointerdown', (e) => {
+      if (!this.catalogOpen) return;
+      const t = e.target as HTMLElement | null;
+      if (t?.closest?.('.catalog, .act-more, .dock')) return;
+      this.closeCatalog();
+    }, true);
   }
 
   /** лист «Каким мне быть?»; onPick — выбор пальцем (голосом выбирают в обход листа) */

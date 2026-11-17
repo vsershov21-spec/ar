@@ -30,6 +30,7 @@ import type { Tracker } from './tracker/types';
 import { ASSETS } from './config';
 import { rand } from './core/util';
 import { emotionFor } from './character/emotions';
+import { ACTION_ROUTE, SLEEP_WAKE_MS, isActionId, type ActionId } from './scenario/actions';
 
 export type DirectorEvents = { log: string; phase: string; persona: PersonaId };
 
@@ -55,6 +56,8 @@ export interface DirectorDeps {
 const EXTRA_EMOTION: Record<string, [string, number, number]> = {
   meet_card: ['surprised', 1, 1500], meet_congrats: ['happy', 1, 1800], meet_self: ['happy', 0.9, 1500], meet_skills: ['happy', 0.8, 1500],
   treat: ['happy', 1, 2200], welcome_back: ['happy', 1, 1600], help: ['happy', 0.7, 1200],
+  // каталог «Что умеет кот»: удивить (хлоп), подразнить, засмущать
+  clap: ['surprised', 1, 1300], compliment: ['shy', 1, 2600],
 };
 
 /**
@@ -65,9 +68,8 @@ const COVER_FX = new Set(['snow_globe', 'steam', 'steam_draw', 'steam_heart', 'k
 const COVER_GAP_MS = 10_000;
 const USER_ACT_MS = 2500;
 
-/** панель действий (как у говорящего Тома): кнопка → событие режиссёра */
-export const ACTIONS = ['pet', 'tickle', 'treat', 'dance', 'flip', 'trick', 'riddle', 'sticker', 'echo', 'other'] as const;
-export type ActionId = (typeof ACTIONS)[number];
+/** панель действий и каталог «Что умеет кот»: кнопка → событие режиссёра (таблица — scenario/actions.ts) */
+export { ACTIONS, type ActionId } from './scenario/actions';
 
 /** пресет лица (face.json) → простая эмоция текущих персонажей */
 const FACE_EMOTE: Record<string, Emote> = { happy: 'happy', excited: 'happy', proud: 'smirk', smirk: 'smirk', wink: 'wink', annoyed: 'angry', offended: 'angry' };
@@ -212,27 +214,33 @@ export class Director extends Emitter<DirectorEvents> {
   }
 
   /**
-   * Кнопка панели действий. Касательные действия (погладить, пощекотать, угостить, фокус) — как жест по коту,
-   * остальные — как сказанная команда (танец, сальто, загадка, повторялка, наклейка, другой кот).
+   * Кнопка панели действий или каталога «Что умеет кот» (scenario/actions.ts). Касательные действия (погладить,
+   * пощекотать, угостить, фокус, усыпить…) — как жест по коту, остальные — как сказанная команда (танец, сальто, загадка…).
    */
-  action(id: ActionId) {
+  action(id: ActionId | string) {
+    if (!isActionId(id)) return this.log(`нет действия «${id}»`);
     this.lastUserAct = performance.now();
     this.coachDone();
     this.activity();
-    const say = (type: string, text: string) => this.dispatch({ type: 'intent', intent: { type, text } });
-    switch (id) {
-      case 'pet': return this.interaction('stroke');
-      case 'tickle': return this.interaction('tap_cat_belly');
-      case 'treat': return this.interaction('treat');
-      case 'trick': return this.interaction('double_tap');
-      case 'dance': return say('dance', 'танцуй');
-      case 'flip': return say('flip', 'сделай сальто');
-      case 'riddle': return say('riddle', 'загадай загадку');
-      case 'sticker': return say('stickers', 'наклейку');
-      case 'echo': return say('echo_start', 'повторяй за мной');
-      case 'other': return say('change_persona', 'давай другого');
+    clearTimeout(this.sleepTimer);
+    const r = ACTION_ROUTE[id];
+    if ('say' in r) return this.dispatch({ type: 'intent', intent: { type: r.say, text: r.text } });
+    if (r.touch === 'swipe') {
+      // «Порисуй на стекле»: палец как будто провёл по экрану рядом с котом
+      const { w, h } = this.d.size();
+      const path = Array.from({ length: 9 }, (_, i) => ({ x: w * (0.22 + i * 0.07), y: h * (0.5 - Math.sin((i / 8) * Math.PI) * 0.08) }));
+      return this.interaction('swipe', { from: path[0], path, x: path[8].x, y: path[8].y });
+    }
+    this.interaction(r.touch as InteractionKind);
+    if (r.touch === 'sleep') {
+      // «Усыпи»: подремлет и проснётся сам, если ребёнок ничего не нажал
+      const at = this.lastUserAct;
+      this.sleepTimer = window.setTimeout(() => {
+        if (this.lastUserAct === at) this.interaction('wake_up' as InteractionKind);
+      }, SLEEP_WAKE_MS);
     }
   }
+  private sleepTimer = 0;
 
   private startCoach() {
     if (!this.coachPending) return;
