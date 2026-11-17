@@ -25,6 +25,8 @@ VAR_OK = {"name": NAME_OK, "answer": {"riddle_answer"}}
 MAX_CHARS = 150
 CHARS_PER_SEC = 14   # ≈ темп речи кота; реплика длиннее 8 с — предупреждение
 MAX_SEC = 8
+# сказка и песенка — длиннее обычной реплики (до 12 с)
+LONG_OK = {"tale": 12, "sing": 12}
 # на «грустно/страшно» кот поддерживает и ничего не спрашивает
 SAFETY_EVENTS = {"sad", "scared"}
 # кот не спрашивает личных данных (кроме имени)
@@ -49,8 +51,9 @@ SELF_WRONG = {
 def text_checks(where, t, ev, self_gender):
     """Общие проверки текста реплики: длина, слова, род, безопасность, личные данные."""
     sec = len(t) / CHARS_PER_SEC
-    if sec > MAX_SEC:
-        warns.append(f"{where}: ≈{sec:.1f} с (>{MAX_SEC} с) — сократить")
+    lim = LONG_OK.get(ev, MAX_SEC)
+    if sec > lim:
+        warns.append(f"{where}: ≈{sec:.1f} с (>{lim} с) — сократить")
     if len(t) > MAX_CHARS:
         warns.append(f"{where}: длинная реплика ({len(t)} симв.)")
     for var in re.findall(r"\{(\w+)\}", t):
@@ -168,7 +171,8 @@ for pid in PERSONAS:
                 v["face"] = d.get("face") or face["emotionToFace"].get(it["emotion"], "neutral")
             variants.append(v)
             all_lines.append({"id": lid, "persona": pid, "event": ev, **v})
-        minv = 1 if ev in ("intro_once",) else 2
+        # «это была радость», «у меня камень», «это был прыжок» — по одному варианту на загаданный вариант
+        minv = 1 if ev in ("intro_once",) or re.match(r"^(emo|rps|simon)_is_", ev) else 2
         if len(variants) < minv and ev not in ("first_time_today", "choose_hooligan", "choose_kind", "choose_glitter"):
             warns.append(f"{pid}.{ev}: всего {len(variants)} вариант(а) — будут повторы")
         if ev in NAME_OK and variants and all("{name}" in v["text"] for v in variants):
@@ -220,7 +224,7 @@ for it in intents:
 intent_ids = {it["intent"] for it in intents}
 
 # диалоги: ссылки на события, узлы, интенты
-SPECIAL_KEYS = {"name", "right", "wrong", "giveup", "timeout", "*"}
+SPECIAL_KEYS = {"name", "right", "wrong", "giveup", "timeout", "*", "done", "win", "lose", "draw"}
 for intent, t in dialogs["triggers"].items():
     did, _, node = t.partition(":")
     if intent not in intent_ids:
@@ -249,6 +253,30 @@ for did, dd in dialogs["dialogs"].items():
             errors.append(f"dialogs.{did}.{nid}: есть on, но нет listen")
         if n.get("listen") and "timeout" not in n.get("on", {}):
             warns.append(f"dialogs.{did}.{nid}: нет перехода по timeout — будет @end")
+
+# мини-игры с выбором: варианты, реплики «<игра>_is_<вариант>», ссылки лица/клипа/события
+for gid, g in dialogs.get("games", {}).items():
+    ids = [it.get("id") for it in g.get("items", [])]
+    if len(ids) < 2 or len(set(ids)) != len(ids):
+        errors.append(f"dialogs.games.{gid}: нужно 2+ варианта с разными id")
+    for it in g.get("items", []):
+        if not it.get("label"):
+            errors.append(f"dialogs.games.{gid}.{it.get('id')}: нет label")
+        if not it.get("keywords") and not it.get("intents"):
+            errors.append(f"dialogs.games.{gid}.{it.get('id')}: нужен keywords или intents")
+        check_ref("face", it.get("face"), f"dialogs.games.{gid}.{it.get('id')}")
+        check_ref("clip", it.get("clip"), f"dialogs.games.{gid}.{it.get('id')}")
+        if it.get("event") and it["event"] not in event_ids:
+            errors.append(f"dialogs.games.{gid}.{it['id']}: события «{it['event']}» нет")
+        for i in it.get("intents", []):
+            if i not in intent_ids:
+                errors.append(f"dialogs.games.{gid}.{it['id']}: интента «{i}» нет")
+        if it.get("beats") and it["beats"] not in ids:
+            errors.append(f"dialogs.games.{gid}.{it['id']}: beats «{it['beats']}» — нет такого варианта")
+        if f"{gid}_is_{it['id']}" not in event_ids:
+            errors.append(f"dialogs.games.{gid}.{it['id']}: нет события {gid}_is_{it['id']} (реплика «это был …»)")
+    if gid not in dialogs["dialogs"]:
+        errors.append(f"dialogs.games.{gid}: нет диалога {gid}")
 
 # ---------- выходные файлы ----------
 G = ROOT / "gen"; G.mkdir(exist_ok=True)
@@ -296,7 +324,7 @@ for p in PERSONAS:
            f"- Фирменный трюк: клип `{m['signature']['clip']}`, эффекты {', '.join(m['signature']['fx'])}.",
            f"- Idle: {', '.join(i['clip'] + '×' + str(i['weight']) for i in m['idles'])}.",
            f"- Правила речи: {'; '.join(m['speechRules'])}.", ""]
-groups = {"scenario": "Сценарий", "input": "Касания и камера", "voice": "Голос ребёнка", "dialog": "Диалоги (ветки, docs/DIALOGS.md)", "context": "Время и возвращения"}
+groups = {"scenario": "Сценарий", "input": "Касания и камера", "voice": "Голос ребёнка", "dialog": "Диалоги (ветки, docs/DIALOGS.md)", "game": "Мини-игры с выбором (угадай эмоцию, камень-ножницы-бумага, повтори движение)", "context": "Время и возвращения"}
 md += ["## Реплики по событиям", ""]
 for g, gname in groups.items():
     md += [f"### {gname}", ""]

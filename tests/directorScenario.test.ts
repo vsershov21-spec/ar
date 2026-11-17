@@ -79,7 +79,7 @@ describe('лестница тишины: ребёнок молчит 3 мину�
     const start = h.T();
     await h.tick(180_000);
     const e = ev(h, start).filter((x) => x !== 'welcome_back');
-    expect(e).toEqual(['silence', 'offer_riddle', 'filler', 'offer_echo', 'sleep']);
+    expect(e).toEqual(['silence', 'offer_riddle', 'filler', 'offer_rps', 'sleep']);
     expect(h.d.dozing).toBe(true);
     // никакая запись не прозвучала дважды
     const ids = h.spoken.map((s) => s.id);

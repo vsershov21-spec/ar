@@ -502,6 +502,137 @@
     },
     "riddle_bye": {
       "clip": "wave"
+    },
+    "where_live": {
+      "clip": "talk_casual"
+    },
+    "likes": {
+      "clip": "talk_excited"
+    },
+    "friends": {
+      "clip": "talk_casual"
+    },
+    "tale": {
+      "clip": "talk_casual"
+    },
+    "friend": {
+      "clip": "shy",
+      "fx": "hearts_float"
+    },
+    "how_are_you": {
+      "clip": "talk_casual"
+    },
+    "offer_emo": {
+      "clip": "talk_excited"
+    },
+    "offer_rps": {
+      "clip": "talk_excited"
+    },
+    "offer_simon": {
+      "clip": "talk_excited"
+    },
+    "emo_start": {
+      "clip": "talk_excited"
+    },
+    "emo_ask": {
+      "clip": "none"
+    },
+    "emo_wrong": {
+      "clip": "none"
+    },
+    "emo_right": {
+      "clip": "celebrate",
+      "sound": "confetti"
+    },
+    "emo_is_happy": {
+      "clip": "laugh",
+      "face": "smile_big"
+    },
+    "emo_is_sad": {
+      "clip": "ears_back",
+      "face": "sad"
+    },
+    "emo_is_angry": {
+      "clip": "offended",
+      "face": "annoyed"
+    },
+    "emo_is_surprised": {
+      "clip": "surprised",
+      "face": "surprised"
+    },
+    "emo_is_sleepy": {
+      "clip": "idle_yawn",
+      "face": "sleepy"
+    },
+    "emo_is_shy": {
+      "clip": "shy",
+      "face": "shy"
+    },
+    "rps_start": {
+      "clip": "talk_excited"
+    },
+    "rps_go": {
+      "clip": "think"
+    },
+    "rps_again": {
+      "clip": "listen"
+    },
+    "rps_is_rock": {
+      "clip": "proud"
+    },
+    "rps_is_scissors": {
+      "clip": "proud"
+    },
+    "rps_is_paper": {
+      "clip": "proud"
+    },
+    "rps_win": {
+      "clip": "offended"
+    },
+    "rps_lose": {
+      "clip": "celebrate"
+    },
+    "rps_draw": {
+      "clip": "surprised"
+    },
+    "simon_start": {
+      "clip": "point_button",
+      "fx": "spotlight_button"
+    },
+    "simon_ask": {
+      "clip": "none"
+    },
+    "simon_wrong": {
+      "clip": "none"
+    },
+    "simon_right": {
+      "clip": "celebrate"
+    },
+    "simon_done": {
+      "clip": "celebrate",
+      "fx": "confetti",
+      "sound": "confetti"
+    },
+    "simon_is_jump": {
+      "clip": "jump"
+    },
+    "simon_is_flip": {
+      "clip": "flip"
+    },
+    "simon_is_dance": {
+      "clip": "dance_glitter"
+    },
+    "simon_is_wave": {
+      "clip": "wave"
+    },
+    "simon_is_sit": {
+      "clip": "sit_down"
+    },
+    "game_more": {
+      "clip": "listen"
+    },
+    "game_bye": {
+      "clip": "wave"
     }
   },
   "lines": {
@@ -672,7 +803,7 @@
       },
       {
         "id": "glitter.nice_name.05",
-        "text": "Звучит как песенка. Я запомнила!",
+        "text": "Какое имя! Запишу его блёстками.",
         "emotion": "happy",
         "face": "happy"
       }
@@ -959,6 +1090,24 @@
         "text": "Голову погладить можно. Только бантик не трогай!",
         "emotion": "happy",
         "face": "happy"
+      },
+      {
+        "id": "glitter.tap_cat_head.03",
+        "text": "Ой, корона! Шучу, это ушки. Но как корона.",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "glitter.tap_cat_head.04",
+        "text": "Тук по макушке! Там живут блестящие идеи.",
+        "emotion": "shy",
+        "face": "shy"
+      },
+      {
+        "id": "glitter.tap_cat_head.05",
+        "text": "Причёска! Я над ней полчаса колдовала.",
+        "emotion": "excited",
+        "face": "excited"
       }
     ],
     "tap_cat_cheek": [
@@ -987,6 +1136,24 @@
         "text": "Только не животик! Ха-ха!",
         "emotion": "excited",
         "face": "excited"
+      },
+      {
+        "id": "glitter.tap_cat_belly.03",
+        "text": "Хи-хи-хи! Щекотно, блёстки сыплются!",
+        "emotion": "excited",
+        "face": "excited"
+      },
+      {
+        "id": "glitter.tap_cat_belly.04",
+        "text": "Только не животик! Я сейчас засмеюсь до звёздочек!",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "glitter.tap_cat_belly.05",
+        "text": "Ой-ой, щекотка! Это нечестно, хи-хи.",
+        "emotion": "shy",
+        "face": "shy"
       }
     ],
     "tap_cat_paw": [
@@ -1001,6 +1168,24 @@
         "text": "Дай лапку — вот, держи мою.",
         "emotion": "neutral",
         "face": "neutral"
+      },
+      {
+        "id": "glitter.tap_cat_paw.03",
+        "text": "Маникюр с блёстками! Нравится?",
+        "emotion": "proud",
+        "face": "proud"
+      },
+      {
+        "id": "glitter.tap_cat_paw.04",
+        "text": "Дай лапку! Вот так, по-звёздному.",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "glitter.tap_cat_paw.05",
+        "text": "Пять! Лапка сверкнула, видишь?",
+        "emotion": "excited",
+        "face": "excited"
       }
     ],
     "tap_cat_tail": [
@@ -1015,6 +1200,24 @@
         "text": "Хвост — не трогать! Ну, почти не трогать.",
         "emotion": "annoyed",
         "face": "annoyed"
+      },
+      {
+        "id": "glitter.tap_cat_tail.03",
+        "text": "Ой, хвостик! Он у меня как у кометы.",
+        "emotion": "surprised",
+        "face": "surprised"
+      },
+      {
+        "id": "glitter.tap_cat_tail.04",
+        "text": "Хвост в тренде, правда? Только не мни.",
+        "emotion": "proud",
+        "face": "proud"
+      },
+      {
+        "id": "glitter.tap_cat_tail.05",
+        "text": "Хвостиком машу, блёстками сыплю!",
+        "emotion": "happy",
+        "face": "happy"
       }
     ],
     "poke_combo": [
@@ -1063,6 +1266,18 @@
         "text": "Мурчу. Красиво мурчу, правда?",
         "emotion": "shy",
         "face": "purr"
+      },
+      {
+        "id": "glitter.stroke.04",
+        "text": "Мурр... Блёстки от удовольствия переливаются.",
+        "emotion": "happy",
+        "face": "purr"
+      },
+      {
+        "id": "glitter.stroke.05",
+        "text": "Гладь ещё. Я как звёздочка под твоей ладошкой.",
+        "emotion": "shy",
+        "face": "purr"
       }
     ],
     "stroke_long": [
@@ -1082,6 +1297,12 @@
         "id": "glitter.stroke_long.03",
         "text": "Смотри, сердечки полетели! Это из-за тебя.",
         "emotion": "excited",
+        "face": "purr"
+      },
+      {
+        "id": "glitter.stroke_long.04",
+        "text": "Обнимашки! Самые сияющие на свете.",
+        "emotion": "shy",
         "face": "purr"
       }
     ],
@@ -1133,6 +1354,18 @@
       {
         "id": "glitter.double_tap.03",
         "text": "Вот это блеск, да?",
+        "emotion": "proud",
+        "face": "proud"
+      },
+      {
+        "id": "glitter.double_tap.04",
+        "text": "Фокус! Ловишь звёздочки?",
+        "emotion": "excited",
+        "face": "excited"
+      },
+      {
+        "id": "glitter.double_tap.05",
+        "text": "Блёстки, блеск, сияние! Фокус удался.",
         "emotion": "proud",
         "face": "proud"
       }
@@ -1221,6 +1454,18 @@
         "text": "Хрум-хрум. Только никому не говори, что я сладкоежка!",
         "emotion": "shy",
         "face": "shy"
+      },
+      {
+        "id": "glitter.treat.04",
+        "text": "Звёздное печенье! Обожаю. Спасибо!",
+        "emotion": "excited",
+        "face": "excited"
+      },
+      {
+        "id": "glitter.treat.05",
+        "text": "Ммм, вкусно! Это как десерт после показа мод.",
+        "emotion": "happy",
+        "face": "happy"
       }
     ],
     "shake": [
@@ -1520,13 +1765,13 @@
     "no": [
       {
         "id": "glitter.no.01",
-        "text": "Ну ладно...",
+        "text": "Ладно, блёстки подождут.",
         "emotion": "neutral",
         "face": "neutral"
       },
       {
         "id": "glitter.no.02",
-        "text": "Как скажешь!",
+        "text": "Как скажешь, звёздочка!",
         "emotion": "neutral",
         "face": "neutral"
       },
@@ -1589,6 +1834,12 @@
         "text": "Меня зовут Блёстка. Ну, когда я в этом образе.",
         "emotion": "happy",
         "face": "happy"
+      },
+      {
+        "id": "glitter.name_ask.03",
+        "text": "Я Блёстка! Модная кошка из твоей карты.",
+        "emotion": "excited",
+        "face": "excited"
       }
     ],
     "age_ask": [
@@ -1683,6 +1934,18 @@
         "text": "Смотри, как я умею!",
         "emotion": "proud",
         "face": "proud"
+      },
+      {
+        "id": "glitter.flip.05",
+        "text": "Звёздное сальто! Ты это видишь?",
+        "emotion": "excited",
+        "face": "excited"
+      },
+      {
+        "id": "glitter.flip.06",
+        "text": "Сальто в платье! Сложно, но я смогла.",
+        "emotion": "proud",
+        "face": "proud"
       }
     ],
     "jump": [
@@ -1695,6 +1958,12 @@
       {
         "id": "glitter.jump.02",
         "text": "Прыг-прыг — и блёстки!",
+        "emotion": "excited",
+        "face": "excited"
+      },
+      {
+        "id": "glitter.jump.03",
+        "text": "Прыжок до звёзд!",
         "emotion": "excited",
         "face": "excited"
       }
@@ -1717,6 +1986,18 @@
         "text": "Давай вместе! Сердечко лапками!",
         "emotion": "excited",
         "face": "excited"
+      },
+      {
+        "id": "glitter.dance.04",
+        "text": "Танец звёздочки! Кружусь, кружусь!",
+        "emotion": "excited",
+        "face": "excited"
+      },
+      {
+        "id": "glitter.dance.05",
+        "text": "Подиум мой! Смотри, какая походка.",
+        "emotion": "proud",
+        "face": "proud"
       }
     ],
     "sit": [
@@ -2487,6 +2768,548 @@
         "text": "Окей, играем дальше!",
         "emotion": "neutral",
         "face": "neutral"
+      }
+    ],
+    "where_live": [
+      {
+        "id": "glitter.where_live.01",
+        "text": "В твоей карте! Это мой блестящий домик.",
+        "emotion": "excited",
+        "face": "excited"
+      },
+      {
+        "id": "glitter.where_live.02",
+        "text": "В карте. У меня там гардероб и зеркальце.",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "glitter.where_live.03",
+        "text": "Под звёздами в твоей карте! А брат живёт в СберKids.",
+        "emotion": "proud",
+        "face": "proud"
+      }
+    ],
+    "likes": [
+      {
+        "id": "glitter.likes.01",
+        "text": "Блёстки, наряды и звёзды!",
+        "emotion": "excited",
+        "face": "excited"
+      },
+      {
+        "id": "glitter.likes.02",
+        "text": "Фотосессии! И наклейки. Голографические.",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "glitter.likes.03",
+        "text": "Смотреть на звёзды и сиять, как они.",
+        "emotion": "proud",
+        "face": "proud"
+      }
+    ],
+    "friends": [
+      {
+        "id": "glitter.friends.01",
+        "text": "Конечно! Ты, например. Моя звёздочка!",
+        "emotion": "excited",
+        "face": "excited"
+      },
+      {
+        "id": "glitter.friends.02",
+        "text": "Хулиган и Добряк, мои братики. И ты!",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "glitter.friends.03",
+        "text": "Много! Звёзды, бабочки и ты, конечно.",
+        "emotion": "proud",
+        "face": "proud"
+      }
+    ],
+    "tale": [
+      {
+        "id": "glitter.tale.01",
+        "text": "Жила-была звёздочка. Она упала в коробку с блёстками и стала сиять ещё ярче. А потом стала мной! Конец.",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "glitter.tale.02",
+        "text": "Сказка! Кошка сшила платье из радуги. Все ахнули, а дождик перестал. Вот и сказочке конец!",
+        "emotion": "excited",
+        "face": "excited"
+      },
+      {
+        "id": "glitter.tale.03",
+        "text": "Однажды луна потеряла блёстки. Кошка нашла их и вернула. С тех пор луна ей подмигивает. Конец!",
+        "emotion": "happy",
+        "face": "happy"
+      }
+    ],
+    "friend": [
+      {
+        "id": "glitter.friend.01",
+        "text": "Давай! Теперь ты мой лучший друг.",
+        "emotion": "excited",
+        "face": "excited"
+      },
+      {
+        "id": "glitter.friend.02",
+        "text": "Дружить? Ура! Это самое блестящее предложение.",
+        "emotion": "shy",
+        "face": "shy"
+      },
+      {
+        "id": "glitter.friend.03",
+        "text": "Конечно! Друзья сияют вместе.",
+        "emotion": "happy",
+        "face": "happy"
+      }
+    ],
+    "how_are_you": [
+      {
+        "id": "glitter.how_are_you.01",
+        "text": "Сияю! А с тобой ещё ярче.",
+        "emotion": "excited",
+        "face": "excited"
+      },
+      {
+        "id": "glitter.how_are_you.02",
+        "text": "Блестяще! Как всегда.",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "glitter.how_are_you.03",
+        "text": "Отлично! Я сегодня особенно красивая.",
+        "emotion": "proud",
+        "face": "proud"
+      }
+    ],
+    "offer_emo": [
+      {
+        "id": "glitter.offer_emo.01",
+        "text": "Хочешь, я покажу настроение, а ты угадаешь?",
+        "emotion": "excited",
+        "face": "excited"
+      },
+      {
+        "id": "glitter.offer_emo.02",
+        "text": "Поиграем в «Угадай эмоцию»? Я актриса!",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "glitter.offer_emo.03",
+        "text": "Я сделаю мордашку, как на фотосессии. Угадаешь? Играем?",
+        "emotion": "excited",
+        "face": "excited"
+      }
+    ],
+    "offer_rps": [
+      {
+        "id": "glitter.offer_rps.01",
+        "text": "Сыграем в камень, ножницы, бумагу? Скажи «да»!",
+        "emotion": "excited",
+        "face": "excited"
+      },
+      {
+        "id": "glitter.offer_rps.02",
+        "text": "Камень, ножницы, бумага? Я быстрая!",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "glitter.offer_rps.03",
+        "text": "Вызываю на камень, ножницы, бумагу! Играем?",
+        "emotion": "proud",
+        "face": "proud"
+      }
+    ],
+    "offer_simon": [
+      {
+        "id": "glitter.offer_simon.01",
+        "text": "Давай я покажу движение, а ты повторишь? Как на подиуме!",
+        "emotion": "excited",
+        "face": "excited"
+      },
+      {
+        "id": "glitter.offer_simon.02",
+        "text": "Поиграем в «Делай как я»? Скажи «да».",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "glitter.offer_simon.03",
+        "text": "Повторишь мои звёздные движения? Играем?",
+        "emotion": "proud",
+        "face": "proud"
+      }
+    ],
+    "emo_start": [
+      {
+        "id": "glitter.emo_start.01",
+        "text": "Играем! Я показываю настроение, а ты угадываешь, какая я.",
+        "emotion": "excited",
+        "face": "excited"
+      },
+      {
+        "id": "glitter.emo_start.02",
+        "text": "Я актриса! Смотри на мордашку и угадай, какая я.",
+        "emotion": "happy",
+        "face": "happy"
+      }
+    ],
+    "emo_ask": [
+      {
+        "id": "glitter.emo_ask.01",
+        "text": "Какая я сейчас?",
+        "emotion": "excited",
+        "face": "excited"
+      },
+      {
+        "id": "glitter.emo_ask.02",
+        "text": "Ну, угадаешь, какая я?",
+        "emotion": "happy",
+        "face": "happy"
+      }
+    ],
+    "emo_wrong": [
+      {
+        "id": "glitter.emo_wrong.01",
+        "text": "Не-а! Смотри ещё разок.",
+        "emotion": "neutral",
+        "face": "neutral"
+      },
+      {
+        "id": "glitter.emo_wrong.02",
+        "text": "Почти! Посмотри внимательнее.",
+        "emotion": "happy",
+        "face": "happy"
+      }
+    ],
+    "emo_right": [
+      {
+        "id": "glitter.emo_right.01",
+        "text": "Угадано! Блестяще!",
+        "emotion": "excited",
+        "face": "excited"
+      },
+      {
+        "id": "glitter.emo_right.02",
+        "text": "В точку! Тебе бы в кино работать.",
+        "emotion": "proud",
+        "face": "proud"
+      }
+    ],
+    "emo_is_happy": [
+      {
+        "id": "glitter.emo_is_happy.01",
+        "text": "Это я радовалась! Сияю!",
+        "emotion": "happy",
+        "face": "smile_big"
+      }
+    ],
+    "emo_is_sad": [
+      {
+        "id": "glitter.emo_is_sad.01",
+        "text": "Это я грустила. Но уже всё, блещу снова.",
+        "emotion": "sad",
+        "face": "sad"
+      }
+    ],
+    "emo_is_angry": [
+      {
+        "id": "glitter.emo_is_angry.01",
+        "text": "Это я сердилась! Хм! Понарошку.",
+        "emotion": "annoyed",
+        "face": "annoyed"
+      }
+    ],
+    "emo_is_surprised": [
+      {
+        "id": "glitter.emo_is_surprised.01",
+        "text": "Это я удивлялась! Ах!",
+        "emotion": "surprised",
+        "face": "surprised"
+      }
+    ],
+    "emo_is_sleepy": [
+      {
+        "id": "glitter.emo_is_sleepy.01",
+        "text": "Это я сонная. Звёздочки снятся...",
+        "emotion": "sleepy",
+        "face": "sleepy"
+      }
+    ],
+    "emo_is_shy": [
+      {
+        "id": "glitter.emo_is_shy.01",
+        "text": "Это я стеснялась. Хи-хи.",
+        "emotion": "shy",
+        "face": "shy"
+      }
+    ],
+    "rps_start": [
+      {
+        "id": "glitter.rps_start.01",
+        "text": "Камень, ножницы, бумага! Говори вслух, что выбираешь.",
+        "emotion": "excited",
+        "face": "excited"
+      },
+      {
+        "id": "glitter.rps_start.02",
+        "text": "На счёт «три» скажи: камень, ножницы или бумага!",
+        "emotion": "happy",
+        "face": "happy"
+      }
+    ],
+    "rps_go": [
+      {
+        "id": "glitter.rps_go.01",
+        "text": "Раз, два, три!",
+        "emotion": "excited",
+        "face": "excited"
+      },
+      {
+        "id": "glitter.rps_go.02",
+        "text": "Камень, ножницы, бумага... раз, два, три!",
+        "emotion": "happy",
+        "face": "happy"
+      }
+    ],
+    "rps_again": [
+      {
+        "id": "glitter.rps_again.01",
+        "text": "Не расслышала! Камень, ножницы или бумага?",
+        "emotion": "neutral",
+        "face": "neutral"
+      },
+      {
+        "id": "glitter.rps_again.02",
+        "text": "Скажи одно: камень, ножницы или бумага.",
+        "emotion": "happy",
+        "face": "happy"
+      }
+    ],
+    "rps_is_rock": [
+      {
+        "id": "glitter.rps_is_rock.01",
+        "text": "У меня камень! Драгоценный.",
+        "emotion": "proud",
+        "face": "proud"
+      }
+    ],
+    "rps_is_scissors": [
+      {
+        "id": "glitter.rps_is_scissors.01",
+        "text": "У меня ножницы! Чик-чик, как в ателье.",
+        "emotion": "excited",
+        "face": "excited"
+      }
+    ],
+    "rps_is_paper": [
+      {
+        "id": "glitter.rps_is_paper.01",
+        "text": "У меня бумага! Блестящая.",
+        "emotion": "happy",
+        "face": "happy"
+      }
+    ],
+    "rps_win": [
+      {
+        "id": "glitter.rps_win.01",
+        "text": "Ой, победа твоя! Ну ладно, тебе идёт.",
+        "emotion": "offended",
+        "face": "neutral"
+      },
+      {
+        "id": "glitter.rps_win.02",
+        "text": "Обыграли меня! Аплодисменты тебе.",
+        "emotion": "happy",
+        "face": "happy"
+      }
+    ],
+    "rps_lose": [
+      {
+        "id": "glitter.rps_lose.01",
+        "text": "Я выиграла! Поклон!",
+        "emotion": "proud",
+        "face": "proud"
+      },
+      {
+        "id": "glitter.rps_lose.02",
+        "text": "Ура, моя победа! Блёстки в честь меня.",
+        "emotion": "excited",
+        "face": "excited"
+      }
+    ],
+    "rps_draw": [
+      {
+        "id": "glitter.rps_draw.01",
+        "text": "Ничья! Мы как близняшки.",
+        "emotion": "surprised",
+        "face": "surprised"
+      },
+      {
+        "id": "glitter.rps_draw.02",
+        "text": "Ничья! Одинаковый вкус, значит.",
+        "emotion": "happy",
+        "face": "happy"
+      }
+    ],
+    "simon_start": [
+      {
+        "id": "glitter.simon_start.01",
+        "text": "Я показываю движение, а ты жмёшь такую же кнопку внизу!",
+        "emotion": "excited",
+        "face": "excited"
+      },
+      {
+        "id": "glitter.simon_start.02",
+        "text": "Делай как я! Смотри на меня и жми ту же кнопку.",
+        "emotion": "happy",
+        "face": "happy"
+      }
+    ],
+    "simon_ask": [
+      {
+        "id": "glitter.simon_ask.01",
+        "text": "Смотри и повторяй!",
+        "emotion": "excited",
+        "face": "excited"
+      },
+      {
+        "id": "glitter.simon_ask.02",
+        "text": "Запоминай!",
+        "emotion": "happy",
+        "face": "happy"
+      }
+    ],
+    "simon_wrong": [
+      {
+        "id": "glitter.simon_wrong.01",
+        "text": "Не то! Смотри ещё раз.",
+        "emotion": "neutral",
+        "face": "neutral"
+      },
+      {
+        "id": "glitter.simon_wrong.02",
+        "text": "Почти! Ещё разок покажу.",
+        "emotion": "happy",
+        "face": "happy"
+      }
+    ],
+    "simon_right": [
+      {
+        "id": "glitter.simon_right.01",
+        "text": "Блестяще! Следующее!",
+        "emotion": "excited",
+        "face": "excited"
+      },
+      {
+        "id": "glitter.simon_right.02",
+        "text": "Верно! Ты звезда.",
+        "emotion": "proud",
+        "face": "proud"
+      }
+    ],
+    "simon_done": [
+      {
+        "id": "glitter.simon_done.01",
+        "text": "Три из трёх! Это звёздный результат!",
+        "emotion": "excited",
+        "face": "excited"
+      },
+      {
+        "id": "glitter.simon_done.02",
+        "text": "Всё повторено! Беру тебя на подиум.",
+        "emotion": "proud",
+        "face": "proud"
+      }
+    ],
+    "simon_is_jump": [
+      {
+        "id": "glitter.simon_is_jump.01",
+        "text": "Это был прыжок!",
+        "emotion": "neutral",
+        "face": "neutral"
+      }
+    ],
+    "simon_is_flip": [
+      {
+        "id": "glitter.simon_is_flip.01",
+        "text": "Это было сальто!",
+        "emotion": "neutral",
+        "face": "neutral"
+      }
+    ],
+    "simon_is_dance": [
+      {
+        "id": "glitter.simon_is_dance.01",
+        "text": "Это был танец!",
+        "emotion": "neutral",
+        "face": "neutral"
+      }
+    ],
+    "simon_is_wave": [
+      {
+        "id": "glitter.simon_is_wave.01",
+        "text": "Это я помахала лапкой!",
+        "emotion": "neutral",
+        "face": "neutral"
+      }
+    ],
+    "simon_is_sit": [
+      {
+        "id": "glitter.simon_is_sit.01",
+        "text": "Это я присела!",
+        "emotion": "neutral",
+        "face": "neutral"
+      }
+    ],
+    "game_more": [
+      {
+        "id": "glitter.game_more.01",
+        "text": "Ещё разок?",
+        "emotion": "excited",
+        "face": "excited"
+      },
+      {
+        "id": "glitter.game_more.02",
+        "text": "Ещё раунд? Скажи «да»!",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "glitter.game_more.03",
+        "text": "Сыграем ещё? Да или нет?",
+        "emotion": "neutral",
+        "face": "neutral"
+      }
+    ],
+    "game_bye": [
+      {
+        "id": "glitter.game_bye.01",
+        "text": "Спасибо за игру! Было блестяще.",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "glitter.game_bye.02",
+        "text": "Ладно, антракт! Потом ещё сыграем.",
+        "emotion": "neutral",
+        "face": "neutral"
+      },
+      {
+        "id": "glitter.game_bye.03",
+        "text": "Игра окончена! Поклон!",
+        "emotion": "excited",
+        "face": "excited"
       }
     ]
   },

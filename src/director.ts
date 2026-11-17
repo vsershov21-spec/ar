@@ -9,10 +9,11 @@ import { initialState, makeScenarioConfig, step, type Action, type Heard, type S
 import { clearMemory, loadMemory, saveMemory } from './scenario/memory';
 import { contextEvent } from './scenario/session';
 import { answerMatches } from './scenario/intentMatch';
-import { matchIntent } from './voice/intents';
+import { matchIntent, normalize } from './voice/intents';
 import { turn } from './voice/turn';
 import { IdleLadder, OFFERS, type IdleStep } from './scenario/initiative';
-import { resolveTrigger, type ListenMode } from './scenario/dialogs';
+import { isGameMode, resolveTrigger, type GameItem, type ListenMode } from './scenario/dialogs';
+import { gameItemByIntent } from './scenario/machine';
 import type { ContentBundle } from './persona/content';
 import { PersonaContext } from './persona/context';
 import { LineQueue } from './persona/lineQueue';
@@ -58,6 +59,9 @@ const EXTRA_EMOTION: Record<string, [string, number, number]> = {
   treat: ['happy', 1, 2200], welcome_back: ['happy', 1, 1600], help: ['happy', 0.7, 1200],
   // каталог «Что умеет кот»: удивить (хлоп), подразнить, засмущать
   clap: ['surprised', 1, 1300], compliment: ['shy', 1, 2600], surprise: ['surprised', 1, 1500], tease: ['pout', 1, 1800],
+  // частые вопросы ребёнка и мини-игры (emo_ask / emo_wrong / simon_ask — без эмоции: лицо показывает загаданное)
+  friend: ['shy', 1, 2600], friends: ['happy', 0.9, 1600], likes: ['happy', 1, 1600], where_live: ['happy', 0.8, 1400], how_are_you: ['happy', 1, 1500], tale: ['happy', 0.7, 2500],
+  emo_right: ['laugh', 0.9, 1500], simon_right: ['happy', 1, 1200], simon_done: ['laugh', 1, 1800], rps_win: ['pout', 0.8, 1500], rps_lose: ['smug', 1, 1500], rps_draw: ['surprised', 1, 1200], game_bye: ['happy', 0.8, 1200],
 };
 
 /**
@@ -191,6 +195,11 @@ export class Director extends Emitter<DirectorEvents> {
     const type = m.intent === 'switch' ? 'change_persona' : m.intent;
     const h: Heard = m.intent === 'name' ? { type: 'name', name: m.name, known: !!m.known, text: t } : { type, text: t };
     this.log(`«${t}» → ${h.type}${h.name ? ` ${h.name}${h.known ? '' : ' (нет в словаре)'}` : ''} ${m.confidence.toFixed(2)}${listening ? ` (ждём: ${listening})` : ''}`);
+    // «Угадай эмоцию»: «ты грустный» — ответ про кота, а не «мне грустно» (про себя — «мне», «я» — поддержка, как всегда)
+    if (listening === 'emo' && !/(^| )(мне|я|меня)( |$)/.test(normalize(t))) {
+      const it = this.gameItems('emo').find((i) => !!i.keywords?.length && answerMatches(t, i.keywords));
+      if (it) return this.dispatch({ type: 'game_answer', value: it.id, text: t });
+    }
     if (this.cfg.dialogs.interrupts.includes(h.type)) return this.dispatch({ type: 'intent', intent: h });
     if (listening === 'riddle') {
       const r = this.currentRiddle();
@@ -199,7 +208,31 @@ export class Director extends Emitter<DirectorEvents> {
       if (h.type !== 'riddle' && h.type !== 'unknown' && resolveTrigger(this.cfg.dialogs, h.type)) return this.dispatch({ type: 'intent', intent: h });
       return this.dispatch({ type: 'answer', result: 'wrong', text: t });
     }
+    if (isGameMode(listening)) {
+      // мини-игра: «весёлый», «камень», «прыжок» — ответ по словам варианта или по интенту (повтори движение: «прыгни»)
+      const g = st.game?.id;
+      const it = this.gameItems(g).find((i) => !!i.keywords?.length && answerMatches(t, i.keywords)) ?? (g ? gameItemByIntent(this.cfg, g, h.type) : undefined);
+      if (it) return this.dispatch({ type: 'game_answer', value: it.id, text: t });
+      if (['giveup', 'no', 'skip'].includes(h.type)) return this.dispatch({ type: 'game_answer', value: '$giveup', text: t });
+      if (h.type !== 'unknown' && resolveTrigger(this.cfg.dialogs, h.type) && h.type !== g && h.type !== 'emo_game') return this.dispatch({ type: 'intent', intent: h });
+      return this.dispatch({ type: 'game_answer', value: null, text: t });
+    }
     this.dispatch({ type: 'intent', intent: h });
+  }
+
+  private gameItems(id: string | undefined): GameItem[] {
+    return (id && this.cfg.dialogs.games?.[id]?.items) || [];
+  }
+
+  /**
+   * Чипы-подсказки для идущей мини-игры (агент UI): какие ответы сейчас можно нажать. Нажатие — director.text(label)
+   * (как будто ребёнок сказал). Повтори движение — кнопки движений панели действий (id совпадают с ACTION_ROUTE).
+   */
+  gameChoices(): { game: string; mode: string; options: { id: string; label: string }[] } | null {
+    const st = this.state;
+    const mode = st.dialog?.listening;
+    if (!st.game || !isGameMode(mode)) return null;
+    return { game: st.game.id, mode, options: this.gameItems(st.game.id).map((i) => ({ id: i.id, label: i.label })) };
   }
 
   interaction(kind: InteractionKind, ctx: { x?: number; y?: number; from?: { x: number; y: number }; path?: { x: number; y: number }[] } = {}) {
@@ -444,7 +477,28 @@ export class Director extends Emitter<DirectorEvents> {
         this.paused = a.on;
         if (a.on) this.queue.clear();
         break;
+      case 'game_show':
+        void this.gameShow(a);
+        break;
+      case 'offer_next':
+        this.offerNext();
+        break;
     }
+  }
+
+  /** мини-игра: кот показывает загаданное (эмоцию лицом и клипом, движение — клипом реакции) после своей реплики */
+  private async gameShow(a: { face?: string; clip?: string; event?: string }) {
+    const tok = this.state.listenToken;
+    await wait(0); // реплика узла встаёт в очередь в том же шаге — показываем после неё
+    await this.queue.whenIdle();
+    if (!this.state.game || this.state.listenToken !== tok) return;
+    const ch = this.character as Character & { setEmotion?: (n: string, w?: number, ms?: number) => void };
+    if (a.event) {
+      const def = this.persona.reactions[a.event];
+      this.playVisual({ clip: def?.clip ?? a.clip, fx: def?.fx ? [def.fx] : [], sound: def?.sound });
+    } else this.playVisual({ clip: a.clip });
+    if (a.face && ch?.setEmotion) ch.setEmotion(a.face, 1, 7000);
+    this.log(`🎲 показ ${a.event ?? a.face ?? a.clip}`);
   }
 
   /** окно ответа: ждём, пока кот договорит, затем микрофон слушает ms */
@@ -879,17 +933,8 @@ export class Director extends Emitter<DirectorEvents> {
     switch (step) {
       case 'silence':
         return this.dispatch({ type: 'silence', byCat: true });
-      case 'offer': {
-        // следующее по кругу занятие, у которого есть озвученный вопрос; нет ни одного — подсказка «скажи…» (bored)
-        for (let i = 0; i < OFFERS.length; i++) {
-          const what = OFFERS[(this.offerIdx + i) % OFFERS.length];
-          if (this.hasVoiced(`offer_${what}`)) {
-            this.offerIdx = (this.offerIdx + i + 1) % OFFERS.length;
-            return this.dispatch({ type: 'offer', what });
-          }
-        }
-        return this.react('bored');
-      }
+      case 'offer':
+        return this.offerNext();
       case 'filler':
         this.speakEvent('filler');
         return;
@@ -897,6 +942,18 @@ export class Director extends Emitter<DirectorEvents> {
         this.react('sleep');
         return;
     }
+  }
+
+  /** следующее по кругу занятие, у которого есть озвученный вопрос; нет ни одного — подсказка «скажи…» (bored) */
+  private offerNext() {
+    for (let i = 0; i < OFFERS.length; i++) {
+      const what = OFFERS[(this.offerIdx + i) % OFFERS.length];
+      if (this.hasVoiced(`offer_${what}`)) {
+        this.offerIdx = (this.offerIdx + i + 1) % OFFERS.length;
+        return this.dispatch({ type: 'offer', what });
+      }
+    }
+    return this.react('bored');
   }
 
   /** любая активность пользователя (касание, голос) откладывает инициативу кота */

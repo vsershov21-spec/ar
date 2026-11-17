@@ -64,7 +64,7 @@ describe('фраза ребёнка → вердикт', () => {
   });
 
   it('непонятая фраза с голосом ≥ 0,5 с → ответ «не понял»', () => {
-    expect(verdict({ text: 'как дела', speechMs: 800 }).kind).toBe('unknown');
+    expect(verdict({ text: 'мяу мяу', speechMs: 800 }).kind).toBe('unknown');
     expect(verdict({ text: 'мяу мяу', speechMs: 700 }).kind).toBe('unknown');
   });
 
@@ -73,7 +73,7 @@ describe('фраза ребёнка → вердикт', () => {
   });
 
   it('шум: коротко, только «а/ну», пусто — без ответа', () => {
-    expect(verdict({ text: 'как дела', speechMs: MIN_SPEECH_MS - 100 })).toEqual({ kind: 'noise', why: 'short' });
+    expect(verdict({ text: 'мяу мяу', speechMs: MIN_SPEECH_MS - 100 })).toEqual({ kind: 'noise', why: 'short' });
     expect(verdict({ text: 'ну', speechMs: 600 })).toEqual({ kind: 'noise', why: 'filler' });
     expect(verdict({ text: '', unk: 0 })).toEqual({ kind: 'noise', why: 'empty' });
     expect(isFillerOnly('а ну')).toBe(true);
@@ -91,8 +91,8 @@ describe('фраза ребёнка → вердикт', () => {
 
   it('«слушаю всегда»: непонятое подряд — не чаще раза в 4 с (разговор взрослых рядом)', () => {
     const now = 100_000;
-    expect(verdict({ text: 'как дела', now, lastUnknownAt: now - 1000 })).toEqual({ kind: 'noise', why: 'rate' });
-    expect(verdict({ text: 'как дела', now, lastUnknownAt: now - UNKNOWN_GAP_MS - 1 }).kind).toBe('unknown');
+    expect(verdict({ text: 'мяу мяу', now, lastUnknownAt: now - 1000 })).toEqual({ kind: 'noise', why: 'rate' });
+    expect(verdict({ text: 'мяу мяу', now, lastUnknownAt: now - UNKNOWN_GAP_MS - 1 }).kind).toBe('unknown');
     // команда — без ограничения
     expect(verdict({ text: 'сальто', now, lastUnknownAt: now - 100 }).kind).toBe('intent');
   });
@@ -121,7 +121,7 @@ describe('маршрутизация в действия кота', () => {
     let s = playing();
     const seq: string[] = [];
     let chips = false;
-    for (const t of ['как дела', 'мяу мяу', 'бла бла кря']) {
+    for (const t of ['мяу мяу', 'бла бла кря', 'абырвалг']) {
       const r = route(s, t);
       s = r.state;
       seq.push(...reacts(r.actions));
@@ -133,10 +133,10 @@ describe('маршрутизация в действия кота', () => {
   });
 
   it('понятая команда сбрасывает серию непонятого', () => {
-    let s = route(playing(), 'как дела').state;
+    let s = route(playing(), 'мяу мяу').state;
     s = route(s, 'сальто').state;
     expect(s.unknownStreak).toBe(0);
-    expect(reacts(route(s, 'как дела').actions)).toEqual(['unknown']);
+    expect(reacts(route(s, 'мяу мяу').actions)).toEqual(['unknown']);
   });
 
   it('«давай» на вопрос кота вне диалога — короткий ответ, а не молчание', () => {

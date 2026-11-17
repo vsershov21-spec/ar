@@ -27,6 +27,10 @@ export const ACTION_ROUTE = {
   riddle: { say: 'riddle', text: 'загадай загадку' },
   echo: { say: 'echo_start', text: 'повторяй за мной' },
   other: { say: 'change_persona', text: 'давай другого' },
+  // мини-игры (ночь 18.11): угадай эмоцию, камень-ножницы-бумага, повтори движение
+  emo: { say: 'emo_game', text: 'угадай эмоцию' },
+  rps: { say: 'rps', text: 'камень ножницы бумага' },
+  simon: { say: 'simon', text: 'повтори движение' },
   // эмоции
   laugh: { say: 'joke', text: 'рассмеши' },
   surprise: { touch: 'surprise' }, // не clap: «Кто хлопнул?» — только на настоящий хлопок в микрофон

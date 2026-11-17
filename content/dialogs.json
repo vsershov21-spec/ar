@@ -1,5 +1,5 @@
 {
-  "$comment": "Многоходовые диалоги. Формат и правила — docs/DIALOGS.md. say — событие из events.json (реплика активного характера) или $riddle.q / $riddle.hint. listen — окно ответа: микрофон открывается сам после реплики. on — переходы по интентам (intents.ru.json), name, right/wrong/giveup (загадки), timeout, * (всё остальное). Цель «@действие[:арг]» завершает диалог. Загадки — блок riddles: по 8 на характер, keywords — основы слов (звёздочка в конце — любое окончание).",
+  "$comment": "Многоходовые диалоги. Формат и правила — docs/DIALOGS.md. say — событие из events.json (реплика активного характера) или $riddle.q / $riddle.hint. listen — окно ответа: микрофон открывается сам после реплики. on — переходы по интентам (intents.ru.json), name, right/wrong/giveup (загадки), timeout, * (всё остальное). Цель «@действие[:арг]» завершает диалог. Загадки — блок riddles: по 8 на характер, keywords — основы слов (звёздочка в конце — любое окончание). Мини-игры с выбором — блок games. Варианты мини-игр с выбором (dialogs emo / rps / simon): id, label (чип-подсказка UI), keywords — основы слов ответа голосом, words — как скажет ребёнок (грамматика Vosk), intents — интенты-ответы (кнопки движений), face/clip — как кот показывает эмоцию, event — клип реакции характера на это движение, beats — кого побеждает. Реплика «это была …» — событие <игра>_is_<id>.",
   "version": 1,
   "answerWindowMs": 5000,
   "adultHint": "Позови взрослого — маму, папу или того, кому доверяешь. Расскажи, что случилось.",
@@ -11,7 +11,10 @@
     "brother_ask": "brother:about",
     "bye": "bye",
     "riddle": "riddle",
-    "echo_start": "echo"
+    "echo_start": "echo",
+    "emo_game": "emo",
+    "rps": "rps",
+    "simon": "simon"
   },
   "interrupts": ["sad", "scared"],
   "dialogs": {
@@ -79,13 +82,62 @@
     },
     "offer": {
       "title": "Кот сам предлагает занятие",
-      "trigger": "Лестница тишины режиссёра (docs/scenario/LOGIC.md): ребёнок давно ничего не делает — кот предлагает одно занятие, по кругу без повторов: загадка → повторялка → танец. «Да» — занятие начинается, «нет» — короткое «ладно», тишина — кот не настаивает.",
+      "trigger": "Лестница тишины режиссёра (docs/scenario/LOGIC.md) или «мне скучно»: кот предлагает одно занятие, по кругу без повторов: загадка → камень-ножницы-бумага → повторялка → угадай эмоцию → танец → повтори движение. «Да» — занятие начинается, «нет» — короткое «ладно», тишина — кот не настаивает.",
       "start": "riddle",
       "nodes": {
         "riddle": { "say": "offer_riddle", "listen": { "mode": "intent" }, "on": { "yes": "@dialog:riddle:ask", "riddle": "@dialog:riddle:ask", "no": "decline", "timeout": "@end", "*": "@end" } },
         "echo": { "say": "offer_echo", "listen": { "mode": "intent" }, "on": { "yes": "@dialog:echo", "echo_start": "@dialog:echo", "no": "decline", "timeout": "@end", "*": "@end" } },
         "dance": { "say": "offer_dance", "listen": { "mode": "intent" }, "on": { "yes": "@react:dance", "dance": "@react:dance", "no": "decline", "timeout": "@end", "*": "@end" } },
+        "emo": { "say": "offer_emo", "listen": { "mode": "intent" }, "on": { "yes": "@dialog:emo", "emo_game": "@dialog:emo", "no": "decline", "timeout": "@end", "*": "@end" } },
+        "rps": { "say": "offer_rps", "listen": { "mode": "intent" }, "on": { "yes": "@dialog:rps", "rps": "@dialog:rps", "no": "decline", "timeout": "@end", "*": "@end" } },
+        "simon": { "say": "offer_simon", "listen": { "mode": "intent" }, "on": { "yes": "@dialog:simon", "simon": "@dialog:simon", "no": "decline", "timeout": "@end", "*": "@end" } },
         "decline": { "say": "no", "next": "@end" }
+      }
+    },
+    "emo": {
+      "title": "Угадай эмоцию",
+      "trigger": "Интент emo_game, кнопка «Угадай эмоцию» или «да» на offer_emo. Кот делает рожицу (лицо и клип), ребёнок называет эмоцию голосом. Касания — без слов, кнопка завершает игру, конец — словами.",
+      "start": "intro",
+      "nodes": {
+        "intro": { "do": ["game:emo"], "say": "emo_start", "next": "ask" },
+        "ask": { "do": ["game_next", "game_show"], "say": "emo_ask", "listen": { "mode": "emo", "ms": 8000 }, "on": { "right": "right", "wrong": "wrong", "giveup": "reveal", "timeout": "wrong" } },
+        "wrong": { "do": ["game_show"], "say": "emo_wrong", "listen": { "mode": "emo", "ms": 8000 }, "on": { "right": "right", "wrong": "reveal", "giveup": "reveal", "timeout": "reveal" } },
+        "right": { "say": "emo_right", "next": "more" },
+        "reveal": { "say": "$game.reveal", "next": "more" },
+        "more": { "say": "game_more", "listen": { "mode": "intent" }, "on": { "yes": "ask", "emo_game": "ask", "no": "bye", "timeout": "bye", "*": "@end" } },
+        "bye": { "say": "game_bye", "next": "@end" }
+      }
+    },
+    "rps": {
+      "title": "Камень, ножницы, бумага",
+      "trigger": "Интент rps, кнопка или «да» на offer_rps. Кот считает «раз, два, три», ребёнок говорит камень, ножницы или бумагу; кот выбирает заранее (случайно), объявляет и говорит, кто выиграл.",
+      "start": "intro",
+      "nodes": {
+        "intro": { "do": ["game:rps"], "say": "rps_start", "next": "ask" },
+        "ask": { "do": ["game_next"], "say": "rps_go", "listen": { "mode": "rps", "ms": 7000 }, "on": { "win": "win", "lose": "lose", "draw": "draw", "wrong": "again", "giveup": "bye", "timeout": "again" } },
+        "again": { "say": "rps_again", "listen": { "mode": "rps", "ms": 7000 }, "on": { "win": "win", "lose": "lose", "draw": "draw", "wrong": "bye", "giveup": "bye", "timeout": "bye" } },
+        "win": { "say": ["$game.reveal", "rps_win"], "next": "more" },
+        "lose": { "say": ["$game.reveal", "rps_lose"], "next": "more" },
+        "draw": { "say": ["$game.reveal", "rps_draw"], "next": "more" },
+        "more": { "say": "game_more", "listen": { "mode": "intent" }, "on": { "yes": "ask", "rps": "ask", "no": "bye", "timeout": "bye", "*": "@end" } },
+        "bye": { "say": "game_bye", "next": "@end" }
+      }
+    },
+    "simon": {
+      "title": "Повтори движение",
+      "trigger": "Интент simon, кнопка или «да» на offer_simon. Кот показывает движение (прыжок, сальто, танец, помахать, сесть), ребёнок жмёт такую же кнопку панели или говорит. Кнопка движения в этой игре — ответ, другие кнопки завершают игру. Три раунда.",
+      "start": "intro",
+      "nodes": {
+        "intro": { "do": ["game:simon"], "say": "simon_start", "next": "ask" },
+        "ask": { "do": ["game_next", "game_show"], "say": "simon_ask", "listen": { "mode": "simon", "ms": 9000 }, "on": { "right": "right", "done": "done", "wrong": "wrong", "giveup": "reveal", "timeout": "wrong" } },
+        "next": { "do": ["game_next", "game_show"], "listen": { "mode": "simon", "ms": 9000 }, "on": { "right": "right", "done": "done", "wrong": "wrong", "giveup": "reveal", "timeout": "wrong" } },
+        "wrong": { "do": ["game_show"], "say": "simon_wrong", "listen": { "mode": "simon", "ms": 9000 }, "on": { "right": "right", "done": "done", "wrong": "reveal", "giveup": "reveal", "timeout": "reveal" } },
+        "right": { "say": "simon_right", "next": "next" },
+        "done": { "say": "simon_done", "next": "more" },
+        "reveal": { "say": "$game.reveal", "next": "more" },
+        "more": { "say": "game_more", "listen": { "mode": "intent" }, "on": { "yes": "intro_again", "simon": "intro_again", "no": "bye", "timeout": "bye", "*": "@end" } },
+        "intro_again": { "do": ["game:simon"], "next": "ask" },
+        "bye": { "say": "game_bye", "next": "@end" }
       }
     },
     "support": {
@@ -97,6 +149,28 @@
         "scared": { "do": ["pause_play:10000", "adult_hint"], "say": "scared", "next": "@end" }
       }
     }
+  },
+  "games": {
+    "emo": { "title": "Угадай эмоцию", "items": [
+      { "id": "happy", "label": "Весёлый", "face": "smile_big", "clip": "laugh", "keywords": ["весел*", "радост*", "рад", "рада", "счастлив*", "доволь*", "довол*", "улыба*", "смеешь*", "смеется"], "words": ["весёлый", "весёлая", "радостный", "радостная", "счастливый", "счастливая", "довольный", "довольная", "улыбаешься", "рад", "рада"] },
+      { "id": "sad", "label": "Грустный", "face": "sad", "clip": "ears_back", "keywords": ["грустн*", "грусти*", "печал*", "расстро*", "плачешь", "плачет"], "words": ["грустный", "грустная", "печальный", "печальная", "расстроенный", "грустишь", "плачешь"] },
+      { "id": "angry", "label": "Сердитый", "face": "annoyed", "clip": "offended", "keywords": ["зл*", "сердит*", "сердишь*", "недовол*", "обижен*", "обидел*", "дуешься", "надул*", "злюк*"], "words": ["злой", "злая", "сердитый", "сердитая", "злишься", "сердишься", "обиделся", "обиделась", "недовольный", "злюка"] },
+      { "id": "surprised", "label": "Удивлённый", "face": "surprised", "clip": "surprised", "keywords": ["удивл*", "удивил*", "изумл*", "ошарашен*"], "words": ["удивлённый", "удивлённая", "удивился", "удивилась", "удивляешься"] },
+      { "id": "sleepy", "label": "Сонный", "face": "sleepy", "clip": "idle_yawn", "keywords": ["сонн*", "спать", "спишь", "спит", "устал*", "зева*", "засыпа*", "дремл*"], "words": ["сонный", "сонная", "спать", "спишь", "устал", "устала", "зеваешь", "засыпаешь"] },
+      { "id": "shy", "label": "Стесняется", "face": "shy", "clip": "shy", "keywords": ["стесня*", "смущ*", "застесн*", "стеснит*"], "words": ["стесняешься", "смущённый", "смущённая", "стеснительный", "застеснялся", "застеснялась"] }
+    ] },
+    "rps": { "title": "Камень, ножницы, бумага", "items": [
+      { "id": "rock", "label": "Камень", "beats": "scissors", "keywords": ["камен*", "камн*", "камуш*", "кулак*"], "words": ["камень", "камушек", "кулак"] },
+      { "id": "scissors", "label": "Ножницы", "beats": "paper", "keywords": ["ножниц*", "ножн*"], "words": ["ножницы"] },
+      { "id": "paper", "label": "Бумага", "beats": "rock", "keywords": ["бумаг*", "бумажк*", "листик*", "листок", "ладош*"], "words": ["бумага", "бумагу", "бумажка", "листик", "ладошка"] }
+    ] },
+    "simon": { "title": "Повтори движение", "rounds": 3, "items": [
+      { "id": "jump", "label": "Прыжок", "event": "jump", "intents": ["jump"], "keywords": ["прыж*", "прыг*"], "words": ["прыжок", "прыгать"] },
+      { "id": "flip", "label": "Сальто", "event": "flip", "intents": ["flip"], "keywords": ["сальт*", "кувыр*"], "words": ["сальто", "кувырок"] },
+      { "id": "dance", "label": "Танец", "event": "dance", "intents": ["dance"], "keywords": ["танц*", "танец"], "words": ["танец", "танцевать"] },
+      { "id": "wave", "label": "Помахать", "event": "wave", "intents": ["wave"], "keywords": ["помах*", "махать", "машешь", "махал*"], "words": ["помахать", "машешь", "помахал"] },
+      { "id": "sit", "label": "Сесть", "event": "sit", "intents": ["sit"], "keywords": ["сяд*", "сел", "села", "сидеть", "присел*", "присест*"], "words": ["сесть", "сел", "села", "присесть"] }
+    ] }
   },
   "riddles": {
     "hooligan": [

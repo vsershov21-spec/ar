@@ -10,7 +10,36 @@
  *   next    — сразу перейти дальше
  * Цель перехода — id узла или «@действие[:аргумент]» (диалог заканчивается и выполняется действие).
  */
-export type ListenMode = 'intent' | 'name' | 'riddle' | 'echo';
+export type ListenMode = 'intent' | 'name' | 'riddle' | 'echo' | GameMode;
+/** мини-игры с ответом-выбором (content/dialogs.json → games): угадай эмоцию, камень-ножницы-бумага, повтори движение */
+export type GameMode = 'emo' | 'rps' | 'simon';
+export const GAME_MODES: readonly GameMode[] = ['emo', 'rps', 'simon'];
+export const isGameMode = (m: string | null | undefined): m is GameMode => !!m && (GAME_MODES as readonly string[]).includes(m);
+
+/** вариант ответа мини-игры: эмоция, жест камень/ножницы/бумага или движение */
+export interface GameItem {
+  id: string;
+  /** подпись для чипа-подсказки (UI) */
+  label: string;
+  /** основы слов ответа голосом («весел*») — как keywords загадок */
+  keywords?: string[];
+  /** как скажет ребёнок — слова для грамматики Vosk («весёлый», «радостный») */
+  words?: string[];
+  /** интенты, которые тоже считаются этим ответом (повтори движение: «прыгни» → jump; кнопка «Прыгни» — тоже) */
+  intents?: string[];
+  /** как кот показывает вариант: пресет лица (face.json) и клип; event — взять клип/эффект реакции характера */
+  face?: string;
+  clip?: string;
+  event?: string;
+  /** камень-ножницы-бумага: кого побеждает */
+  beats?: string;
+}
+export interface GameDef {
+  title: string;
+  /** сколько раундов до «done» (повтори движение); нет — игра идёт, пока ребёнок говорит «ещё» */
+  rounds?: number;
+  items: GameItem[];
+}
 
 export interface DialogNode {
   do?: string[];
@@ -40,6 +69,7 @@ export interface DialogsFile {
   interrupts: string[];
   dialogs: Record<string, DialogDef>;
   riddles?: Record<string, unknown>;
+  games?: Record<string, GameDef>;
 }
 
 export interface DialogState {

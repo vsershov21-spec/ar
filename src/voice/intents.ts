@@ -19,7 +19,9 @@ import namesRaw from '../../content/names.ru.txt?raw';
 export type IntentId =
   | 'sad' | 'scared' | 'echo_stop' | 'echo_start' | 'bye' | 'hello' | 'money' | 'sberkids' | 'brother_ask' | 'name_ask'
   | 'age_ask' | 'choose_hooligan' | 'choose_kind' | 'choose_glitter' | 'switch' | 'flip' | 'jump' | 'dance' | 'sit'
-  | 'wave' | 'sing' | 'gum' | 'stickers' | 'riddle' | 'joke' | 'help' | 'bored' | 'compliment' | 'rude' | 'thanks' | 'yes' | 'no' | 'skip';
+  | 'wave' | 'sing' | 'gum' | 'stickers' | 'riddle' | 'joke' | 'help' | 'bored' | 'compliment' | 'rude' | 'thanks' | 'yes' | 'no' | 'skip'
+  // мини-игры и частые детские вопросы (ночь 18.11, docs/scenario/CONTENT_NIGHT.md)
+  | 'emo_game' | 'rps' | 'simon' | 'where_live' | 'likes' | 'friends' | 'tale' | 'friend' | 'how_are_you';
 
 /** Совместимый с автоматом сценария тип: change_persona из словаря → 'switch' */
 export type Intent =
@@ -264,6 +266,17 @@ export function riddleWords(riddles: Record<string, { answer: string; keywords: 
 }
 
 /**
+ * Слова-ответы мини-игр (content/dialogs.json → games): подпись варианта, words (как скажет ребёнок: «весёлый»,
+ * «радостный», «камень») и ключевые слова без «*».
+ */
+export function gameWords(games: Record<string, { items: { label: string; words?: string[]; keywords?: string[] }[] }> = (dialogsData as any).games ?? {}): string[] {
+  const out = new Set<string>();
+  for (const g of Object.values(games))
+    for (const it of g.items) for (const w of [it.label, ...(it.words ?? []), ...(it.keywords ?? []).filter((k) => !k.endsWith('*'))]) out.add(normalize(w));
+  return [...out].filter(Boolean);
+}
+
+/**
  * Фразы для грамматики Vosk: все фразы словаря (основы вроде «жвачк» пропускаем — их нет в словаре модели),
  * имена, ответы загадок, частые детские фразы, связки. Ограниченный словарь заметно повышает точность
  * на детской речи. Слова с «ё» — и с «е», и с «ё» (как записано в модели, не знаем; лишнее Vosk пропустит).
@@ -279,6 +292,7 @@ export function grammarPhrases(): string[] {
   for (const p of REFUSALS) set.add(p.join(' '));
   for (const n of NAMES.keys()) set.add(n);
   for (const w of riddleWords()) set.add(w);
+  for (const w of gameWords()) set.add(w);
   for (const f of CHAT_PHRASES) set.add(normalize(f));
   for (const f of ['меня зовут', 'я', 'зови меня', 'мое имя', 'ну', 'а', 'котик', 'кот', 'пожалуйста', 'можешь', 'сделай', 'ещё', 'еще', 'хватит', 'покажи', 'расскажи', 'давай'])
     set.add(f);

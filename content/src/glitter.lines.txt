@@ -44,7 +44,7 @@ excited: {name}! Ну какое же красивое имя!
 happy: {name}... звучит как песенка. Я запомнила!
 excited: {name}, ура! Посыплю это имя блёстками.
 excited: Ах, какое имя! Прямо для обложки журнала.
-happy: Звучит как песенка. Я запомнила!
+happy: Какое имя! Запишу его блёстками.
 
 ## no_name | clip=shy
 happy: Секрет? Обожаю секреты!
@@ -114,6 +114,9 @@ happy: Мур! Ещё разочек.
 ## tap_cat_head | clip=poke_head
 annoyed: Ой, бантик! Аккуратно, я его час поправляла.
 happy: Голову погладить можно. Только бантик не трогай!
+happy: Ой, корона! Шучу, это ушки. Но как корона.
+shy: Тук по макушке! Там живут блестящие идеи.
+excited: Причёска! Я над ней полчаса колдовала.
 
 ## tap_cat_cheek | clip=poke_cheek face=squished
 shy: Хи-хи, щёчки! Они мягкие, правда?
@@ -122,14 +125,23 @@ happy: Пф-ф! Как подушечка, да?
 ## tap_cat_belly | clip=poke_belly sound=giggle
 happy: Ой-ой-ой, щекотно! Хи-хи-хи!
 excited: Только не животик! Ха-ха!
+excited: Хи-хи-хи! Щекотно, блёстки сыплются!
+happy: Только не животик! Я сейчас засмеюсь до звёздочек!
+shy: Ой-ой, щекотка! Это нечестно, хи-хи.
 
 ## tap_cat_paw | clip=wave
 happy: Лапка! Видишь, у меня маникюр с блёстками.
 neutral: Дай лапку — вот, держи мою.
+proud: Маникюр с блёстками! Нравится?
+happy: Дай лапку! Вот так, по-звёздному.
+excited: Пять! Лапка сверкнула, видишь?
 
 ## tap_cat_tail | clip=poke_tail sound=gasp
 surprised: Ай, хвостик! Он у меня с блёстками, не стряхни!
 annoyed: Хвост — не трогать! Ну, почти не трогать.
+surprised: Ой, хвостик! Он у меня как у кометы.
+proud: Хвост в тренде, правда? Только не мни.
+happy: Хвостиком машу, блёстками сыплю!
 
 ## poke_combo | clip=offended sound=hmph
 annoyed: Ну всё, я обиделась! На одну секундочку.
@@ -143,11 +155,14 @@ sad: Не надо так. Давай лучше нежно.
 happy: Мурр... Обожаю!
 happy: Вот здесь, за ушком. Ах...
 shy: Мурчу. Красиво мурчу, правда?
+happy: Мурр... Блёстки от удовольствия переливаются.
+shy: Гладь ещё. Я как звёздочка под твоей ладошкой.
 
 ## stroke_long | clip=purr_stroke sound=purr face=purr fx=hearts_float
 shy: Мурр... Можно так всегда?
 happy: Я сейчас вся засияю от счастья.
 excited: Смотри, сердечки полетели! Это из-за тебя.
+shy: Обнимашки! Самые сияющие на свете.
 
 ## tap_screen | clip=knock_glass fx=glitter_burst sound=sparkle_burst
 happy: Пуф — блёстки!
@@ -160,6 +175,8 @@ excited: Давай украсим тут всё!
 excited: Лови блёстки!
 excited: Фух! Целое облако!
 proud: Вот это блеск, да?
+excited: Фокус! Ловишь звёздочки?
+proud: Блёстки, блеск, сияние! Фокус удался.
 
 ## walk_to | clip=walk sound=footstep
 happy: Иду, как по подиуму.
@@ -181,6 +198,8 @@ excited: Отпечаток-сердечко на память!
 excited: Ням! Рыбка с блёстками? Шучу. Вкусно!
 happy: Мм, вкусняшка! Спасибо, я так рада!
 shy: Хрум-хрум. Только никому не говори, что я сладкоежка!
+excited: Звёздное печенье! Обожаю. Спасибо!
+happy: Ммм, вкусно! Это как десерт после показа мод.
 
 ## shake | clip=snowglobe_shake fx=snow_globe sound=snowglobe
 excited: Ах! Снежный шар! Как красиво!
@@ -257,8 +276,8 @@ happy: Договорились!
 happy: Я так и знала!
 
 ## no
-neutral: Ну ладно...
-neutral: Как скажешь!
+neutral: Ладно, блёстки подождут.
+neutral: Как скажешь, звёздочка!
 annoyed: Хм. А я так хотела... Ладно!
 
 ## skip
@@ -274,6 +293,7 @@ surprised: Это что-то волшебное? Не поняла.
 ## name_ask
 proud: Я Блёстка! Сестра-близняшка СберКота. Самая блестящая в семье.
 happy: Меня зовут Блёстка. Ну, когда я в этом образе.
+excited: Я Блёстка! Модная кошка из твоей карты.
 
 ## age_ask
 neutral: Мы с братом одного возраста. Мы же близнецы!
@@ -298,15 +318,20 @@ excited: Оп-ля! С блёстками!
 proud: Сальто — как гимнастка!
 excited: Ух! Ещё раз?
 proud: Смотри, как я умею!
+excited: Звёздное сальто! Ты это видишь?
+proud: Сальто в платье! Сложно, но я смогла.
 
 ## jump | clip=jump sound=boing fx=glitter_burst
 happy: Прыг!
 excited: Прыг-прыг — и блёстки!
+excited: Прыжок до звёзд!
 
 ## dance | clip=dance_glitter fx=glitter_trail sound=shimmer
 excited: Танцуем! Кружимся!
 happy: Я балерина... ну почти.
 excited: Давай вместе! Сердечко лапками!
+excited: Танец звёздочки! Кружусь, кружусь!
+proud: Подиум мой! Смотри, какая походка.
 
 ## sit | clip=sit_down
 neutral: Села. Красиво сижу?
@@ -508,3 +533,160 @@ neutral: Загадать ещё? Скажи «да».
 neutral: Загадки уходят на антракт.
 happy: Ладно! Было интересно.
 neutral: Окей, играем дальше!
+
+## offer_emo | clip=talk_excited
+excited: Хочешь, я покажу настроение, а ты угадаешь?
+happy: Поиграем в «Угадай эмоцию»? Я актриса!
+excited: Я сделаю мордашку, как на фотосессии. Угадаешь? Играем?
+
+## offer_rps | clip=talk_excited
+excited: Сыграем в камень, ножницы, бумагу? Скажи «да»!
+happy: Камень, ножницы, бумага? Я быстрая!
+proud: Вызываю на камень, ножницы, бумагу! Играем?
+
+## offer_simon | clip=talk_excited
+excited: Давай я покажу движение, а ты повторишь? Как на подиуме!
+happy: Поиграем в «Делай как я»? Скажи «да».
+proud: Повторишь мои звёздные движения? Играем?
+
+## emo_start | clip=talk_excited
+excited: Играем! Я показываю настроение, а ты угадываешь, какая я.
+happy: Я актриса! Смотри на мордашку и угадай, какая я.
+
+## emo_ask | clip=none
+excited: Какая я сейчас?
+happy: Ну, угадаешь, какая я?
+
+## emo_wrong | clip=none
+neutral: Не-а! Смотри ещё разок.
+happy: Почти! Посмотри внимательнее.
+
+## emo_right | clip=celebrate sound=confetti
+excited: Угадано! Блестяще!
+proud: В точку! Тебе бы в кино работать.
+
+## emo_is_happy | face=smile_big clip=laugh
+happy: Это я радовалась! Сияю!
+
+## emo_is_sad | face=sad clip=ears_back
+sad: Это я грустила. Но уже всё, блещу снова.
+
+## emo_is_angry | face=annoyed clip=offended
+annoyed: Это я сердилась! Хм! Понарошку.
+
+## emo_is_surprised | face=surprised clip=surprised
+surprised: Это я удивлялась! Ах!
+
+## emo_is_sleepy | face=sleepy clip=idle_yawn
+sleepy: Это я сонная. Звёздочки снятся...
+
+## emo_is_shy | face=shy clip=shy
+shy: Это я стеснялась. Хи-хи.
+
+## rps_start | clip=talk_excited
+excited: Камень, ножницы, бумага! Говори вслух, что выбираешь.
+happy: На счёт «три» скажи: камень, ножницы или бумага!
+
+## rps_go | clip=think
+excited: Раз, два, три!
+happy: Камень, ножницы, бумага... раз, два, три!
+
+## rps_again | clip=listen
+neutral: Не расслышала! Камень, ножницы или бумага?
+happy: Скажи одно: камень, ножницы или бумага.
+
+## rps_is_rock | clip=proud
+proud: У меня камень! Драгоценный.
+
+## rps_is_scissors | clip=proud
+excited: У меня ножницы! Чик-чик, как в ателье.
+
+## rps_is_paper | clip=proud
+happy: У меня бумага! Блестящая.
+
+## rps_win | clip=offended
+offended: Ой, победа твоя! Ну ладно, тебе идёт.
+happy: Обыграли меня! Аплодисменты тебе.
+
+## rps_lose | clip=celebrate
+proud: Я выиграла! Поклон!
+excited: Ура, моя победа! Блёстки в честь меня.
+
+## rps_draw | clip=surprised
+surprised: Ничья! Мы как близняшки.
+happy: Ничья! Одинаковый вкус, значит.
+
+## simon_start | clip=point_button fx=spotlight_button
+excited: Я показываю движение, а ты жмёшь такую же кнопку внизу!
+happy: Делай как я! Смотри на меня и жми ту же кнопку.
+
+## simon_ask | clip=none
+excited: Смотри и повторяй!
+happy: Запоминай!
+
+## simon_wrong | clip=none
+neutral: Не то! Смотри ещё раз.
+happy: Почти! Ещё разок покажу.
+
+## simon_right | clip=celebrate
+excited: Блестяще! Следующее!
+proud: Верно! Ты звезда.
+
+## simon_done | clip=celebrate fx=confetti sound=confetti
+excited: Три из трёх! Это звёздный результат!
+proud: Всё повторено! Беру тебя на подиум.
+
+## simon_is_jump | clip=jump
+neutral: Это был прыжок!
+
+## simon_is_flip | clip=flip
+neutral: Это было сальто!
+
+## simon_is_dance | clip=dance_glitter
+neutral: Это был танец!
+
+## simon_is_wave | clip=wave
+neutral: Это я помахала лапкой!
+
+## simon_is_sit | clip=sit_down
+neutral: Это я присела!
+
+## game_more | clip=listen
+excited: Ещё разок?
+happy: Ещё раунд? Скажи «да»!
+neutral: Сыграем ещё? Да или нет?
+
+## game_bye | clip=wave
+happy: Спасибо за игру! Было блестяще.
+neutral: Ладно, антракт! Потом ещё сыграем.
+excited: Игра окончена! Поклон!
+
+## where_live | clip=talk_casual
+excited: В твоей карте! Это мой блестящий домик.
+happy: В карте. У меня там гардероб и зеркальце.
+proud: Под звёздами в твоей карте! А брат живёт в СберKids.
+
+## likes | clip=talk_excited
+excited: Блёстки, наряды и звёзды!
+happy: Фотосессии! И наклейки. Голографические.
+proud: Смотреть на звёзды и сиять, как они.
+
+## friends | clip=talk_casual
+excited: Конечно! Ты, например. Моя звёздочка!
+happy: Хулиган и Добряк, мои братики. И ты!
+proud: Много! Звёзды, бабочки и ты, конечно.
+
+## tale | clip=talk_casual
+happy: Жила-была звёздочка. Она упала в коробку с блёстками и стала сиять ещё ярче. А потом стала мной! Конец.
+excited: Сказка! Кошка сшила платье из радуги. Все ахнули, а дождик перестал. Вот и сказочке конец!
+happy: Однажды луна потеряла блёстки. Кошка нашла их и вернула. С тех пор луна ей подмигивает. Конец!
+
+## friend | clip=shy fx=hearts_float
+excited: Давай! Теперь ты мой лучший друг.
+shy: Дружить? Ура! Это самое блестящее предложение.
+happy: Конечно! Друзья сияют вместе.
+
+## how_are_you | clip=talk_casual
+excited: Сияю! А с тобой ещё ярче.
+happy: Блестяще! Как всегда.
+proud: Отлично! Я сегодня особенно красивая.

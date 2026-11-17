@@ -489,6 +489,137 @@
     },
     "riddle_bye": {
       "clip": "wave"
+    },
+    "where_live": {
+      "clip": "talk_casual"
+    },
+    "likes": {
+      "clip": "talk_excited"
+    },
+    "friends": {
+      "clip": "talk_casual"
+    },
+    "tale": {
+      "clip": "talk_casual"
+    },
+    "friend": {
+      "clip": "shy",
+      "fx": "hearts_float"
+    },
+    "how_are_you": {
+      "clip": "talk_casual"
+    },
+    "offer_emo": {
+      "clip": "talk_excited"
+    },
+    "offer_rps": {
+      "clip": "talk_excited"
+    },
+    "offer_simon": {
+      "clip": "talk_excited"
+    },
+    "emo_start": {
+      "clip": "talk_casual"
+    },
+    "emo_ask": {
+      "clip": "none"
+    },
+    "emo_wrong": {
+      "clip": "none"
+    },
+    "emo_right": {
+      "clip": "celebrate",
+      "sound": "confetti"
+    },
+    "emo_is_happy": {
+      "clip": "laugh",
+      "face": "smile_big"
+    },
+    "emo_is_sad": {
+      "clip": "ears_back",
+      "face": "sad"
+    },
+    "emo_is_angry": {
+      "clip": "offended",
+      "face": "annoyed"
+    },
+    "emo_is_surprised": {
+      "clip": "surprised",
+      "face": "surprised"
+    },
+    "emo_is_sleepy": {
+      "clip": "idle_yawn",
+      "face": "sleepy"
+    },
+    "emo_is_shy": {
+      "clip": "shy",
+      "face": "shy"
+    },
+    "rps_start": {
+      "clip": "talk_casual"
+    },
+    "rps_go": {
+      "clip": "think"
+    },
+    "rps_again": {
+      "clip": "listen"
+    },
+    "rps_is_rock": {
+      "clip": "proud"
+    },
+    "rps_is_scissors": {
+      "clip": "proud"
+    },
+    "rps_is_paper": {
+      "clip": "proud"
+    },
+    "rps_win": {
+      "clip": "celebrate"
+    },
+    "rps_lose": {
+      "clip": "celebrate"
+    },
+    "rps_draw": {
+      "clip": "surprised"
+    },
+    "simon_start": {
+      "clip": "point_button",
+      "fx": "spotlight_button"
+    },
+    "simon_ask": {
+      "clip": "none"
+    },
+    "simon_wrong": {
+      "clip": "none"
+    },
+    "simon_right": {
+      "clip": "celebrate"
+    },
+    "simon_done": {
+      "clip": "celebrate",
+      "fx": "confetti",
+      "sound": "confetti"
+    },
+    "simon_is_jump": {
+      "clip": "jump"
+    },
+    "simon_is_flip": {
+      "clip": "flip"
+    },
+    "simon_is_dance": {
+      "clip": "dance_kind"
+    },
+    "simon_is_wave": {
+      "clip": "wave"
+    },
+    "simon_is_sit": {
+      "clip": "sit_down"
+    },
+    "game_more": {
+      "clip": "listen"
+    },
+    "game_bye": {
+      "clip": "wave"
     }
   },
   "lines": {
@@ -621,7 +752,7 @@
       },
       {
         "id": "kind.ask_name.02",
-        "text": "Давай познакомимся? Я Кот. А ты?",
+        "text": "Давай познакомимся? А то я тут один мурчу.",
         "emotion": "neutral",
         "face": "neutral"
       },
@@ -920,6 +1051,12 @@
         "text": "Тук — и я улыбаюсь.",
         "emotion": "caring",
         "face": "caring"
+      },
+      {
+        "id": "kind.tap_cat.04",
+        "text": "Тук-тук по коту! Я тут, рядышком.",
+        "emotion": "caring",
+        "face": "caring"
       }
     ],
     "tap_cat_head": [
@@ -934,6 +1071,24 @@
         "text": "Ой, по макушке. Это почти как погладить.",
         "emotion": "neutral",
         "face": "neutral"
+      },
+      {
+        "id": "kind.tap_cat_head.03",
+        "text": "По макушке? Мурр, это как маленькая обнимашка.",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "kind.tap_cat_head.04",
+        "text": "Ушки любят, когда их трогают ласково. Вот так.",
+        "emotion": "caring",
+        "face": "caring"
+      },
+      {
+        "id": "kind.tap_cat_head.05",
+        "text": "Тук по голове. Там живут добрые мысли.",
+        "emotion": "shy",
+        "face": "shy"
       }
     ],
     "tap_cat_cheek": [
@@ -962,6 +1117,24 @@
         "text": "Ой-ой, там я очень боюсь щекотки!",
         "emotion": "shy",
         "face": "shy"
+      },
+      {
+        "id": "kind.tap_cat_belly.03",
+        "text": "Хи-хи-хи! Животик щекотный, ой, не могу!",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "kind.tap_cat_belly.04",
+        "text": "Щекотка! Ой, сейчас от смеха пузыри пойдут!",
+        "emotion": "excited",
+        "face": "excited"
+      },
+      {
+        "id": "kind.tap_cat_belly.05",
+        "text": "Пузико! Только тихонько, оно стеснительное.",
+        "emotion": "shy",
+        "face": "shy"
       }
     ],
     "tap_cat_paw": [
@@ -976,6 +1149,24 @@
         "text": "Лапопожатие! Очень приятно.",
         "emotion": "caring",
         "face": "caring"
+      },
+      {
+        "id": "kind.tap_cat_paw.03",
+        "text": "Лапка в лапку! Теперь мы друзья.",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "kind.tap_cat_paw.04",
+        "text": "Тёплая лапка, правда? Я её для тебя грел.",
+        "emotion": "caring",
+        "face": "caring"
+      },
+      {
+        "id": "kind.tap_cat_paw.05",
+        "text": "Дай пять! Мягкие-мягкие пять.",
+        "emotion": "happy",
+        "face": "happy"
       }
     ],
     "tap_cat_tail": [
@@ -988,6 +1179,24 @@
       {
         "id": "kind.tap_cat_tail.02",
         "text": "Хвост лучше не трогать, ладно? Он у меня один.",
+        "emotion": "caring",
+        "face": "caring"
+      },
+      {
+        "id": "kind.tap_cat_tail.03",
+        "text": "Ой, хвостик! Он пушистый, как облачко.",
+        "emotion": "surprised",
+        "face": "surprised"
+      },
+      {
+        "id": "kind.tap_cat_tail.04",
+        "text": "Хвост виляет, значит, я радуюсь.",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "kind.tap_cat_tail.05",
+        "text": "Хвостик щекотно. Лучше погладь меня по спинке.",
         "emotion": "caring",
         "face": "caring"
       }
@@ -1038,6 +1247,18 @@
         "text": "Мур. Это значит «спасибо» по-кошачьи.",
         "emotion": "caring",
         "face": "purr"
+      },
+      {
+        "id": "kind.stroke.04",
+        "text": "Мур-мур. Гладь ещё, мне так спокойно.",
+        "emotion": "happy",
+        "face": "purr"
+      },
+      {
+        "id": "kind.stroke.05",
+        "text": "Ты гладишь, а я мурчу. Это наша песенка.",
+        "emotion": "caring",
+        "face": "purr"
       }
     ],
     "stroke_long": [
@@ -1057,6 +1278,18 @@
         "id": "kind.stroke_long.03",
         "text": "Можно я тебя обниму? Вот так, через стекло.",
         "emotion": "shy",
+        "face": "purr"
+      },
+      {
+        "id": "kind.stroke_long.04",
+        "text": "Обнимашки! Самые тёплые на свете.",
+        "emotion": "shy",
+        "face": "purr"
+      },
+      {
+        "id": "kind.stroke_long.05",
+        "text": "Мурр... Обниму тебя крепко-крепко, через экран.",
+        "emotion": "caring",
         "face": "purr"
       }
     ],
@@ -1104,6 +1337,18 @@
         "text": "Каждый пузырь — маленькое желание.",
         "emotion": "caring",
         "face": "caring"
+      },
+      {
+        "id": "kind.double_tap.04",
+        "text": "Пузыри для тебя! Загадай желание и лопни.",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "kind.double_tap.05",
+        "text": "Фокус! Самый большой пузырь. Он тоже тебя обнимает.",
+        "emotion": "excited",
+        "face": "excited"
       }
     ],
     "walk_to": [
@@ -1184,6 +1429,18 @@
         "text": "Ням! Самое вкусное угощение на свете.",
         "emotion": "excited",
         "face": "excited"
+      },
+      {
+        "id": "kind.treat.04",
+        "text": "Мм, печенька! Поделюсь с тобой. Половинку тебе!",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "kind.treat.05",
+        "text": "Спасибо! С тобой даже рыбка вкуснее.",
+        "emotion": "caring",
+        "face": "caring"
       }
     ],
     "shake": [
@@ -1507,15 +1764,21 @@
     "name_ask": [
       {
         "id": "kind.name_ask.01",
-        "text": "Я кот, близнец СберКота. Добрый вариант.",
+        "text": "Я Добряк, близнец СберКота. Самый тёплый из нас.",
         "emotion": "happy",
         "face": "happy"
       },
       {
         "id": "kind.name_ask.02",
-        "text": "Меня зовут Кот. У меня есть брат — СберКот. Мы похожи, правда?",
+        "text": "Меня зовут Добряк. А мой брат СберКот живёт в СберKids.",
         "emotion": "neutral",
         "face": "neutral"
+      },
+      {
+        "id": "kind.name_ask.03",
+        "text": "Я Добряк! Кот из твоей карты. Люблю обнимашки и пузыри.",
+        "emotion": "happy",
+        "face": "happy"
       }
     ],
     "age_ask": [
@@ -1604,6 +1867,18 @@
         "text": "Сальто для тебя!",
         "emotion": "happy",
         "face": "happy"
+      },
+      {
+        "id": "kind.flip.04",
+        "text": "Кувырок! Голова кружится, но весело.",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "kind.flip.05",
+        "text": "Ой, получилось! Держи пузырик в честь сальто.",
+        "emotion": "surprised",
+        "face": "surprised"
       }
     ],
     "jump": [
@@ -1644,6 +1919,18 @@
         "text": "Я не очень умею, но мне весело.",
         "emotion": "happy",
         "face": "happy"
+      },
+      {
+        "id": "kind.dance.04",
+        "text": "Танцую и пускаю пузыри! Буль-буль!",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "kind.dance.05",
+        "text": "Медленный танец, для обнимашек. Покачаемся?",
+        "emotion": "caring",
+        "face": "caring"
       }
     ],
     "sit": [
@@ -2402,6 +2689,548 @@
         "text": "Было интересно. Играем дальше.",
         "emotion": "happy",
         "face": "happy"
+      }
+    ],
+    "where_live": [
+      {
+        "id": "kind.where_live.01",
+        "text": "В твоей карте! Тут тепло и уютно.",
+        "emotion": "caring",
+        "face": "caring"
+      },
+      {
+        "id": "kind.where_live.02",
+        "text": "В карте, а в гостях бываю у брата в СберKids.",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "kind.where_live.03",
+        "text": "В карте. У меня там плед и какао.",
+        "emotion": "happy",
+        "face": "happy"
+      }
+    ],
+    "likes": [
+      {
+        "id": "kind.likes.01",
+        "text": "Какао с пенкой, мыльные пузыри и обнимашки.",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "kind.likes.02",
+        "text": "Люблю, когда меня гладят. И когда ты улыбаешься.",
+        "emotion": "caring",
+        "face": "caring"
+      },
+      {
+        "id": "kind.likes.03",
+        "text": "Пузыри! Большие, маленькие, всякие.",
+        "emotion": "happy",
+        "face": "happy"
+      }
+    ],
+    "friends": [
+      {
+        "id": "kind.friends.01",
+        "text": "Конечно! Ты мой друг. И брат СберКот.",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "kind.friends.02",
+        "text": "Есть. Хулиган и Блёстка, мои близнецы. И ты.",
+        "emotion": "caring",
+        "face": "caring"
+      },
+      {
+        "id": "kind.friends.03",
+        "text": "Друзей много не бывает. А с тобой дружить лучше всего.",
+        "emotion": "happy",
+        "face": "happy"
+      }
+    ],
+    "tale": [
+      {
+        "id": "kind.tale.01",
+        "text": "Жил-был котёнок, который боялся темноты. Он надул светящийся пузырь, и стало светло. Спокойной сказки!",
+        "emotion": "caring",
+        "face": "caring"
+      },
+      {
+        "id": "kind.tale.02",
+        "text": "Сказка про какао. Кот сварил его так много, что угостил всех соседей. И все подружились. Конец.",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "kind.tale.03",
+        "text": "Однажды пузырь улетел к облаку. Облако его обняло и стало мягким-мягким. Вот и сказочке конец.",
+        "emotion": "caring",
+        "face": "caring"
+      }
+    ],
+    "friend": [
+      {
+        "id": "kind.friend.01",
+        "text": "Давай! Я так рад. Теперь у нас дружба навсегда.",
+        "emotion": "shy",
+        "face": "shy"
+      },
+      {
+        "id": "kind.friend.02",
+        "text": "Конечно! Друзья обнимаются. Обними экран!",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "kind.friend.03",
+        "text": "Дружим! Я буду тебя ждать в карте.",
+        "emotion": "caring",
+        "face": "caring"
+      }
+    ],
+    "how_are_you": [
+      {
+        "id": "kind.how_are_you.01",
+        "text": "Хорошо! А раз ты тут, ещё лучше.",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "kind.how_are_you.02",
+        "text": "Тепло и уютно. Спасибо, что спрашиваешь.",
+        "emotion": "caring",
+        "face": "caring"
+      },
+      {
+        "id": "kind.how_are_you.03",
+        "text": "Мурр, отлично! Только что пил какао.",
+        "emotion": "happy",
+        "face": "happy"
+      }
+    ],
+    "offer_emo": [
+      {
+        "id": "kind.offer_emo.01",
+        "text": "Хочешь, я покажу настроение, а ты угадаешь?",
+        "emotion": "caring",
+        "face": "caring"
+      },
+      {
+        "id": "kind.offer_emo.02",
+        "text": "Поиграем в «Угадай эмоцию»? Скажи «да».",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "kind.offer_emo.03",
+        "text": "Я сделаю мордочку, а ты отгадаешь. Играем?",
+        "emotion": "happy",
+        "face": "happy"
+      }
+    ],
+    "offer_rps": [
+      {
+        "id": "kind.offer_rps.01",
+        "text": "Сыграем в камень, ножницы, бумагу? По-доброму.",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "kind.offer_rps.02",
+        "text": "Давай в камень, ножницы, бумагу? Скажи «да».",
+        "emotion": "caring",
+        "face": "caring"
+      },
+      {
+        "id": "kind.offer_rps.03",
+        "text": "Хочешь, сыграем в камень, ножницы, бумагу?",
+        "emotion": "happy",
+        "face": "happy"
+      }
+    ],
+    "offer_simon": [
+      {
+        "id": "kind.offer_simon.01",
+        "text": "Давай я покажу движение, а ты повторишь?",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "kind.offer_simon.02",
+        "text": "Поиграем? Я двигаюсь, а ты жмёшь такую же кнопку.",
+        "emotion": "caring",
+        "face": "caring"
+      },
+      {
+        "id": "kind.offer_simon.03",
+        "text": "Хочешь поиграть в «Делай как я»? Скажи «да».",
+        "emotion": "happy",
+        "face": "happy"
+      }
+    ],
+    "emo_start": [
+      {
+        "id": "kind.emo_start.01",
+        "text": "Играем! Я покажу настроение, а ты угадай, какое.",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "kind.emo_start.02",
+        "text": "Смотри на мою мордочку и скажи, какой я.",
+        "emotion": "caring",
+        "face": "caring"
+      }
+    ],
+    "emo_ask": [
+      {
+        "id": "kind.emo_ask.01",
+        "text": "Какой я сейчас?",
+        "emotion": "caring",
+        "face": "caring"
+      },
+      {
+        "id": "kind.emo_ask.02",
+        "text": "А теперь угадай, какой я?",
+        "emotion": "happy",
+        "face": "happy"
+      }
+    ],
+    "emo_wrong": [
+      {
+        "id": "kind.emo_wrong.01",
+        "text": "Почти! Посмотри ещё разок.",
+        "emotion": "caring",
+        "face": "caring"
+      },
+      {
+        "id": "kind.emo_wrong.02",
+        "text": "Не совсем. Смотри внимательно.",
+        "emotion": "neutral",
+        "face": "neutral"
+      }
+    ],
+    "emo_right": [
+      {
+        "id": "kind.emo_right.01",
+        "text": "Правильно! Ты меня так хорошо понимаешь.",
+        "emotion": "excited",
+        "face": "excited"
+      },
+      {
+        "id": "kind.emo_right.02",
+        "text": "Угадано! Мурр, держи пузырик.",
+        "emotion": "happy",
+        "face": "happy"
+      }
+    ],
+    "emo_is_happy": [
+      {
+        "id": "kind.emo_is_happy.01",
+        "text": "Это я радовался! Мурр.",
+        "emotion": "happy",
+        "face": "smile_big"
+      }
+    ],
+    "emo_is_sad": [
+      {
+        "id": "kind.emo_is_sad.01",
+        "text": "Это я грустил. Но с тобой уже не грустно.",
+        "emotion": "sad",
+        "face": "sad"
+      }
+    ],
+    "emo_is_angry": [
+      {
+        "id": "kind.emo_is_angry.01",
+        "text": "Это я сердился. Понарошку, честно.",
+        "emotion": "annoyed",
+        "face": "annoyed"
+      }
+    ],
+    "emo_is_surprised": [
+      {
+        "id": "kind.emo_is_surprised.01",
+        "text": "Это я удивлялся! Ух ты!",
+        "emotion": "surprised",
+        "face": "surprised"
+      }
+    ],
+    "emo_is_sleepy": [
+      {
+        "id": "kind.emo_is_sleepy.01",
+        "text": "Это я был сонный. Ох, зеваю.",
+        "emotion": "sleepy",
+        "face": "sleepy"
+      }
+    ],
+    "emo_is_shy": [
+      {
+        "id": "kind.emo_is_shy.01",
+        "text": "Это я стеснялся. Ой, опять.",
+        "emotion": "shy",
+        "face": "shy"
+      }
+    ],
+    "rps_start": [
+      {
+        "id": "kind.rps_start.01",
+        "text": "Камень, ножницы, бумага! Скажи, что выбираешь.",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "kind.rps_start.02",
+        "text": "Я считаю до трёх, а ты говоришь: камень, ножницы или бумага.",
+        "emotion": "caring",
+        "face": "caring"
+      }
+    ],
+    "rps_go": [
+      {
+        "id": "kind.rps_go.01",
+        "text": "Раз, два, три!",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "kind.rps_go.02",
+        "text": "Камень, ножницы, бумага... раз, два, три!",
+        "emotion": "caring",
+        "face": "caring"
+      }
+    ],
+    "rps_again": [
+      {
+        "id": "kind.rps_again.01",
+        "text": "Я не расслышал. Камень, ножницы или бумага?",
+        "emotion": "caring",
+        "face": "caring"
+      },
+      {
+        "id": "kind.rps_again.02",
+        "text": "Скажи одно слово: камень, ножницы или бумага.",
+        "emotion": "neutral",
+        "face": "neutral"
+      }
+    ],
+    "rps_is_rock": [
+      {
+        "id": "kind.rps_is_rock.01",
+        "text": "У меня камень!",
+        "emotion": "happy",
+        "face": "happy"
+      }
+    ],
+    "rps_is_scissors": [
+      {
+        "id": "kind.rps_is_scissors.01",
+        "text": "У меня ножницы!",
+        "emotion": "happy",
+        "face": "happy"
+      }
+    ],
+    "rps_is_paper": [
+      {
+        "id": "kind.rps_is_paper.01",
+        "text": "У меня бумага!",
+        "emotion": "happy",
+        "face": "happy"
+      }
+    ],
+    "rps_win": [
+      {
+        "id": "kind.rps_win.01",
+        "text": "Победа твоя! Поздравляю, мурр.",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "kind.rps_win.02",
+        "text": "Победа за тобой! Я за тебя рад.",
+        "emotion": "caring",
+        "face": "caring"
+      }
+    ],
+    "rps_lose": [
+      {
+        "id": "kind.rps_lose.01",
+        "text": "Ой, у меня получилось! Это случайно.",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "kind.rps_lose.02",
+        "text": "Я выиграл. Хочешь, отдам тебе пузырик?",
+        "emotion": "shy",
+        "face": "shy"
+      }
+    ],
+    "rps_draw": [
+      {
+        "id": "kind.rps_draw.01",
+        "text": "Ничья! Мы одинаково думаем.",
+        "emotion": "surprised",
+        "face": "surprised"
+      },
+      {
+        "id": "kind.rps_draw.02",
+        "text": "Ничья! Значит, мы оба молодцы.",
+        "emotion": "happy",
+        "face": "happy"
+      }
+    ],
+    "simon_start": [
+      {
+        "id": "kind.simon_start.01",
+        "text": "Я делаю движение, а ты нажимаешь такую же кнопку внизу.",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "kind.simon_start.02",
+        "text": "Смотри на меня и повторяй кнопкой. Не торопись.",
+        "emotion": "caring",
+        "face": "caring"
+      }
+    ],
+    "simon_ask": [
+      {
+        "id": "kind.simon_ask.01",
+        "text": "Смотри внимательно!",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "kind.simon_ask.02",
+        "text": "Повторишь?",
+        "emotion": "caring",
+        "face": "caring"
+      }
+    ],
+    "simon_wrong": [
+      {
+        "id": "kind.simon_wrong.01",
+        "text": "Не то. Ничего, смотри ещё раз.",
+        "emotion": "caring",
+        "face": "caring"
+      },
+      {
+        "id": "kind.simon_wrong.02",
+        "text": "Почти! Повторяю медленнее.",
+        "emotion": "neutral",
+        "face": "neutral"
+      }
+    ],
+    "simon_right": [
+      {
+        "id": "kind.simon_right.01",
+        "text": "Здорово! Следующее.",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "kind.simon_right.02",
+        "text": "Верно! Ещё одно.",
+        "emotion": "excited",
+        "face": "excited"
+      }
+    ],
+    "simon_done": [
+      {
+        "id": "kind.simon_done.01",
+        "text": "Три из трёх! Ты повторяешь лучше меня.",
+        "emotion": "excited",
+        "face": "excited"
+      },
+      {
+        "id": "kind.simon_done.02",
+        "text": "Всё правильно! Держи обнимашку.",
+        "emotion": "happy",
+        "face": "happy"
+      }
+    ],
+    "simon_is_jump": [
+      {
+        "id": "kind.simon_is_jump.01",
+        "text": "Это был прыжок!",
+        "emotion": "neutral",
+        "face": "neutral"
+      }
+    ],
+    "simon_is_flip": [
+      {
+        "id": "kind.simon_is_flip.01",
+        "text": "Это было сальто!",
+        "emotion": "neutral",
+        "face": "neutral"
+      }
+    ],
+    "simon_is_dance": [
+      {
+        "id": "kind.simon_is_dance.01",
+        "text": "Это был танец!",
+        "emotion": "neutral",
+        "face": "neutral"
+      }
+    ],
+    "simon_is_wave": [
+      {
+        "id": "kind.simon_is_wave.01",
+        "text": "Это я помахал лапкой!",
+        "emotion": "neutral",
+        "face": "neutral"
+      }
+    ],
+    "simon_is_sit": [
+      {
+        "id": "kind.simon_is_sit.01",
+        "text": "Это я присел!",
+        "emotion": "neutral",
+        "face": "neutral"
+      }
+    ],
+    "game_more": [
+      {
+        "id": "kind.game_more.01",
+        "text": "Ещё разок?",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "kind.game_more.02",
+        "text": "Сыграем ещё? Скажи «да».",
+        "emotion": "caring",
+        "face": "caring"
+      },
+      {
+        "id": "kind.game_more.03",
+        "text": "Ещё раунд? Да или нет?",
+        "emotion": "neutral",
+        "face": "neutral"
+      }
+    ],
+    "game_bye": [
+      {
+        "id": "kind.game_bye.01",
+        "text": "Хорошо, отдохнём. Было весело.",
+        "emotion": "caring",
+        "face": "caring"
+      },
+      {
+        "id": "kind.game_bye.02",
+        "text": "Спасибо за игру! Мурр.",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "kind.game_bye.03",
+        "text": "Ладно, поиграем потом.",
+        "emotion": "neutral",
+        "face": "neutral"
       }
     ]
   },

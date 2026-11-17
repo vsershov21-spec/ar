@@ -498,6 +498,137 @@
     },
     "riddle_bye": {
       "clip": "wave"
+    },
+    "where_live": {
+      "clip": "point_button"
+    },
+    "likes": {
+      "clip": "talk_excited"
+    },
+    "friends": {
+      "clip": "talk_casual"
+    },
+    "tale": {
+      "clip": "talk_casual"
+    },
+    "friend": {
+      "clip": "shy",
+      "fx": "hearts_float"
+    },
+    "how_are_you": {
+      "clip": "talk_casual"
+    },
+    "offer_emo": {
+      "clip": "talk_excited"
+    },
+    "offer_rps": {
+      "clip": "talk_excited"
+    },
+    "offer_simon": {
+      "clip": "talk_excited"
+    },
+    "emo_start": {
+      "clip": "talk_excited"
+    },
+    "emo_ask": {
+      "clip": "none"
+    },
+    "emo_wrong": {
+      "clip": "none"
+    },
+    "emo_right": {
+      "clip": "celebrate",
+      "sound": "confetti"
+    },
+    "emo_is_happy": {
+      "clip": "laugh",
+      "face": "smile_big"
+    },
+    "emo_is_sad": {
+      "clip": "ears_back",
+      "face": "sad"
+    },
+    "emo_is_angry": {
+      "clip": "offended",
+      "face": "annoyed"
+    },
+    "emo_is_surprised": {
+      "clip": "surprised",
+      "face": "surprised"
+    },
+    "emo_is_sleepy": {
+      "clip": "idle_yawn",
+      "face": "sleepy"
+    },
+    "emo_is_shy": {
+      "clip": "shy",
+      "face": "shy"
+    },
+    "rps_start": {
+      "clip": "talk_excited"
+    },
+    "rps_go": {
+      "clip": "think"
+    },
+    "rps_again": {
+      "clip": "listen"
+    },
+    "rps_is_rock": {
+      "clip": "proud"
+    },
+    "rps_is_scissors": {
+      "clip": "proud"
+    },
+    "rps_is_paper": {
+      "clip": "proud"
+    },
+    "rps_win": {
+      "clip": "offended"
+    },
+    "rps_lose": {
+      "clip": "celebrate"
+    },
+    "rps_draw": {
+      "clip": "surprised"
+    },
+    "simon_start": {
+      "clip": "point_button",
+      "fx": "spotlight_button"
+    },
+    "simon_ask": {
+      "clip": "none"
+    },
+    "simon_wrong": {
+      "clip": "none"
+    },
+    "simon_right": {
+      "clip": "celebrate"
+    },
+    "simon_done": {
+      "clip": "celebrate",
+      "fx": "confetti",
+      "sound": "confetti"
+    },
+    "simon_is_jump": {
+      "clip": "jump"
+    },
+    "simon_is_flip": {
+      "clip": "flip"
+    },
+    "simon_is_dance": {
+      "clip": "dance_hooligan"
+    },
+    "simon_is_wave": {
+      "clip": "wave"
+    },
+    "simon_is_sit": {
+      "clip": "sit_down"
+    },
+    "game_more": {
+      "clip": "listen"
+    },
+    "game_bye": {
+      "clip": "wave"
     }
   },
   "lines": {
@@ -959,6 +1090,12 @@
         "text": "Тык в кота — к удаче. Наверное.",
         "emotion": "cheeky",
         "face": "smirk"
+      },
+      {
+        "id": "hooligan.tap_cat.05",
+        "text": "Ещё тык, и начну брать плату. Жвачкой.",
+        "emotion": "cheeky",
+        "face": "smirk"
       }
     ],
     "tap_cat_head": [
@@ -977,6 +1114,18 @@
       {
         "id": "hooligan.tap_cat_head.03",
         "text": "Ай! Ну ладно, это было смешно.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.tap_cat_head.04",
+        "text": "Эй, причёску под кепкой не трогать!",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.tap_cat_head.05",
+        "text": "Тук по макушке. Там, между прочим, гениальные идеи.",
         "emotion": "cheeky",
         "face": "smirk"
       }
@@ -1019,6 +1168,18 @@
         "text": "Щекотка! Сдаюсь, сдаюсь!",
         "emotion": "excited",
         "face": "excited"
+      },
+      {
+        "id": "hooligan.tap_cat_belly.04",
+        "text": "Ха-ха! Пузо щекотать нечестно!",
+        "emotion": "excited",
+        "face": "excited"
+      },
+      {
+        "id": "hooligan.tap_cat_belly.05",
+        "text": "Стоп, это мой пресс! Ладно, не пресс. Ха-ха!",
+        "emotion": "cheeky",
+        "face": "smirk"
       }
     ],
     "tap_cat_paw": [
@@ -1039,6 +1200,18 @@
         "text": "Хочешь лапу? Сначала покажи трюк.",
         "emotion": "cheeky",
         "face": "smirk"
+      },
+      {
+        "id": "hooligan.tap_cat_paw.04",
+        "text": "Эта лапа рисует граффити. Аккуратнее с ней.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.tap_cat_paw.05",
+        "text": "Ладно, держи пять. Только лапу верни!",
+        "emotion": "happy",
+        "face": "happy"
       }
     ],
     "tap_cat_tail": [
@@ -1057,6 +1230,18 @@
       {
         "id": "hooligan.tap_cat_tail.03",
         "text": "Хвост не кнопка, не нажимается!",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.tap_cat_tail.04",
+        "text": "Хвост мне нужен на скейте. Это руль!",
+        "emotion": "annoyed",
+        "face": "annoyed"
+      },
+      {
+        "id": "hooligan.tap_cat_tail.05",
+        "text": "За хвост? Ну всё, ловлю твой палец!",
         "emotion": "cheeky",
         "face": "smirk"
       }
@@ -1119,6 +1304,18 @@
         "text": "Вот тут, за ухом. Да, вот так.",
         "emotion": "happy",
         "face": "purr"
+      },
+      {
+        "id": "hooligan.stroke.04",
+        "text": "Мурр... Только пацанам со двора не рассказывай.",
+        "emotion": "shy",
+        "face": "purr"
+      },
+      {
+        "id": "hooligan.stroke.05",
+        "text": "Ещё за ухом. Да, вот тут. Респект.",
+        "emotion": "happy",
+        "face": "purr"
       }
     ],
     "stroke_long": [
@@ -1137,6 +1334,12 @@
       {
         "id": "hooligan.stroke_long.03",
         "text": "Хулиганы тоже любят, когда их гладят. Тс-с.",
+        "emotion": "shy",
+        "face": "purr"
+      },
+      {
+        "id": "hooligan.stroke_long.04",
+        "text": "Обнимашки? Ладно, только быстро. Ну ладно, не быстро.",
         "emotion": "shy",
         "face": "purr"
       }
@@ -1191,6 +1394,18 @@
         "text": "Хоп — и пузырь на весь экран!",
         "emotion": "cheeky",
         "face": "smirk"
+      },
+      {
+        "id": "hooligan.double_tap.04",
+        "text": "Пузырь размером с арбуз! Ну почти.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.double_tap.05",
+        "text": "Фокус-покус, жвачка, пузырь!",
+        "emotion": "proud",
+        "face": "proud"
       }
     ],
     "walk_to": [
@@ -1283,6 +1498,18 @@
         "text": "Хрум-хрум! Вот это я понимаю — угощение!",
         "emotion": "excited",
         "face": "excited"
+      },
+      {
+        "id": "hooligan.treat.04",
+        "text": "Хрусть! Это вкуснее жвачки. Почти.",
+        "emotion": "excited",
+        "face": "excited"
+      },
+      {
+        "id": "hooligan.treat.05",
+        "text": "Вкусняшка засчитана. За такое и трюк не жалко.",
+        "emotion": "cheeky",
+        "face": "smirk"
       }
     ],
     "shake": [
@@ -1636,13 +1863,13 @@
       },
       {
         "id": "hooligan.name_ask.02",
-        "text": "Я кот из карты. Имя секретное — зови просто Кот.",
+        "text": "Я Хулиган! Кот из твоей карты и мастер трюков.",
         "emotion": "cheeky",
         "face": "smirk"
       },
       {
         "id": "hooligan.name_ask.03",
-        "text": "Я Кот, близнец СберКота. Похож, но с характером.",
+        "text": "Хулиган я. Близнец СберКота, только с характером.",
         "emotion": "neutral",
         "face": "neutral"
       }
@@ -1739,6 +1966,18 @@
         "text": "Хоп! Как тебе?",
         "emotion": "cheeky",
         "face": "smirk"
+      },
+      {
+        "id": "hooligan.flip.04",
+        "text": "Сальто с разворотом! Скейт бы обзавидовался.",
+        "emotion": "proud",
+        "face": "proud"
+      },
+      {
+        "id": "hooligan.flip.05",
+        "text": "Хоп! Кепка на месте, проверено.",
+        "emotion": "cheeky",
+        "face": "smirk"
       }
     ],
     "jump": [
@@ -1779,6 +2018,18 @@
         "text": "Оп-оп, смотри, какой движ!",
         "emotion": "cheeky",
         "face": "smirk"
+      },
+      {
+        "id": "hooligan.dance.04",
+        "text": "Брейк-данс! Пол не царапаю, честно.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.dance.05",
+        "text": "Музыка в голове, движ в лапах!",
+        "emotion": "excited",
+        "face": "excited"
       }
     ],
     "sit": [
@@ -2535,6 +2786,548 @@
       {
         "id": "hooligan.riddle_bye.03",
         "text": "Хватит так хватит. Играем дальше.",
+        "emotion": "neutral",
+        "face": "neutral"
+      }
+    ],
+    "where_live": [
+      {
+        "id": "hooligan.where_live.01",
+        "text": "В твоей карте! А в СберKids живёт мой брат.",
+        "emotion": "neutral",
+        "face": "neutral"
+      },
+      {
+        "id": "hooligan.where_live.02",
+        "text": "В карте. Тесновато, зато скейт помещается.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.where_live.03",
+        "text": "Днём в карте, а ночью катаюсь по экрану. Секрет!",
+        "emotion": "cheeky",
+        "face": "smirk"
+      }
+    ],
+    "likes": [
+      {
+        "id": "hooligan.likes.01",
+        "text": "Скейт, граффити и жвачку. И с тобой тусить.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.likes.02",
+        "text": "Кататься на скейте! И рыбку. И когда смешно.",
+        "emotion": "excited",
+        "face": "excited"
+      },
+      {
+        "id": "hooligan.likes.03",
+        "text": "Рэп и пузыри из жвачки. Огромные!",
+        "emotion": "cheeky",
+        "face": "smirk"
+      }
+    ],
+    "friends": [
+      {
+        "id": "hooligan.friends.01",
+        "text": "Конечно! Ты, например.",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "hooligan.friends.02",
+        "text": "Целая банда: брат, Добряк, Блёстка и ты.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.friends.03",
+        "text": "Друзья есть. Но ты в списке номер один.",
+        "emotion": "neutral",
+        "face": "neutral"
+      }
+    ],
+    "tale": [
+      {
+        "id": "hooligan.tale.01",
+        "text": "Жил-был кот на скейте. Катался, катался и докатился до твоей карты. Тут и живёт. Конец!",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.tale.02",
+        "text": "Сказка. Кот нарисовал на стене солнце. Стало так светло, что все проснулись. Даже брат. Конец.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.tale.03",
+        "text": "Однажды жвачка надулась так, что кот улетел на ней к звёздам. Вернулся к ужину. Конец!",
+        "emotion": "neutral",
+        "face": "neutral"
+      }
+    ],
+    "friend": [
+      {
+        "id": "hooligan.friend.01",
+        "text": "Дружить? Давай! Ты теперь в моей банде.",
+        "emotion": "shy",
+        "face": "shy"
+      },
+      {
+        "id": "hooligan.friend.02",
+        "text": "Давай! Друг хулигана почти супергерой.",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "hooligan.friend.03",
+        "text": "Дружим! Дай пять. Только по-честному.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      }
+    ],
+    "how_are_you": [
+      {
+        "id": "hooligan.how_are_you.01",
+        "text": "Норм! Даже отлично, раз ты тут.",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "hooligan.how_are_you.02",
+        "text": "Как у кота на скейте: быстро и весело!",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.how_are_you.03",
+        "text": "Нормально. Скейт цел, кепка на месте.",
+        "emotion": "neutral",
+        "face": "neutral"
+      }
+    ],
+    "offer_emo": [
+      {
+        "id": "hooligan.offer_emo.01",
+        "text": "Хочешь, скорчу рожицу, а ты угадаешь, какой я?",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.offer_emo.02",
+        "text": "Спорим, не угадаешь мою рожицу? Играем?",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.offer_emo.03",
+        "text": "Давай в «Угадай эмоцию»? Скажи «да».",
+        "emotion": "happy",
+        "face": "happy"
+      }
+    ],
+    "offer_rps": [
+      {
+        "id": "hooligan.offer_rps.01",
+        "text": "Сыграем в камень, ножницы, бумагу?",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.offer_rps.02",
+        "text": "Камень, ножницы, бумага. Вызываю тебя! Играем?",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.offer_rps.03",
+        "text": "Давай в камень, ножницы, бумагу? Скажи «да».",
+        "emotion": "excited",
+        "face": "excited"
+      }
+    ],
+    "offer_simon": [
+      {
+        "id": "hooligan.offer_simon.01",
+        "text": "Повторишь мои движения? Спорим, нет?",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.offer_simon.02",
+        "text": "Я показываю движение, ты повторяешь. Играем?",
+        "emotion": "excited",
+        "face": "excited"
+      },
+      {
+        "id": "hooligan.offer_simon.03",
+        "text": "Игра «Делай как я», только кнопками. Сыграем?",
+        "emotion": "cheeky",
+        "face": "smirk"
+      }
+    ],
+    "emo_start": [
+      {
+        "id": "hooligan.emo_start.01",
+        "text": "Играем! Я корчу рожицу, а ты угадываешь, какой я.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.emo_start.02",
+        "text": "Угадай мою рожицу! Я мастер кривляний.",
+        "emotion": "excited",
+        "face": "excited"
+      }
+    ],
+    "emo_ask": [
+      {
+        "id": "hooligan.emo_ask.01",
+        "text": "Ну, какой я сейчас?",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.emo_ask.02",
+        "text": "Смотри на морду. Какой я?",
+        "emotion": "neutral",
+        "face": "neutral"
+      }
+    ],
+    "emo_wrong": [
+      {
+        "id": "hooligan.emo_wrong.01",
+        "text": "Не-а. Смотри ещё раз, внимательно.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.emo_wrong.02",
+        "text": "Мимо! Глянь ещё разок.",
+        "emotion": "neutral",
+        "face": "neutral"
+      }
+    ],
+    "emo_right": [
+      {
+        "id": "hooligan.emo_right.01",
+        "text": "В точку! Читаешь меня, как комикс.",
+        "emotion": "excited",
+        "face": "excited"
+      },
+      {
+        "id": "hooligan.emo_right.02",
+        "text": "Угадано! Респект.",
+        "emotion": "proud",
+        "face": "proud"
+      }
+    ],
+    "emo_is_happy": [
+      {
+        "id": "hooligan.emo_is_happy.01",
+        "text": "Это был весёлый я! Ну, как обычно.",
+        "emotion": "happy",
+        "face": "smile_big"
+      }
+    ],
+    "emo_is_sad": [
+      {
+        "id": "hooligan.emo_is_sad.01",
+        "text": "Это был грустный я. Но уже прошло.",
+        "emotion": "sad",
+        "face": "sad"
+      }
+    ],
+    "emo_is_angry": [
+      {
+        "id": "hooligan.emo_is_angry.01",
+        "text": "Это был сердитый я! Р-р-р. Шучу.",
+        "emotion": "annoyed",
+        "face": "annoyed"
+      }
+    ],
+    "emo_is_surprised": [
+      {
+        "id": "hooligan.emo_is_surprised.01",
+        "text": "Это был удивлённый я! Ого-го.",
+        "emotion": "surprised",
+        "face": "surprised"
+      }
+    ],
+    "emo_is_sleepy": [
+      {
+        "id": "hooligan.emo_is_sleepy.01",
+        "text": "Это был сонный я. Хр-р... Ой.",
+        "emotion": "sleepy",
+        "face": "sleepy"
+      }
+    ],
+    "emo_is_shy": [
+      {
+        "id": "hooligan.emo_is_shy.01",
+        "text": "Это я стеснялся. Только никому!",
+        "emotion": "shy",
+        "face": "shy"
+      }
+    ],
+    "rps_start": [
+      {
+        "id": "hooligan.rps_start.01",
+        "text": "Камень, ножницы, бумага! Скажи вслух, что выбираешь.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.rps_start.02",
+        "text": "Играем! На счёт «три» говори: камень, ножницы или бумага.",
+        "emotion": "excited",
+        "face": "excited"
+      }
+    ],
+    "rps_go": [
+      {
+        "id": "hooligan.rps_go.01",
+        "text": "Раз, два, три!",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.rps_go.02",
+        "text": "Камень, ножницы, бумага... раз, два, три!",
+        "emotion": "excited",
+        "face": "excited"
+      }
+    ],
+    "rps_again": [
+      {
+        "id": "hooligan.rps_again.01",
+        "text": "Не понял. Камень, ножницы или бумага?",
+        "emotion": "neutral",
+        "face": "neutral"
+      },
+      {
+        "id": "hooligan.rps_again.02",
+        "text": "Ну? Скажи одно: камень, ножницы или бумага.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      }
+    ],
+    "rps_is_rock": [
+      {
+        "id": "hooligan.rps_is_rock.01",
+        "text": "У меня камень!",
+        "emotion": "proud",
+        "face": "proud"
+      }
+    ],
+    "rps_is_scissors": [
+      {
+        "id": "hooligan.rps_is_scissors.01",
+        "text": "У меня ножницы! Чик-чик.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      }
+    ],
+    "rps_is_paper": [
+      {
+        "id": "hooligan.rps_is_paper.01",
+        "text": "У меня бумага!",
+        "emotion": "neutral",
+        "face": "neutral"
+      }
+    ],
+    "rps_win": [
+      {
+        "id": "hooligan.rps_win.01",
+        "text": "Эх, победа твоя! Ну ты даёшь.",
+        "emotion": "annoyed",
+        "face": "annoyed"
+      },
+      {
+        "id": "hooligan.rps_win.02",
+        "text": "Обыграли меня! Ладно, уважаю.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      }
+    ],
+    "rps_lose": [
+      {
+        "id": "hooligan.rps_lose.01",
+        "text": "Йо, моя победа!",
+        "emotion": "proud",
+        "face": "proud"
+      },
+      {
+        "id": "hooligan.rps_lose.02",
+        "text": "Хе-хе, я выиграл. Повезло, наверное.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      }
+    ],
+    "rps_draw": [
+      {
+        "id": "hooligan.rps_draw.01",
+        "text": "Ничья! Мысли у нас одинаковые.",
+        "emotion": "surprised",
+        "face": "surprised"
+      },
+      {
+        "id": "hooligan.rps_draw.02",
+        "text": "Ничья! Кажется, ты читаешь мои мысли.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      }
+    ],
+    "simon_start": [
+      {
+        "id": "hooligan.simon_start.01",
+        "text": "Я показываю движение, а ты жмёшь такую же кнопку внизу. Погнали!",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.simon_start.02",
+        "text": "Делай как я! Смотри, что я делаю, и жми ту же кнопку.",
+        "emotion": "excited",
+        "face": "excited"
+      }
+    ],
+    "simon_ask": [
+      {
+        "id": "hooligan.simon_ask.01",
+        "text": "Смотри и повторяй!",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.simon_ask.02",
+        "text": "Запоминай движение!",
+        "emotion": "neutral",
+        "face": "neutral"
+      }
+    ],
+    "simon_wrong": [
+      {
+        "id": "hooligan.simon_wrong.01",
+        "text": "Не то! Смотри ещё раз.",
+        "emotion": "neutral",
+        "face": "neutral"
+      },
+      {
+        "id": "hooligan.simon_wrong.02",
+        "text": "Мимо. Глянь внимательно.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      }
+    ],
+    "simon_right": [
+      {
+        "id": "hooligan.simon_right.01",
+        "text": "Чётко! Следующее!",
+        "emotion": "excited",
+        "face": "excited"
+      },
+      {
+        "id": "hooligan.simon_right.02",
+        "text": "Есть! Дальше сложнее.",
+        "emotion": "proud",
+        "face": "proud"
+      }
+    ],
+    "simon_done": [
+      {
+        "id": "hooligan.simon_done.01",
+        "text": "Три из трёх! Повторяешь лучше всех.",
+        "emotion": "excited",
+        "face": "excited"
+      },
+      {
+        "id": "hooligan.simon_done.02",
+        "text": "Всё повторено! Беру тебя в свою банду.",
+        "emotion": "proud",
+        "face": "proud"
+      }
+    ],
+    "simon_is_jump": [
+      {
+        "id": "hooligan.simon_is_jump.01",
+        "text": "Это был прыжок!",
+        "emotion": "neutral",
+        "face": "neutral"
+      }
+    ],
+    "simon_is_flip": [
+      {
+        "id": "hooligan.simon_is_flip.01",
+        "text": "Это было сальто!",
+        "emotion": "neutral",
+        "face": "neutral"
+      }
+    ],
+    "simon_is_dance": [
+      {
+        "id": "hooligan.simon_is_dance.01",
+        "text": "Это был танец!",
+        "emotion": "neutral",
+        "face": "neutral"
+      }
+    ],
+    "simon_is_wave": [
+      {
+        "id": "hooligan.simon_is_wave.01",
+        "text": "Это я лапой махал!",
+        "emotion": "neutral",
+        "face": "neutral"
+      }
+    ],
+    "simon_is_sit": [
+      {
+        "id": "hooligan.simon_is_sit.01",
+        "text": "Я просто сел!",
+        "emotion": "neutral",
+        "face": "neutral"
+      }
+    ],
+    "game_more": [
+      {
+        "id": "hooligan.game_more.01",
+        "text": "Ещё раунд?",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.game_more.02",
+        "text": "Ещё разок? Да или нет?",
+        "emotion": "neutral",
+        "face": "neutral"
+      },
+      {
+        "id": "hooligan.game_more.03",
+        "text": "Реванш? Скажи «да».",
+        "emotion": "cheeky",
+        "face": "smirk"
+      }
+    ],
+    "game_bye": [
+      {
+        "id": "hooligan.game_bye.01",
+        "text": "Окей, игра окончена. Было огонь!",
+        "emotion": "neutral",
+        "face": "neutral"
+      },
+      {
+        "id": "hooligan.game_bye.02",
+        "text": "Ладно, перерыв. Лапы отдыхают.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.game_bye.03",
+        "text": "Хватит так хватит. Ещё сыграем.",
         "emotion": "neutral",
         "face": "neutral"
       }

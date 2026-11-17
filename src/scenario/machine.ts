@@ -6,7 +6,7 @@
  */
 import type { PersonaId } from '../persona/types';
 import { PERSONA_IDS, isPersonaId } from '../persona/types';
-import { answerDialog, resolveTrigger, startDialog, type DialogCmd, type DialogStep, type DialogsFile, type DialogState, type ListenMode } from './dialogs';
+import { answerDialog, isGameMode, resolveTrigger, startDialog, type DialogCmd, type DialogStep, type DialogsFile, type DialogState, type GameItem, type ListenMode } from './dialogs';
 import type { ContextEvent } from './session';
 
 export type Phase =
@@ -56,7 +56,17 @@ export interface ScenarioState {
   /** поддержка (грустно/страшно): игра на паузе */
   paused: boolean;
   riddleSeq: number;
+  /** мини-игра с выбором (угадай эмоцию, камень-ножницы-бумага, повтори движение): что загадал кот, какой раунд */
+  game: GameState | null;
   context: ContextEvent | null;
+}
+
+export interface GameState {
+  id: string;
+  /** что загадал / выбрал кот (id варианта из dialogs.json → games) */
+  pick: string | null;
+  round: number;
+  last: string | null;
 }
 
 export type ScenarioEvent =
@@ -72,6 +82,8 @@ export type ScenarioEvent =
   | { type: 'interaction'; kind: InteractionKind }
   | { type: 'intent'; intent: Heard }
   | { type: 'answer'; result: 'right' | 'wrong' | 'giveup'; text?: string }
+  /** ответ в мини-игре: id варианта (dialogs.json → games), '$giveup' — «не знаю», null — не разобрали */
+  | { type: 'game_answer'; value: string | null; text?: string }
   /** тишина: кот сам заговаривает (лестница тишины режиссёра — scenario/initiative.ts) */
   | { type: 'silence'; byCat?: boolean }
   /** кот сам предлагает занятие (по кругу): riddle | echo | dance */
@@ -110,7 +122,11 @@ export type Action =
   | { type: 'open_sberkids' }
   | { type: 'adult_hint' }
   | { type: 'goodbye' }
-  | { type: 'pause'; on: boolean };
+  | { type: 'pause'; on: boolean }
+  /** мини-игра: кот показывает вариант (эмоцию лицом и клипом, движение — клипом реакции события) — когда договорит */
+  | { type: 'game_show'; face?: string; clip?: string; event?: string }
+  /** «мне скучно»: кот предлагает следующее занятие по кругу (у какого есть озвученный вопрос — знает режиссёр) */
+  | { type: 'offer_next' };
 
 export interface ScenarioConfig {
   dialogs: DialogsFile;
@@ -147,6 +163,7 @@ export function initialState(memory: { name?: string | null; persona?: PersonaId
     listenToken: 0,
     paused: false,
     riddleSeq: 0,
+    game: null,
     context,
   };
 }
@@ -171,7 +188,39 @@ function enterPlay(s: ScenarioState, cfg: ScenarioConfig, a: Action[]): Scenario
 function stopDialog(s: ScenarioState, a: Action[]): ScenarioState {
   if (!s.dialog) return s;
   a.push({ type: 'stop_listen' });
-  return { ...s, dialog: null };
+  return { ...s, dialog: null, game: null };
+}
+
+/* ───────── мини-игры с выбором (dialogs.json → games) ───────── */
+
+const gameDef = (cfg: ScenarioConfig, id: string | undefined) => (id ? cfg.dialogs.games?.[id] : undefined);
+const gameItem = (cfg: ScenarioConfig, game: string | undefined, item: string | null | undefined): GameItem | undefined =>
+  item ? gameDef(cfg, game)?.items.find((i) => i.id === item) : undefined;
+/** вариант игры по интенту ребёнка (повтори движение: «прыгни» или кнопка «Прыгни» → jump) */
+export const gameItemByIntent = (cfg: ScenarioConfig, game: string | undefined, intent: string): GameItem | undefined =>
+  gameDef(cfg, game)?.items.find((i) => i.id === intent || i.intents?.includes(intent));
+
+/** ключ ответа узла игры: right/wrong/done (эмоция, движение), win/lose/draw (камень-ножницы-бумага — для ребёнка), giveup */
+export function gameKey(cfg: ScenarioConfig, g: GameState, value: string | null): string {
+  if (value === '$giveup') return 'giveup';
+  const def = gameDef(cfg, g.id);
+  if (!def || !value || !gameItem(cfg, g.id, value)) return 'wrong';
+  if (g.id === 'rps') {
+    if (value === g.pick) return 'draw';
+    return gameItem(cfg, g.id, value)!.beats === g.pick ? 'win' : 'lose';
+  }
+  if (value !== g.pick) return 'wrong';
+  return def.rounds && g.round >= def.rounds ? 'done' : 'right';
+}
+
+function gameAnswer(s: ScenarioState, value: string | null, text: string, cfg: ScenarioConfig, a: Action[]): ScenarioState {
+  const dlg = s.dialog;
+  if (!dlg?.listening || !isGameMode(dlg.listening) || !s.game) return s;
+  let key = gameKey(cfg, s.game, value);
+  // узел не ждёт «done» (повторный показ) — это просто «верно»
+  if (key === 'done' && !expects(cfg, dlg, 'done')) key = 'right';
+  const r = answerDialog(cfg.dialogs, dlg, key);
+  return r ? runDialog({ ...s, unknownStreak: 0 }, r, cfg, a, text) : s;
 }
 
 function startSwitch(s: ScenarioState, a: Action[], to: PersonaId = nextPersona(s.persona)): ScenarioState {
@@ -216,6 +265,22 @@ function doAction(s: ScenarioState, action: string, arg: string | undefined, hea
       return { ...s, phase: 'choose' };
     case 'riddle_next':
       return { ...s, riddleSeq: s.riddleSeq + 1 };
+    case 'game':
+      // начало мини-игры: «game:rps»
+      return gameDef(cfg, arg) ? { ...s, game: { id: arg!, pick: null, round: 0, last: null } } : s;
+    case 'game_next': {
+      // кот загадывает следующий вариант — не тот же, что в прошлый раз
+      const def = gameDef(cfg, s.game?.id);
+      if (!def || !s.game) return s;
+      const pool = def.items.length > 1 ? def.items.filter((i) => i.id !== s.game!.pick) : def.items;
+      const it = pool[Math.min(pool.length - 1, Math.floor(cfg.random() * pool.length))];
+      return { ...s, game: { ...s.game, pick: it.id, last: s.game.pick, round: s.game.round + 1 } };
+    }
+    case 'game_show': {
+      const it = gameItem(cfg, s.game?.id, s.game?.pick);
+      if (it) a.push({ type: 'game_show', ...(it.face ? { face: it.face } : {}), ...(it.clip ? { clip: it.clip } : {}), ...(it.event ? { event: it.event } : {}) });
+      return s;
+    }
     case 'pause_play': {
       a.push({ type: 'pause', on: true }, { type: 'timer', id: 'pause_end', ms: Number(arg) || 10_000 });
       return { ...s, paused: true };
@@ -256,6 +321,10 @@ function runDialog(s: ScenarioState, r: DialogStep, cfg: ScenarioConfig, a: Acti
     if (c.type === 'say') {
       if (c.event === '$riddle.q') a.push({ type: 'say_riddle', part: 'q', node: c.node });
       else if (c.event === '$riddle.hint') a.push({ type: 'say_riddle', part: 'hint', node: c.node });
+      // «Это была радость!», «У меня камень!» — реплика про загаданный котом вариант
+      else if (c.event === '$game.reveal') {
+        if (st.game?.pick) a.push({ type: 'say', key: `${st.game.id}_is_${st.game.pick}`, force: true, node: c.node });
+      }
       else a.push({ type: 'say', key: c.event, force: true, node: c.node });
     } else if (c.type === 'listen') {
       const token = st.listenToken + 1;
@@ -283,6 +352,7 @@ function answerKey(h: Heard, mode: ListenMode): string {
   if (h.type === 'name' && mode === 'name') return 'name';
   if (mode === 'riddle' && ['giveup', 'no', 'skip'].includes(h.type)) return 'giveup';
   if (mode === 'echo') return h.type === 'echo_stop' ? 'echo_stop' : '*';
+  if (isGameMode(mode) && ['giveup', 'no', 'skip'].includes(h.type)) return 'giveup';
   return h.type;
 }
 
@@ -294,6 +364,8 @@ function expects(cfg: ScenarioConfig, d: DialogState, key: string) {
 function onHeard(s: ScenarioState, h: Heard, cfg: ScenarioConfig, a: Action[]): ScenarioState {
   // безопасность — всегда первой, прерывает любой диалог
   if (cfg.dialogs.interrupts.includes(h.type)) return triggerDialog({ ...s, unknownStreak: 0 }, h.type, cfg, a) ?? s;
+  // «Повтори движение»: кнопка движения («Прыгни», «Сальто»…) — это ответ, а не конец игры
+  if (s.dialog?.listening === 'simon' && s.game && gameItemByIntent(cfg, 'simon', h.type)) return gameAnswer(s, gameItemByIntent(cfg, 'simon', h.type)!.id, h.text ?? '', cfg, a);
   // кнопка — явная команда: мини-игра (загадка, повторялка, предложение кота) заканчивается, команда выполняется.
   // Не «неверный ответ» загадке и не фраза для повторялки. Знакомство кнопками не прерывается.
   if (h.button && s.dialog && s.dialog.id !== 'intro') s = stopDialog(s, a);
@@ -312,6 +384,11 @@ function onHeard(s: ScenarioState, h: Heard, cfg: ScenarioConfig, a: Action[]): 
     if (mode === 'intent' && !expects(cfg, dlg, key) && (!star || star === '@end') && h.type !== 'unknown') {
       s = stopDialog(s, a);
       return onHeard(s, h, cfg, a);
+    }
+    // мини-игра с выбором: ответ голосом director присылает событием game_answer; интент здесь — «не знаю» или «не то»
+    if (isGameMode(mode)) {
+      const it = s.game ? gameItemByIntent(cfg, s.game.id, h.type) : undefined;
+      return gameAnswer(s, key === 'giveup' ? '$giveup' : it?.id ?? null, h.text ?? '', cfg, a);
     }
     if (h.type === 'name' && h.known) {
       a.push({ type: 'remember', patch: { name: h.name } });
@@ -347,6 +424,11 @@ function onHeard(s: ScenarioState, h: Heard, cfg: ScenarioConfig, a: Action[]): 
     a.push({ type: 'react', event: unknownReply(n) });
     if (n >= 2) a.push({ type: 'ui', ui: 'chips', show: true });
     return { ...s, unknownStreak: n };
+  }
+  // «мне скучно» — кот не только подсказывает, а сразу предлагает занятие (по кругу, как в лестнице тишины)
+  if (t === 'bored') {
+    a.push({ type: 'offer_next' });
+    return { ...s, unknownStreak: 0 };
   }
   // «да»/«нет» на реплику-вопрос вне диалога («Может, постучать тебе в экран?» — «давай») — короткий ответ
   if (t === 'yes' || t === 'no' || t === 'giveup') {
@@ -384,6 +466,7 @@ export function step(s: ScenarioState, e: ScenarioEvent, cfg: ScenarioConfig): S
     const r = answerDialog(cfg.dialogs, s.dialog, e.result);
     return done(r ? runDialog(s, r, cfg, a, e.text ?? '') : s);
   }
+  if (e.type === 'game_answer') return done(gameAnswer(s, e.value, e.text ?? '', cfg, a));
   if (e.type === 'timer' && e.id === 'pause_end') {
     a.push({ type: 'pause', on: false });
     return done({ ...s, paused: false });

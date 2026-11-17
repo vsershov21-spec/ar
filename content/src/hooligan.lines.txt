@@ -115,11 +115,14 @@ cheeky: Эй, щекотно!
 cheeky: Тык засчитан.
 happy: Неплохо тыкаешь. Для новичка.
 cheeky: Тык в кота — к удаче. Наверное.
+cheeky: Ещё тык, и начну брать плату. Жвачкой.
 
 ## tap_cat_head | clip=poke_head
 annoyed: Э, кепку помнёшь!
 cheeky: По голове не надо, там мысли.
 cheeky: Ай! Ну ладно, это было смешно.
+cheeky: Эй, причёску под кепкой не трогать!
+cheeky: Тук по макушке. Там, между прочим, гениальные идеи.
 
 ## tap_cat_cheek | clip=poke_cheek face=squished
 shy: Чё, щёку мнёшь? Да, пушистая. Знаю.
@@ -130,16 +133,22 @@ happy: Хе, мягкая, да? Только никому.
 happy: Ха-ха, не-не-не, только не живот!
 cheeky: Живот — запретная зона! Вход по пропускам.
 excited: Щекотка! Сдаюсь, сдаюсь!
+excited: Ха-ха! Пузо щекотать нечестно!
+cheeky: Стоп, это мой пресс! Ладно, не пресс. Ха-ха!
 
 ## tap_cat_paw | clip=poke_paw
 cheeky: Дай пять! А, это просто тык.
 neutral: Это моя лапа. Для скейта, между прочим.
 cheeky: Хочешь лапу? Сначала покажи трюк.
+cheeky: Эта лапа рисует граффити. Аккуратнее с ней.
+happy: Ладно, держи пять. Только лапу верни!
 
 ## tap_cat_tail | clip=poke_tail fx=none sound=gasp
 surprised: Ай, хвост! Он чувствительный!
 annoyed: Хвост — это святое, слышишь?
 cheeky: Хвост не кнопка, не нажимается!
+annoyed: Хвост мне нужен на скейте. Это руль!
+cheeky: За хвост? Ну всё, ловлю твой палец!
 
 ## poke_combo | clip=offended sound=hmph
 annoyed: Три раза в одно место? Серьёзно?
@@ -155,11 +164,14 @@ offended: Не, так не играем. Давай нежнее.
 happy: Мурр... ладно, так можно.
 shy: Только никому не говори, что я мурчу.
 happy: Вот тут, за ухом. Да, вот так.
+shy: Мурр... Только пацанам со двора не рассказывай.
+happy: Ещё за ухом. Да, вот тут. Респект.
 
 ## stroke_long | clip=purr_stroke sound=purr face=purr fx=hearts_float
 shy: Ну всё, меня приручили. Это секрет.
 happy: Мурр... Я сейчас растаю, как пломбир на солнце.
 shy: Хулиганы тоже любят, когда их гладят. Тс-с.
+shy: Обнимашки? Ладно, только быстро. Ну ладно, не быстро.
 
 ## tap_screen | clip=knock_glass fx=knock sound=glass_knock
 cheeky: Тук-тук, чё надо?
@@ -172,6 +184,8 @@ cheeky: Тук-тук в ответ!
 excited: Смотри, чё умею!
 proud: Пузырь-рекордсмен!
 cheeky: Хоп — и пузырь на весь экран!
+cheeky: Пузырь размером с арбуз! Ну почти.
+proud: Фокус-покус, жвачка, пузырь!
 
 ## walk_to | clip=walk sound=footstep
 neutral: Иду-иду.
@@ -194,6 +208,8 @@ cheeky: Нос к носу, ха!
 happy: Ням! Рыбка — топ. Спасибо!
 cheeky: О, вкусняшка! Ещё одну? Шучу. Спасибо!
 excited: Хрум-хрум! Вот это я понимаю — угощение!
+excited: Хрусть! Это вкуснее жвачки. Почти.
+cheeky: Вкусняшка засчитана. За такое и трюк не жалко.
 
 ## shake | clip=dizzy fx=glitch sound=glitch
 annoyed: Эй, я так укачаюсь!
@@ -284,8 +300,8 @@ neutral: Связь барахлит. Повтори?
 
 ## name_ask
 proud: Я брат СберКота. Близнец. Только поинтереснее.
-cheeky: Я кот из карты. Имя секретное — зови просто Кот.
-neutral: Я Кот, близнец СберКота. Похож, но с характером.
+cheeky: Я Хулиган! Кот из твоей карты и мастер трюков.
+neutral: Хулиган я. Близнец СберКота, только с характером.
 
 ## age_ask
 cheeky: Столько же, сколько брату. Мы же близнецы.
@@ -310,6 +326,8 @@ cheeky: В СберKids? Это можно. Открываю?
 excited: Смотри внимательно!
 proud: Сальто? Легко!
 cheeky: Хоп! Как тебе?
+proud: Сальто с разворотом! Скейт бы обзавидовался.
+cheeky: Хоп! Кепка на месте, проверено.
 
 ## jump | clip=jump sound=boing
 excited: Оп!
@@ -320,6 +338,8 @@ proud: Вот это прыжок! Олимпийский.
 excited: Диджей, музыку!
 proud: Танцую как умею. А умею круто.
 cheeky: Оп-оп, смотри, какой движ!
+cheeky: Брейк-данс! Пол не царапаю, честно.
+excited: Музыка в голове, движ в лапах!
 
 ## sit | clip=sit_down
 neutral: Сижу. Только недолго, я непоседа.
@@ -519,3 +539,160 @@ cheeky: Продолжаем? Скажи «да».
 neutral: Ладно, загадки потом.
 cheeky: Окей, мозги отдыхают.
 neutral: Хватит так хватит. Играем дальше.
+
+## offer_emo | clip=talk_excited
+cheeky: Хочешь, скорчу рожицу, а ты угадаешь, какой я?
+cheeky: Спорим, не угадаешь мою рожицу? Играем?
+happy: Давай в «Угадай эмоцию»? Скажи «да».
+
+## offer_rps | clip=talk_excited
+cheeky: Сыграем в камень, ножницы, бумагу?
+cheeky: Камень, ножницы, бумага. Вызываю тебя! Играем?
+excited: Давай в камень, ножницы, бумагу? Скажи «да».
+
+## offer_simon | clip=talk_excited
+cheeky: Повторишь мои движения? Спорим, нет?
+excited: Я показываю движение, ты повторяешь. Играем?
+cheeky: Игра «Делай как я», только кнопками. Сыграем?
+
+## emo_start | clip=talk_excited
+cheeky: Играем! Я корчу рожицу, а ты угадываешь, какой я.
+excited: Угадай мою рожицу! Я мастер кривляний.
+
+## emo_ask | clip=none
+cheeky: Ну, какой я сейчас?
+neutral: Смотри на морду. Какой я?
+
+## emo_wrong | clip=none
+cheeky: Не-а. Смотри ещё раз, внимательно.
+neutral: Мимо! Глянь ещё разок.
+
+## emo_right | clip=celebrate sound=confetti
+excited: В точку! Читаешь меня, как комикс.
+proud: Угадано! Респект.
+
+## emo_is_happy | face=smile_big clip=laugh
+happy: Это был весёлый я! Ну, как обычно.
+
+## emo_is_sad | face=sad clip=ears_back
+sad: Это был грустный я. Но уже прошло.
+
+## emo_is_angry | face=annoyed clip=offended
+annoyed: Это был сердитый я! Р-р-р. Шучу.
+
+## emo_is_surprised | face=surprised clip=surprised
+surprised: Это был удивлённый я! Ого-го.
+
+## emo_is_sleepy | face=sleepy clip=idle_yawn
+sleepy: Это был сонный я. Хр-р... Ой.
+
+## emo_is_shy | face=shy clip=shy
+shy: Это я стеснялся. Только никому!
+
+## rps_start | clip=talk_excited
+cheeky: Камень, ножницы, бумага! Скажи вслух, что выбираешь.
+excited: Играем! На счёт «три» говори: камень, ножницы или бумага.
+
+## rps_go | clip=think
+cheeky: Раз, два, три!
+excited: Камень, ножницы, бумага... раз, два, три!
+
+## rps_again | clip=listen
+neutral: Не понял. Камень, ножницы или бумага?
+cheeky: Ну? Скажи одно: камень, ножницы или бумага.
+
+## rps_is_rock | clip=proud
+proud: У меня камень!
+
+## rps_is_scissors | clip=proud
+cheeky: У меня ножницы! Чик-чик.
+
+## rps_is_paper | clip=proud
+neutral: У меня бумага!
+
+## rps_win | clip=offended
+annoyed: Эх, победа твоя! Ну ты даёшь.
+cheeky: Обыграли меня! Ладно, уважаю.
+
+## rps_lose | clip=celebrate
+proud: Йо, моя победа!
+cheeky: Хе-хе, я выиграл. Повезло, наверное.
+
+## rps_draw | clip=surprised
+surprised: Ничья! Мысли у нас одинаковые.
+cheeky: Ничья! Кажется, ты читаешь мои мысли.
+
+## simon_start | clip=point_button fx=spotlight_button
+cheeky: Я показываю движение, а ты жмёшь такую же кнопку внизу. Погнали!
+excited: Делай как я! Смотри, что я делаю, и жми ту же кнопку.
+
+## simon_ask | clip=none
+cheeky: Смотри и повторяй!
+neutral: Запоминай движение!
+
+## simon_wrong | clip=none
+neutral: Не то! Смотри ещё раз.
+cheeky: Мимо. Глянь внимательно.
+
+## simon_right | clip=celebrate
+excited: Чётко! Следующее!
+proud: Есть! Дальше сложнее.
+
+## simon_done | clip=celebrate fx=confetti sound=confetti
+excited: Три из трёх! Повторяешь лучше всех.
+proud: Всё повторено! Беру тебя в свою банду.
+
+## simon_is_jump | clip=jump
+neutral: Это был прыжок!
+
+## simon_is_flip | clip=flip
+neutral: Это было сальто!
+
+## simon_is_dance | clip=dance_hooligan
+neutral: Это был танец!
+
+## simon_is_wave | clip=wave
+neutral: Это я лапой махал!
+
+## simon_is_sit | clip=sit_down
+neutral: Я просто сел!
+
+## game_more | clip=listen
+cheeky: Ещё раунд?
+neutral: Ещё разок? Да или нет?
+cheeky: Реванш? Скажи «да».
+
+## game_bye | clip=wave
+neutral: Окей, игра окончена. Было огонь!
+cheeky: Ладно, перерыв. Лапы отдыхают.
+neutral: Хватит так хватит. Ещё сыграем.
+
+## where_live | clip=point_button
+neutral: В твоей карте! А в СберKids живёт мой брат.
+cheeky: В карте. Тесновато, зато скейт помещается.
+cheeky: Днём в карте, а ночью катаюсь по экрану. Секрет!
+
+## likes | clip=talk_excited
+cheeky: Скейт, граффити и жвачку. И с тобой тусить.
+excited: Кататься на скейте! И рыбку. И когда смешно.
+cheeky: Рэп и пузыри из жвачки. Огромные!
+
+## friends | clip=talk_casual
+happy: Конечно! Ты, например.
+cheeky: Целая банда: брат, Добряк, Блёстка и ты.
+neutral: Друзья есть. Но ты в списке номер один.
+
+## tale | clip=talk_casual
+cheeky: Жил-был кот на скейте. Катался, катался и докатился до твоей карты. Тут и живёт. Конец!
+cheeky: Сказка. Кот нарисовал на стене солнце. Стало так светло, что все проснулись. Даже брат. Конец.
+neutral: Однажды жвачка надулась так, что кот улетел на ней к звёздам. Вернулся к ужину. Конец!
+
+## friend | clip=shy fx=hearts_float
+shy: Дружить? Давай! Ты теперь в моей банде.
+happy: Давай! Друг хулигана почти супергерой.
+cheeky: Дружим! Дай пять. Только по-честному.
+
+## how_are_you | clip=talk_casual
+happy: Норм! Даже отлично, раз ты тут.
+cheeky: Как у кота на скейте: быстро и весело!
+neutral: Нормально. Скейт цел, кепка на месте.

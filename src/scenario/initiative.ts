@@ -68,7 +68,7 @@ export class InitiativeGate {
  * Лестница тишины (docs/scenario/LOGIC.md): что кот делает сам, пока ребёнок ничего не делает.
  * Отсчёт — от последнего действия ребёнка (касание, кнопка, фраза) или конца мини-игры. Любое действие — с начала.
  *   12 с  — «ты тут?» (silence);
- *   30 с  — предлагает занятие (offer: загадка / повторялка / танец — по кругу, без повторов подряд);
+ *   30 с  — предлагает занятие (offer: загадка / камень-ножницы-бумага / повторялка / угадай эмоцию / танец / повтори движение — по кругу);
  *   55 с  — мысль вслух (filler);
  *   80 с  — предлагает следующее занятие;
  *   110 с — дремлет (doze): дальше молчит, пока ребёнок не разбудит.
@@ -83,7 +83,7 @@ export const IDLE_PLAN: readonly { at: number; step: IdleStep }[] = [
   { at: 110_000, step: 'doze' },
 ];
 /** что кот предлагает сам — по кругу (узлы диалога offer в content/dialogs.json) */
-export const OFFERS = ['riddle', 'echo', 'dance'] as const;
+export const OFFERS = ['riddle', 'rps', 'echo', 'emo', 'dance', 'simon'] as const;
 
 export class IdleLadder {
   private since: number;
