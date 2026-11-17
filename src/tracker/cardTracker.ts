@@ -98,6 +98,13 @@ export class CardTracker extends TrackerBase implements Tracker {
     return this.session.K;
   }
 
+  /**
+   * Открыть камеру ВМЕСТЕ с микрофоном одним getUserMedia (iOS: второй запрос за микрофоном рвёт видео).
+   * Аудиодорожка — в audioStream, её забирает MicInput.adopt. Микрофон запрещён/не нужен — камера откроется одна.
+   */
+  withAudio = false;
+  audioStream: MediaStream | null = null;
+
   /** Камера: вызывать прямо из обработчика жеста (iOS требует user gesture для getUserMedia/play). */
   async startVideo(): Promise<void> {
     const video = document.createElement('video');
@@ -116,16 +123,28 @@ export class CardTracker extends TrackerBase implements Tracker {
     this.video = video;
     this.watchFrames(video);
     if (!navigator.mediaDevices?.getUserMedia) throw new Error('no-getusermedia');
-    await this.openCamera(video);
+    await this.openCamera(video, this.withAudio);
     this.watchCamera();
   }
 
-  private async openCamera(video: HTMLVideoElement) {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      audio: false,
-      // 720p и 30 к/с: больше трекеру (320 px) и экрану не нужно, а камера 60 к/с / 4K греет телефон
-      video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } },
-    });
+  private async openCamera(video: HTMLVideoElement, withAudio = false) {
+    // 720p и 30 к/с: больше трекеру (320 px) и экрану не нужно, а камера 60 к/с / 4K греет телефон
+    const vc: MediaTrackConstraints = { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } };
+    let stream: MediaStream | null = null;
+    if (withAudio) {
+      const aec = new URLSearchParams(location.search).get('aec') !== '0';
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: vc, audio: { echoCancellation: aec, noiseSuppression: aec, autoGainControl: false, channelCount: 1 } });
+        const at = stream.getAudioTracks();
+        this.audioStream = at.length ? new MediaStream(at) : null;
+        // в <video> — только видео (иначе звук микрофона в динамик и лишняя дорожка у плеера)
+        stream = new MediaStream(stream.getVideoTracks());
+      } catch (e) {
+        this.debug('камера+микрофон одним запросом не вышло (' + (e as Error)?.name + ') — камера отдельно');
+        stream = null;
+      }
+    }
+    stream ??= await navigator.mediaDevices.getUserMedia({ audio: false, video: vc });
     await new Promise<void>((resolve) => {
       video.addEventListener('loadedmetadata', () => resolve(), { once: true });
       video.srcObject = stream;
@@ -167,7 +186,8 @@ export class CardTracker extends TrackerBase implements Tracker {
       const t = (v.srcObject as MediaStream | null)?.getVideoTracks()[0];
       if (t && t.readyState === 'live' && !t.muted && !v.paused && !(this.rvfc && performance.now() - this.rvfcAt > 1500)) return;
       console.warn('[card] камера переоткрывается:', why);
-      (v.srcObject as MediaStream | null)?.getTracks().forEach((x) => x.stop());
+      // только видео: микрофон (дорожка из общего запроса) живёт своей жизнью в MicInput
+      (v.srcObject as MediaStream | null)?.getVideoTracks().forEach((x) => x.stop());
       await this.openCamera(v);
       this.rvfcAt = performance.now();
       this.watchFrames(v);

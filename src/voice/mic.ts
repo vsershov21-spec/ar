@@ -66,6 +66,13 @@ export class MicInput {
    *  фон становится чёрным. Микрофон, раз открытый, живёт до ухода со страницы. */
   idleCloseMs = Infinity;
 
+  /** готовая аудиодорожка из общего запроса камеры (iOS: один getUserMedia на камеру и микрофон — без второго
+   *  запроса, который рвёт видео). Берётся при первом открытии; нет/завершилась — открываем свой getUserMedia. */
+  private preStream: MediaStream | null = null;
+  adopt(stream: MediaStream | null) {
+    if (stream?.getAudioTracks().some((t) => t.readyState === 'live')) this.preStream = stream;
+  }
+
   constructor(private audio: Audio) {}
 
   get supported() {
@@ -138,9 +145,13 @@ export class MicInput {
       // эхоподавление нужно: кот не слышит себя, голосом можно перебить. На iOS оно включает «голосовую обработку»,
       // и звук приложения играет тише; ?aec=0 — без него (проверить громкость на устройстве)
       const aec = typeof location === 'undefined' || new URLSearchParams(location.search).get('aec') !== '0';
-      this.stream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: aec, noiseSuppression: aec, autoGainControl: false, channelCount: 1 },
-      });
+      const pre = this.preStream;
+      this.preStream = null;
+      this.stream = pre && pre.getAudioTracks().some((t) => t.readyState === 'live')
+        ? pre
+        : await navigator.mediaDevices.getUserMedia({
+            audio: { echoCancellation: aec, noiseSuppression: aec, autoGainControl: false, channelCount: 1 },
+          });
       this.src = ctx.createMediaStreamSource(this.stream);
       const sr = ctx.sampleRate;
       let node: AudioWorkletNode | ScriptProcessorNode;

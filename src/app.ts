@@ -616,8 +616,11 @@ export class App {
     const sensors = this.input.requestSensors();
     this.ui.setStartBusy('Включаю камеру…');
     try {
-      const tv = this.tracker as unknown as { startVideo?: () => Promise<void> };
+      const tv = this.tracker as unknown as { startVideo?: () => Promise<void>; withAudio?: boolean; audioStream?: MediaStream | null };
+      // iOS: камера и микрофон одним запросом — второй getUserMedia за микрофоном рвёт видео
+      if ('withAudio' in tv) tv.withAudio = this.engine.mic.supported;
       if (typeof tv.startVideo === 'function') await tv.startVideo();
+      this.engine.mic.adopt(tv.audioStream ?? null);
       openMic();
       void sensors.then((ok) => {
         this.director.log(`датчики: ${ok ? 'да' : 'нет'}`);
