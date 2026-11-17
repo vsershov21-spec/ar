@@ -89,8 +89,11 @@ export class TouchInterpreter {
 
   constructor(
     private emit: (e: TouchEvent) => void,
-    /** зона кота в точке экрана (null — мимо кота) */
-    private zoneAt: (x: number, y: number) => TouchZone | null,
+    /**
+     * зона кота в точке экрана (null — мимо кота). coarse — «палец всё ещё на коте?» на каждом движении пальца:
+     * хватает грубой проверки (габарит кота); точная — по сетке скинованной модели — стоит 15–20 мс на телефоне
+     */
+    private zoneAt: (x: number, y: number, coarse?: boolean) => TouchZone | null,
     readonly cfg: InterpreterConfig = defaultInterpreterConfig,
     gcfg: GestureConfig = defaultGestureConfig,
   ) {
@@ -125,7 +128,7 @@ export class TouchInterpreter {
     while (this.recent.length > 2 && t - this.recent[0].t > 150) this.recent.shift();
     this.rec.move(x, y, t);
     if (!prev) return;
-    const onCat = this.downZone !== null && this.zoneAt(x, y) !== null;
+    const onCat = this.downZone !== null && this.zoneAt(x, y, true) !== null;
     if (onCat) {
       this.lastOnCat = t;
       // скорость по последним ~150 мс: медленно — это глажка

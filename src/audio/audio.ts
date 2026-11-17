@@ -3,8 +3,15 @@
  *  - категории: sfx (аудиоспрайт), voice (реплики, Web Audio), ambience (петли) — у каждой своя громкость;
  *  - ducking: пока звучит реплика, sfx и ambience приглушаются на −8 дБ;
  *  - вариации: play('glass_knock') выбирает случайный из glass_knock_1..N и меняет pitch ±5%;
- *  - iOS: unlock() в первом жесте; audioSession='playback' (Safari 17+) — звук и при беззвучном режиме;
- *    на старых iOS Web Audio молчит при включённом переключателе «Без звука» — UI показывает подсказку.
+ *  - iOS: unlock() в первом жесте; на старых iOS Web Audio молчит при включённом переключателе «Без звука» —
+ *    UI показывает подсказку.
+ *  - ОДИН AudioContext на всё приложение: его создаём сами (latencyHint 'playback' — крупнее буфер, реже будим
+ *    поток звука) и отдаём Howler; микрофон, голос, фанфары, повтор — на нём же. Howler сам по себе на iOS
+ *    (48 кГц ≠ 44.1) закрывал первый контекст и создавал второй, а на первом жесте плодил 10 HTML-Audio.
+ *  - Аудиосессия iOS (navigator.audioSession, Safari 17+) выставляется ОДИН раз в unlock() и больше не трогается:
+ *    смена playback ↔ play-and-record при открытии микрофона рвала камеру (чёрный фон). Если микрофон будет —
+ *    сразу 'play-and-record' (то же, что iOS включает сама при захвате микрофона; не глушится «Без звука»).
+ *    ?session=playback|play-and-record|auto|off — для проверки на устройстве.
  */
 import { Howl, Howler } from 'howler';
 import { asset } from '../core/util';
@@ -24,10 +31,33 @@ export class Audio {
   private voiceGain: GainNode | null = null;
   muted = false;
 
+  private sessionSet = false;
+  /** был жест (unlock): до него микрофон не открываем — ни запроса доступа на старте, ни getUserMedia раньше камеры */
+  unlocked = false;
+
   constructor() {
-    // Howler сам усыпляет AudioContext через 30 с тишины — микрофон (повтор, «слушаю сам») на том же
-    // контексте тогда замолкает. Не усыплять.
-    Howler.autoSuspend = false;
+    const H = Howler as any;
+    // Howler на iOS (контекст 48 кГц) закрывал свой первый AudioContext и создавал новый («баг iOS 9»)
+    H._mobileUnloaded = true;
+    // пул HTML5 Audio (10 элементов на первом жесте) не нужен: всё на Web Audio
+    H.html5PoolSize = 0;
+    // Howler сам усыпляет AudioContext через 30 с тишины — микрофон на том же контексте тогда замолкает
+    H.autoSuspend = false;
+    if (typeof window !== 'undefined' && !H.ctx) {
+      try {
+        const q = new URLSearchParams(location.search).get('latency');
+        const AC = window.AudioContext ?? (window as any).webkitAudioContext;
+        const ctx: AudioContext = new AC({ latencyHint: (q as AudioContextLatencyCategory) || 'playback' });
+        H.ctx = ctx;
+        H.usingWebAudio = true;
+        H.masterGain = ctx.createGain();
+        H.masterGain.gain.setValueAtTime(H._muted ? 0 : H._volume ?? 1, ctx.currentTime);
+        H.masterGain.connect(ctx.destination);
+        H._setup?.();
+      } catch {
+        /* Howler создаст свой */
+      }
+    }
     // iOS: после звонка/сворачивания контекст «interrupted» — будим при возврате
     if (typeof document !== 'undefined')
       document.addEventListener('visibilitychange', () => {
@@ -64,15 +94,13 @@ export class Audio {
     });
   }
 
-  /** вызывать синхронно внутри обработчика жеста */
-  unlock() {
-    try {
-      // Safari 17+: играть как медиа, а не как «звуки интерфейса» — не глушится переключателем Без звука
-      const nav = navigator as any;
-      if (nav.audioSession) nav.audioSession.type = 'playback';
-    } catch {
-      /* ignore */
-    }
+  /**
+   * Вызывать синхронно внутри обработчика жеста. willRecord — микрофон будет (поддерживается): тогда
+   * аудиосессия сразу 'play-and-record', и открытие микрофона её уже не переключает.
+   */
+  unlock(willRecord = false) {
+    this.initSession(willRecord);
+    this.unlocked = true;
     try {
       const ctx = Howler.ctx;
       if (ctx && ctx.state !== 'running') void ctx.resume();
@@ -198,17 +226,28 @@ export class Audio {
   }
 
   /**
-   * iOS/Safari 17+: тип аудиосессии. 'playback' — обычный режим (звук и при переключателе «Без звука»);
-   * 'play-and-record' — пока открыт микрофон: без него iOS сама переводит сессию и может увести звук
-   * в разговорный динамик/сделать тише. Вызывать при открытии и закрытии микрофона.
+   * iOS/Safari 17+: тип аудиосессии — ОДИН раз за страницу. 'playback' — звук и при «Без звука»;
+   * 'play-and-record' — то же плюс микрофон. Переключение туда-обратно (раньше — при каждом открытии/закрытии
+   * микрофона) на iOS прерывает захват камеры и уводит звук. Повторные вызовы ничего не делают.
    */
-  setSession(type: 'playback' | 'play-and-record') {
+  initSession(willRecord: boolean) {
+    if (this.sessionSet) return;
+    this.sessionSet = true;
     try {
       const nav = navigator as any;
-      if (nav.audioSession && nav.audioSession.type !== type) nav.audioSession.type = type;
+      if (!nav.audioSession) return;
+      const q = new URLSearchParams(location.search).get('session');
+      if (q === 'off') return;
+      const type = q && ['playback', 'play-and-record', 'auto', 'ambient'].includes(q) ? q : willRecord ? 'play-and-record' : 'playback';
+      if (nav.audioSession.type !== type) nav.audioSession.type = type;
     } catch {
       /* ignore */
     }
+  }
+
+  /** тип аудиосессии сейчас (debug) */
+  get sessionType(): string {
+    return (navigator as any).audioSession?.type ?? '—';
   }
 
   private applyDuck() {

@@ -220,7 +220,10 @@ function rotWorld(b: THREE.Object3D, axis: THREE.Vector3, angle: number, tmp: TH
   if (!angle || !b.parent) return;
   b.parent.updateWorldMatrix(true, false);
   const pq = b.parent.getWorldQuaternion(tmp);
-  const d = new THREE.Quaternion().setFromAxisAngle(axis, angle);
-  const local = pq.clone().invert().multiply(d).multiply(pq);
+  const d = RW_D.setFromAxisAngle(axis, angle);
+  const local = RW_L.copy(pq).invert().multiply(d).multiply(pq);
   b.quaternion.premultiply(local);
 }
+// временные для rotWorld (вызывается каждый кадр слоя покоя): без двух new Quaternion на вызов
+const RW_D = new THREE.Quaternion();
+const RW_L = new THREE.Quaternion();

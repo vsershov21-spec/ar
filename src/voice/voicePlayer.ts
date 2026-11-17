@@ -9,6 +9,12 @@
  *     в один буфер. Имени нет в словаре → синтез всей фразы.
  *  3) Нет записи → speechSynthesis ru-RU с pitch/rate персоны, рот — по буквам. Только фоллбэк.
  *
+ * В проде на сайте полная озвучка ElevenLabs (voice/el/manifest.json) — тогда Piper-индекс и манифесты характеров
+ * НЕ грузятся, а speechSynthesis не трогается вовсе (ни unlock в жесте, ни getVoices, ни cancel: на iOS синтез
+ * поднимает свою аудиосессию). Для отладки: ?piper — Piper-записи как запасной голос, ?synth — синтез браузера.
+ * Кэш декодированных реплик — LRU по объёму (VOICE_CACHE_BYTES, ~12 МБ ≈ минута звука 48 кГц), предзагрузка —
+ * не больше 2 декодирований одновременно, реплика «сейчас» — без очереди.
+ *
  * Перебивание (barge-in): fadeOut(120) — реплика затухает, очередь DialogQueue сохраняется.
  * Самопрослушивание: onSpeaking(true/false) — VoiceEngine глушит распознавание на время реплики + 250 мс.
  */
@@ -100,7 +106,14 @@ type ElEntry = ClipEntry & { kind?: 'line' | 'part' | 'slot'; line?: string; par
 type ElHit = { kind: 'line'; e: ElEntry } | { kind: 'parts'; a?: ElEntry; b?: ElEntry; v: ElEntry };
 const SLOT_RE = /\{(name|answer)\}/;
 
-const LRU_MAX = 48;
+/** кэш декодированных реплик: объём (декодируется в частоту контекста: 3 с ≈ 0,58 МБ) и число записей */
+export const VOICE_CACHE_BYTES = 12 * 1024 * 1024;
+const LRU_MAX = 64;
+/** одновременно декодируемых предзагрузок */
+const PRELOAD_PARALLEL = 2;
+const qflag = (k: string) => typeof location !== 'undefined' && new URLSearchParams(location.search).has(k);
+
+interface BufEntry { p: Promise<AudioBuffer | null>; bytes: number; dead?: boolean }
 
 export class VoicePlayer {
   readonly lip = new LipSync();
@@ -110,7 +123,17 @@ export class VoicePlayer {
   private personas = new Map<string, Promise<PersonaVoice | null>>();
   private loaded = new Map<string, PersonaVoice>();
   private byText = new Map<string, { persona: string; id: string }>();
-  private buffers = new Map<string, Promise<AudioBuffer | null>>();
+  private buffers = new Map<string, BufEntry>();
+  private cacheBytes = 0;
+  private inflight = 0;
+  private waiting = new Map<string, () => void>();
+  private onsets = new WeakMap<AudioBuffer, number>();
+  /** ?piper — Piper-записи как запасной голос при озвучке ElevenLabs */
+  private piperFlag = qflag('piper');
+  /** ?synth — синтез браузера (speechSynthesis) при озвучке ElevenLabs */
+  private synthFlag = qflag('synth');
+  private synthUsed = false;
+  private synthPicked = false;
   private legacy: Record<string, Record<string, LegacyEntry>> = {};
   /** озвучка ElevenLabs: id → файл; приоритет выше Piper. kind: line | part (кусок реплики со слотом) | slot (имя, ответ) */
   private el: Record<string, ElEntry> = {};
@@ -136,14 +159,6 @@ export class VoicePlayer {
   last: { id?: string; source: string; text: string } | null = null;
 
   constructor(private audio: Audio) {
-    if (typeof speechSynthesis !== 'undefined') {
-      const pick = () => {
-        const vs = speechSynthesis.getVoices();
-        this.synthVoice = vs.find((v) => v.lang === 'ru-RU' && /Milena|Милена|Yuri|Google/i.test(v.name)) ?? vs.find((v) => v.lang.startsWith('ru')) ?? null;
-      };
-      pick();
-      speechSynthesis.addEventListener?.('voiceschanged', pick);
-    }
     if (typeof location !== 'undefined' && new URLSearchParams(location.search).get('lips') === 'amp') this.lipStrategy = 'amp';
   }
 
@@ -151,14 +166,25 @@ export class VoicePlayer {
     return this.audio.ctx;
   }
 
+  /** синтез браузера разрешён: озвучки ElevenLabs нет (локально) или ?synth */
+  get synthAllowed(): boolean {
+    return typeof speechSynthesis !== 'undefined' && (!this.hasRecordings || this.synthFlag);
+  }
+
+  /** голоса синтеза — лениво, при первом синтезе (не в конструкторе: getVoices на iOS будит движок синтеза) */
+  private pickSynthVoice() {
+    if (this.synthPicked || typeof speechSynthesis === 'undefined') return;
+    this.synthPicked = true;
+    const pick = () => {
+      const vs = speechSynthesis.getVoices();
+      this.synthVoice = vs.find((v) => v.lang === 'ru-RU' && /Milena|Милена|Yuri|Google/i.test(v.name)) ?? vs.find((v) => v.lang.startsWith('ru')) ?? null;
+    };
+    pick();
+    speechSynthesis.addEventListener?.('voiceschanged', pick);
+  }
+
   /** Индекс озвучки (маленький). legacyUrl — старый манифест voice:build, если нового нет. */
   async load(legacyUrl?: string) {
-    try {
-      const r = await fetch(asset('voice/manifest.json'), { cache: 'no-cache' });
-      if (r.ok && (r.headers.get('content-type') ?? '').includes('json')) this.index = await r.json();
-    } catch {
-      /* нет озвучки — синтез */
-    }
     try {
       const r = await fetch(asset('voice/el/manifest.json'), { cache: 'no-cache' });
       if (r.ok && (r.headers.get('content-type') ?? '').includes('json')) {
@@ -176,6 +202,14 @@ export class VoicePlayer {
       }
     } catch {
       /* нет — только Piper */
+    }
+    // озвучка ElevenLabs есть — Piper не нужен (не качаем ни индекс, ни манифесты, ни mp3); ?piper — для отладки
+    if (this.hasRecordings && !this.piperFlag) return;
+    try {
+      const r = await fetch(asset('voice/manifest.json'), { cache: 'no-cache' });
+      if (r.ok && (r.headers.get('content-type') ?? '').includes('json')) this.index = await r.json();
+    } catch {
+      /* нет озвучки — синтез */
     }
     if (!this.index && legacyUrl) {
       try {
@@ -268,8 +302,11 @@ export class VoicePlayer {
     return le ? { kind: 'legacy', e: le, id } : null;
   }
 
-  /** iOS: первый вызов speechSynthesis — из жеста */
+  /** iOS: первый вызов speechSynthesis — из жеста (только если синтез вообще возможен) */
   unlock() {
+    if (!this.synthAllowed) return;
+    this.pickSynthVoice();
+    this.synthUsed = true;
     try {
       const u = new SpeechSynthesisUtterance(' ');
       u.volume = 0;
@@ -281,11 +318,12 @@ export class VoicePlayer {
 
   cancel() {
     this.gen++;
-    try {
-      speechSynthesis?.cancel();
-    } catch {
-      /* ignore */
-    }
+    if (this.synthUsed)
+      try {
+        speechSynthesis.cancel();
+      } catch {
+        /* ignore */
+      }
     try {
       this.src?.stop();
     } catch {
@@ -332,35 +370,96 @@ export class VoicePlayer {
 
   // ───────────── загрузка звука ─────────────
 
-  private fetchBuffer(path: string): Promise<AudioBuffer | null> {
+  /**
+   * Декодированная реплика из кэша / сети. low — предзагрузка: в очередь (не больше PRELOAD_PARALLEL
+   * декодирований сразу); реплика «сейчас» идёт без очереди и поднимает свою же предзагрузку из очереди.
+   */
+  private fetchBuffer(path: string, low = false): Promise<AudioBuffer | null> {
     const hit = this.buffers.get(path);
     if (hit) {
       this.buffers.delete(path); // LRU: в конец
       this.buffers.set(path, hit);
-      return hit;
+      if (!low) this.promote(path);
+      return hit.p;
     }
-    const p = (async () => {
+    const entry: BufEntry = { p: Promise.resolve(null), bytes: 0 };
+    const gate = low && this.inflight >= PRELOAD_PARALLEL ? new Promise<void>((r) => this.waiting.set(path, r)) : null;
+    entry.p = (async () => {
+      if (gate) await gate;
+      if (entry.dead) return null;
       const ctx = this.audio.ctx;
       if (!ctx) return null;
+      this.inflight++;
       try {
         const data = await fetch(asset(path)).then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(String(r.status)))));
-        return await ctx.decodeAudioData(data);
+        const buf = await ctx.decodeAudioData(data);
+        if (!entry.dead && this.buffers.get(path) === entry) {
+          entry.bytes = buf.length * buf.numberOfChannels * 4;
+          this.cacheBytes += entry.bytes;
+          this.evict();
+        }
+        return buf;
       } catch {
         return null;
+      } finally {
+        this.inflight--;
+        this.next();
       }
     })();
-    this.buffers.set(path, p);
-    while (this.buffers.size > LRU_MAX) this.buffers.delete(this.buffers.keys().next().value!);
-    void p.then((b) => b || this.buffers.delete(path));
-    return p;
+    this.buffers.set(path, entry);
+    this.evict();
+    void entry.p.then((b) => {
+      if (!b && this.buffers.get(path) === entry) this.drop(path);
+    });
+    return entry.p;
   }
 
-  private clip(e: ClipEntry) {
-    return this.fetchBuffer(`voice/${e.f}`);
+  private promote(path: string) {
+    const r = this.waiting.get(path);
+    if (r) {
+      this.waiting.delete(path);
+      r();
+    }
+  }
+
+  private next() {
+    while (this.inflight < PRELOAD_PARALLEL && this.waiting.size) this.promote(this.waiting.keys().next().value!);
+  }
+
+  private drop(path: string) {
+    const e = this.buffers.get(path);
+    if (!e) return;
+    this.buffers.delete(path);
+    this.cacheBytes -= e.bytes;
+    e.dead = true;
+    // ждала в очереди — отпускаем (выйдет сразу, ничего не декодируя)
+    this.promote(path);
+  }
+
+  /** LRU: самые давние — вон, пока не уложимся в объём и число (последнюю запись не трогаем) */
+  private evict() {
+    while (this.buffers.size > 1 && (this.cacheBytes > VOICE_CACHE_BYTES || this.buffers.size > LRU_MAX)) this.drop(this.buffers.keys().next().value!);
+  }
+
+  /** для debug/стенда: сколько декодированного звука держим */
+  cacheStats() {
+    return { entries: this.buffers.size, mb: +(this.cacheBytes / 1048576).toFixed(2), inflight: this.inflight, queued: this.waiting.size };
+  }
+
+  private clip(e: ClipEntry, low = false) {
+    return this.fetchBuffer(`voice/${e.f}`, low);
   }
 
   /** где в декодированном буфере реально начинается звук (MP3-декодеры по-разному отрезают задержку) */
   private onsetShift(buf: AudioBuffer, e: ClipEntry) {
+    const c = this.onsets.get(buf);
+    if (c !== undefined) return c;
+    const v = this.measureOnset(buf, e);
+    this.onsets.set(buf, v);
+    return v;
+  }
+
+  private measureOnset(buf: AudioBuffer, e: ClipEntry) {
     const x = buf.getChannelData(0);
     const step = Math.round(buf.sampleRate * 0.01);
     let mx = 0;
@@ -482,10 +581,10 @@ export class VoicePlayer {
     void this.usePersona(persona).then(() => {
       const f = this.lookup(persona, template, lineId);
       const el = this.elFor({ persona, template, text: template, pitch: 1, rate: 1, lineId });
-      if (el?.kind === 'line') return void this.clip(el.e);
-      if (el?.kind === 'parts') return void [el.a, el.v, el.b].forEach((e) => e && void this.clip(e));
-      if (f?.kind === 'line') void this.clip(f.e);
-      if (f?.kind === 'parts') [f.a, f.b].forEach((e) => e && void this.clip(e));
+      if (el?.kind === 'line') return void this.clip(el.e, true);
+      if (el?.kind === 'parts') return void [el.a, el.v, el.b].forEach((e) => e && void this.clip(e, true));
+      if (f?.kind === 'line') void this.clip(f.e, true);
+      if (f?.kind === 'parts') [f.a, f.b].forEach((e) => e && void this.clip(e, true));
     });
   }
 
@@ -497,7 +596,7 @@ export class VoicePlayer {
         const ids = [...all].filter((id) => id.split('.')[1] === ev).sort().slice(0, max);
         ids.forEach((id) => {
           const e = this.el[id] ?? m?.lines[id];
-          if (e) void this.clip(e);
+          if (e) void this.clip(e, true);
         });
       }
     });
@@ -541,7 +640,7 @@ export class VoicePlayer {
       }
       return;
     }
-    if (!text || text === '…') return;
+    if (!text || text === '…' || !this.synthAllowed) return;
     await this.speak({ persona: o.persona, template: `echo:${text}`, text, pitch: Math.min(2, Math.max(0.5, Math.pow(2, o.pitchSemitones / 12))), rate: o.rate });
   }
 
@@ -557,6 +656,11 @@ export class VoicePlayer {
     if (prep && ctx && out) {
       this.last = { id: req.lineId, source: `${this.lastSource}${this.lipStrategy === 'amp' ? '+amp' : ''}`, text: req.text };
       return this.playPrepared(ctx, out, prep, gen, 'file');
+    }
+    if (!this.synthAllowed) {
+      // записи нет (или не скачалась), синтез на сайте с живой озвучкой не используем — молчим
+      this.last = { id: req.lineId, source: 'none', text: req.text };
+      return;
     }
     this.last = { id: req.lineId, source: 'synth', text: req.text };
     return this.synth(req, gen);
@@ -603,6 +707,8 @@ export class VoicePlayer {
 
   private synth(req: SpeakRequest, gen: number) {
     if (typeof speechSynthesis === 'undefined') return Promise.resolve();
+    this.pickSynthVoice();
+    this.synthUsed = true;
     return new Promise<void>((resolve) => {
       const u = new SpeechSynthesisUtterance(req.text);
       u.lang = 'ru-RU';

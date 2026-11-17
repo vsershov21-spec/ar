@@ -16,6 +16,7 @@ import { KIND } from './effects/kind';
 import { GLITTER } from './effects/glitter';
 import { HOOLIGAN } from './effects/hooligan';
 import { clamp, rand } from '../core/util';
+import { isMobileDevice } from '../core/energy';
 
 export type { Sticker } from './stickerSheet';
 export type { FxArgs } from './core';
@@ -133,7 +134,8 @@ export class FxLayer {
   }
 
   resize(w: number, h: number) {
-    this.dpr = Math.min(2, window.devicePixelRatio || 1);
+    // телефон: 1,5 (как видео камеры и 3D-слой) — полноэкранный холст на 44% меньше (390×844: 0,74 Мп вместо 1,3 Мп)
+    this.dpr = Math.min(isMobileDevice() ? 1.5 : 2, window.devicePixelRatio || 1);
     this.w = w;
     this.h = h;
     this.wasEmpty = false;
@@ -154,6 +156,12 @@ export class FxLayer {
   /** живые эффекты (debug) */
   get activeIds(): string[] {
     return this.live.map((l) => l.inst.id);
+  }
+
+  /** есть живой эффект, подходящий под условие (без массива на каждый кадр, как activeIds) */
+  hasLive(pred: (id: string) => boolean): boolean {
+    for (const l of this.live) if (pred(l.inst.id)) return true;
+    return false;
   }
 
   // ───────────── главный вход ─────────────

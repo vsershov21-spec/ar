@@ -1,29 +1,61 @@
 /**
  * Микрофон — один поток getUserMedia на всё: распознавание (Vosk), VAD, громкость (крик/шёпот/хлопок), повтор.
- * Звук идёт через AudioContext Howler (на iOS — один контекст на страницу, так проигрыш и запись не глушат
- * друг друга). ScriptProcessor (устарел, но работает везде, включая iOS Safari 14+); нет — AudioWorklet не нужен:
- * кадры 10 мс считаются в главном потоке за доли миллисекунды.
+ * Звук идёт через единственный AudioContext приложения (Audio.ctx, его же использует Howler): на iOS второй
+ * контекст или повторный getUserMedia рвут камеру и глушат друг друга.
  *
- * Подписчики получают сырой буфер и кадры по 10 мс. Микрофон не держим открытым без нужды:
- * close() через idleCloseMs после последнего release() — иначе iOS держит «красную точку» и режим разговора.
+ * Обработка — в AudioWorklet (micWorklet.ts, поток звука): кадры 10 мс для VAD и 16 кГц для Vosk считаются там,
+ * главный поток получает одно сообщение на ~85 мс. Нет AudioWorklet (старый браузер) или модуль не загрузился —
+ * ScriptProcessor 4096 с той же обработкой (micDsp.ts) в главном потоке. ?micnode=sp — принудительно ScriptProcessor.
+ *
+ * Подписчики получают MicChunk: pcm (частота контекста, для повтора), asr (16 кГц ×32768, для Vosk), frames.
+ * Аудиосессию iOS микрофон НЕ переключает: тип выставляется один раз в Audio.unlock() (см. audio.ts).
  */
 import type { Audio } from '../audio/audio';
-import { NoiseFloor, toFrames, type Frame } from './vad';
+import { NoiseFloor, type Frame } from './vad';
+import { MicDsp, ASR_SR, type MicChunk } from './micDsp';
 import { perf } from '../core/perf';
 
-export type MicListener = (buf: Float32Array, frames: Frame[], sampleRate: number) => void;
+export type { MicChunk };
+export interface MicEvent extends MicChunk {
+  /** кадры 10 мс */
+  list: Frame[];
+}
+export type MicListener = (c: MicEvent) => void;
+
+/** модуль ворклета загружается в контекст один раз */
+const workletLoaded = new WeakMap<BaseAudioContext, Promise<boolean>>();
+function loadWorklet(ctx: AudioContext): Promise<boolean> {
+  let p = workletLoaded.get(ctx);
+  if (!p) {
+    p = (async () => {
+      if (!ctx.audioWorklet || typeof AudioWorkletNode === 'undefined') return false;
+      if (typeof location !== 'undefined' && new URLSearchParams(location.search).get('micnode') === 'sp') return false;
+      try {
+        const { default: url } = await import('./micWorklet.ts?worker&url');
+        await ctx.audioWorklet.addModule(url);
+        return true;
+      } catch (e) {
+        console.warn('[mic] AudioWorklet недоступен — ScriptProcessor', e);
+        return false;
+      }
+    })();
+    workletLoaded.set(ctx, p);
+  }
+  return p;
+}
 
 export class MicInput {
   readonly floor = new NoiseFloor(2000);
   private stream: MediaStream | null = null;
   private src: MediaStreamAudioSourceNode | null = null;
-  private node: ScriptProcessorNode | null = null;
+  private node: AudioWorkletNode | ScriptProcessorNode | null = null;
   private sink: GainNode | null = null;
   private listeners = new Set<MicListener>();
   private opening: Promise<boolean> | null = null;
   private users = 0;
   private idleTimer = 0;
-  private carry = { buf: new Float32Array(4096), n: 0 };
+  /** чем обрабатывается звук: 'worklet' | 'script' (для debug/стенда) */
+  nodeKind: 'worklet' | 'script' | null = null;
   /** уровень 0..1 (для индикатора) */
   level = 0;
   /** последний кадр dBFS */
@@ -45,6 +77,8 @@ export class MicInput {
   get sampleRate() {
     return this.audio.ctx?.sampleRate ?? 48000;
   }
+  /** частота chunk.asr */
+  readonly asrRate = ASR_SR;
 
   on(fn: MicListener) {
     this.listeners.add(fn);
@@ -92,18 +126,35 @@ export class MicInput {
       this.error = 'unsupported';
       return false;
     }
+    // до жеста (Audio.unlock) не открываем: «слушаю всегда» откроет снова после камеры (App.wake → resumeAuto)
+    if (!this.audio.unlocked) {
+      this.error = 'locked';
+      return false;
+    }
     try {
       if (ctx.state !== 'running') await ctx.resume().catch(() => undefined);
-      this.audio.setSession('play-and-record');
+      // модуль ворклета — параллельно с запросом доступа (getUserMedia ждёт ответа ребёнка/родителя)
+      const wl = loadWorklet(ctx);
       this.stream = await navigator.mediaDevices.getUserMedia({
         audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: false, channelCount: 1 },
       });
       this.src = ctx.createMediaStreamSource(this.stream);
-      // 4096 отсчётов (≈ 85 мс при 48 кГц): вдвое реже будим главный поток, чем 2048, — микрофон открыт всё время
-      // («слушаю всегда»); VAD всё равно считает кадры по 10 мс, начало фразы берётся из кольца 400 мс
-      const node = ctx.createScriptProcessor(4096, 1, 1);
-      node.onaudioprocess = (e) => this.process(e.inputBuffer.getChannelData(0), ctx.sampleRate);
-      // ScriptProcessor работает, только если подключён к выходу — через нулевую громкость
+      const sr = ctx.sampleRate;
+      let node: AudioWorkletNode | ScriptProcessorNode;
+      if (await wl) {
+        const w = new AudioWorkletNode(ctx, 'mic-tap', { numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [1], channelCount: 1, channelCountMode: 'explicit' });
+        w.port.onmessage = (e: MessageEvent<MicChunk>) => this.node === w && this.process(e.data);
+        node = w;
+        this.nodeKind = 'worklet';
+      } else {
+        // 4096 отсчётов (≈ 85 мс при 48 кГц) — та же обработка (micDsp), но в главном потоке
+        const dsp = new MicDsp(sr, (c) => this.process(c), 4096);
+        const sp = ctx.createScriptProcessor(4096, 1, 1);
+        sp.onaudioprocess = (e) => dsp.push(e.inputBuffer.getChannelData(0));
+        node = sp;
+        this.nodeKind = 'script';
+      }
+      // узел работает, только если подключён к выходу — через нулевую громкость
       this.sink = ctx.createGain();
       this.sink.gain.value = 0;
       this.src.connect(node);
@@ -123,28 +174,31 @@ export class MicInput {
       return true;
     } catch (e: any) {
       this.error = e?.name === 'NotAllowedError' ? 'not-allowed' : e?.name === 'NotFoundError' ? 'no-device' : String(e?.message ?? e);
-      this.audio.setSession('playback');
       this.cleanup();
       return false;
     }
   }
 
-  private process(x: Float32Array, sr: number) {
+  private process(c: MicChunk) {
     perf.count('mic');
-    const frames = toFrames(x, sr, this.carry);
-    for (const f of frames) {
-      this.lastDb = 20 * Math.log10(Math.max(f.rms, 1e-7));
+    const f = c.frames;
+    const list: Frame[] = [];
+    for (let i = 0; i + 2 < f.length; i += 3) {
+      const fr = { rms: f[i], peak: f[i + 1], zcr: f[i + 2] };
+      list.push(fr);
+      this.lastDb = 20 * Math.log10(Math.max(fr.rms, 1e-7));
       // индикатор: −60…−10 dBFS → 0…1, сглаживание
       const v = Math.min(1, Math.max(0, (this.lastDb + 60) / 50));
       this.level += (v - this.level) * (v > this.level ? 0.5 : 0.15);
     }
-    for (const fn of this.listeners) fn(x, frames, sr);
+    const ev = c as MicEvent;
+    ev.list = list;
+    for (const fn of this.listeners) fn(ev);
   }
 
   close() {
     clearTimeout(this.idleTimer);
     this.cleanup();
-    this.audio.setSession('playback');
     this.level = 0;
   }
 
@@ -156,12 +210,17 @@ export class MicInput {
     } catch {
       /* ignore */
     }
-    if (this.node) this.node.onaudioprocess = null;
+    const n = this.node;
+    if (n && 'onaudioprocess' in n) n.onaudioprocess = null;
+    if (n && 'port' in n) {
+      n.port.onmessage = null;
+      n.port.postMessage('stop');
+    }
     this.node = null;
+    this.nodeKind = null;
     this.src = null;
     this.sink = null;
     this.stream?.getTracks().forEach((t) => t.stop());
     this.stream = null;
-    this.carry.n = 0;
   }
 }

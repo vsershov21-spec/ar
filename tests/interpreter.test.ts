@@ -169,3 +169,21 @@ describe('антиспам', () => {
     expect([c.strokeMinPx, c.strokeLongMs, c.comboTaps, c.comboWindowMs, c.sulkMs, c.spamTaps, c.spamWindowMs, c.spamIgnoreMs]).toEqual([80, 4000, 3, 2000, 2000, 5, 2000, 3000]);
   });
 });
+
+describe('цена проверки зоны', () => {
+  it('движение пальца — грубая проверка (coarse), касание — точная зона', () => {
+    const calls: boolean[] = [];
+    const ev: TouchEvent[] = [];
+    const it = new TouchInterpreter((e) => ev.push(e), (x, y, coarse) => {
+      calls.push(!!coarse);
+      return zoneAt(x, y);
+    });
+    it.down(150, 220, 0);
+    expect(calls).toEqual([false]);
+    calls.length = 0;
+    for (let i = 1; i <= 30; i++) it.move(150 + i, 220, i * 16);
+    // каждое движение — только грубая проверка (точная по скинованной сетке стоит 15–20 мс на телефоне)
+    expect(calls.length).toBeGreaterThan(0);
+    expect(calls.every((c) => c)).toBe(true);
+  });
+});

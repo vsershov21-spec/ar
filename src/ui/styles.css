@@ -204,8 +204,24 @@ canvas.gl.glitch { --gshift: 8px; animation: glitch .68s steps(1) infinite;
 .mic svg { width: 32px; height: 32px; }
 .mic.on, .mic.listening { background: var(--green); color: var(--white); transform: scale(1.08);
   box-shadow: 0 0 0 calc(6px + var(--lvl, 0) * 18px) rgba(181,227,106,.45), var(--sh-2); transition: box-shadow .08s, transform var(--t-fast) var(--ease); }
-.mic.listening:not(.on) { animation: listen 1.4s ease-in-out infinite; }
-@keyframes listen { 50% { box-shadow: 0 0 0 14px rgba(181,227,106,.25), var(--sh-2); } }
+/* пульс «слушаю» — кольцом-псевдоэлементом: анимируются только opacity/transform (композитор), а не box-shadow
+   (тот перерисовывал кнопку на главном потоке каждый кадр всё время, пока кот слушает) */
+.mic::after { content: ''; position: absolute; inset: -14px; border-radius: 50%; box-shadow: 0 0 0 14px rgba(181,227,106,.25) inset; opacity: 0; pointer-events: none; }
+.mic.listening:not(.on)::after { animation: listen 1.4s ease-in-out infinite; }
+@keyframes listen { 50% { opacity: 1; } }
+
+/* «ушки» над кнопкой, пока кот слушает: геометрия прежнего эффекта listen_ears (основание 0,32 и рост 0,35 ширины кнопки,
+   центры на ±0,28 ширины, наклон 20° ± 7° с периодом ~1 с) — теперь transform-анимация вместо перерисовки холста */
+.mic-slot { isolation: isolate; }
+.mic-ears { position: absolute; inset: 0; z-index: -1; pointer-events: none; display: none; }
+.mic-slot.ears .mic-ears { display: block; }
+.dock.no-mic .mic-ears, .mic-slot:has(.mic.hidden) .mic-ears { display: none; }
+.mic-ears b { position: absolute; top: calc(4px - 35.2%); width: 32%; height: 35.2%; transform-origin: 50% 98%; }
+.mic-ears b.l { left: 6%; animation: earwob-l .52s ease-in-out infinite alternate; }
+.mic-ears b.r { right: 6%; animation: earwob-r .52s ease-in-out infinite alternate; }
+.mic-ears svg { display: block; width: 100%; height: 100%; overflow: visible; }
+@keyframes earwob-l { from { transform: rotate(-13.2deg); } to { transform: rotate(-26.9deg); } }
+@keyframes earwob-r { from { transform: rotate(13.2deg); } to { transform: rotate(26.9deg); } }
 
 /* подсказка микрофона */
 .mic-hint { max-width: min(86vw, 360px); padding: 8px 14px; border-radius: var(--r-pill); background: var(--glass); border: 1px solid var(--glass-line);
@@ -324,7 +340,7 @@ body > .toast { position: fixed; }
 .mic-mode { position: absolute; bottom: calc(100% + 10px); left: 50%; transform: translateX(-50%); white-space: nowrap;
   font: 600 12px/1 var(--font, system-ui); padding: 7px 12px; border-radius: 999px; border: 0; color: #fff;
   background: rgba(11, 94, 107, .72); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); box-shadow: 0 2px 10px rgba(0,0,0,.18); }
-.mic-mode.auto::before { content: ''; display: inline-block; width: 7px; height: 7px; margin-right: 7px; border-radius: 50%; background: var(--lime, #B5E36A); vertical-align: 1px; animation: scandot 1.4s ease-in-out infinite; }
+.mic-mode.auto::before { content: ''; display: inline-block; width: 7px; height: 7px; margin-right: 7px; border-radius: 50%; background: var(--lime, #B5E36A); vertical-align: 1px; animation: scandot 1.4s ease-in-out 4; }
 .dock.no-mic .mic-mode { display: none; }
 .mic.auto:not(.listening) { box-shadow: 0 0 0 4px rgba(181, 227, 106, .35); }
 

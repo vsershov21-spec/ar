@@ -127,6 +127,30 @@ function softEnv() {
   return t;
 }
 
+const TAIL = ['Tail1', 'Tail2', 'Tail3', 'Tail4'];
+const TAIL_EARS = [...TAIL, 'LeftEar1', 'RightEar1'];
+
+/** освободить геометрию, материалы и текстуры поддерева (общие — ENV — пропускаем; повторный dispose безвреден) */
+export function disposeObject(root: THREE.Object3D) {
+  const mats = new Set<THREE.Material>();
+  const geos = new Set<THREE.BufferGeometry>();
+  root.traverse((o) => {
+    const m = o as THREE.Mesh;
+    if (m.geometry) geos.add(m.geometry);
+    const list = m.material ? (Array.isArray(m.material) ? m.material : [m.material]) : [];
+    for (const x of list) mats.add(x);
+    for (const k of ['origMat', 'tintMat']) if (m.userData?.[k]) mats.add(m.userData[k] as THREE.Material);
+    if ((m as unknown as THREE.SkinnedMesh).isSkinnedMesh) (m as unknown as THREE.SkinnedMesh).skeleton?.dispose();
+  });
+  const texs = new Set<THREE.Texture>();
+  for (const mat of mats) {
+    for (const v of Object.values(mat)) if ((v as THREE.Texture)?.isTexture && v !== ENV) texs.add(v as THREE.Texture);
+    mat.dispose();
+  }
+  for (const t of texs) t.dispose();
+  for (const g of geos) g.dispose();
+}
+
 export class GlbCharacter implements Character {
   readonly kind = 'glb' as const;
   readonly object = new THREE.Group();
@@ -156,6 +180,8 @@ export class GlbCharacter implements Character {
   private mouth = 0;
   private look: THREE.Vector3 | null = null;
   private hitBox = new THREE.Mesh(new THREE.BoxGeometry(0.55, 1, 0.4), new THREE.MeshBasicMaterial({ visible: false }));
+  /** габарит с запасом (уши, лапы в стороны) — для движения пальца при поглаживании (hitCoarse) */
+  private coarseBox = new THREE.Mesh(new THREE.BoxGeometry(0.8, 1.15, 0.6), new THREE.MeshBasicMaterial({ visible: false }));
   private faces = new Map<string, THREE.Object3D>();
   private morphMeshes: THREE.Mesh[] = [];
   private time = 0;
@@ -183,7 +209,8 @@ export class GlbCharacter implements Character {
   constructor(private url = 'models/character.glb', private animsUrl?: string) {
     this.object.name = 'character-glb';
     this.hitBox.position.y = 0.5;
-    this.object.add(this.inner, this.hitBox);
+    this.coarseBox.position.y = 0.55;
+    this.object.add(this.inner, this.hitBox, this.coarseBox);
   }
 
   get currentClip(): ClipName {
@@ -300,11 +327,18 @@ export class GlbCharacter implements Character {
       const mat = m.material as THREE.MeshStandardMaterial;
       if (!mat || !('color' in mat)) return;
       if (!m.userData.origMat) m.userData.origMat = mat;
+      // прошлая перекраска — освободить (раньше клон копился на каждую смену характера)
+      const prevTint = m.userData.tintMat as THREE.Material | undefined;
       if (key) {
         const c = (m.userData.origMat as THREE.MeshStandardMaterial).clone();
         c.color = new THREE.Color(tint[key]);
         m.material = c;
-      } else m.material = m.userData.origMat;
+        m.userData.tintMat = c;
+      } else {
+        m.material = m.userData.origMat;
+        m.userData.tintMat = undefined;
+      }
+      if (prevTint && prevTint !== m.material) prevTint.dispose();
     });
   }
 
@@ -540,20 +574,17 @@ export class GlbCharacter implements Character {
     this.collider?.apply();
     this.applyTailEars(dt, ears, facePresetId);
     this.props?.update(this.clips.cur.id);
-    for (const E of ['LeftEye', 'RightEye']) this.bones.get(E)?.scale.setScalar(pupils);
+    this.bones.get('LeftEye')?.scale.setScalar(pupils);
+    this.bones.get('RightEye')?.scale.setScalar(pupils);
 
     const head = this.bones.get('Head');
     if (head) {
       // взгляд на камеру + движения головы во время речи — вокруг осей персонажа в мире
       // (локальные оси кости Head у моделей Tripo повёрнуты: локальный X смотрит вперёд, поворот по нему — крен)
-      const target = this.look ?? camera.getWorldPosition(new THREE.Vector3());
-      const local = this.object.worldToLocal(target.clone());
+      const local = this.object.worldToLocal(this.tLocal.copy(this.look ?? camera.getWorldPosition(this.tLocal)));
       const yaw = clamp(Math.atan2(local.x, local.z), -0.6, 0.6);
       const pitch = clamp(Math.atan2(local.y - 0.85, Math.hypot(local.x, local.z)), -0.4, 0.4);
-      const mq = (this.model ?? this.object).getWorldQuaternion(this.tq2);
-      const up = this.tv.set(0, 1, 0).applyQuaternion(mq).clone();
-      const side = new THREE.Vector3(1, 0, 0).applyQuaternion(mq);
-      const fwd = new THREE.Vector3(0, 0, 1).applyQuaternion(mq);
+      const { up, side, fwd } = this.modelAxes();
       const h = this.life.head;
       const neck = this.bones.get('Neck');
       // часть движения — шеей: голова не «отламывается»
@@ -577,8 +608,7 @@ export class GlbCharacter implements Character {
 
   /** хвост и уши: сброс к покою и вторичная анимация TailRig поверх тела */
   private applyTailEars(dt: number, faceEars: number, facePresetId = this.faceMix.preset) {
-    const names = ['Tail1', 'Tail2', 'Tail3', 'Tail4', 'LeftEar1', 'RightEar1'];
-    for (const n of names) {
+    for (const n of TAIL_EARS) {
       const b = this.bones.get(n);
       const r = this.rest.get(n);
       if (b && r) b.quaternion.copy(r);
@@ -594,7 +624,7 @@ export class GlbCharacter implements Character {
       const hq = hips.getWorldQuaternion(this.tq).premultiply(objQ);
       const fwd = this.tv.set(0, 0, 1).applyQuaternion(hq);
       const yaw = Math.atan2(fwd.x, fwd.z);
-      const y = this.object.worldToLocal(hips.getWorldPosition(new THREE.Vector3())).y;
+      const y = this.object.worldToLocal(hips.getWorldPosition(this.tLocal)).y;
       if (this.hipsPrev) {
         let dy = yaw - this.hipsPrev.yaw;
         if (dy > Math.PI) dy -= 2 * Math.PI;
@@ -615,16 +645,13 @@ export class GlbCharacter implements Character {
       hipsUpVel: upVel,
     });
     this.tailOut = out;
-    const mq = (this.model ?? this.object).getWorldQuaternion(this.tq2);
-    const up = new THREE.Vector3(0, 1, 0).applyQuaternion(mq);
-    const side = new THREE.Vector3(1, 0, 0).applyQuaternion(mq);
-    const fwd = new THREE.Vector3(0, 0, 1).applyQuaternion(mq);
-    ['Tail1', 'Tail2', 'Tail3', 'Tail4'].forEach((n, i) => {
-      const b = this.bones.get(n);
-      if (!b) return;
+    const { up, side, fwd } = this.modelAxes();
+    for (let i = 0; i < 4; i++) {
+      const b = this.bones.get(TAIL[i]);
+      if (!b) continue;
       this.rotWorld(b, up, out.tail[i][0]);
       this.rotWorld(b, side, out.tail[i][1]);
-    });
+    }
     const eL = this.bones.get('LeftEar1');
     if (eL) {
       this.rotWorld(eL, side, out.earL[0]);
@@ -637,19 +664,35 @@ export class GlbCharacter implements Character {
     }
   }
 
+  /** оси модели в мире (вверх, вбок, вперёд) — во временных векторах: без new Vector3 на каждый кадр */
+  private modelAxes() {
+    const mq = (this.model ?? this.object).getWorldQuaternion(this.tq2);
+    return { up: this.axUp.set(0, 1, 0).applyQuaternion(mq), side: this.axSide.set(1, 0, 0).applyQuaternion(mq), fwd: this.axFwd.set(0, 0, 1).applyQuaternion(mq) };
+  }
+  private axUp = new THREE.Vector3();
+  private axSide = new THREE.Vector3();
+  private axFwd = new THREE.Vector3();
+  private tLocal = new THREE.Vector3();
+  private rq = new THREE.Quaternion();
+  private rq2 = new THREE.Quaternion();
+
   /** поворот кости вокруг оси в мировых координатах (ось — уже в мире) */
   private rotWorld(b: THREE.Object3D, axis: THREE.Vector3, angle: number) {
     if (!angle || !b.parent) return;
     b.parent.updateWorldMatrix(true, false);
     const pq = b.parent.getWorldQuaternion(this.tq);
-    const d = new THREE.Quaternion().setFromAxisAngle(axis, angle);
-    const local = pq.clone().invert().multiply(d).multiply(pq);
+    const d = this.rq.setFromAxisAngle(axis, angle);
+    const local = this.rq2.copy(pq).invert().multiply(d).multiply(pq);
     b.quaternion.premultiply(local);
     b.updateMatrixWorld(false);
   }
 
   hitTest(ray: THREE.Raycaster) {
     return ray.intersectObject(this.hitBox, false).length > 0;
+  }
+
+  hitCoarse(ray: THREE.Raycaster) {
+    return ray.intersectObject(this.coarseBox, false).length > 0;
   }
 
   /** зона: ближайшая к точке попадания кость (щека — голова сбоку от морды) */
@@ -699,10 +742,19 @@ export class GlbCharacter implements Character {
     return null;
   }
 
+  /**
+   * Смена характера грузит другую модель: освобождаем всё своё на GPU — геометрию, материалы (и перекраски), текстуры,
+   * кэш миксера. Раньше освобождалась только геометрия: каждая смена образа оставляла в памяти GPU текстуры
+   * прошлой модели (KTX2 2–3 карты по 1–2К) и программы шейдеров. Общая карта окружения (softEnv) не трогается.
+   */
   dispose() {
-    this.model?.traverse((o) => {
-      const m = o as THREE.Mesh;
-      m.geometry?.dispose();
-    });
+    this.mixer?.stopAllAction();
+    if (this.mixer && this.model) this.mixer.uncacheRoot(this.model);
+    this.mixer = null;
+    this.actions.clear();
+    disposeObject(this.object);
+
+    this.model?.removeFromParent();
+    this.model = null;
   }
 }

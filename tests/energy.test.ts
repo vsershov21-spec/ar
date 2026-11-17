@@ -34,6 +34,27 @@ describe('энергобюджет', () => {
     expect(e.update({ ...base, now: 70020 }).mode).toBe('boost');
   });
 
+  it('порядок app.ts (сначала due, потом update): в дрёме лишние rAF не работают, касание — кадр сразу', () => {
+    const e = new EnergyBudget({ enabled: true, now: 0 });
+    e.gyroSample(0, 0);
+    let work = 0;
+    const tick = (t: number) => {
+      if (!e.due(t)) return false;
+      e.update({ ...base, now: t });
+      work++;
+      return true;
+    };
+    for (let t = 70000; t < 71000; t += 1000 / 60) tick(t);
+    expect(e.out.mode).toBe('doze');
+    work = 0;
+    for (let t = 71000; t < 72000; t += 1000 / 60) tick(t);
+    expect(work).toBeLessThanOrEqual(13);
+    // касание между кадрами дрёмы: ближайший rAF — уже кадр, и режим — boost
+    e.activity(72001);
+    expect(tick(72005)).toBe(true);
+    expect(e.out.mode).toBe('boost');
+  });
+
   it('речь кота не даёт уйти в покой (рот — не реже 30 к/с)', () => {
     const e = new EnergyBudget({ enabled: true, now: 0 });
     e.gyroSample(0, 0);
@@ -77,11 +98,10 @@ describe('энергобюджет', () => {
   });
 
   it('pixelRatio: iPhone (dpr 3) — 1,5…2 по размеру экрана, ПК — до 2', () => {
-    const p15 = defaultPixelRatio(390, 844, 3, true);
-    expect(p15).toBeGreaterThanOrEqual(1.5);
-    expect(p15).toBeLessThan(2);
-    expect(defaultPixelRatio(430, 932, 3, true)).toBeGreaterThanOrEqual(1.5);
-    expect(defaultPixelRatio(375, 667, 2, true)).toBe(2);
+    // телефон: как видео камеры (≈ 1,5 пикселя видео на CSS-пиксель), независимо от экрана
+    expect(defaultPixelRatio(390, 844, 3, true)).toBe(1.5);
+    expect(defaultPixelRatio(430, 932, 3, true)).toBe(1.5);
+    expect(defaultPixelRatio(375, 667, 2, true)).toBe(1.5);
     expect(defaultPixelRatio(1440, 900, 2, false)).toBe(2);
     expect(defaultPixelRatio(390, 844, 1, true)).toBe(1);
   });

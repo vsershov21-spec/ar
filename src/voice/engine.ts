@@ -26,10 +26,10 @@
 import { Emitter } from '../core/emitter';
 import type { Audio } from '../audio/audio';
 import type { VoicePlayer } from './voicePlayer';
-import { MicInput } from './mic';
+import { MicInput, type MicEvent } from './mic';
 import { makeAsr, VoskAsr, type Asr, type AsrState } from './asr';
 import { EchoMode, type EchoPreset } from './echo';
-import { SoundEvents, Vad, db, type Frame } from './vad';
+import { SoundEvents, Vad, db } from './vad';
 import { grammarPhrases, intentContext, matchIntent, setIntentContext, type IntentMatch } from './intents';
 import { classifyUtterance, type ListenReason } from './utterance';
 import { turn } from './turn';
@@ -176,7 +176,7 @@ export class VoiceEngine extends Emitter<EngineEvents> {
       this.st.modelProgress = p;
       this.pushState();
     };
-    this.mic.on((buf, frames, sr) => this.onAudio(buf, frames, sr));
+    this.mic.on((c) => this.onAudio(c));
     if (opts.mode === 'auto') this.setMode('auto');
     // iOS: после звонка/сворачивания дорожка микрофона закрыта — «слушаю всегда» открывает её снова
     if (typeof document !== 'undefined')
@@ -316,9 +316,11 @@ export class VoiceEngine extends Emitter<EngineEvents> {
   }
 
   // ───────────── звук микрофона ─────────────
-  private onAudio(buf: Float32Array, frames: Frame[], sr: number) {
-    // кольцо 400 мс — начало фразы при перебивании
-    this.ring.push(Float32Array.from(buf));
+  private onAudio(c: MicEvent) {
+    const frames = c.list;
+    // кольцо 400 мс (16 кГц, формат распознавателя) — начало фразы при перебивании; без копий: буфер ничей
+    const buf = c.asr, sr = this.mic.asrRate;
+    this.ring.push(buf);
     this.ringLen += buf.length;
     while (this.ring.length > 1 && this.ringLen - this.ring[0].length > sr * 0.4) this.ringLen -= this.ring.shift()!.length;
     for (const f of frames) {

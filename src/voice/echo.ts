@@ -16,7 +16,8 @@
  */
 import type { MicInput } from './mic';
 import type { VoicePlayer } from './voicePlayer';
-import { Vad, VAD_DEFAULTS, type Frame } from './vad';
+import { Vad, VAD_DEFAULTS } from './vad';
+import type { MicEvent } from './mic';
 import { ECHO_SR, processEcho } from './echoDsp';
 
 export interface EchoPreset { echoPitchSemitones: number; echoRate: number }
@@ -82,7 +83,7 @@ export class EchoMode {
     this.phase = 'waiting';
     this.vad.reset();
     this.lastSpeech = performance.now();
-    this.off = this.mic.on((buf, frames, sr) => this.onAudio(buf, frames, sr));
+    this.off = this.mic.on((c) => this.onAudio(c));
     this.idleTimer = window.setInterval(() => {
       if (this.delivery === 'direct' && this.phase === 'waiting' && performance.now() - this.lastSpeech > IDLE_EXIT_MS) this.stop('timeout');
     }, 1000);
@@ -144,8 +145,9 @@ export class EchoMode {
     this.preLen = 0;
   }
 
-  private onAudio(buf: Float32Array, frames: Frame[], sr: number) {
+  private onAudio(c: MicEvent) {
     if (!this.active) return;
+    const frames = c.list, sr = c.sampleRate;
     if (this.phase === 'processing' || this.phase === 'ready' || this.phase === 'speaking' || this.gated()) {
       if (this.phase === 'recording') {
         // заговорил кот / окно закрылось посреди фразы — запись выбрасываем
@@ -155,7 +157,8 @@ export class EchoMode {
       this.vad.reset();
       return;
     }
-    const copy = Float32Array.from(buf);
+    // исходный звук блока — свой у каждого блока (никто больше его не держит): без копии
+    const copy = c.pcm;
     if (this.phase === 'recording') this.chunks.push(copy);
     else {
       // кольцо «до начала фразы»

@@ -6,7 +6,9 @@
  *    Модель (~45 МБ) грузится лениво при первом нажатии микрофона, с прогрессом; кладётся в Cache Storage.
  *  - WebSpeechAsr (только ?asr=web): webkitSpeechRecognition. В Chrome звук уходит на серверы Google —
  *    на пилоте с детьми нельзя, поэтому только по флагу.
- * Звук для Vosk берётся из общего MicInput (тот же поток, что VAD/громкость/повтор).
+ * Звук для Vosk берётся из общего MicInput (тот же поток, что VAD/громкость/повтор) — уже 16 кГц и в шкале int16
+ * (пересчитан в AudioWorklet, micDsp.ts): в воркер Vosk уходит как есть, главный поток его не трогает.
+ * Сам Kaldi работает в своём воркере (vosk-browser) и получает звук только пока идёт фраза (VAD / окно ответа).
  */
 import { asset } from '../core/util';
 import type { MicInput } from './mic';
@@ -17,6 +19,7 @@ export type AsrState = 'idle' | 'loading' | 'listening' | 'error';
 export interface Asr {
   readonly name: string;
   readonly supported: boolean;
+  /** preroll — начало фразы (16 кГц ×32768, как MicChunk.asr) */
   start(preroll?: Float32Array[]): void;
   stop(): void;
   /** прервать без результата */
@@ -235,7 +238,7 @@ export class VoskAsr implements Asr {
       this.mic.release();
       return;
     }
-    const sr = this.mic.sampleRate;
+    const sr = this.mic.asrRate;
     const rec = this.grammar ? new this.model.KaldiRecognizer(sr, JSON.stringify(this.grammar)) : new this.model.KaldiRecognizer(sr);
     rec.on('result', (m: any) => {
       const t: string = m.result?.text ?? '';
@@ -255,12 +258,13 @@ export class VoskAsr implements Asr {
     for (const b of preroll ?? []) this.feed(rec, b, sr);
     this.held = [];
     this.heldLen = 0;
-    this.off = this.mic.on((buf) => {
+    this.off = this.mic.on((c) => {
+      const buf = c.asr;
       this.onLevel(this.mic.level);
       if (this.paused) return;
       if (this.gate && !this.gate()) {
         // тишина: не будим распознаватель, держим последние 400 мс — начало фразы не потеряется
-        this.held.push(Float32Array.from(buf));
+        this.held.push(buf);
         this.heldLen += buf.length;
         while (this.held.length > 1 && this.heldLen - this.held[0].length > sr * 0.4) this.heldLen -= this.held.shift()!.length;
         return;
@@ -276,11 +280,17 @@ export class VoskAsr implements Asr {
     this.timer = window.setTimeout(() => this.stop(), MAX_HOLD_MS);
   }
 
-  private feed(rec: { acceptWaveformFloat(b: Float32Array, sr: number): void }, buf: Float32Array, sr: number) {
+  /**
+   * Звук уже 16 кГц и ×32768: шлём в воркер Vosk напрямую (acceptWaveformFloat заново умножал бы каждый
+   * отсчёт в главном потоке). Без передачи владения — тот же буфер лежит в кольце начала фразы.
+   */
+  private feed(rec: { id?: string; acceptWaveformFloat(b: Float32Array, sr: number): void }, buf: Float32Array, sr: number) {
     perf.count('asr');
     perf.count('asrSec', buf.length / sr);
     try {
-      rec.acceptWaveformFloat(buf, sr);
+      const m = this.model;
+      if (rec.id && typeof m?.postMessage === 'function') m.postMessage({ action: 'audioChunk', data: buf, recognizerId: rec.id, sampleRate: sr });
+      else rec.acceptWaveformFloat(buf.map((v) => v / 32768), sr);
     } catch {
       /* ignore */
     }

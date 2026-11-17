@@ -9,12 +9,12 @@ describe('VoskAsr.gate', () => {
   });
 
   it('тишина не кормит распознаватель, начало фразы (≤ 400 мс) уходит перед голосом', async () => {
-    const SR = 48000, CH = 4096;
-    const listeners = new Set<(b: Float32Array) => void>();
+    const SR = 16000, CH = 1365; // MicChunk.asr: 16 кГц, ~85 мс
+    const listeners = new Set<(c: { asr: Float32Array }) => void>();
     const mic = {
-      supported: true, sampleRate: SR, level: 0, error: null,
+      supported: true, sampleRate: 48000, asrRate: SR, level: 0, error: null,
       acquire: () => Promise.resolve(true), release: () => {},
-      on: (fn: (b: Float32Array) => void) => (listeners.add(fn), () => listeners.delete(fn)),
+      on: (fn: (c: { asr: Float32Array }) => void) => (listeners.add(fn), () => listeners.delete(fn)),
     } as unknown as MicInput;
     let fed = 0;
     class Rec {
@@ -32,7 +32,7 @@ describe('VoskAsr.gate', () => {
     asr.gate = () => voice;
     await asr.start();
     const push = (n: number) => {
-      for (let i = 0; i < n; i++) listeners.forEach((fn) => fn(new Float32Array(CH)));
+      for (let i = 0; i < n; i++) listeners.forEach((fn) => fn({ asr: new Float32Array(CH) }));
     };
     push(60); // ~5 с тишины в окне ответа
     expect(fed).toBe(0);

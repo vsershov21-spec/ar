@@ -235,7 +235,7 @@ export class App {
     this.voice.preloadEvents(this.director.persona.id, ['point_camera', 'meet_card', 'meet_congrats', 'ask_name', 'nice_name', 'no_name', 'meet_self', 'meet_skills', 'welcome_back']);
 
     this.input = new Input(this.fx.canvas, {
-      zoneAt: (x, y) => this.zoneAt(x, y),
+      zoneAt: (x, y, coarse) => this.zoneAt(x, y, coarse),
       tryPeel: (x, y) => this.fx.beginPeel(x, y),
       fxDown: (x, y) => this.fx.pointerDown(x, y),
       fxMove: (x, y, px, py) => this.fx.pointerMove(x, y, px, py),
@@ -260,8 +260,9 @@ export class App {
     this.engine?.on('state', (st) => {
       if (st.listening !== listening) {
         listening = st.listening;
-        if (listening) fx.play('listen_ears');
-        else fx.stop('listen_ears');
+        // «ушки» у кнопки — CSS (ui.setEars), а не эффект на полноэкранном холсте: тот перерисовывался бы каждый кадр,
+        // пока кот слушает (в режиме «слушаю всегда» — почти всё время)
+        this.ui.setEars(listening);
       }
       const e = st.echo !== 'off';
       if (e !== echo) {
@@ -324,17 +325,8 @@ export class App {
       else if (s.echo === 'waiting') this.ui.micHintText('Говори — повторю!');
       if (s.asrState === 'idle' && !s.listening && s.echo === 'off') this.ui.micLevel(0);
     });
-    // уровень микрофона: ~15 раз в секунду и только при заметном изменении (раньше — стиль кнопки 60 раз в секунду
-    // всё время, пока микрофон открыт: пересчёт стилей и перерисовка слоя без нужды)
-    let lvlT = 0, lvlV = -1;
-    const lvl = (t: number) => {
-      requestAnimationFrame(lvl);
-      if (!e.mic.isOpen || t - lvlT < 66) return;
-      lvlT = t;
-      const v = Math.round(e.mic.level * 20) / 20;
-      if (v !== lvlV) this.ui.micLevel((lvlV = v));
-    };
-    requestAnimationFrame(lvl);
+    // уровень микрофона на кнопке — в frame() (micLevelTick): ~15 раз в секунду и только при заметном изменении;
+    // раньше — отдельный requestAnimationFrame-цикл, крутившийся 60 раз в секунду всегда, даже в дрёме
     e.on('state', (s) => {
       this.voiceBusy = s.catSpeaking || s.listening;
       if (s.listening) this.energy.activity(performance.now(), false);
@@ -477,7 +469,7 @@ export class App {
     }
     // реакция (не idle-вариант и не сон) — первые 4 с клипа; длинные петли (танец, сон) дальше идут на обычной частоте
     const reacting = !/^idle|sleep/.test(clip) && now - this.clipSince < 4000;
-    const fxLive = this.fx.parts.list.length > 0 || this.fx.activeIds.some((id) => id !== 'listen_ears' && id !== 'echo_wave');
+    const fxLive = this.fx.parts.list.length > 0 || this.fx.hasLive((id) => id !== 'listen_ears' && id !== 'echo_wave');
     const action = reacting || this.stage.walking || fxLive || this.fx.isPeeling || !!this.input?.touch.isStroking;
     const out = this.energy.update({
       now,
@@ -511,16 +503,31 @@ export class App {
     setTimeout(() => (ric ? ric(run, { timeout: 5000 }) : run()), 20000);
   }
 
-  /** зона кота под пальцем (head, cheek, belly, paw, tail, body) или null — мимо кота */
-  zoneAt(x: number, y: number): TouchZone | null {
+  /**
+   * Зона кота под пальцем (head, cheek, belly, paw, tail, body) или null — мимо кота.
+   * Точная зона (касание, долгое нажатие) — луч по сетке скинованной модели: 15–20 мс на телефоне (≈ 80 мс в headless
+   * при CPU×4) — раньше так проверялось и КАЖДОЕ движение пальца при поглаживании (60–120 раз в секунду: главный поток
+   * занят целиком, кадры рвутся, телефон греется). coarse — только «на коте ли палец»: габаритный бокс, микросекунды.
+   * Точный ответ для той же точки (касание сразу после нажатия) — из кэша (≤ 4 px, ≤ 400 мс).
+   */
+  zoneAt(x: number, y: number, coarse = false): TouchZone | null {
     if (!this.stage.root.visible) return null;
-    const ray = new THREE.Raycaster();
+    const now = performance.now();
+    const c = this.zoneCache;
+    if (!coarse && c && now - c.t < 400 && Math.abs(c.x - x) <= 4 && Math.abs(c.y - y) <= 4) return c.zone;
+    const ray = this.ray;
     const w = this.root.clientWidth, h = this.root.clientHeight;
-    ray.setFromCamera(new THREE.Vector2((x / w) * 2 - 1, -(y / h) * 2 + 1), this.tracker.camera);
+    ray.setFromCamera(this.rayPt.set((x / w) * 2 - 1, -(y / h) * 2 + 1), this.tracker.camera);
     this.stage.root.updateMatrixWorld(true);
-    if (this.character.hitZone) return this.character.hitZone(ray);
-    return this.character.hitTest(ray) ? 'body' : null;
+    if (coarse) return (this.character.hitCoarse?.(ray) ?? this.character.hitTest(ray)) ? 'body' : null;
+    if (!this.character.hitZone) return this.character.hitTest(ray) ? 'body' : null;
+    const zone = this.character.hitZone(ray);
+    this.zoneCache = { x, y, t: now, zone };
+    return zone;
   }
+  private ray = new THREE.Raycaster();
+  private rayPt = new THREE.Vector2();
+  private zoneCache: { x: number; y: number; t: number; zone: TouchZone | null } | null = null;
 
   /**
    * Событие касания кота → режиссёр. Если у характера нет реакции на это событие (старые persona-файлы),
@@ -592,10 +599,16 @@ export class App {
 
   /** «Разбудить кота»: всё, что требует жеста в iOS, — синхронно в начале обработчика */
   async wake() {
-    this.audio.unlock();
+    // аудиосессия iOS — один раз и сразу «с микрофоном», если он будет: потом её никто не переключает
+    this.audio.unlock(this.engine.mic.supported);
     this.voice.unlock();
-    // «слушаю всегда»: микрофон открываем в жесте (iOS), до него AudioContext спит
-    this.engine.resumeAuto();
+    // «слушаю всегда»: микрофон — ПОСЛЕ камеры (два getUserMedia одновременно на iOS рвут видео)
+    let micAsked = false;
+    const openMic = () => {
+      if (micAsked) return;
+      micAsked = true;
+      this.engine.resumeAuto();
+    };
     // офлайн-распознавание (~45 МБ + 2.4 МБ движок) — заранее, чтобы первое «нажми и скажи» не ждало;
     // не на «экономии трафика»
     if (!(navigator as any).connection?.saveData) setTimeout(() => void this.engine.asr.preload?.(), 3000);
@@ -605,6 +618,7 @@ export class App {
     try {
       const tv = this.tracker as unknown as { startVideo?: () => Promise<void> };
       if (typeof tv.startVideo === 'function') await tv.startVideo();
+      openMic();
       void sensors.then((ok) => {
         this.director.log(`датчики: ${ok ? 'да' : 'нет'}`);
         // без гироскопа кот, когда карты не видно, «едет» вместе с телефоном — скажем, как включить
@@ -614,9 +628,11 @@ export class App {
       this.ui.hideStart();
       this.director.dispatch({ type: 'wake' });
       await this.tracker.start();
+      openMic();
       this.resize();
     } catch (e) {
       console.error(e);
+      openMic();
       this.ui.hideStart();
       this.ui.error('Камера не включилась', 'Разреши доступ к камере в настройках браузера и попробуй ещё раз.');
     }
@@ -629,10 +645,30 @@ export class App {
     this.fx.resize(w, h);
   }
 
+  private lvlT = 0;
+  private lvlV = -1;
+  /** уровень микрофона → кольцо кнопки: ≤ 15 Гц и только при изменении (стиль кнопки — перерисовка) */
+  private micLevelTick(now: number) {
+    const mic = this.engine?.mic;
+    if (!mic?.isOpen) {
+      if (this.lvlV > 0) this.ui.micLevel((this.lvlV = 0));
+      return;
+    }
+    if (now - this.lvlT < 66) return;
+    this.lvlT = now;
+    const v = Math.round(mic.level * 20) / 20;
+    if (v !== this.lvlV) this.ui.micLevel((this.lvlV = v));
+  }
+
+  /**
+   * Кадр. rAF приходит 60 (120) раз в секунду, но работа — только в кадрах, которые разрешил энергобюджет:
+   * сначала дешёвая проверка due() по прошлому решению, и лишь потом пересчёт режима (energyTick) — пропущенный
+   * кадр стоит одно сравнение. Касание/речь сбрасывают ожидание (energy.activity), реакция не ждёт кадра дрёмы.
+   */
   private frame() {
     const now = performance.now();
-    this.energyTick(now);
     if (!this.energy.due(now)) return;
+    this.energyTick(now);
     perf.count('logic');
     perf.beginFrame();
     perf.section('tracker');
@@ -650,7 +686,8 @@ export class App {
     this.tracker.update(dt, this.elapsed);
     if (this.director.state.appeared) {
       this.cardMonitor.card(cardScreenFrac(this.tracker), dt * 1000);
-      if ((this.lumaT += dt) >= 0.5) {
+      // освещённость меняется медленно: раз в секунду (кадр камеры 1280×720 → 32×24 — полное чтение кадра с GPU на iOS)
+      if ((this.lumaT += dt) >= 1) {
         const l = this.luma.sample((this.tracker as { video?: HTMLVideoElement | null }).video);
         if (l !== null) this.cardMonitor.light(l, this.lumaT * 1000);
         this.lumaT = 0;
@@ -658,6 +695,7 @@ export class App {
     }
     perf.section('input');
     this.input.tick();
+    this.micLevelTick(now);
     // мурчание-петля, пока гладят
     if (this.input.touch.isStroking && (this.purrT -= dt) <= 0) {
       this.purrT = 1.7;

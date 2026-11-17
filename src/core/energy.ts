@@ -80,7 +80,11 @@ export class EnergyBudget {
   /** касание, речь, встряска: сбросить дрёму и коротко — 60 к/с */
   activity(now: number, boost = true) {
     this.lastActivity = now;
-    if (boost) this.boostUntil = Math.max(this.boostUntil, now + this.boostMs);
+    if (boost) {
+      this.boostUntil = Math.max(this.boostUntil, now + this.boostMs);
+      // следующий rAF — сразу кадр (app.ts проверяет due() до пересчёта режима): из дрёмы реакция без ожидания 83 мс
+      this.lastRender = -1e9;
+    }
   }
 
   /** скорость поворота телефона, °/с (devicemotion.rotationRate) */
@@ -164,11 +168,14 @@ export function isMobileDevice(): boolean {
   return /Macintosh/.test(ua) && (navigator.maxTouchPoints ?? 0) > 1;
 }
 
-/** pixelRatio по умолчанию: телефон — 1,5…2 по размеру экрана (≈ 1 Мп буфера, не 3× экрана); ПК — до 2 */
-export function defaultPixelRatio(cssW: number, cssH: number, dpr: number, mobile: boolean): number {
+/**
+ * pixelRatio по умолчанию: телефон — 1,5 (ПК — до 2).
+ * Почему 1,5: видео камеры 720×1280 растянуто «cover» на экран 390×844 → ≈ 1,5 пикселя видео на CSS-пиксель;
+ * кот чётче фона не нужен, а буфер 1,75 (было для 390×844) — на 36% больше пикселей (заливка, MSAA, композитинг).
+ * Маленькие экраны (SE 375×667) — тоже 1,5: было 2 (×1,8 пикселей при той же камере).
+ */
+export function defaultPixelRatio(_cssW: number, _cssH: number, dpr: number, mobile: boolean): number {
   const d = dpr || 1;
-  if (!mobile) return Math.min(2, d);
-  const budget = Math.sqrt(1.0e6 / Math.max(1, cssW * cssH));
-  // шаг 0,25: 390×844 → 1,75; 430×932 → 1,5; маленькие экраны (SE) → 2
-  return Math.min(d, Math.max(1.5, Math.min(2, Math.round(budget * 4) / 4)));
+  return Math.min(d, mobile ? MOBILE_PR : 2);
 }
+export const MOBILE_PR = 1.5;

@@ -34,8 +34,8 @@ export type InputEvents = {
 };
 
 export interface InputHooks {
-  /** зона кота в точке экрана (null — мимо кота) */
-  zoneAt(x: number, y: number): TouchZone | null;
+  /** зона кота в точке экрана (null — мимо кота); coarse — дешёвая проверка «на коте ли палец» (движение пальца) */
+  zoneAt(x: number, y: number, coarse?: boolean): TouchZone | null;
   /** true — палец начал отклеивать наклейку (жест забирает слой наклеек) */
   tryPeel(x: number, y: number): boolean;
   /** true — тап попал в наклейку-выбор */
@@ -62,7 +62,7 @@ export class Input extends Emitter<InputEvents> {
   constructor(surface: HTMLElement, private hooks: InputHooks, now = performance.now()) {
     super();
     this.silence = new SilenceTimer(now, 10000);
-    this.touch = new TouchInterpreter((e) => this.onTouch(e), (x, y) => this.hooks.zoneAt(x, y));
+    this.touch = new TouchInterpreter((e) => this.onTouch(e), (x, y, coarse) => this.hooks.zoneAt(x, y, coarse));
     surface.addEventListener('pointerdown', (e) => this.down(e));
     surface.addEventListener('pointermove', (e) => this.move(e));
     surface.addEventListener('pointerup', (e) => this.up(e));

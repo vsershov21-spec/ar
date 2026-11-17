@@ -77,6 +77,17 @@ const PERSONA_UI: Record<string, { img: string; tagline: string; color: string; 
   glitter: { img: 'video/sprites/glitter/pose_wave.webp', tagline: 'Яркая и с блёстками', color: '#9a7be8', soft: '#efe8fd' },
 };
 
+/** «ушки» над микрофоном, пока кот слушает (раньше — эффект listen_ears на полноэкранном холсте) */
+const EAR = '<svg viewBox="0 0 100 112" aria-hidden="true"><polygon points="0,110 50,1 100,110" fill="#A9B6CC" stroke="#fff" stroke-width="2" vector-effect="non-scaling-stroke" stroke-linejoin="round"/><polygon points="25,108 50,35 75,108" fill="#F3A6B6"/></svg>';
+const EARS = `<i class="mic-ears" aria-hidden="true"><b class="l">${EAR}</b><b class="r">${EAR}</b></i>`;
+
+/** положение кота для пузыря с точностью ~6 px: пузырь перекладывается, только когда оно меняется */
+export function bubbleKey(r: { top: number; bottom: number; cx: number; headY: number; half: number } | null): string {
+  if (!r) return '-';
+  const q = (v: number) => Math.round(v / 6);
+  return `${q(r.top)}|${q(r.bottom)}|${q(r.cx)}|${q(r.headY)}|${q(r.half)}`;
+}
+
 const ICON = {
   mic: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="8.5" y="2.5" width="7" height="12" rx="3.5" fill="currentColor" stroke="none"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3.5M8.5 21.5h7"/></svg>',
   sound: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor"/><path d="M15.5 9a4.5 4.5 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11"/></svg>',
@@ -112,6 +123,7 @@ export class UI {
   private mic: HTMLButtonElement;
   private micHint: HTMLDivElement;
   private micMode!: HTMLButtonElement;
+  private micSlot!: HTMLElement;
   private micModeNow: 'auto' | 'ptt' = 'auto';
   private dock: HTMLDivElement;
   private hintsBtn: HTMLButtonElement;
@@ -211,7 +223,7 @@ export class UI {
       </div>
       <div class="dock no-mic">
         <button class="iconbtn side-l" data-a="mute" aria-label="Выключить звук">${ICON.sound}</button>
-        <div class="mic-slot"><button class="mic-mode" type="button" aria-label="Режим микрофона"></button><button class="mic hidden" aria-label="Держи и говори">${ICON.mic}</button></div>
+        <div class="mic-slot">${EARS}<button class="mic-mode" type="button" aria-label="Режим микрофона"></button><button class="mic hidden" aria-label="Держи и говори">${ICON.mic}</button></div>
         <button class="iconbtn side-r" data-a="hints" aria-label="Подсказки" aria-pressed="false">${ICON.hints}</button>
       </div>`;
     parent.appendChild(root);
@@ -223,6 +235,7 @@ export class UI {
     this.chips = q('.chips');
     this.mic = q('.mic');
     this.micMode = q('.mic-mode');
+    this.micSlot = q('.mic-slot');
     this.micMode.addEventListener('click', () => h.onMicMode(this.micModeNow === 'auto' ? 'ptt' : 'auto'));
     this.micHint = q('.mic-hint');
     this.dock = q('.dock');
@@ -720,14 +733,19 @@ export class UI {
         this.following = false;
         return;
       }
+      // раскладка (сброс стилей + чтение offset* = синхронный layout, а смена top/left — ещё и CSS-переход на 0,25 с)
+      // только когда кот на экране заметно сдвинулся: дрожание трекинга на 1–3 px не перекладывает пузырь каждые 120 мс
       if (now - t > 120) {
         t = now;
-        this.layoutBubble();
+        const k = bubbleKey(this.catRect());
+        if (k !== this.bubbleAt) this.layoutBubble();
       }
       requestAnimationFrame(loop);
     };
     requestAnimationFrame(loop);
   }
+  /** положение кота при последней раскладке пузыря (bubbleKey) */
+  private bubbleAt = '';
 
   /** пузырь сверху с хвостиком к голове; если сверху не помещается — сбоку от головы, на свободной стороне */
   layoutBubble() {
@@ -735,6 +753,7 @@ export class UI {
     if (!b.classList.contains('show')) return;
     const W = this.root.clientWidth, H = this.root.clientHeight;
     const cat = this.catRect();
+    this.bubbleAt = bubbleKey(cat);
     const st = b.style;
     // по умолчанию — сверху (позиция из CSS)
     b.classList.remove('side', 'tail-left', 'tail-right', 'tail-down');
@@ -774,6 +793,10 @@ export class UI {
 
   micLevel(v: number) {
     this.mic.style.setProperty('--lvl', String(v));
+  }
+  /** «ушки» над кнопкой микрофона, пока кот слушает (CSS-анимация на композиторе, без перерисовки холста эффектов) */
+  setEars(on: boolean) {
+    this.micSlot.classList.toggle('ears', on);
   }
   /** кот слушает сам (окно ответа) — микрофон подсвечен */
   setListening(on: boolean) {
