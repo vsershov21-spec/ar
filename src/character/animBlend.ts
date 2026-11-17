@@ -15,6 +15,10 @@ import type { ClipState } from './clipState';
 import type { ClipPrepInfo } from './animPrep';
 
 const smoother = (x: number) => (x <= 0 ? 0 : x >= 1 ? 1 : x * x * x * (x * (x * 6 - 15) + 10));
+/** остаток смещения для реакции: быстрый старт (за 0,1 с проходит ~половина пути), мягкая посадка */
+const snappy = (x: number) => (x <= 0 ? 1 : x >= 1 ? 0 : (1 - x) * (1 - x) * (1 + 0.5 * x));
+/** клипы «покоя»: в них входим мягко (smootherstep), в реакции — быстро (snappy) */
+export const isCalm = (id: string) => /^(idle|sit_idle|sleep_loop|listen|talk_|echo_speak|walk|run)/.test(id);
 
 /** длительность затухания перехода, с: из каталога (blendInMs), но не резче 0,15 с и не дольше 0,6 с */
 export function blendSeconds(blendInMs: number, from: string, to: string) {
@@ -47,6 +51,7 @@ export class AnimBlender {
   private from = '';
   private t = 0;
   private dur = 0.3;
+  private snap = false;
   private haveLast = false;
   /** вес слоя покоя 0..1 (входит и уходит плавно) */
   private idleW = 0;
@@ -124,6 +129,7 @@ export class AnimBlender {
             this.from = from;
             this.t = 0;
             this.dur = blendSeconds(cs.cur.def.blendInMs, from, id);
+            this.snap = !isCalm(id);
           }
         }
       } else if (this.action) {
@@ -164,15 +170,15 @@ export class AnimBlender {
         jump = Math.max(jump, 2 * Math.acos(Math.min(1, Math.abs(s.off.w))));
         if (s.hasPos) s.offP.copy(s.lastP).sub(s.b.position);
       }
-      // большой разрыв позы — дольше: пиковая скорость затухания ≈ 1,9·разрыв/длительность ≤ ~10 рад/с
-      this.dur = Math.max(this.dur, Math.min(0.6, jump * 0.19));
+      // большой разрыв позы — дольше: пиковая скорость затухания ≈ 1,9 (snappy 1,5)·разрыв/длительность ≤ ~10 рад/с
+      this.dur = Math.max(this.dur, Math.min(0.6, jump * (this.snap ? 0.15 : 0.19)));
       this.log.push({ at: +this.time.toFixed(2), from: this.from, to: this.playing, dur: +this.dur.toFixed(2), jump: +jump.toFixed(2) });
       if (this.log.length > 30) this.log.shift();
       this.t = 0;
     }
     if (this.t < this.dur) {
       this.t += dt;
-      const w = 1 - smoother(this.t / this.dur);
+      const w = this.snap ? snappy(this.t / this.dur) : 1 - smoother(this.t / this.dur);
       for (const s of slots) {
         if (w > 0) {
           this.tq.copy(this.iq).slerp(s.off, w);
