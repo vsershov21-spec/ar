@@ -4,7 +4,9 @@
  *  - без повтора последних 3 вариантов в событии (если вариантов меньше — без повтора последнего);
  *  - cooldownMs из events.json: событие не срабатывает чаще (force — для сценария);
  *  - {name} только если имя есть в словаре names.ru.txt, иначе берутся варианты без имени;
- *  - эмоция → пресет лица (face.json), clip/fx/sound — из строки или умолчаний события.
+ *  - эмоция → пресет лица (face.json), clip/fx/sound — из строки или умолчаний события;
+ *  - prefer (озвучено): если среди вариантов есть озвученные записью — выбираем только из них (кот не говорит синтезом,
+ *    пока есть живой голос).
  */
 import type { ContentBundle } from './content';
 import { fill } from './content';
@@ -33,6 +35,8 @@ export interface PickOptions {
   /** игнорировать cooldown (реплики сценария и диалогов) */
   force?: boolean;
   now?: number;
+  /** вариант прозвучит записью (template, готовый текст) — такие в приоритете */
+  prefer?: (line: ContentLine, text: string) => boolean;
 }
 
 const DEFAULT_EVENT: Omit<EventDef, 'id'> = { group: 'dialog', priority: 1, cooldownMs: 0, interruptible: true, trigger: '' };
@@ -70,8 +74,13 @@ export class LinePicker {
   pick(p: Persona, event: string, o: PickOptions = {}): PickedLine | null {
     const now = o.now ?? Date.now();
     if (!o.force && this.coolingDown(event, now)) return null;
-    const cands = this.candidates(p, event, o.name);
+    let cands = this.candidates(p, event, o.name);
     if (!cands.length) return null;
+    const okName0 = this.nameAllowed(o.name);
+    if (o.prefer) {
+      const voiced = cands.filter((l) => o.prefer!(l, fill(l.text, { ...(okName0 ? { name: okName0 } : {}), ...(o.vars ?? {}) }).replace(/\s+/g, ' ').trim()));
+      if (voiced.length) cands = voiced;
+    }
     const key = `${p.id}:${event}`;
     const hist = this.history.get(key) ?? [];
     // история могла набраться при другом наборе вариантов (с именем / без) — считаем только текущие

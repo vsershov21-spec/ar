@@ -222,6 +222,28 @@ export class VoicePlayer {
     return this.personas.get(persona)!;
   }
 
+  /** основная озвучка (ElevenLabs) на сайте есть — иначе «неозвученность» не проверяем (локально, без озвучки — синтез) */
+  get hasRecordings(): boolean {
+    return Object.keys(this.el).length > 0;
+  }
+
+  /**
+   * Реплика прозвучит записью целиком (ElevenLabs, а если манифест характера уже загружен — Piper), а не синтезом.
+   * template — текст со слотом, text — с подставленным именем/ответом. Синхронно: для выбора варианта реплики.
+   */
+  recorded(persona: string, lineId: string | undefined, template: string, text = template): boolean {
+    const req = { persona, lineId, template, text, pitch: 1, rate: 1 };
+    if (this.elFor(req)) return true;
+    if (!this.loaded.has(persona)) return false;
+    const f = this.lookup(persona, template, lineId);
+    if (!f) return false;
+    if (f.kind !== 'parts') return true;
+    const val = extractName(template, text, f.slot);
+    const m = this.loaded.get(persona);
+    const dict = m?.slots?.[f.slot] ?? (f.slot === 'name' ? m?.names : undefined) ?? {};
+    return !!val && Object.keys(dict).some((k) => normName(k) === normName(val));
+  }
+
   /** есть ли запись этой реплики (после usePersona) */
   has(persona: string, template: string, lineId?: string) {
     return !!this.lookup(persona, template, lineId);

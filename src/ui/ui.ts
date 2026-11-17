@@ -19,6 +19,8 @@ export interface UiHandlers {
   onMicMode(m: 'auto' | 'ptt'): void;
   /** «Пересадить кота» на карту, которая сейчас в кадре */
   onReanchor?(): void;
+  /** кнопка панели действий (погладить, угостить, танец…) */
+  onAction?(id: string): void;
 }
 
 /** вариант в листе выбора характера */
@@ -42,7 +44,25 @@ export interface CatRect {
   half: number;
 }
 
-export const CHIPS = ['Привет!', 'Сделай сальто', 'Загадай загадку', 'Танцуй', 'Сколько у меня денег?', 'Давай другого'];
+/** подсказки-фразы (старый формат: чип = сказанная фраза); в игре вместо них — панель действий ACTION_BAR */
+export const CHIPS = ['Привет!', 'Сделай сальто', 'Загадай загадку', 'Танцуй', 'Повторяй за мной', 'Давай другого'];
+
+/**
+ * Панель действий, как у говорящего Тома: иконка + короткая подпись, видно, что можно делать с котом.
+ * id — Director.action(id). Порядок: сначала то, что вызывает эмоцию сразу (погладить, пощекотать, угостить).
+ */
+export const ACTION_BAR: { id: string; label: string; icon: string }[] = [
+  { id: 'pet', label: 'Погладить', icon: 'hand' },
+  { id: 'tickle', label: 'Щекотка', icon: 'feather' },
+  { id: 'treat', label: 'Угостить', icon: 'fish' },
+  { id: 'dance', label: 'Танец', icon: 'note' },
+  { id: 'flip', label: 'Сальто', icon: 'flip' },
+  { id: 'trick', label: 'Фокус', icon: 'star' },
+  { id: 'riddle', label: 'Загадка', icon: 'quest' },
+  { id: 'sticker', label: 'Наклейка', icon: 'sticker' },
+  { id: 'echo', label: 'Повторяй', icon: 'parrot' },
+  { id: 'other', label: 'Другой кот', icon: 'swap' },
+];
 
 /** превью, подпись и цвет характера в листе выбора (цвета — из палитры персонажа, если она есть) */
 const PERSONA_UI: Record<string, { img: string; tagline: string; color: string; soft: string }> = {
@@ -63,6 +83,17 @@ const ICON = {
   adult: '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="7.5" r="4"/><path d="M3.5 22c.7-5 4.1-8 8.5-8s7.8 3 8.5 8z"/></svg>',
   repin: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="13" width="16" height="7" rx="2"/><path d="M12 2.5v7M8.8 6.3 12 9.5l3.2-3.2"/></svg>',
   paw: '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><ellipse cx="12" cy="16" rx="5" ry="4.2"/><ellipse cx="5.5" cy="10.5" rx="2.1" ry="2.6"/><ellipse cx="9.5" cy="6.5" rx="2.1" ry="2.7"/><ellipse cx="14.5" cy="6.5" rx="2.1" ry="2.7"/><ellipse cx="18.5" cy="10.5" rx="2.1" ry="2.6"/></svg>',
+  hand: '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 11V5.5a1.5 1.5 0 0 1 3 0V10h.5V4a1.5 1.5 0 0 1 3 0v6h.5V5.5a1.5 1.5 0 0 1 3 0V13c0 4.4-2.6 8-7 8-3 0-4.6-1.6-6.2-4.3L3.4 14a1.5 1.5 0 0 1 2.4-1.8L8 14.5z"/></svg>',
+  feather: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 4c-7 0-13 5-13 12v4" /><path d="M20 4c0 7-5 12-13 12" fill="currentColor" fill-opacity=".25"/><path d="M11 12h5M9 15h4"/></svg>',
+  fish: '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 12c2.5-4 6-6 9.5-6 3.6 0 6.3 2.4 7.5 6-1.2 3.6-3.9 6-7.5 6C9 18 5.5 16 3 12z"/><path d="M19 12l3-4v8z"/><circle cx="8" cy="11" r="1.3" fill="#fff"/></svg>',
+  note: '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M9 17.5V5l11-2v12.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/><ellipse cx="6.5" cy="17.5" rx="3" ry="2.4"/><ellipse cx="17.5" cy="15.5" rx="3" ry="2.4"/></svg>',
+  flip: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.7"/><path d="M20 4v4h-4"/></svg>',
+  star: '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.5l2.6 6 6.4.6-4.9 4.3 1.5 6.4L12 16.5l-5.6 3.3 1.5-6.4L3 9.1l6.4-.6z"/></svg>',
+  quest: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8.5 8.5a3.5 3.5 0 1 1 5.2 3c-1 .6-1.7 1.3-1.7 2.5v.5"/><path d="M12 19h.01" stroke-width="3.2"/></svg>',
+  sticker: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M5 3h14a2 2 0 0 1 2 2v9l-7 7H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z" fill="currentColor" fill-opacity=".2"/><path d="M14 21v-5a2 2 0 0 1 2-2h5"/><path d="M9 9h.01M15 9h.01" stroke-width="3"/></svg>',
+  parrot: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5.5h11v8H9l-4 3.5v-3.5H4z" fill="currentColor" fill-opacity=".2"/><path d="M18 9.5c1.5 1 1.5 4 0 5M20.5 7c3 2.5 3 7.5 0 10"/></svg>',
+  swap: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h13l-3.5-3.5M20 16H7l3.5 3.5"/></svg>',
+  finger: '<svg viewBox="0 0 48 48" aria-hidden="true"><path d="M18 30V9a3.5 3.5 0 0 1 7 0v13l1-.2V16a3.3 3.3 0 0 1 6.5 0v7l.8.1v-4a3.2 3.2 0 0 1 6.3 0V30c0 8-5 14-12.5 14-5 0-8-2.6-10.8-7.4L11.6 31a3.2 3.2 0 0 1 5-4z" fill="#fff" stroke="#1f2a2e" stroke-width="2.2" stroke-linejoin="round"/></svg>',
   camoff: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7.5h3l2-2.5h8l2 2.5h3v11H3z"/><circle cx="12" cy="13" r="3.5"/><path d="M3 3l18 18"/></svg>',
 };
 
@@ -99,7 +130,7 @@ export class UI {
       <div class="screen start ob" data-step="0">
         <div class="ob-sky" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
         <div class="ob-track">
-          <section class="ob-slide" aria-label="Шаг 1 из 4">
+          <section class="ob-slide" aria-label="Шаг 1 из 2">
             <div class="ob-art art-mystery" aria-hidden="true">
               <div class="kc">
                 <div class="kc-chip"></div><div class="kc-logo">СБЕР KIDS</div>
@@ -110,35 +141,20 @@ export class UI {
             </div>
             <div class="screen-text"><h1>Привет! В&nbsp;твоей карте кто-то живёт</h1><p>Он давно ждёт, когда ты заглянешь. Познакомимся?</p></div>
           </section>
-          <section class="ob-slide" aria-label="Шаг 2 из 4">
+          <section class="ob-slide" aria-label="Шаг 2 из 2">
             <div class="ob-art art-safe" aria-hidden="true">
               <div class="sf-card"><div class="kc-chip"></div><div class="kc-logo">СБЕР KIDS</div></div>
               <div class="sf-shield">${ICON.shield}</div>
               <div class="sf-fam"><span class="ava a-kid">${ICON.kid}</span><span class="ava a-mom">${ICON.adult}</span><span class="ava a-dad">${ICON.adult}</span></div>
             </div>
-            <div class="screen-text"><h1>Карта — только твоя</h1><p>Никому её не давай и&nbsp;не&nbsp;показывай. Только маме или папе. Цифры на&nbsp;карте мне не&nbsp;нужны&nbsp;— я&nbsp;их не&nbsp;читаю.</p></div>
-          </section>
-          <section class="ob-slide" aria-label="Шаг 3 из 4">
-            <div class="ob-art art-table" aria-hidden="true">
-              <div class="tbl"></div>
-              <div class="tc-shadow"></div>
-              <div class="tc"><div class="kc-chip"></div><div class="kc-logo">СБЕР KIDS</div></div>
-            </div>
-            <div class="screen-text"><h1>Положи карту на&nbsp;стол</h1><p>Подойдёт любая карта Сбера. На&nbsp;столе с&nbsp;рисунком другу будет проще держаться.</p></div>
-          </section>
-          <section class="ob-slide" aria-label="Шаг 4 из 4">
-            <div class="ob-art art-phone" aria-hidden="true">
-              <div class="ph"><div class="ph-scr"><div class="ph-tbl"></div><div class="ph-card"></div><div class="ph-frame"></div></div><div class="ph-notch"></div></div>
-              <div class="ph-perm">${ICON.cam}<span>Разрешить камеру</span></div>
-            </div>
-            <div class="screen-text"><h1>Разреши камеру и&nbsp;наведи на&nbsp;карту</h1><p>Дальше твой новый друг сам всё расскажет и&nbsp;покажет!</p></div>
+            <div class="screen-text"><h1>Положи карту на&nbsp;стол и&nbsp;наведи камеру</h1><p>Карта — только твоя: показывай её только маме или папе. Цифры на&nbsp;карте я&nbsp;не&nbsp;читаю.</p></div>
           </section>
         </div>
         <div class="ob-foot">
-          <div class="ob-dots" aria-hidden="true"><i class="on"></i><i></i><i></i><i></i></div>
+          <div class="ob-dots" aria-hidden="true"><i class="on"></i><i></i></div>
           <button class="btn btn-primary btn-block ob-next" data-a="ob-next" type="button">Познакомиться</button>
           <button class="btn btn-primary btn-block ob-wake hidden" data-a="wake" type="button">${ICON.cam}<span>Открыть камеру</span></button>
-          <div class="fine">${ICON.lock}<span>Видео и голос остаются в телефоне. Номер, срок и код карты не считываются и не сохраняются. <button class="linkbtn" type="button" data-a="terms">Условия</button></span></div>
+          <div class="fine">${ICON.lock}<span>Камера и микрофон — одним нажатием. Видео и голос остаются в телефоне, данные карты не считываются. <button class="linkbtn" type="button" data-a="terms">Условия</button></span></div>
         </div>
         <div class="terms hidden" role="dialog" aria-modal="true" aria-label="Условия">
           <div class="terms-card">
@@ -158,6 +174,7 @@ export class UI {
       <div class="scan hidden"><span>${ICON.paw}<em>Наведи камеру на карту</em></span></div>
       <button class="iconbtn reanchor hidden" data-a="reanchor" type="button" aria-label="Пересадить кота">${ICON.repin}<span>Пересадить</span></button>
       <div class="bubble" role="status" aria-live="polite"><span class="who"></span><span class="txt"></span></div>
+      <div class="coach hidden" aria-hidden="true"><div class="coach-hand">${ICON.finger}</div><div class="coach-label">Погладь меня</div></div>
       <div class="stack">
         <div class="sheet name-sheet namebox hidden">
           <div class="sheet-title">Как тебя зовут?</div>
@@ -172,8 +189,14 @@ export class UI {
           <div class="choices"></div>
         </div>
         <button class="btn btn-primary kids hidden" data-a="kids">В СберKids <span aria-hidden="true">→</span></button>
+        <div class="sheet kids-sheet hidden" role="dialog" aria-label="СберKids">
+          <div class="sheet-title">Брат живёт в СберKids</div>
+          <p class="sheet-sub">Это приложение Сбера для детей и родителей. Попроси взрослого открыть его на телефоне — там брат-кот и копилка.</p>
+          <a class="btn btn-primary btn-block kids-go" href="#" target="_blank" rel="noopener" data-a="kids-go">Открыть СберKids</a>
+          <button class="btn btn-text btn-block" type="button" data-a="kids-close">Потом</button>
+        </div>
         <button class="btn btn-light shakebtn hidden" data-a="shake">Сдёрнуть наклейки</button>
-        <div class="chips hidden"></div>
+        <div class="chips actions hidden" role="toolbar" aria-label="Что можно делать с котом"></div>
         <div class="mic-hint" aria-live="polite"></div>
       </div>
       <div class="dock no-mic">
@@ -199,13 +222,31 @@ export class UI {
     this.namebox = q('.namebox');
     this.choice = q('.choice-sheet');
 
-    for (const t of CHIPS) {
-      const b = document.createElement('button');
-      b.className = 'chip';
-      b.textContent = t;
-      b.onclick = () => h.onChip(t);
-      this.chips.appendChild(b);
-    }
+    // панель действий; без обработчика действий (старые сборки) — фразы-подсказки, как раньше
+    if (h.onAction)
+      for (const a of ACTION_BAR) {
+        const b = document.createElement('button');
+        b.className = 'act';
+        b.type = 'button';
+        b.dataset.act = a.id;
+        b.innerHTML = `<span class="act-ico">${(ICON as Record<string, string>)[a.icon] ?? ''}</span><span class="act-l"></span>`;
+        (b.querySelector('.act-l') as HTMLElement).textContent = a.label;
+        b.onclick = () => {
+          b.classList.remove('tapped');
+          void b.offsetWidth;
+          b.classList.add('tapped');
+          h.onAction!(a.id);
+        };
+        this.chips.appendChild(b);
+      }
+    else
+      for (const t of CHIPS) {
+        const b = document.createElement('button');
+        b.className = 'chip';
+        b.textContent = t;
+        b.onclick = () => h.onChip(t);
+        this.chips.appendChild(b);
+      }
     root.addEventListener('click', (e) => {
       const btn = (e.target as HTMLElement).closest('[data-a]') as HTMLElement | null;
       const a = btn?.getAttribute('data-a');
@@ -215,6 +256,8 @@ export class UI {
       if (a === 'terms') this.start.querySelector('.terms')!.classList.remove('hidden');
       if (a === 'terms-close') this.start.querySelector('.terms')!.classList.add('hidden');
       if (a === 'kids') h.onKids();
+      if (a === 'kids-close') this.showKids(false);
+      if (a === 'kids-go') setTimeout(() => this.showKids(false), 300);
       if (a === 'shake') h.onShakeButton();
       if (a === 'skip') h.onSkipName();
       if (a === 'reload') location.reload();
@@ -282,17 +325,17 @@ export class UI {
     this.h.onName(v);
   }
 
-  /** онбординг: три шага, свайп и кнопка «дальше»; на последнем — «Открыть камеру» (жест для iOS) */
+  /** онбординг: два шага, свайп и кнопка «дальше»; на последнем — «Открыть камеру» (жест для iOS: камера, микрофон, датчики) */
   private obStep = 0;
   private obGo(i: number) {
-    const n = 4;
+    const n = 2;
     i = Math.max(0, Math.min(n - 1, i));
     this.obStep = i;
     this.start.dataset.step = String(i);
     (this.start.querySelector('.ob-track') as HTMLElement).style.transform = `translateX(${-i * 100}%)`;
     this.start.querySelectorAll('.ob-dots i').forEach((d, k) => d.classList.toggle('on', k === i));
     const next = this.start.querySelector('.ob-next') as HTMLElement;
-    next.textContent = ['Познакомиться', 'Понятно, не покажу', 'Готово, лежит', ''][i];
+    next.textContent = ['Познакомиться', ''][i];
     next.classList.toggle('hidden', i === n - 1);
     this.start.querySelector('.ob-wake')!.classList.toggle('hidden', i !== n - 1);
   }
@@ -305,6 +348,40 @@ export class UI {
       const dx = e.clientX - x0, dy = e.clientY - y0;
       if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) this.obGo(this.obStep + (dx < 0 ? 1 : -1));
     });
+  }
+
+  /** лист «Брат живёт в СберKids» со ссылкой (url — из config) */
+  showKids(v: boolean, url?: string) {
+    const sh = this.root.querySelector('.kids-sheet') as HTMLElement;
+    if (url) (sh.querySelector('.kids-go') as HTMLAnchorElement).href = url;
+    sh.classList.toggle('hidden', !v);
+    this.layoutBubble();
+  }
+
+  /** обучалка первого знакомства: палец гладит кота + подпись «Погладь меня»; панель действий подсвечена */
+  coach(v: boolean) {
+    const c = this.root.querySelector('.coach') as HTMLElement;
+    this.chips.classList.toggle('attn', v);
+    if (!v) {
+      c.classList.add('hidden');
+      return;
+    }
+    const place = () => {
+      const r = this.catRect();
+      const W = this.root.clientWidth, H = this.root.clientHeight;
+      // палец гладит по голове-спине: чуть ниже центра головы, подпись — над панелью действий
+      const x = r ? r.cx : W / 2, y = r ? r.headY + (r.bottom - r.headY) * 0.18 : H * 0.42;
+      c.style.left = `${Math.round(Math.max(70, Math.min(W - 70, x)))}px`;
+      c.style.top = `${Math.round(Math.max(120, Math.min(H - 300, y)))}px`;
+    };
+    place();
+    c.classList.remove('hidden');
+    const loop = () => {
+      if (c.classList.contains('hidden')) return;
+      place();
+      setTimeout(loop, 250);
+    };
+    setTimeout(loop, 250);
   }
 
   /** кнопка «Пересадить» видна, когда кот на карте */

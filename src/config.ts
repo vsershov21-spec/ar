@@ -77,5 +77,9 @@ export const ASSETS = {
   voskModel: 'models/vosk-ru-small/model.tar.gz',
   eighthWallTarget: 'targets/8thwall/card.json',
   debugBg: 'debug/table.jpg',
-  sberKidsUrl: 'https://www.sberbank.ru/ru/person/kids',
+  /**
+   * «В СберKids»: страница приложения в RuStore (проверена 17.11.2026). Прежняя sberbank.ru/ru/person/kids отдавала 404.
+   * Поменять на диплинк/страницу Сбера, когда будет согласованный адрес.
+   */
+  sberKidsUrl: 'https://www.rustore.ru/catalog/app/ru.sberbank.sberkids',
 };

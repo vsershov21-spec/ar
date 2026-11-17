@@ -38,6 +38,8 @@ export interface ScenarioState {
   persona: PersonaId | null;
   name: string | null;
   visits: number;
+  /** первое знакомство уже было (память): дальше — короткое «с возвращением» */
+  met: boolean;
   outroShown: boolean;
   playStarted: boolean;
   boredCount: number;
@@ -90,8 +92,10 @@ export type Action =
   | { type: 'offer_choice' }
   | { type: 'hide_choice' }
   | { type: 'set_persona'; persona: PersonaId }
-  | { type: 'signature' }
-  | { type: 'remember'; patch: { name?: string | null; persona?: PersonaId } }
+  | { type: 'signature'; silent?: boolean }
+  | { type: 'remember'; patch: { name?: string | null; persona?: PersonaId; met?: boolean } }
+  /** первое знакомство: палец «погладь меня» и подсвеченная панель действий */
+  | { type: 'coach' }
   | { type: 'cover_stickers'; persona: PersonaId }
   | { type: 'blow_stickers' }
   | { type: 'hold_pose' }
@@ -114,15 +118,16 @@ export interface ScenarioConfig {
 }
 
 export function makeScenarioConfig(dialogs: DialogsFile, o: Partial<Omit<ScenarioConfig, 'dialogs'>> = {}): ScenarioConfig {
-  return { dialogs, defaultPersona: 'hooligan', appearMs: 2600, outroMinMs: 4 * 60_000, outroMaxMs: 6 * 60_000, outroRetryMs: 20_000, random: Math.random, ...o };
+  return { dialogs, defaultPersona: 'hooligan', appearMs: 1500, outroMinMs: 4 * 60_000, outroMaxMs: 6 * 60_000, outroRetryMs: 20_000, random: Math.random, ...o };
 }
 
-export function initialState(memory: { name?: string | null; persona?: PersonaId | null; visits?: number } = {}, context: ContextEvent | null = null): ScenarioState {
+export function initialState(memory: { name?: string | null; persona?: PersonaId | null; visits?: number; met?: boolean } = {}, context: ContextEvent | null = null): ScenarioState {
   return {
     phase: 'start',
     persona: memory.persona ?? null,
     name: memory.name ?? null,
     visits: memory.visits ?? 0,
+    met: !!memory.met,
     outroShown: false,
     playStarted: false,
     boredCount: 0,
@@ -184,6 +189,21 @@ function choosePersona(s: ScenarioState, p: PersonaId, cfg: ScenarioConfig, a: A
 
 function doAction(s: ScenarioState, action: string, arg: string | undefined, heardText: string, cfg: ScenarioConfig, a: Action[]): ScenarioState {
   switch (action) {
+    case 'name_prompt':
+      a.push({ type: 'ui', ui: 'name_prompt', show: true });
+      return s;
+    case 'hide_name':
+      a.push({ type: 'ui', ui: 'name_prompt', show: false });
+      return s;
+    case 'coach':
+      a.push({ type: 'coach' });
+      return s;
+    case 'met': {
+      // знакомство закончилось: запоминаем (один раз), дальше — обычная жизнь
+      const p = s.persona ?? cfg.defaultPersona;
+      a.push({ type: 'ui', ui: 'name_prompt', show: false }, { type: 'remember', patch: { met: true, persona: p } });
+      return enterPlay({ ...s, met: true, persona: p }, cfg, a);
+    }
     case 'offer_choice':
       a.push({ type: 'ui', ui: 'name_prompt', show: false }, { type: 'offer_choice' });
       return { ...s, phase: 'choose' };
@@ -370,17 +390,15 @@ export function step(s: ScenarioState, e: ScenarioEvent, cfg: ScenarioConfig): S
     case 'appear':
       if (e.type === 'timer' && e.id === 'appear_done') {
         const st = { ...s, appeared: true };
-        if (s.persona && s.visits > 1) {
-          // повторный визит: узнаём, без анкеты. Контекст — префикс к приветствию
-          a.push({ type: 'set_persona', persona: s.persona });
-          if (s.context) a.push({ type: 'say', key: s.context, force: true });
-          a.push({ type: 'say', key: 'welcome_back', force: true }, { type: 'signature' });
+        if (s.met) {
+          // уже знакомы: короткое «с возвращением, <имя>!» и трюк без слов — сразу играть.
+          // Из контекста — только «давно не виделись» (утро/вечер — лишняя реплика перед игрой)
+          if (s.persona) a.push({ type: 'set_persona', persona: s.persona });
+          if (s.context === 'long_absence') a.push({ type: 'say', key: s.context, force: true });
+          a.push({ type: 'say', key: 'welcome_back', force: true }, { type: 'signature', silent: true });
           return done(enterPlay(st, cfg, a));
         }
-        // первая встреча: привет → (утро/вечер) → знакомство
-        a.push({ type: 'say', key: 'intro', force: true });
-        if (s.context === 'morning' || s.context === 'evening') a.push({ type: 'say', key: s.context, force: true });
-        a.push({ type: 'ui', ui: 'name_prompt', show: true });
+        // первое знакомство (один раз): карта → поздравление и привет → имя → «я — …» → как играть (dialogs.json → intro)
         return done(runDialog({ ...st, phase: 'ask_name' }, startDialog(cfg.dialogs, 'intro'), cfg, a));
       }
       return done(s);
@@ -407,10 +425,13 @@ export function step(s: ScenarioState, e: ScenarioEvent, cfg: ScenarioConfig): S
         return done({ ...s, boredCount: 0 });
       }
       if (e.type === 'switch_request') return done(startSwitch(s, a));
+      // выбор характера листом (debug, старый поток) уже в игре — сразу, без заклеивания экрана
+      if (e.type === 'choose') return done(e.persona === s.persona ? s : choosePersona(s, e.persona, cfg, a));
       if (e.type === 'silence') {
+        // тишина: кот зовёт поиграть и подсказывает, что можно делать. Экран наклейками сам не заклеивает —
+        // смена образа только по просьбе ребёнка (кнопка «Другой кот», «давай другого», встряска наклеек)
         if (s.paused || s.dialog) return done(s);
-        if (s.boredCount >= 1) return done(startSwitch(s, a));
-        a.push({ type: 'react', event: 'silence' });
+        a.push({ type: 'react', event: s.boredCount >= 1 ? 'bored' : 'silence' }, { type: 'ui', ui: 'chips', show: true });
         return done({ ...s, boredCount: s.boredCount + 1 });
       }
       if ((e.type === 'timer' && e.id === 'outro') || e.type === 'outro_request') {

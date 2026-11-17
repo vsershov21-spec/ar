@@ -148,6 +148,22 @@
       "fx": "warm_lights",
       "sound": "chime_soft"
     },
+    "meet_card": {
+      "clip": "surprised",
+      "fx": "warm_lights",
+      "sound": "chime_soft"
+    },
+    "meet_congrats": {
+      "clip": "celebrate",
+      "fx": "hearts_float"
+    },
+    "meet_self": {
+      "clip": "wave"
+    },
+    "meet_skills": {
+      "clip": "point_button",
+      "fx": "spotlight_button"
+    },
     "ask_name": {
       "clip": "listen"
     },
@@ -252,6 +268,11 @@
       "clip": "press_glass",
       "fx": "steam",
       "sound": "breath"
+    },
+    "treat": {
+      "clip": "celebrate",
+      "fx": "hearts_float",
+      "sound": "chime_soft"
     },
     "shake": {
       "clip": "dizzy",
@@ -493,6 +514,86 @@
         "text": "Ой, как светло! Привет. Я немножко стесняюсь.",
         "emotion": "surprised",
         "face": "surprised"
+      }
+    ],
+    "meet_card": [
+      {
+        "id": "kind.meet_card.01",
+        "text": "Ой! Это твоя карта? Теперь я живу в ней.",
+        "emotion": "surprised",
+        "face": "surprised"
+      },
+      {
+        "id": "kind.meet_card.02",
+        "text": "Какая хорошая карта! Можно, я буду в ней жить?",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "kind.meet_card.03",
+        "text": "Ух ты, своя карта! Я теперь живу в ней.",
+        "emotion": "caring",
+        "face": "caring"
+      }
+    ],
+    "meet_congrats": [
+      {
+        "id": "kind.meet_congrats.01",
+        "text": "Поздравляю с картой! Привет-привет!",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "kind.meet_congrats.02",
+        "text": "Своя карта — это здорово! Поздравляю. Привет!",
+        "emotion": "excited",
+        "face": "excited"
+      },
+      {
+        "id": "kind.meet_congrats.03",
+        "text": "Поздравляю тебя! И привет. Очень рад встрече.",
+        "emotion": "caring",
+        "face": "caring"
+      }
+    ],
+    "meet_self": [
+      {
+        "id": "kind.meet_self.01",
+        "text": "А я Добряк — кот, который живёт в твоей карте.",
+        "emotion": "caring",
+        "face": "caring"
+      },
+      {
+        "id": "kind.meet_self.02",
+        "text": "Меня зовут Добряк. Я умею мурчать и дружить.",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "kind.meet_self.03",
+        "text": "Я Добряк, твой тёплый кот из карты.",
+        "emotion": "happy",
+        "face": "happy"
+      }
+    ],
+    "meet_skills": [
+      {
+        "id": "kind.meet_skills.01",
+        "text": "Погладь меня пальцем — я замурчу. А кнопки внизу — наши игры.",
+        "emotion": "caring",
+        "face": "caring"
+      },
+      {
+        "id": "kind.meet_skills.02",
+        "text": "Меня можно гладить, щекотать и угощать. Нажми любую кнопку внизу!",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "kind.meet_skills.03",
+        "text": "Погладь меня или нажми кнопку внизу. А ещё со мной можно говорить.",
+        "emotion": "neutral",
+        "face": "neutral"
       }
     ],
     "ask_name": [
@@ -742,13 +843,13 @@
       },
       {
         "id": "kind.welcome_back.02",
-        "text": "Привет, {name}. Я по тебе скучал.",
+        "text": "{name}, привет! Я по тебе скучал.",
         "emotion": "caring",
         "face": "caring"
       },
       {
         "id": "kind.welcome_back.03",
-        "text": "Ой, {name}! Ты тут. Как хорошо.",
+        "text": "{name}! Ты тут. Как хорошо.",
         "emotion": "excited",
         "face": "excited"
       },
@@ -1047,6 +1148,26 @@
         "text": "Ха-а... Запотело! Можно рисовать.",
         "emotion": "neutral",
         "face": "neutral"
+      }
+    ],
+    "treat": [
+      {
+        "id": "kind.treat.01",
+        "text": "Ой, рыбка! Спасибо, очень вкусно.",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "kind.treat.02",
+        "text": "Мм, молочко! Спасибо, что заботишься обо мне.",
+        "emotion": "caring",
+        "face": "caring"
+      },
+      {
+        "id": "kind.treat.03",
+        "text": "Ням! Самое вкусное угощение на свете.",
+        "emotion": "excited",
+        "face": "excited"
       }
     ],
     "shake": [
@@ -1772,19 +1893,19 @@
     "help": [
       {
         "id": "kind.help.01",
-        "text": "Я умею петь, танцевать и загадывать загадки. Скажи «спой».",
+        "text": "Погладь меня пальцем или нажми кнопку внизу. Ещё можно сказать «спой».",
         "emotion": "caring",
         "face": "caring"
       },
       {
         "id": "kind.help.02",
-        "text": "Попроси «расскажи шутку» или «загадай загадку». Я с радостью.",
+        "text": "Я умею петь, танцевать и загадывать загадки. Кнопки — внизу.",
         "emotion": "happy",
         "face": "happy"
       },
       {
         "id": "kind.help.03",
-        "text": "Я пока знаю немного слов. Скажи «танцуй» или «повторяй за мной».",
+        "text": "Скажи «танцуй» или «повторяй за мной». Или угости меня — кнопка внизу.",
         "emotion": "neutral",
         "face": "neutral"
       }

@@ -1,11 +1,12 @@
 /**
  * Память между визитами в localStorage (только на телефоне). Всё в try/catch: приватный режим Safari / запрет хранилища.
- * Храним: имя (только если оно есть в словаре names.ru.txt), последний характер, число визитов, время последнего входа.
+ * Храним: имя (только если оно есть в словаре names.ru.txt), последний характер, число визитов, время последнего входа,
+ * было ли первое знакомство (met — его показываем один раз).
  */
 import type { PersonaId } from '../persona/types';
 import { isPersonaId } from '../persona/types';
 
-export interface Memory { name: string | null; persona: PersonaId | null; visits: number; lastVisitAt: number | null }
+export interface Memory { name: string | null; persona: PersonaId | null; visits: number; lastVisitAt: number | null; met?: boolean }
 const KEY = 'sber-ar-cat:v1';
 
 export function loadMemory(storage: Pick<Storage, 'getItem'> | null = safeStorage()): Memory {
@@ -19,6 +20,7 @@ export function loadMemory(storage: Pick<Storage, 'getItem'> | null = safeStorag
       persona: isPersonaId(o.persona) ? o.persona : null,
       visits: Number.isFinite(o.visits) ? o.visits : 0,
       lastVisitAt: Number.isFinite(o.lastVisitAt) ? o.lastVisitAt : null,
+      ...(o.met === true ? { met: true } : {}),
     };
   } catch {
     return def;

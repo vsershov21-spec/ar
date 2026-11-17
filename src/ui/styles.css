@@ -529,3 +529,44 @@ body > .toast { position: fixed; }
   display: inline-flex; gap: 6px; align-items: center; font-size: 13px; font-weight: 800; color: var(--green-text); z-index: 3; }
 .iconbtn.reanchor svg { width: 20px; height: 20px; color: var(--green); }
 .ui:has(.bubble.show) .iconbtn.reanchor { opacity: 0; pointer-events: none; }
+
+/* ═════════════════════ панель действий (как у говорящего Тома) ═════════════════════
+   Круглые белые «конфеты» с иконкой и подписью: сразу видно, что можно делать с котом. Ряд листается пальцем. */
+.chips.actions { gap: 10px; padding: 4px var(--s-4) 2px; align-items: flex-start; }
+.act { appearance: none; flex: none; width: 64px; border: 0; padding: 0; background: none; display: flex; flex-direction: column; align-items: center; gap: 5px;
+  scroll-snap-align: start; color: #fff; font: 800 11.5px/1.1 var(--font); text-shadow: 0 1px 3px rgba(0,0,0,.55); cursor: pointer; }
+.act-ico { width: 54px; height: 54px; border-radius: 50%; display: grid; place-items: center; color: var(--green);
+  background: linear-gradient(180deg, #fff, #eef5f1); box-shadow: 0 4px 0 #c5d6cc, 0 8px 16px rgba(0,0,0,.22); transition: transform var(--t-fast) var(--ease); }
+.act-ico svg { width: 28px; height: 28px; }
+.act:active .act-ico { transform: translateY(3px); box-shadow: 0 1px 0 #c5d6cc, 0 3px 8px rgba(0,0,0,.2); }
+.act.tapped .act-ico { animation: acttap .45s var(--ease-back); }
+@keyframes acttap { 0% { transform: scale(.86); } 60% { transform: scale(1.1); } 100% { transform: none; } }
+.act[data-act="pet"] .act-ico { color: #e0783c; }
+.act[data-act="tickle"] .act-ico { color: #9a7be8; }
+.act[data-act="treat"] .act-ico { color: #3f7fc4; }
+.act[data-act="trick"] .act-ico { color: #f2b51f; }
+.act[data-act="other"] .act-ico { color: var(--teal); }
+/* первое знакомство: панель «дышит», чтобы её заметили */
+.chips.attn .act-ico { animation: actattn 1.6s var(--ease) 3; }
+.chips.attn .act:nth-child(2) .act-ico { animation-delay: .12s; }
+.chips.attn .act:nth-child(3) .act-ico { animation-delay: .24s; }
+@keyframes actattn { 50% { transform: translateY(-5px) scale(1.06); box-shadow: 0 4px 0 #c5d6cc, 0 0 0 7px rgba(181,227,106,.45); } }
+
+/* обучалка «Погладь меня»: палец водит по коту */
+.coach { position: absolute; z-index: 4; width: 0; height: 0; pointer-events: none; }
+.coach-hand { position: absolute; left: -26px; top: -10px; width: 52px; height: 52px; filter: drop-shadow(0 6px 10px rgba(0,0,0,.35)); animation: coachstroke 1.8s var(--ease) infinite; }
+.coach-hand svg { width: 100%; height: 100%; }
+.coach-label { position: absolute; left: 50%; top: 52px; transform: translateX(-50%); white-space: nowrap; padding: 8px 14px; border-radius: 999px; background: #fff; color: var(--green-text);
+  font: 800 15px/1 var(--font); box-shadow: 0 4px 0 #c5d6cc, 0 10px 20px rgba(0,0,0,.25); animation: pop .4s var(--ease-back); }
+@keyframes coachstroke { 0% { transform: translate(-46px, 6px) rotate(-12deg); opacity: 0; } 15% { opacity: 1; } 50% { transform: translate(40px, -4px) rotate(8deg); }
+  85% { opacity: 1; } 100% { transform: translate(-46px, 6px) rotate(-12deg); opacity: 0; } }
+
+/* лист «Брат живёт в СберKids» */
+.kids-sheet .sheet-sub { margin: -4px var(--s-1) var(--s-3); line-height: 1.4; }
+.kids-sheet .kids-go { text-decoration: none; }
+
+/* быстрее: онбординг листается за .3 с */
+.ob-track { transition-duration: .3s; }
+@media (prefers-reduced-motion: reduce) { .coach-hand, .chips.attn .act-ico { animation: none; } }
+@media (orientation: landscape) and (max-height: 520px) { .act { width: 56px; } .act-ico { width: 46px; height: 46px; } .act-ico svg { width: 24px; height: 24px; } }
+.stack:has(.kids-sheet:not(.hidden)) .kids, .stack:has(.kids-sheet:not(.hidden)) .chips { display: none; }

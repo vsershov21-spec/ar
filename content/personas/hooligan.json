@@ -151,6 +151,22 @@
       "clip": "appear_jump_in",
       "sound": "boing"
     },
+    "meet_card": {
+      "clip": "surprised",
+      "fx": "glitter_burst",
+      "sound": "confetti"
+    },
+    "meet_congrats": {
+      "clip": "celebrate",
+      "fx": "confetti"
+    },
+    "meet_self": {
+      "clip": "proud"
+    },
+    "meet_skills": {
+      "clip": "point_button",
+      "fx": "spotlight_button"
+    },
     "ask_name": {
       "clip": "listen"
     },
@@ -259,6 +275,11 @@
       "clip": "press_glass",
       "fx": "glass_cat",
       "sound": "glass_squeak"
+    },
+    "treat": {
+      "clip": "celebrate",
+      "fx": "hearts_float",
+      "sound": "chime_soft"
     },
     "shake": {
       "clip": "dizzy",
@@ -509,6 +530,86 @@
         "face": "smirk"
       }
     ],
+    "meet_card": [
+      {
+        "id": "hooligan.meet_card.01",
+        "text": "Опа! Это твоя карта? Всё, теперь я живу в ней!",
+        "emotion": "surprised",
+        "face": "surprised"
+      },
+      {
+        "id": "hooligan.meet_card.02",
+        "text": "Ничего себе карта! Чур, я в ней живу.",
+        "emotion": "excited",
+        "face": "excited"
+      },
+      {
+        "id": "hooligan.meet_card.03",
+        "text": "Йо! Классная карта. Я тут поселился, окей?",
+        "emotion": "cheeky",
+        "face": "smirk"
+      }
+    ],
+    "meet_congrats": [
+      {
+        "id": "hooligan.meet_congrats.01",
+        "text": "Поздравляю! Своя карта — это круто. Привет!",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "hooligan.meet_congrats.02",
+        "text": "С картой тебя! Теперь у нас своя банда. Привет!",
+        "emotion": "proud",
+        "face": "proud"
+      },
+      {
+        "id": "hooligan.meet_congrats.03",
+        "text": "Поздравляю с картой! Дай пять — и привет!",
+        "emotion": "excited",
+        "face": "excited"
+      }
+    ],
+    "meet_self": [
+      {
+        "id": "hooligan.meet_self.01",
+        "text": "А я Хулиган — кот из твоей карты.",
+        "emotion": "proud",
+        "face": "proud"
+      },
+      {
+        "id": "hooligan.meet_self.02",
+        "text": "Я — Хулиган. Кот, жвачка и куча трюков.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.meet_self.03",
+        "text": "Меня зовут Хулиган. Живу в карте и дружу с тобой.",
+        "emotion": "happy",
+        "face": "happy"
+      }
+    ],
+    "meet_skills": [
+      {
+        "id": "hooligan.meet_skills.01",
+        "text": "Погладь меня пальцем или пощекочи живот. А кнопки внизу — мои трюки!",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "hooligan.meet_skills.02",
+        "text": "Тыкни меня, погладь или потряси телефон. И жми кнопки внизу!",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.meet_skills.03",
+        "text": "Гладь, щекочи, жми кнопки внизу — и болтай со мной. Погнали!",
+        "emotion": "neutral",
+        "face": "neutral"
+      }
+    ],
     "ask_name": [
       {
         "id": "hooligan.ask_name.01",
@@ -544,7 +645,7 @@
       },
       {
         "id": "hooligan.nice_name.03",
-        "text": "О, {name}! Будем знакомы, дай пять.",
+        "text": "{name}! Будем знакомы, дай пять.",
         "emotion": "happy",
         "face": "happy"
       },
@@ -768,7 +869,7 @@
     "welcome_back": [
       {
         "id": "hooligan.welcome_back.01",
-        "text": "О, {name}! Снова ты. Я как раз заскучал.",
+        "text": "{name}! Снова ты. Я как раз заскучал.",
         "emotion": "happy",
         "face": "happy"
       },
@@ -1145,6 +1246,26 @@
         "text": "Нос к носу, ха!",
         "emotion": "cheeky",
         "face": "smirk"
+      }
+    ],
+    "treat": [
+      {
+        "id": "hooligan.treat.01",
+        "text": "Ням! Рыбка — топ. Спасибо!",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "hooligan.treat.02",
+        "text": "О, вкусняшка! Ещё одну? Шучу. Спасибо!",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.treat.03",
+        "text": "Хрум-хрум! Вот это я понимаю — угощение!",
+        "emotion": "excited",
+        "face": "excited"
       }
     ],
     "shake": [
@@ -1906,19 +2027,19 @@
     "help": [
       {
         "id": "hooligan.help.01",
-        "text": "Я умею сальто, танцы и загадки. Скажи «сальто» — покажу.",
+        "text": "Погладь меня, тыкни в живот или жми кнопки внизу. А ещё скажи «сальто»!",
         "emotion": "cheeky",
         "face": "smirk"
       },
       {
         "id": "hooligan.help.02",
-        "text": "Скажи «танцуй», «загадку» или «шутку». Остальному я пока учусь.",
+        "text": "Я умею сальто, танцы и загадки. Нажми кнопку внизу — покажу.",
         "emotion": "excited",
         "face": "excited"
       },
       {
         "id": "hooligan.help.03",
-        "text": "Пока я понимаю простые слова: «прыгай», «спой», «повторяй за мной».",
+        "text": "Скажи «танцуй» или «загадку». Или просто погладь меня пальцем.",
         "emotion": "neutral",
         "face": "neutral"
       }

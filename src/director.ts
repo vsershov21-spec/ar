@@ -17,7 +17,7 @@ import type { ContentBundle } from './persona/content';
 import { PersonaContext } from './persona/context';
 import { LineQueue } from './persona/lineQueue';
 import type { PickedLine } from './persona/picker';
-import type { FxName, PersonaId, Riddle } from './persona/types';
+import type { ContentLine, FxName, PersonaId, Riddle } from './persona/types';
 import { isPersonaId, PERSONA_IDS } from './persona/types';
 import { runtimeClip, runtimeFx, runtimeSound } from './persona/runtimeMap';
 import type { Character, Emote } from './character/types';
@@ -51,6 +51,24 @@ export interface DirectorDeps {
   personas?: ContentBundle['personas'];
 }
 
+/** эмоции новых событий (знакомство, угощение), которых ещё нет в character/emotions.ts */
+const EXTRA_EMOTION: Record<string, [string, number, number]> = {
+  meet_card: ['surprised', 1, 1500], meet_congrats: ['happy', 1, 1800], meet_self: ['happy', 0.9, 1500], meet_skills: ['happy', 0.8, 1500],
+  treat: ['happy', 1, 2200], welcome_back: ['happy', 1, 1600], help: ['happy', 0.7, 1200],
+};
+
+/**
+ * Эффекты, которые закрывают экран (туман, снежный шар, жвачка на стекле, наклейки, конфетти…): только сразу после
+ * действия ребёнка и не чаще раза в COVER_GAP_MS. Сами по себе (мысли вслух, приветствие, тишина) — нет.
+ */
+const COVER_FX = new Set(['snow_globe', 'steam', 'steam_draw', 'steam_heart', 'kiss_print', 'glass_cat', 'gum_splat', 'glitch', 'confetti', 'tag_spray', 'stickers_cover', 'holo_shine']);
+const COVER_GAP_MS = 10_000;
+const USER_ACT_MS = 2500;
+
+/** панель действий (как у говорящего Тома): кнопка → событие режиссёра */
+export const ACTIONS = ['pet', 'tickle', 'treat', 'dance', 'flip', 'trick', 'riddle', 'sticker', 'echo', 'other'] as const;
+export type ActionId = (typeof ACTIONS)[number];
+
 /** пресет лица (face.json) → простая эмоция текущих персонажей */
 const FACE_EMOTE: Record<string, Emote> = { happy: 'happy', excited: 'happy', proud: 'smirk', smirk: 'smirk', wink: 'wink', annoyed: 'angry', offended: 'angry' };
 
@@ -75,6 +93,14 @@ export class Director extends Emitter<DirectorEvents> {
   private ctx: { x?: number; y?: number; from?: { x: number; y: number }; path?: { x: number; y: number }[] } = {};
   /** последнее касание экрана (жвачка липнет к стеклу только сразу после тапа по стеклу) */
   private lastTouch: { kind: string; at: number } | null = null;
+  /** последнее действие ребёнка (касание, голос, кнопка) и последний «закрывающий экран» эффект */
+  private lastUserAct = -1e9;
+  private lastCoverAt = -1e9;
+  private coachTimer = 0;
+  /** обучалка ждёт реплику meet_skills (палец и панель — вместе с «погладь меня…», а не раньше) */
+  private coachPending = false;
+  /** ?synth — разрешить синтез браузера для неозвученных реплик (по умолчанию: есть озвучка — без синтеза, только пузырь) */
+  private allowSynth = typeof location !== 'undefined' && new URLSearchParams(location.search).has('synth');
 
   constructor(private d: DirectorDeps) {
     super();
@@ -131,6 +157,8 @@ export class Director extends Emitter<DirectorEvents> {
 
   /** ввод голосом/чипом/текстом. Разбор — src/voice/intents.ts по content/intents.ru.json */
   text(t: string) {
+    this.lastUserAct = performance.now();
+    this.coachDone();
     const st = this.state;
     const listening: ListenMode | null = st.dialog?.listening ?? null;
     const expectName = listening === 'name' || (st.phase === 'ask_name' && !listening);
@@ -154,6 +182,10 @@ export class Director extends Emitter<DirectorEvents> {
     if (kind === 'swipe' && ctx.from) this.lastSwipe = ctx.from;
     this.ctx = ctx;
     this.lastTouch = { kind, at: Date.now() };
+    if (!/^(card_|low_light|loud|whisper|clap|stickers_all_gone)/.test(kind)) {
+      this.lastUserAct = performance.now();
+      if (/^(stroke|tap_cat|poke|double_tap|treat)/.test(kind)) this.coachDone();
+    }
     // тап по поверхности карты (не по коту) → кот идёт в эту точку (локомоция)
     if (kind === 'tap_screen' && ctx.x !== undefined && this.state.appeared && !this.d.stage.atGlass && this.canWalk()) {
       const { w, h } = this.d.size();
@@ -179,6 +211,48 @@ export class Director extends Emitter<DirectorEvents> {
     return Math.abs(p.x) <= 0.5 && Math.abs(p.y) <= 0.5 / this.d.tracker.aspect;
   }
 
+  /**
+   * Кнопка панели действий. Касательные действия (погладить, пощекотать, угостить, фокус) — как жест по коту,
+   * остальные — как сказанная команда (танец, сальто, загадка, повторялка, наклейка, другой кот).
+   */
+  action(id: ActionId) {
+    this.lastUserAct = performance.now();
+    this.coachDone();
+    this.activity();
+    const say = (type: string, text: string) => this.dispatch({ type: 'intent', intent: { type, text } });
+    switch (id) {
+      case 'pet': return this.interaction('stroke');
+      case 'tickle': return this.interaction('tap_cat_belly');
+      case 'treat': return this.interaction('treat');
+      case 'trick': return this.interaction('double_tap');
+      case 'dance': return say('dance', 'танцуй');
+      case 'flip': return say('flip', 'сделай сальто');
+      case 'riddle': return say('riddle', 'загадай загадку');
+      case 'sticker': return say('stickers', 'наклейку');
+      case 'echo': return say('echo_start', 'повторяй за мной');
+      case 'other': return say('change_persona', 'давай другого');
+    }
+  }
+
+  private startCoach() {
+    if (!this.coachPending) return;
+    this.coachPending = false;
+    this.d.ui.show('chips', true);
+    this.d.ui.show('mic', true);
+    this.d.ui.coach?.(true);
+    clearTimeout(this.coachTimer);
+    this.coachTimer = window.setTimeout(() => this.coachDone(), 9000);
+  }
+
+  /** подсказка «погладь меня» показана — убрать по первому действию ребёнка или через 9 с */
+  private coachDone() {
+    if (this.coachPending) this.startCoach();
+    if (!this.coachTimer) return;
+    clearTimeout(this.coachTimer);
+    this.coachTimer = 0;
+    this.d.ui.coach?.(false);
+  }
+
   chooseSticker(x: number, y: number) {
     const s = this.d.fx.stickerAt(x, y);
     if (s?.choice && isPersonaId(s.choice)) this.dispatch({ type: 'choose', persona: s.choice });
@@ -198,6 +272,17 @@ export class Director extends Emitter<DirectorEvents> {
         this.react(a.event);
         break;
       case 'ui':
+        if (a.ui === 'chips' && a.show && this.coachPending) break; // панель покажет обучалка
+        if (a.ui === 'name_prompt' && a.show && this.state.dialog?.id === 'intro') {
+          // лист «Как тебя зовут?» — когда кот договорил вопрос, а не поверх поздравления
+          void this.queue.whenIdle().then(() => {
+            if (this.state.phase === 'ask_name' && this.state.dialog?.listening === 'name') {
+              d.ui.show('name_prompt', true);
+              d.ui.show('mic', true);
+            }
+          });
+          break;
+        }
         d.ui.show(a.ui, a.show);
         if (a.ui === 'chips') d.ui.show('mic', a.show);
         if (a.ui === 'name_prompt' && a.show) d.ui.show('mic', true);
@@ -238,7 +323,13 @@ export class Director extends Emitter<DirectorEvents> {
         this.setPersona(a.persona);
         break;
       case 'signature':
-        void this.signature();
+        void this.signature(a.silent);
+        break;
+      case 'coach':
+        // первое знакомство: палец «погладь меня» у кота и подсвеченная панель действий — когда кот начнёт meet_skills
+        this.coachPending = true;
+        clearTimeout(this.coachTimer);
+        this.coachTimer = window.setTimeout(() => this.startCoach(), 15_000); // запасной: реплику отбросили
         break;
       case 'remember':
         saveMemory({ ...a.patch, visits: this.state.visits, lastVisitAt: Date.now() });
@@ -266,17 +357,12 @@ export class Director extends Emitter<DirectorEvents> {
         clearTimeout(this.lostTimer);
         d.stage.setMode('card');
         break;
-      case 'open_sberkids': {
-        // из голоса (не из жеста) браузер может заблокировать окно — тогда остаётся кнопка
-        let w: Window | null = null;
-        try {
-          w = window.open(ASSETS.sberKidsUrl, '_blank', 'noopener');
-        } catch {
-          /* ignore */
-        }
-        if (!w) d.ui.toast('Нажми кнопку «В СберKids» внизу', 4000);
+      case 'open_sberkids':
+        // из голоса окно браузер может заблокировать, а уводить ребёнка из AR без взрослого не нужно:
+        // лист «Брат живёт в СберKids» с кнопкой (ссылка — из config)
+        if (d.ui.showKids) d.ui.showKids(true, ASSETS.sberKidsUrl);
+        else d.ui.toast('Нажми кнопку «В СберKids» внизу', 4000);
         break;
-      }
       case 'adult_hint':
         d.ui.toast(this.cfg.dialogs.adultHint ?? 'Позови взрослого.', 10_000);
         break;
@@ -309,18 +395,24 @@ export class Director extends Emitter<DirectorEvents> {
 
   private async appear() {
     const d = this.d;
-    // чавк → хлопок → кот выскакивает из карты
+    // хлопок → кот выскакивает из карты; первая встреча — под фанфары и конфетти
+    const first = !this.state.met;
     d.stage.resetPosition();
     d.audio.play('gum_chew');
-    await wait(900);
+    await wait(300);
     d.audio.play('gum_pop');
     const { w, h } = d.size();
     d.stage.show(true);
     this.character.play('appear');
     d.audio.play('pop_appear');
+    if (first) (d.audio as Audio & { fanfare?: () => void }).fanfare?.();
     await wait(80);
     const p = d.stage.headScreen(w, h, 0.4);
-    d.fx.burst(p.x, p.y, this.persona.palette.fx, 30);
+    d.fx.burst(p.x, p.y, this.persona.palette.fx, first ? 48 : 30);
+    if (first) {
+      this.lastCoverAt = performance.now();
+      (d.fx as FxLayer & { play?: (id: string, o?: Record<string, unknown>) => unknown }).play?.('confetti', { palette: this.persona.palette });
+    }
   }
 
   private async offerChoice() {
@@ -356,23 +448,24 @@ export class Director extends Emitter<DirectorEvents> {
     }
   }
 
-  private async signature() {
+  private async signature(silent = false) {
     await wait(250);
     const sig = this.personas.signature;
     // сам по себе (приветствие) — без пятен на стекле: жвачку на экран ребёнок «заслуживает» двойным тапом
     this.playVisual({ clip: sig.clip, fx: sig.fx.filter((f) => f !== 'gum_splat'), sound: sig.sound });
-    this.speakEvent(sig.event, { visuals: false });
+    if (!silent) this.speakEvent(sig.event, { visuals: false });
   }
 
   /** реакция на ввод: эффект/звук/клип сразу, реплика — через очередь */
   private react(event: string) {
     if (this.paused && this.picker.event(event).priority < 3) return;
     this.emotion(event);
-    let pk = this.personas.line(event, { name: this.state.name });
+    const prefer = this.prefer;
+    let pk = this.personas.line(event, { name: this.state.name, prefer });
     // не понял: «переспроси» и «я пока умею…» подменяют друг друга, если одно ещё остывает, — ребёнок всегда слышит ответ
     // «что ты умеешь» — отвечаем всегда (без cooldown; варианты всё равно не повторяются подряд)
-    if (!pk && event === 'unknown') pk = this.personas.line('help', { name: this.state.name }) ?? this.personas.line('unknown', { name: this.state.name, force: true });
-    else if (!pk && event === 'help') pk = this.personas.line('help', { name: this.state.name, force: true });
+    if (!pk && event === 'unknown') pk = this.personas.line('help', { name: this.state.name, prefer }) ?? this.personas.line('unknown', { name: this.state.name, force: true, prefer });
+    else if (!pk && event === 'help') pk = this.personas.line('help', { name: this.state.name, force: true, prefer });
     if (!pk) {
       if (this.picker.coolingDown(event)) return;
       const def = this.persona.reactions[event];
@@ -392,13 +485,23 @@ export class Director extends Emitter<DirectorEvents> {
   speakEvent(event: string, o: { force?: boolean; visuals?: boolean } = {}): boolean {
     this.emotion(event);
     const r = this.currentRiddle();
-    const pk = this.personas.line(event, { name: this.state.name, vars: r ? { answer: r.answer } : {}, force: o.force });
+    const pk = this.personas.line(event, { name: this.state.name, vars: r ? { answer: r.answer } : {}, force: o.force, prefer: this.prefer });
     if (!pk) {
       this.log(`реплика «${event}» не выбрана (${this.picker.coolingDown(event) ? 'cooldown' : 'нет подходящих'})`);
       return false;
     }
     return this.enqueue(pk, o.visuals !== false);
   }
+
+  /** вариант реплики прозвучит записью (а не синтезом) — такие picker выбирает в первую очередь */
+  private prefer = (l: ContentLine, text: string): boolean => {
+    const v = this.d.voice as VoicePlayer & { recorded?: (p: string, id: string | undefined, t: string, x?: string) => boolean; hasRecordings?: boolean };
+    if (!v.recorded || !v.hasRecordings) return true;
+    const p = this.persona.id;
+    const r = this.currentRiddle();
+    if (r && l.text.includes('{answer}') && v.recorded(p, `${l.id}@${r.id}`, text, text)) return true;
+    return v.recorded(p, l.id, l.text, text);
+  };
 
   private currentRiddle(): Riddle | null {
     const rs = this.persona.riddles;
@@ -434,6 +537,7 @@ export class Director extends Emitter<DirectorEvents> {
     else this.face(pk.face);
     this.d.ui.say(pk.text, p.name, p.id);
     this.emit('log', `🗨 ${pk.line.id}: ${pk.text}`);
+    if (pk.event === 'meet_skills') this.startCoach();
     const prevClip = this.character.currentClip;
     const talk = prevClip === 'idle' && !this.d.stage.walking;
     if (talk) this.character.play('talk', { loop: true });
@@ -442,6 +546,24 @@ export class Director extends Emitter<DirectorEvents> {
       persona: p.id, template: pk.line.text, text: pk.text, pitch: semis(v.pitchSemitones), rate: v.rate,
       lineId: pk.line.id, piperVoice: v.piperVoice, pitchSemitones: v.pitchSemitones, emotion: pk.line.emotion,
     };
+    const vp = this.d.voice as VoicePlayer & { recorded?: (p: string, id: string | undefined, t: string, x?: string) => boolean; hasRecordings?: boolean; usePersona?: (p: string) => Promise<unknown> };
+    // ответ загадки целиком одной записью («Ответ — огурец.»), а не склейкой «Ответ —» + «огурец»
+    const r = this.currentRiddle();
+    if (r && pk.line.text.includes('{answer}') && vp.recorded?.(p.id, `${pk.line.id}@${r.id}`, pk.text, pk.text)) {
+      req.lineId = `${pk.line.id}@${r.id}`;
+      req.template = pk.text;
+    }
+    // записи нет, а озвучка на сайте есть — не говорим синтезом браузера («неозвученные фрагменты»): только пузырь
+    if (vp.recorded && vp.hasRecordings && !this.allowSynth) {
+      await vp.usePersona?.(p.id);
+      if (!vp.recorded(p.id, req.lineId, req.template, req.text)) {
+        this.log(`🔇 нет записи ${req.lineId} — без синтеза, только текст`);
+        await wait(Math.min(4500, 900 + pk.text.length * 45));
+        this.initiative.catLine(performance.now());
+        if (talk && this.character.currentClip === 'talk') this.character.play('idle');
+        return;
+      }
+    }
     await this.d.voice.speak(req);
     this.initiative.catLine(performance.now());
     if (talk && this.character.currentClip === 'talk') this.character.play('idle');
@@ -484,7 +606,7 @@ export class Director extends Emitter<DirectorEvents> {
 
   /** эмоция события поверх лица реплики (src/character/emotions.ts): радость при тапе, удивление при находке карты… */
   private emotion(event: string) {
-    const cue = emotionFor(event, this.persona.id);
+    const cue = emotionFor(event, this.persona.id) ?? EXTRA_EMOTION[event] ?? null;
     const ch = this.character as Character & { setEmotion?: (n: string, w?: number, ms?: number) => void };
     if (cue && ch?.setEmotion) ch.setEmotion(cue[0], cue[1], cue[2]);
   }
@@ -509,6 +631,28 @@ export class Director extends Emitter<DirectorEvents> {
   /** контентный эффект: сначала родной API FxLayer (если научится), иначе запасной из runtimeMap */
   async runFx(id: string) {
     const d = this.d;
+    // заклеивание экрана при смене образа делает команда cover_stickers — второй раз из реплики не нужен
+    if (id === 'stickers_cover') return;
+    if (id === 'sticker' || id === 'tag_spray') {
+      // наклейки не копятся: на стекле не больше трёх, старая улетает
+      const own = d.fx.stickers.filter((x) => !x.flying && !x.choice && !x.cover);
+      for (const x of own.slice(0, Math.max(0, own.length - 2))) {
+        x.flying = true;
+        x.vx = rand(-500, 500);
+        x.vy = -700;
+        x.vr = rand(-5, 5);
+      }
+    }
+    if (COVER_FX.has(id)) {
+      // закрывающий экран эффект — только по действию ребёнка и не чаще раза в 10 с (смена образа — по просьбе ребёнка)
+      const now = performance.now();
+      const byUser = now - this.lastUserAct < USER_ACT_MS || this.state.phase === 'switching';
+      if (!byUser || now - this.lastCoverAt < COVER_GAP_MS) {
+        this.log(`[fx] ${id} пропущен (${byUser ? 'слишком часто' : 'не по действию ребёнка'})`);
+        return;
+      }
+      this.lastCoverAt = now;
+    }
     const { w, h } = d.size();
     const pal = this.persona.palette;
     const tune = this.personas.fxTuning(id);

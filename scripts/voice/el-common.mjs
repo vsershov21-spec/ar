@@ -65,10 +65,13 @@ export function buildJobs(root, { model: modelOverride } = {}) {
     jobs.push({ ...j, persona, voice_id: v.elevenVoiceId, model_id: model, h: elHash(j.text, v.elevenVoiceId, model), out: `${persona}/${safeName(j.id)}.mp3`, chars: j.text.length });
   };
   const answers = {};
+  /** реплики с {answer}: озвучиваются ещё и целиком для каждой загадки характера (<id>@<загадка>) — без склейки */
+  const answerTpl = [];
   for (const l of lines) {
     if (!voices[l.persona]?.elevenVoiceId) continue;
     if (l.event === 'riddle_q' || l.event === 'riddle_hint') continue; // загадки — ниже, из dialogs.json (в CSV те же строки)
     const m = l.text.match(SLOT_RE);
+    if (m?.[1] === 'answer') answerTpl.push(l);
     if (!m) {
       push(l.persona, { id: l.id, kind: 'line', event: l.event, emotion: l.emotion, t: l.text, plain: spoken(l.text), text: elText(l) });
       continue;
@@ -95,6 +98,10 @@ export function buildJobs(root, { model: modelOverride } = {}) {
     for (const r of list) {
       for (const part of ['q', 'hint']) if (r[part]) push(p, { id: `${p}.riddle.${r.id}.${part}`, kind: 'line', event: `riddle_${part}`, emotion: 'neutral', t: r[part], plain: spoken(r[part]), text: spoken(r[part]) });
       if (r.answer) answers[p].add(r.answer);
+      for (const l of answerTpl.filter((x) => x.persona === p)) {
+        const t = l.text.replace('{answer}', r.answer);
+        push(p, { id: `${l.id}@${r.id}`, kind: 'line', event: l.event, emotion: l.emotion, tpl: l.text, t, plain: spoken(t), text: elText({ emotion: l.emotion, text: t }) });
+      }
     }
   }
   for (const p of Object.keys(voices)) {

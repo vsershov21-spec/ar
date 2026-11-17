@@ -26,25 +26,24 @@ describe('сценарий первой встречи', () => {
     expect(s.phase).toBe('ask_name');
     expect(s.visits).toBe(1);
     expect(has(all, 'appear')).toBe(true);
-    expect(has(all, 'say', { key: 'intro' })).toBe(true);
+    expect(has(all, 'say', { key: 'meet_card' })).toBe(true);
+    expect(has(all, 'say', { key: 'meet_congrats' })).toBe(true);
     expect(has(all, 'ui', { ui: 'name_prompt', show: true })).toBe(true);
   });
 
-  it('имя голосом → выбор → 5 с без выбора = Хулиган', () => {
-    let { s, all } = run(initialState(), [
-      ...toChoose,
-      { type: 'intent', intent: { type: 'name', name: 'Маша', known: true } },
-      { type: 'choice_shown' },
-    ]);
-    expect(s.phase).toBe('choose');
-    const listen = [...all].reverse().find((x) => x.type === 'listen') as Extract<Action, { type: 'listen' }>;
-    expect(listen.ms).toBe(5000);
-    ({ s, all } = run(s, [{ type: 'listen_timeout', token: listen.token }]));
+  it('имя голосом → «я — …» → как играть (обучалка) → игра; знакомство запоминается', () => {
+    const { s, all } = run(initialState(), [...toChoose, { type: 'intent', intent: { type: 'name', name: 'Маша', known: true } }]);
+    const keys = all.filter((x) => x.type === 'say').map((x) => (x as { key: string }).key);
+    expect(keys).toEqual(['meet_card', 'meet_congrats', 'ask_name', 'nice_name', 'meet_self', 'meet_skills']);
     expect(s.name).toBe('Маша');
     expect(s.persona).toBe('hooligan');
     expect(s.phase).toBe('play');
-    expect(has(all, 'remember')).toBe(true);
-    expect(has(all, 'signature')).toBe(true);
+    expect(s.met).toBe(true);
+    expect(has(all, 'coach')).toBe(true);
+    expect(has(all, 'ui', { ui: 'chips', show: true })).toBe(true);
+    expect(all.some((x) => x.type === 'remember' && x.patch.met === true)).toBe(true);
+    // без анкеты выбора характера и без лишних переходов
+    expect(has(all, 'offer_choice')).toBe(false);
   });
 
   it('пропуск имени и выбор Блёстки тапом', () => {
@@ -116,28 +115,38 @@ describe('сценарий первой встречи', () => {
     expect(has(r.actions, 'remember')).toBe(true);
   });
 
-  it('скука: первая тишина — реплика, вторая подряд — смена характера', () => {
+  it('скука: тишина — зовёт поиграть и показывает панель, экран сам не заклеивает', () => {
     let { s } = run(initialState(), [...toChoose, { type: 'skip_name' }, { type: 'choose', persona: 'glitter' }]);
     let r = step(s, { type: 'silence' });
     expect(has(r.actions, 'react', { event: 'silence' })).toBe(true);
     r = step(r.state, { type: 'silence' });
-    expect(r.state.phase).toBe('switching');
-    expect(r.state.switchTo).toBe('hooligan');
+    expect(has(r.actions, 'react', { event: 'bored' })).toBe(true);
+    r = step(r.state, { type: 'silence' });
+    expect(r.state.phase).toBe('play');
+    expect(has(r.actions, 'cover_stickers')).toBe(false);
   });
 
-  it('повторный визит: узнаёт, без анкеты; контекст — префикс к приветствию', () => {
-    const { s, all } = run(initialState({ name: 'Петя', persona: 'glitter', visits: 3 }, 'long_absence'), toChoose);
+  it('повторный визит: «с возвращением» без анкеты; из контекста — только «давно не виделись»', () => {
+    const { s, all } = run(initialState({ name: 'Петя', persona: 'glitter', visits: 3, met: true }, 'long_absence'), toChoose);
     expect(s.phase).toBe('play');
     const keys = all.filter((x) => x.type === 'say').map((x) => (x as { key: string }).key);
-    expect(keys.slice(0, 2)).toEqual(['long_absence', 'welcome_back']);
+    expect(keys).toEqual(['long_absence', 'welcome_back']);
     expect(has(all, 'set_persona', { persona: 'glitter' })).toBe(true);
-    expect(has(all, 'say', { key: 'ask_name' })).toBe(false);
+    expect(has(all, 'signature', { silent: true })).toBe(true);
+    const morning = run(initialState({ persona: 'glitter', visits: 3, met: true }, 'morning'), toChoose).all;
+    expect(morning.filter((x) => x.type === 'say').map((x) => (x as { key: string }).key)).toEqual(['welcome_back']);
   });
 
-  it('первая встреча: intro → утро → вопрос имени', () => {
+  it('старая память без отметки знакомства — знакомство один раз', () => {
+    const { s, all } = run(initialState({ name: 'Петя', persona: 'glitter', visits: 3 }), toChoose);
+    expect(s.phase).toBe('ask_name');
+    expect(has(all, 'say', { key: 'meet_card' })).toBe(true);
+  });
+
+  it('первая встреча: карта → поздравление → вопрос имени (утро/вечер не добавляем)', () => {
     const { all } = run(initialState({}, 'morning'), toChoose);
     const keys = all.filter((x) => x.type === 'say').map((x) => (x as { key: string }).key);
-    expect(keys).toEqual(['intro', 'morning', 'ask_name']);
+    expect(keys).toEqual(['meet_card', 'meet_congrats', 'ask_name']);
   });
 
   it('смена по кругу: hooligan → kind → glitter → hooligan', () => {
@@ -164,6 +173,8 @@ describe('память', () => {
     const st = { getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => void m.set(k, v) };
     saveMemory({ name: 'Аня', visits: 2 }, st);
     expect(loadMemory(st)).toEqual({ name: 'Аня', persona: null, visits: 2, lastVisitAt: null });
+    saveMemory({ met: true }, st);
+    expect(loadMemory(st).met).toBe(true);
     saveMemory({ persona: 'kind', lastVisitAt: 123 }, st);
     expect(loadMemory(st).persona).toBe('kind');
     m.set('sber-ar-cat:v1', JSON.stringify({ persona: 'evil' }));

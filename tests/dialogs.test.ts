@@ -45,16 +45,17 @@ describe('dialogs.json', () => {
 });
 
 describe('знакомство', () => {
-  it('ask_name → окно 5 с → имя → nice_name → choose', () => {
+  it('ask_name → окно 5 с → имя → nice_name → meet_self → meet_skills → игра', () => {
     let { s, all } = run(initialState(), toChoose);
     expect(s.dialog?.id).toBe('intro');
     expect(lastListen(all)).toMatchObject({ mode: 'name', ms: 5000 });
     ({ s, all } = run(s, [heard('name', { name: 'Маша', known: true })]));
-    expect(says(all)).toEqual(['nice_name', 'choose']);
+    expect(says(all)).toEqual(['nice_name', 'meet_self', 'meet_skills']);
     expect(s.name).toBe('Маша');
     expect(all.some((a) => a.type === 'remember' && a.patch.name === 'Маша')).toBe(true);
-    expect(s.phase).toBe('choose');
-    expect(all.some((a) => a.type === 'offer_choice')).toBe(true);
+    expect(s.phase).toBe('play');
+    expect(s.dialog).toBeNull();
+    expect(all.some((a) => a.type === 'coach')).toBe(true);
   });
   it('имя не из словаря — не запоминаем, но знакомство идёт', () => {
     const { s, all } = run(initialState(), [...toChoose, heard('name', { name: 'Зюзя', known: false })]);
@@ -67,7 +68,7 @@ describe('знакомство', () => {
     ({ s, all } = run(s, [{ type: 'listen_timeout', token: lastListen(all)!.token }]));
     expect(says(all)).toEqual(['ask_name_again']);
     ({ s, all } = run(s, [{ type: 'listen_timeout', token: lastListen(all)!.token }]));
-    expect(says(all)).toEqual(['no_name', 'choose']);
+    expect(says(all)).toEqual(['no_name', 'meet_self', 'meet_skills']);
   });
   it('старый таймаут окна игнорируется', () => {
     let { s, all } = run(initialState(), toChoose);
@@ -76,14 +77,13 @@ describe('знакомство', () => {
     const r = step(s, { type: 'listen_timeout', token: old });
     expect(r.actions).toEqual([]);
   });
-  it('«не скажу» → no_name; выбор голосом «добряк»', () => {
+  it('«не скажу» → no_name → игра; «будь добряком» — смена образа', () => {
     let { s, all } = run(run(initialState(), toChoose).s, [heard('no')]);
-    expect(says(all)).toEqual(['no_name', 'choose']);
-    ({ s, all } = run(s, [heard('choose_kind')]));
-    expect(s.persona).toBe('kind');
-    expect(says(all)).toEqual(['choose_kind', 'invite']);
-    expect(all.findIndex((a) => a.type === 'set_persona')).toBeLessThan(all.findIndex((a) => a.type === 'say'));
+    expect(says(all)).toEqual(['no_name', 'meet_self', 'meet_skills']);
     expect(s.phase).toBe('play');
+    ({ s, all } = run(s, [heard('choose_kind')]));
+    expect(says(all)[0]).toBe('choose_kind');
+    expect(s.switchTo).toBe('kind');
   });
   it('выбор тапом по стикеру во время вопроса', () => {
     const { s } = run(initialState(), [...toChoose, { type: 'choose', persona: 'glitter' }]);

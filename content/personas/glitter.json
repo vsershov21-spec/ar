@@ -147,6 +147,23 @@
       "fx": "glitter_burst",
       "sound": "sparkle_burst"
     },
+    "meet_card": {
+      "clip": "surprised",
+      "fx": "glitter_burst",
+      "sound": "sparkle_burst"
+    },
+    "meet_congrats": {
+      "clip": "celebrate",
+      "fx": "confetti"
+    },
+    "meet_self": {
+      "clip": "proud",
+      "fx": "glitter_burst"
+    },
+    "meet_skills": {
+      "clip": "point_button",
+      "fx": "spotlight_button"
+    },
     "ask_name": {
       "clip": "listen"
     },
@@ -254,6 +271,11 @@
       "clip": "press_glass",
       "fx": "kiss_print",
       "sound": "kiss"
+    },
+    "treat": {
+      "clip": "celebrate",
+      "fx": "hearts_float",
+      "sound": "sparkle_burst"
     },
     "shake": {
       "clip": "snowglobe_shake",
@@ -506,6 +528,86 @@
         "face": "excited"
       }
     ],
+    "meet_card": [
+      {
+        "id": "glitter.meet_card.01",
+        "text": "Ого! Это твоя карта? Теперь я живу в ней!",
+        "emotion": "excited",
+        "face": "excited"
+      },
+      {
+        "id": "glitter.meet_card.02",
+        "text": "Вау, какая карта! Всё, я в ней поселилась.",
+        "emotion": "surprised",
+        "face": "surprised"
+      },
+      {
+        "id": "glitter.meet_card.03",
+        "text": "Ах, карта! Самый красивый домик для меня.",
+        "emotion": "happy",
+        "face": "happy"
+      }
+    ],
+    "meet_congrats": [
+      {
+        "id": "glitter.meet_congrats.01",
+        "text": "Поздравляю, у тебя своя карта! Привет-привет!",
+        "emotion": "excited",
+        "face": "excited"
+      },
+      {
+        "id": "glitter.meet_congrats.02",
+        "text": "Своя карта! Поздравляю! И привет!",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "glitter.meet_congrats.03",
+        "text": "Ура, поздравляю с картой! Привет!",
+        "emotion": "excited",
+        "face": "excited"
+      }
+    ],
+    "meet_self": [
+      {
+        "id": "glitter.meet_self.01",
+        "text": "А я Блёстка — кошка из твоей карты.",
+        "emotion": "proud",
+        "face": "proud"
+      },
+      {
+        "id": "glitter.meet_self.02",
+        "text": "Меня зовут Блёстка. Я люблю блеск и наклейки.",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "glitter.meet_self.03",
+        "text": "Я Блёстка! Самая блестящая кошка на свете.",
+        "emotion": "excited",
+        "face": "excited"
+      }
+    ],
+    "meet_skills": [
+      {
+        "id": "glitter.meet_skills.01",
+        "text": "Погладь меня пальцем или пощекочи животик. А кнопки внизу — мои фокусы!",
+        "emotion": "excited",
+        "face": "excited"
+      },
+      {
+        "id": "glitter.meet_skills.02",
+        "text": "Меня можно гладить, щекотать и угощать. Жми кнопки внизу!",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "glitter.meet_skills.03",
+        "text": "Погладь меня или нажми кнопку внизу. А ещё со мной можно болтать!",
+        "emotion": "neutral",
+        "face": "neutral"
+      }
+    ],
     "ask_name": [
       {
         "id": "glitter.ask_name.01",
@@ -541,7 +643,7 @@
       },
       {
         "id": "glitter.nice_name.03",
-        "text": "Ура, {name}! Посыплю это имя блёстками.",
+        "text": "{name}, ура! Посыплю это имя блёстками.",
         "emotion": "excited",
         "face": "excited"
       },
@@ -759,7 +861,7 @@
       },
       {
         "id": "glitter.welcome_back.02",
-        "text": "Привет, {name}! Я так рада!",
+        "text": "{name}, привет! Я так рада!",
         "emotion": "happy",
         "face": "happy"
       },
@@ -1082,6 +1184,26 @@
         "text": "Отпечаток-сердечко на память!",
         "emotion": "excited",
         "face": "excited"
+      }
+    ],
+    "treat": [
+      {
+        "id": "glitter.treat.01",
+        "text": "Ням! Рыбка с блёстками? Шучу. Вкусно!",
+        "emotion": "excited",
+        "face": "excited"
+      },
+      {
+        "id": "glitter.treat.02",
+        "text": "Мм, вкусняшка! Спасибо, я так рада!",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "glitter.treat.03",
+        "text": "Хрум-хрум. Только никому не говори, что я сладкоежка!",
+        "emotion": "shy",
+        "face": "shy"
       }
     ],
     "shake": [
@@ -1855,19 +1977,19 @@
     "help": [
       {
         "id": "glitter.help.01",
-        "text": "Я умею танцевать, петь и блестеть! Скажи «танцуй».",
+        "text": "Погладь меня, пощекочи или жми кнопки внизу. Скажи «танцуй»!",
         "emotion": "excited",
         "face": "excited"
       },
       {
         "id": "glitter.help.02",
-        "text": "Скажи «загадку» или «шутку» — и начнём шоу!",
+        "text": "Я умею танцевать, петь и блестеть! Кнопки внизу — мои фокусы.",
         "emotion": "happy",
         "face": "happy"
       },
       {
         "id": "glitter.help.03",
-        "text": "Я пока учусь новым словам. Скажи «сальто» или «повторяй за мной».",
+        "text": "Скажи «загадку» или «повторяй за мной». Или угости меня!",
         "emotion": "neutral",
         "face": "neutral"
       }

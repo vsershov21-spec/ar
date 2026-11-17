@@ -16,21 +16,17 @@
   "interrupts": ["sad", "scared"],
   "dialogs": {
     "intro": {
-      "title": "Знакомство",
-      "trigger": "После появления кота на первой встрече. Имя можно не говорить.",
-      "start": "ask",
+      "title": "Первое знакомство",
+      "trigger": "Один раз, когда кот впервые сел на карту (фанфары уже сыграли): карта → поздравление и привет → имя → кот представляется → как с ним играть. Дальше — обычная игра. Имя можно не говорить.",
+      "start": "card",
       "nodes": {
-        "ask": { "say": "ask_name", "listen": { "mode": "name" }, "on": { "name": "nice", "no": "noname", "skip": "noname", "timeout": "ask_again", "*": "ask_again" } },
+        "card": { "say": ["meet_card", "meet_congrats"], "next": "ask" },
+        "ask": { "do": ["name_prompt"], "say": "ask_name", "listen": { "mode": "name" }, "on": { "name": "nice", "no": "noname", "skip": "noname", "timeout": "ask_again", "*": "ask_again" } },
         "ask_again": { "say": "ask_name_again", "listen": { "mode": "name" }, "on": { "name": "nice", "timeout": "noname", "*": "noname" } },
-        "nice": { "say": "nice_name", "next": "choose" },
-        "noname": { "say": "no_name", "next": "choose" },
-        "choose": {
-          "say": "choose",
-          "do": ["offer_choice"],
-          "listen": { "mode": "intent" },
-          "on": { "choose_hooligan": "@choose:hooligan", "choose_kind": "@choose:kind", "choose_glitter": "@choose:glitter", "timeout": "@choose:default", "*": "choose_wait" }
-        },
-        "choose_wait": { "listen": { "mode": "intent" }, "on": { "choose_hooligan": "@choose:hooligan", "choose_kind": "@choose:kind", "choose_glitter": "@choose:glitter", "timeout": "@choose:default", "*": "@choose:default" } }
+        "nice": { "say": "nice_name", "next": "self" },
+        "noname": { "say": "no_name", "next": "self" },
+        "self": { "do": ["hide_name"], "say": "meet_self", "next": "skills" },
+        "skills": { "do": ["coach"], "say": "meet_skills", "next": "@met" }
       }
     },
     "bye": {

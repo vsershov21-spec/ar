@@ -132,6 +132,47 @@ export class Audio {
     this.howl.rate(1 + (Math.random() * 2 - 1) * j, id);
   }
 
+  /**
+   * Фанфары «та-да-да-дам!» (~1,2 с) — когда кот впервые выскочил из карты. Синтез Web Audio (файла в спрайте нет):
+   * «медные» пилы через фильтр, восходящее арпеджио до-ми-соль и аккорд до мажор, сверху — звёздочки.
+   */
+  fanfare(volume = 0.5) {
+    const ctx = this.ctx;
+    if (!ctx || this.muted) return;
+    const out = ctx.createGain();
+    out.gain.value = volume * this.volume.sfx * this.duckK;
+    out.connect((Howler as any).masterGain ?? ctx.destination);
+    const t0 = ctx.currentTime + 0.02;
+    const note = (f: number, at: number, dur: number, g = 0.22, type: OscillatorType = 'sawtooth') => {
+      const o = ctx.createOscillator(), o2 = ctx.createOscillator(), lp = ctx.createBiquadFilter(), env = ctx.createGain();
+      o.type = o2.type = type;
+      o.frequency.value = f;
+      o2.frequency.value = f * 1.004; // лёгкий хорус — «труба», а не писк
+      lp.type = 'lowpass';
+      lp.frequency.setValueAtTime(900, t0 + at);
+      lp.frequency.linearRampToValueAtTime(3200, t0 + at + 0.06);
+      lp.frequency.exponentialRampToValueAtTime(1400, t0 + at + dur);
+      env.gain.setValueAtTime(0.0001, t0 + at);
+      env.gain.exponentialRampToValueAtTime(g, t0 + at + 0.025);
+      env.gain.setValueAtTime(g, t0 + at + dur * 0.7);
+      env.gain.exponentialRampToValueAtTime(0.0001, t0 + at + dur);
+      o.connect(lp);
+      o2.connect(lp);
+      lp.connect(env).connect(out);
+      for (const x of [o, o2]) {
+        x.start(t0 + at);
+        x.stop(t0 + at + dur + 0.05);
+      }
+    };
+    // C5 E5 G5 — C6 + аккорд
+    note(523.25, 0, 0.13);
+    note(659.25, 0.12, 0.13);
+    note(783.99, 0.24, 0.13);
+    for (const f of [523.25, 659.25, 783.99, 1046.5]) note(f, 0.38, 0.75, 0.13);
+    for (let i = 0; i < 6; i++) note(2093 * (1 + i * 0.12), 0.42 + i * 0.07, 0.12, 0.05, 'triangle');
+    setTimeout(() => out.disconnect(), 1600);
+  }
+
   playAmbience(url: string) {
     this.ambience?.unload();
     this.ambience = new Howl({ src: [asset(url)], loop: true, volume: this.volume.ambience * this.duckK });

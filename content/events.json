@@ -4,6 +4,10 @@
   "events": [
     { "id": "point_camera", "group": "scenario", "priority": 2, "cooldownMs": 8000, "interruptible": false, "trigger": "Камера открыта, карта не найдена 3 с (до первой встречи). Звучит голос из-за кадра, кота не видно." },
     { "id": "intro", "group": "scenario", "priority": 2, "cooldownMs": 0, "interruptible": false, "trigger": "Карта найдена впервые: кот выпрыгивает из карты (appear_jump_in) и здоровается." },
+    { "id": "meet_card", "group": "scenario", "priority": 2, "cooldownMs": 0, "interruptible": false, "trigger": "Первая встреча: кот выскочил из карты под фанфары и удивляется карте («Это твоя карта? Теперь я в ней живу!»)." },
+    { "id": "meet_congrats", "group": "scenario", "priority": 2, "cooldownMs": 0, "interruptible": false, "trigger": "Первая встреча: поздравляет ребёнка с картой и здоровается. Дальше — вопрос имени (ask_name)." },
+    { "id": "meet_self", "group": "scenario", "priority": 2, "cooldownMs": 0, "interruptible": true, "trigger": "Первая встреча, после имени: кот представляется (имя характера)." },
+    { "id": "meet_skills", "group": "scenario", "priority": 2, "cooldownMs": 0, "interruptible": true, "trigger": "Первая встреча, последний шаг: как со мной играть — погладить, пощекотать, кнопки внизу. На экране — палец «погладь меня» и подсвеченная панель действий." },
     { "id": "ask_name", "group": "scenario", "priority": 2, "cooldownMs": 0, "interruptible": true, "trigger": "Знакомство (диалог intro): кот спрашивает имя, микрофон открывается сам на 5 с после реплики. Имя можно не говорить." },
     { "id": "nice_name", "group": "scenario", "priority": 2, "cooldownMs": 0, "interruptible": true, "trigger": "Имя распознано и прошло фильтр (есть в словаре имён)." },
     { "id": "no_name", "group": "scenario", "priority": 2, "cooldownMs": 0, "interruptible": true, "trigger": "Имя не сказали, не распознали или ребёнок сказал «не скажу»." },
@@ -32,6 +36,7 @@
     { "id": "walk_to", "group": "input", "priority": 1, "cooldownMs": 800, "interruptible": true, "trigger": "Тап по карте (или по поверхности): кот идёт в эту точку." },
     { "id": "swipe", "group": "input", "priority": 1, "cooldownMs": 900, "interruptible": true, "trigger": "Свайп по экрану мимо кота: след характера (когти, блёстки, пар)." },
     { "id": "longpress", "group": "input", "priority": 1, "cooldownMs": 2500, "interruptible": true, "trigger": "Долгое нажатие на экран 0,6 с: кот прижимается к стеклу носом." },
+    { "id": "treat", "group": "input", "priority": 1, "cooldownMs": 2500, "interruptible": true, "trigger": "Кнопка «Угостить» в панели действий: кот получает вкусняшку и радуется." },
     { "id": "shake", "group": "input", "priority": 1, "cooldownMs": 2000, "interruptible": true, "trigger": "Телефон встряхнули (не в режиме смены образа)." },
     { "id": "spam", "group": "input", "priority": 3, "cooldownMs": 6000, "interruptible": false, "trigger": "5 тапов за 2 с: кот кружится, просит полегче; следующие 3 с тапы игнорируются." },
     { "id": "silence", "group": "input", "priority": 0, "cooldownMs": 10000, "interruptible": true, "trigger": "10 с без касаний и голоса." },

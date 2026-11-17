@@ -18,7 +18,8 @@ import { VoiceEngine } from './voice/engine';
 import { loadContent } from './persona/content';
 import { Input } from './input/input';
 import { UI, posterUrl } from './ui/ui';
-import { Director } from './director';
+import { Director, type ActionId } from './director';
+import { NAMES, normalize } from './voice/intents';
 import { personaMeta } from './character/personaMeta';
 import { CardMonitor, LumaSampler, cardScreenFrac, type CardEvent } from './tracker/cardMonitor';
 import { perf, AdaptiveQuality, type QualityLevel } from './core/perf';
@@ -172,10 +173,18 @@ export class App {
         this.input.activity();
         this.engine.handleText(t, 'chip');
       },
-      onName: (n) => this.director.dispatch({ type: 'name', name: n }),
+      // имя из поля ввода: как голосом — кот произносит и запоминает только имя из словаря
+      onName: (n) => {
+        const known = NAMES.get(normalize(n));
+        this.director.dispatch({ type: 'name', name: known ?? n.trim(), known: !!known });
+      },
+      onAction: (id) => {
+        this.input.activity();
+        this.director.action(id as ActionId);
+      },
       onSkipName: () => this.director.dispatch({ type: 'skip_name' }),
       onShakeButton: () => this.input.simulateShake(),
-      onKids: () => window.open(ASSETS.sberKidsUrl, '_blank', 'noopener'),
+      onKids: () => this.ui.showKids(true, ASSETS.sberKidsUrl),
       onMute: (m) => {
         this.audio.setMuted(m);
         this.voice.muted = m;
@@ -215,7 +224,7 @@ export class App {
     perf.mark('char');
     this.wireFx();
     // озвучка: манифест текущего характера и первые реплики сценария — заранее
-    this.voice.preloadEvents(this.director.persona.id, ['point_camera', 'intro', 'ask_name', 'nice_name', 'no_name']);
+    this.voice.preloadEvents(this.director.persona.id, ['point_camera', 'meet_card', 'meet_congrats', 'ask_name', 'nice_name', 'no_name', 'meet_self', 'meet_skills', 'welcome_back']);
 
     this.input = new Input(this.fx.canvas, {
       zoneAt: (x, y) => this.zoneAt(x, y),
@@ -584,7 +593,7 @@ export class App {
     if (!(navigator as any).connection?.saveData) setTimeout(() => void this.engine.asr.preload?.(), 3000);
     if (this.audio.maybeSilentSwitch) setTimeout(() => this.ui.toast('Не слышно кота? Проверь переключатель «Без звука» сбоку iPhone и громкость.', 5000), 2500);
     const sensors = this.input.requestSensors();
-    this.ui.setStartBusy('Просыпается…');
+    this.ui.setStartBusy('Включаю камеру…');
     try {
       const tv = this.tracker as unknown as { startVideo?: () => Promise<void> };
       if (typeof tv.startVideo === 'function') await tv.startVideo();
