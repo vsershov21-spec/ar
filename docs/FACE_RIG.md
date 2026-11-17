@@ -66,3 +66,12 @@ for n in hooligan kind glitter; do python3 scripts/models/face_detail.py $n publ
 | sleep — глаза закрыты | сон (до пробуждения) |
 
 Ещё: брови подпрыгивают на ударных слогах речи (faceLife), микромимика в покое осталась.
+
+
+## v3: рот-накладка MouthD, плавная челюсть, слёзка (face_detail.py)
+- Узел `Mouth` (полость из face_rig.py) удаляется стадией; вместо него `MouthD` (дочерний к Head, extras.mouth: рамка рта
+  o/ex/ey/W, высота носа, опускание челюсти по ключам `jaw`). Ключи накладки повторяют ключи тела (mouth_*, tongue_out,
+  smile, cheeks_gum, cheek_up, frown, nose_wrinkle). Рантайм — `src/character/mouthRig.ts` (форма в шейдере, mouthParams — чистая функция).
+- Ключи челюсти тела mouth_A/E/O/U/tongue_out пересчитываются плавными (`smooth_jaw`, амплитуды как в face_rig).
+- `Tear_L/R` — капля под нижним веком (дочерняя к Eye_*), показывает eyeRig по весу `tear`.
+- Глаза: `EYE_SCALE`, `IRIS_K`, `REST_UP`, выступ яблока 0.03–0.12 B, оболочки век 1.055/1.032.
