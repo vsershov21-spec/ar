@@ -10,7 +10,7 @@
 import * as THREE from 'three';
 import { TrackerBase } from './base';
 import type { Tracker } from './types';
-import { CARD_ASPECT, labelCard, poseFromQuad, quadDiag, type Intrinsics, type Pose, type Pt, type Quad } from './card/geometry';
+import { CARD_ASPECT, focalFromQuad, labelCard, poseFromQuad, quadDiag, type Intrinsics, type Pose, type Pt, type Quad } from './card/geometry';
 import { focalFromFov } from './card/detector';
 import type { CardWorkerIn, CardWorkerOut } from './card/worker';
 import { CardOverlay } from './card/overlay';
@@ -138,7 +138,40 @@ export class CardTracker extends TrackerBase implements Tracker {
     this.dh = Math.round(vh * k);
     this.canvas.width = this.dw;
     this.canvas.height = this.dh;
-    this.K = { f: focalFromFov(this.dw, this.dh), cx: this.dw / 2, cy: this.dh / 2 };
+    // фокус: сохранённая калибровка этого телефона (доля от длинной стороны кадра) или типичный угол обзора
+    let saved = NaN;
+    try {
+      saved = parseFloat(localStorage.getItem(FOCAL_KEY) ?? '');
+    } catch {
+      /* приватный режим */
+    }
+    const fDef = focalFromFov(this.dw, this.dh);
+    this.K = { f: saved > 0 ? saved * Math.max(this.dw, this.dh) : fDef, cx: this.dw / 2, cy: this.dh / 2 };
+    this.fSamples = [];
+  }
+
+  /** самокалибровка фокуса по карте: медиана оценок с наклонённых устойчивых кадров */
+  private fSamples: number[] = [];
+  private calibrate(quad: Quad) {
+    if (this.fSamples.length >= 60) return;
+    const f = focalFromQuad(quad, this.K.cx, this.K.cy, CARD_ASPECT);
+    if (!f) return;
+    const L = Math.max(this.dw, this.dh);
+    // правдоподобный диапазон: горизонтальный угол обзора 45–85°
+    const fMin = L / 2 / Math.tan((85 * Math.PI) / 360), fMax = L / 2 / Math.tan((45 * Math.PI) / 360);
+    if (f < fMin || f > fMax) return;
+    this.fSamples.push(f);
+    if (this.fSamples.length % 10 !== 0) return;
+    const sorted = [...this.fSamples].sort((a, b) => a - b);
+    const med = sorted[sorted.length >> 1];
+    if (Math.abs(med - this.K.f) / this.K.f < 0.02) return;
+    this.K = { ...this.K, f: med };
+    this.resize(this.w, this.h);
+    try {
+      localStorage.setItem(FOCAL_KEY, String(med / L));
+    } catch {
+      /* приватный режим */
+    }
   }
 
   /**
@@ -246,6 +279,7 @@ export class CardTracker extends TrackerBase implements Tracker {
       this.orientRef = quad;
       this.orientAt = performance.now();
       this.misses = 0;
+      if (pose.err < 2) this.calibrate(quad);
       if (!this.locked) {
         this.stable = pose.err < 2.5 && jitter < 0.04 ? this.stable + 1 : 0;
         if (this.stable < LOCK_FRAMES) return;
@@ -366,6 +400,7 @@ function grabFrame(v: HTMLVideoElement): VideoFrame | null {
 /** поза (R — столбцы осей карты в системе камеры, t — центр, единица = ширина карты) → матрица якоря */
 /** сколько устойчивых кадров подряд нужно, чтобы посадить кота (~0,3 с) */
 const LOCK_FRAMES = 6;
+const FOCAL_KEY = 'ar.focal.v1';
 
 export function poseMatrix(p: Pose): THREE.Matrix4 {
   const R = p.R, t = p.t;

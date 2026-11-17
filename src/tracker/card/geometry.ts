@@ -374,3 +374,34 @@ export function roundedCardOutline(aspect = CARD_ASPECT, radius = CARD_RADIUS, s
     }
   return out;
 }
+
+/**
+ * Фокус камеры по одной карте (известное соотношение сторон): из гомографии модель→пиксели
+ * (центр кадра — главная точка) условия r1⊥r2 и |r1|=|r2| дают f². Работает, когда карта видна под углом;
+ * почти сверху — неустойчиво (возвращаем null). Нужен, чтобы кот не «съезжал» и не кренился при движении:
+ * с неверным фокусом карта совпадает, а объёмный кот — нет.
+ */
+export function focalFromQuad(q: Quad, cx: number, cy: number, aspect = CARD_ASPECT): number | null {
+  const H = homography(cardModel(aspect), q.map((p) => ({ x: p.x - cx, y: -(p.y - cy) })));
+  if (!H) return null;
+  const [h11, h12, , h21, h22, , h31, h32] = H;
+  const ests: number[] = [];
+  const d1 = h31 * h32;
+  const s = Math.hypot(h11, h21, h12, h22);
+  // перспективная часть должна быть заметной относительно масштаба, иначе шум
+  if (Math.abs(d1) * 1e3 > 1e-9) {
+    const f2 = -(h11 * h12 + h21 * h22) / d1;
+    if (f2 > 0) ests.push(Math.sqrt(f2));
+  }
+  const d2 = h32 * h32 - h31 * h31;
+  if (Math.abs(d2) > 1e-12) {
+    const f2 = (h11 * h11 + h21 * h21 - h12 * h12 - h22 * h22) / d2;
+    if (f2 > 0) ests.push(Math.sqrt(f2));
+  }
+  if (!ests.length || !s) return null;
+  // устойчивость: наклон карты не меньше ~20° (persp ≈ 0,9 · градусы наклона)
+  const persp = Math.hypot(h31, h32) * Math.max(...ests);
+  if (persp < 18) return null;
+  ests.sort((a, b) => a - b);
+  return ests.length === 2 && Math.abs(ests[0] - ests[1]) > 0.25 * ests[1] ? null : ests.reduce((a, b) => a + b) / ests.length;
+}
