@@ -436,6 +436,15 @@ export class VoiceEngine extends Emitter<EngineEvents> {
       preloadModel: () => this.asr.preload?.(),
       thresholds: { vad: this.vad.opts, sound: this.sound.opts },
       lips: (s: 'phon' | 'amp') => (this.voice.lipStrategy = s),
+      /** звуковой стек на устройстве: контекст, аудиосессия, узел микрофона, кэш реплик */
+      audio: () => {
+        const ctx = this.audio.ctx;
+        return {
+          ctx: ctx ? { state: ctx.state, sampleRate: ctx.sampleRate, baseLatency: ctx.baseLatency, outputLatency: (ctx as AudioContext & { outputLatency?: number }).outputLatency } : null,
+          session: this.audio.sessionType, micOpen: this.mic.isOpen, micNode: this.mic.nodeKind, micError: this.mic.error,
+          voiceCache: this.voice.cacheStats(), synth: this.voice.synthAllowed,
+        };
+      },
     };
   }
 }

@@ -135,8 +135,11 @@ export class MicInput {
       if (ctx.state !== 'running') await ctx.resume().catch(() => undefined);
       // модуль ворклета — параллельно с запросом доступа (getUserMedia ждёт ответа ребёнка/родителя)
       const wl = loadWorklet(ctx);
+      // эхоподавление нужно: кот не слышит себя, голосом можно перебить. На iOS оно включает «голосовую обработку»,
+      // и звук приложения играет тише; ?aec=0 — без него (проверить громкость на устройстве)
+      const aec = typeof location === 'undefined' || new URLSearchParams(location.search).get('aec') !== '0';
       this.stream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: false, channelCount: 1 },
+        audio: { echoCancellation: aec, noiseSuppression: aec, autoGainControl: false, channelCount: 1 },
       });
       this.src = ctx.createMediaStreamSource(this.stream);
       const sr = ctx.sampleRate;

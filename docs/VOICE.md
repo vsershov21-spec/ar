@@ -365,7 +365,9 @@ tail -f /var/lib/vershov-commander/ar/el-run.log
 ввод текста «как будто ребёнок сказал», визуализация визем, переключатель липсинка, проигрыш реплик, громкости.
 
 `window.__voice`: `state()`, `text('…')`, `listen({windowMs})`, `mode('auto'|'ptt')`, `echo.start()/stop()`,
-`ptt.down()/up()`, `preloadModel()`, `thresholds`, `lips('phon'|'amp')`.
+`ptt.down()/up()`, `preloadModel()`, `thresholds`, `lips('phon'|'amp')`, `audio()` — контекст (частота, задержка),
+aудиосессия, узел микрофона (`worklet`/`script`), кэш реплик. Флаги проверки на iPhone: `?session=`, `?aec=0`,
+`?micnode=sp`, `?latency=interactive`, `?piper`, `?synth`.
 
 ## Ограничения
 
