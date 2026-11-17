@@ -60,9 +60,10 @@ export class FaceLife {
     const closed = v === 'A' ? clamp01(w) : 0;
     if (open < 0.01 && closed < 0.01 && round < 0.01) return {};
     return {
-      mouth_A: clamp01(open * 1.15 * (1 - round * 0.85)),
+      // до 1.3: ключ линейный — рот и челюсть раскрываются дальше нарисованного максимума, рот виден издалека
+      mouth_A: Math.min(1.3, open * 1.4 * (1 - round * 0.85)),
       mouth_E: clamp01(wide * 0.9 * (1 - round)),
-      mouth_O: clamp01(round * clamp01((open - 0.2) * 3) * 1.4),
+      mouth_O: Math.min(1.2, round * clamp01((open - 0.2) * 3) * 1.6),
       mouth_U: clamp01(round * (1 - clamp01((open - 0.2) * 3))),
       mouth_M: closed,
     };

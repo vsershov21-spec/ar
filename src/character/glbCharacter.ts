@@ -84,6 +84,35 @@ export const TRIPO_ALIAS: Record<string, string[]> = {
   'knock on glass': ['knock_glass'],
 };
 
+let ENV: THREE.Texture | null = null;
+/** маленькая equirect-карта «комната»: светлый верх, тёплый горизонт, тёмный низ (стол); PMREM делает рендерер */
+function softEnv() {
+  if (ENV) return ENV;
+  const W = 64, H = 32;
+  const d = new Uint8Array(W * H * 4);
+  for (let y = 0; y < H; y++) {
+    const v = 1 - y / (H - 1); // 1 — зенит
+    for (let x = 0; x < W; x++) {
+      const win = Math.exp(-(((x / W - 0.3) * 6) ** 2) - (((v - 0.7) * 5) ** 2)); // мягкое «окно»
+      const r = v > 0.5 ? 200 + 55 * (v - 0.5) * 2 : 120 + 80 * v * 2;
+      const g = v > 0.5 ? 200 + 50 * (v - 0.5) * 2 : 100 + 90 * v * 2;
+      const b = v > 0.5 ? 205 + 50 * (v - 0.5) * 2 : 85 + 100 * v * 2;
+      const i = (y * W + x) * 4;
+      d[i] = Math.min(255, r + 60 * win);
+      d[i + 1] = Math.min(255, g + 60 * win);
+      d[i + 2] = Math.min(255, b + 60 * win);
+      d[i + 3] = 255;
+    }
+  }
+  const t = new THREE.DataTexture(d, W, H);
+  t.mapping = THREE.EquirectangularReflectionMapping;
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.magFilter = THREE.LinearFilter;
+  t.needsUpdate = true;
+  ENV = t;
+  return t;
+}
+
 export class GlbCharacter implements Character {
   readonly kind = 'glb' as const;
   readonly object = new THREE.Group();
@@ -158,6 +187,12 @@ export class GlbCharacter implements Character {
       const m = o as THREE.Mesh;
       if (m.isMesh) {
         m.frustumCulled = false;
+        const mat = m.material as THREE.MeshStandardMaterial;
+        // мягкое окружение: без него металл (золото Блёстки) чернеет, а мех и ткань выглядят плоско
+        if (mat?.isMeshStandardMaterial) {
+          mat.envMap = softEnv();
+          mat.envMapIntensity = 0.4;
+        }
         if (m.morphTargetDictionary) this.morphMeshes.push(m);
       }
     });

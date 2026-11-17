@@ -47,6 +47,12 @@ for (const p of personas) {
     c.setMouth = (v, w, s) => (window.__mouth ? c.__sm(...window.__mouth) : c.__sm(v, w, s));
   });
   const shot = async (name) => {
+    // один и тот же клип покоя перед каждым кадром (idle-набор режиссёра не подменяет позу)
+    await page.evaluate(() => {
+      const c = window.__app.character;
+      c.play('idle');
+      c.clips.setIdles?.(['idle'], c.personaId);
+    });
     await wait(700);
     await page.screenshot({ path: path.join(outDir, `${prefix}_${p}_${name}.png`) });
     console.log('  ✓', p, name);
