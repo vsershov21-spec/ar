@@ -10,6 +10,7 @@
  */
 import { asset } from '../core/util';
 import type { MicInput } from './mic';
+import { perf } from '../core/perf';
 
 export type AsrState = 'idle' | 'loading' | 'listening' | 'error';
 
@@ -34,6 +35,11 @@ export interface Asr {
   setGrammar?(phrases: string[] | null): void;
   /** сколько слов вне грамматики ([unk]) было в последней фразе — «речь есть, но не из словаря» */
   lastUnk?: number;
+  /**
+   * Энергия: звук в распознаватель — только пока gate() true (в окне ответа — пока в микрофоне есть голос);
+   * тишина копится в кольце 400 мс и уходит перед началом фразы. null — всё подряд (кнопка, VAD-фраза).
+   */
+  gate?: (() => boolean) | null;
 }
 
 const MAX_HOLD_MS = 8000;
@@ -173,6 +179,9 @@ export class VoskAsr implements Asr {
   private unkPartial = 0;
   lastUnk = 0;
   paused = false;
+  gate: (() => boolean) | null = null;
+  private held: Float32Array[] = [];
+  private heldLen = 0;
   onResult = (_: string) => {};
   onInterim = (_: string) => {};
   onState = (_: AsrState, _m?: string) => {};
@@ -243,18 +252,38 @@ export class VoskAsr implements Asr {
       this.onInterim((this.final + this.partial).trim());
     });
     this.rec = rec;
-    for (const b of preroll ?? []) rec.acceptWaveformFloat(b, sr);
+    for (const b of preroll ?? []) this.feed(rec, b, sr);
+    this.held = [];
+    this.heldLen = 0;
     this.off = this.mic.on((buf) => {
       this.onLevel(this.mic.level);
       if (this.paused) return;
-      try {
-        rec.acceptWaveformFloat(buf, sr);
-      } catch {
-        /* ignore */
+      if (this.gate && !this.gate()) {
+        // тишина: не будим распознаватель, держим последние 400 мс — начало фразы не потеряется
+        this.held.push(Float32Array.from(buf));
+        this.heldLen += buf.length;
+        while (this.held.length > 1 && this.heldLen - this.held[0].length > sr * 0.4) this.heldLen -= this.held.shift()!.length;
+        return;
       }
+      if (this.held.length) {
+        for (const b of this.held) this.feed(rec, b, sr);
+        this.held = [];
+        this.heldLen = 0;
+      }
+      this.feed(rec, buf, sr);
     });
     this.onState('listening');
     this.timer = window.setTimeout(() => this.stop(), MAX_HOLD_MS);
+  }
+
+  private feed(rec: { acceptWaveformFloat(b: Float32Array, sr: number): void }, buf: Float32Array, sr: number) {
+    perf.count('asr');
+    perf.count('asrSec', buf.length / sr);
+    try {
+      rec.acceptWaveformFloat(buf, sr);
+    } catch {
+      /* ignore */
+    }
   }
 
   stop() {

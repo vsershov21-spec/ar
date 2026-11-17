@@ -3,6 +3,7 @@
  * Встроенные вкладки — builtinTabs.ts; свои вкладки модули регистрируют через registerDebugTab().
  */
 import type { App } from '../app';
+import { perf } from '../core/perf';
 import { debugTabs, onDebugTab, type DebugTab, type DebugUi } from './tabs';
 import { registerBuiltinTabs } from './builtinTabs';
 
@@ -80,7 +81,8 @@ export class DebugPanel {
         const fxMs = (app.fx as any).frameMs as number | undefined;
         fps.textContent =
           `${app.fps.toFixed(0)} fps · max ${(worst * 1000).toFixed(0)} мс · fx ${fxMs?.toFixed(2) ?? '—'} мс\n` +
-          `${app.director.state.phase} · ${app.director.persona.id} · ${app.character.kind}${app.tracker.isTracking ? '' : ' · карта потеряна'}`;
+          `${app.director.state.phase} · ${app.director.persona.id} · ${app.character.kind}${app.tracker.isTracking ? '' : ' · карта потеряна'}\n` +
+          energyLine(app);
         togFps.textContent = app.fps.toFixed(0);
         acc = 0;
         worst = 0;
@@ -219,4 +221,21 @@ export class DebugPanel {
     if (d.state.phase === 'ask_name') d.dispatch({ type: 'skip_name' });
     if (d.state.phase === 'choose') d.dispatch({ type: 'choose', persona: d.persona.id });
   }
+}
+
+/**
+ * Строка энергобюджета: режим (boost 60 / normal 30 / calm 20 / doze 12), фактические частоты за ~1 с —
+ * рендер (кадры, где реально рисовали WebGL), трекер (кадры в детектор), распознавание (порции звука в Vosk
+ * и доля реального времени), микрофон; поворот телефона °/с; pixelRatio.
+ */
+function energyLine(app: App): string {
+  const r = perf.rates();
+  const e = app.energy.out;
+  const tr = app.tracker as unknown as { maxHz?: number };
+  const cap = tr.maxHz ? `≤${tr.maxHz}` : 'камера';
+  const asr = r.asr ? `${r.asr.toFixed(0)} Гц (${((r.asrSec ?? 0) * 100).toFixed(0)}% времени)` : 'спит';
+  return (
+    `⚡ ${app.energy.enabled || app.energy.fixedFps ? e.mode : 'выкл'} · рендер ${(r.render ?? 0).toFixed(0)}/${e.renderFps || '∞'} к/с · трекер ${(r.tracker ?? 0).toFixed(0)} Гц (${cap})\n` +
+    `⚡ распознавание ${asr} · мик ${(r.mic ?? 0).toFixed(0)} Гц · поворот ${app.energy.phoneDps.toFixed(0)}°/с · px ${app.renderer.getPixelRatio().toFixed(2)}`
+  );
 }

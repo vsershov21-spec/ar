@@ -21,6 +21,37 @@ export class PerfMeter {
   private frameStart = 0;
   readonly marks: Record<string, number> = {};
 
+  /**
+   * Счётчики работы (всегда включены, стоят копейки): render — кадры рендера, logic — кадры логики,
+   * tracker — кадры в детектор, mic — порции звука микрофона, asr — порции звука в распознавание.
+   * rates() — частоты, Гц, за последнюю ~1 с (строка энергобюджета в ?debug, стенд scripts/bench/energy.mjs).
+   */
+  private counts: Record<string, number> = {};
+  private rateCounts: Record<string, number> = {};
+  private rateT = 0;
+  private lastRates: Record<string, number> = {};
+  /** накопительные счётчики с открытия страницы */
+  readonly totals: Record<string, number> = {};
+
+  count(name: string, n = 1) {
+    this.counts[name] = (this.counts[name] ?? 0) + n;
+    this.totals[name] = (this.totals[name] ?? 0) + n;
+  }
+
+  rates(): Record<string, number> {
+    const t = now();
+    if (!this.rateT) this.rateT = t;
+    if (t - this.rateT >= 1000) {
+      const k = 1000 / (t - this.rateT);
+      const out: Record<string, number> = {};
+      for (const n of new Set([...Object.keys(this.counts), ...Object.keys(this.rateCounts)])) out[n] = +(((this.counts[n] ?? 0) - (this.rateCounts[n] ?? 0)) * k).toFixed(1);
+      this.rateCounts = { ...this.counts };
+      this.rateT = t;
+      this.lastRates = out;
+    }
+    return this.lastRates;
+  }
+
   mark(name: string) {
     if (!(name in this.marks)) this.marks[name] = Math.round(now());
   }
@@ -130,15 +161,22 @@ export class AdaptiveQuality {
     this.warmup = Math.max(this.warmup, sec);
   }
 
-  /** dt — реальный интервал между кадрами, с */
-  tick(dt: number) {
+  private capped = false;
+  /**
+   * dt — реальный интервал между кадрами, с; capFps — частота, которую сейчас просит энергобюджет (0 — без потолка).
+   * При потолке 30/20 к/с интервал приводим к «как при 60» (dt · cap / 60): медленно — относительно потолка,
+   * иначе бюджет и адаптация подстёгивали бы друг друга (кадров меньше → «тормозит» → хуже картинка).
+   */
+  tick(dt: number, capFps = 0) {
     if (this.fixed) return;
+    const norm = capFps > 0 && capFps < 60 ? capFps / 60 : 1;
+    if (norm < 1) this.capped = true;
     if (this.warmup > 0) {
       this.warmup -= dt;
       return;
     }
     if (dt > 2) return; // пауза (свёрнуто, отладчик) — не кадр; скрытие вкладки сбрасывает окно само (pause)
-    this.win.push(dt);
+    this.win.push(dt * norm);
     this.winT += dt;
     if (this.cooldown > 0) this.cooldown -= dt;
     if (this.winT < 2) return;
@@ -147,14 +185,17 @@ export class AdaptiveQuality {
     const fps = 1 / med;
     this.win = [];
     this.winT = 0;
+    const wasCapped = this.capped;
+    this.capped = false;
     if (this.cooldown > 0) return;
     // экран 30 Гц / энергосбережение iOS (rAF 30) — это не «тормозит»: снижать качество бессмысленно
-    const capped30 = fps > 28 && fps < 32.5 && s[Math.floor(s.length * 0.1)] > 1 / 34;
-    if (fps < this.target * 0.8 && !capped30 && this.level < QUALITY_LEVELS.length - 1) {
+    const target = this.target;
+    const capped30 = !wasCapped && fps > 28 && fps < 32.5 && s[Math.floor(s.length * 0.1)] > 1 / 34;
+    if (fps < target * 0.8 && !capped30 && this.level < QUALITY_LEVELS.length - 1) {
       this.set(this.level + 1);
       this.goodT = 0;
       this.cooldown = 2;
-    } else if (fps > this.target * 1.1) {
+    } else if (fps > target * 1.1) {
       // вверх — только после 10 с стабильно хорошей частоты
       this.goodT += 2;
       if (this.goodT >= 10 && this.level > 0) {

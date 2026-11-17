@@ -9,6 +9,7 @@
  */
 import type { Audio } from '../audio/audio';
 import { NoiseFloor, toFrames, type Frame } from './vad';
+import { perf } from '../core/perf';
 
 export type MicListener = (buf: Float32Array, frames: Frame[], sampleRate: number) => void;
 
@@ -96,7 +97,9 @@ export class MicInput {
         audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: false, channelCount: 1 },
       });
       this.src = ctx.createMediaStreamSource(this.stream);
-      const node = ctx.createScriptProcessor(2048, 1, 1);
+      // 4096 отсчётов (≈ 85 мс при 48 кГц): вдвое реже будим главный поток, чем 2048, — микрофон открыт всё время
+      // («слушаю всегда»); VAD всё равно считает кадры по 10 мс, начало фразы берётся из кольца 400 мс
+      const node = ctx.createScriptProcessor(4096, 1, 1);
       node.onaudioprocess = (e) => this.process(e.inputBuffer.getChannelData(0), ctx.sampleRate);
       // ScriptProcessor работает, только если подключён к выходу — через нулевую громкость
       this.sink = ctx.createGain();
@@ -125,6 +128,7 @@ export class MicInput {
   }
 
   private process(x: Float32Array, sr: number) {
+    perf.count('mic');
     const frames = toFrames(x, sr, this.carry);
     for (const f of frames) {
       this.lastDb = 20 * Math.log10(Math.max(f.rms, 1e-7));

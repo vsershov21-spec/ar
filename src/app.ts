@@ -26,6 +26,7 @@ import { prefetchModel, warmModel } from './core/modelUrl';
 import { loadMemory } from './scenario/memory';
 import { PERSONA_IDS } from './persona/types';
 import { setGlRenderer } from './core/glRenderer';
+import { EnergyBudget, defaultPixelRatio, isMobileDevice } from './core/energy';
 
 export type CharacterMode = 'sprite' | 'rig' | 'glb';
 export type TrackerKind = 'card' | 'mindar' | 'debug' | '8thwall' | 'webxr';
@@ -97,20 +98,35 @@ export class App {
   onFrame: (dt: number) => void = () => {};
   /** адаптивное качество (src/core/perf.ts): ?q=0..3 — зафиксировать уровень */
   readonly quality = new AdaptiveQuality(new URLSearchParams(location.search).get('q'));
+  /** энергобюджет (src/core/energy.ts): частота рендера и трекера по тому, что происходит; ?fps=N, ?energy=0|1 */
+  readonly energy = makeEnergy();
+  /** pixelRatio без адаптации: телефон 1,5…2 по экрану, ?dpr=N — вручную */
+  private basePr() {
+    const q = Number(new URLSearchParams(location.search).get('dpr'));
+    if (q > 0) return Math.min(q, window.devicePixelRatio || 1);
+    return defaultPixelRatio(this.root.clientWidth || innerWidth, this.root.clientHeight || innerHeight, window.devicePixelRatio || 1, isMobileDevice());
+  }
 
   constructor(root: HTMLElement, readonly params: AppParams) {
     this.root = root;
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance', preserveDrawingBuffer: params.debug });
-    this.renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+    this.renderer.setPixelRatio(this.basePr());
     this.renderer.setClearColor(0x000000, 0);
     this.renderer.domElement.className = 'gl';
     setGlRenderer(this.renderer);
+    // WebXR рисует кадры сессии сам — пропускать их нельзя
+    if (params.tracker === 'webxr') this.energy.enabled = false;
   }
 
   async init() {
     const p = this.params;
     this.quality.onChange = (lvl, i) => this.applyQuality(lvl, i);
     document.addEventListener('visibilitychange', () => this.quality.pause());
+    // энергобюджет: поворот телефона (гироскоп; на iOS — после разрешения «Движение и ориентация»)
+    window.addEventListener('devicemotion', (e) => {
+      const r = e.rotationRate;
+      if (r && r.alpha != null) this.energy.gyroSample(Math.hypot(r.alpha ?? 0, r.beta ?? 0, r.gamma ?? 0), performance.now());
+    });
     if (p.debug) {
       const bg = document.createElement('div');
       bg.className = 'debug-bg';
@@ -291,13 +307,23 @@ export class App {
       else if (s.echo === 'waiting') this.ui.micHintText('Говори — повторю!');
       if (s.asrState === 'idle' && !s.listening && s.echo === 'off') this.ui.micLevel(0);
     });
-    // уровень микрофона — плавно, по кадрам
-    const lvl = () => {
+    // уровень микрофона: ~15 раз в секунду и только при заметном изменении (раньше — стиль кнопки 60 раз в секунду
+    // всё время, пока микрофон открыт: пересчёт стилей и перерисовка слоя без нужды)
+    let lvlT = 0, lvlV = -1;
+    const lvl = (t: number) => {
       requestAnimationFrame(lvl);
-      if (e.mic.isOpen) this.ui.micLevel(e.mic.level);
+      if (!e.mic.isOpen || t - lvlT < 66) return;
+      lvlT = t;
+      const v = Math.round(e.mic.level * 20) / 20;
+      if (v !== lvlV) this.ui.micLevel((lvlV = v));
     };
-    lvl();
+    requestAnimationFrame(lvl);
+    e.on('state', (s) => {
+      this.voiceBusy = s.catSpeaking || s.listening;
+      if (s.listening) this.energy.activity(performance.now(), false);
+    });
     e.on('text', ({ text, source }) => {
+      this.energy.activity(performance.now());
       if (source === 'asr') this.ui.micHintText(`«${text}»`);
       this.input?.activity();
       this.director.text(text);
@@ -378,20 +404,82 @@ export class App {
 
   /** адаптивное качество: чёткость рендера, слои меха, частота трекера */
   private applyQuality(lvl: QualityLevel, i: number) {
-    const pr = Math.min(Math.min(2, window.devicePixelRatio || 1), lvl.dprCap);
+    const pr = Math.min(this.basePr(), lvl.dprCap);
     if (Math.abs(this.renderer.getPixelRatio() - pr) > 1e-3) {
       this.renderer.setPixelRatio(pr);
       if (this.tracker) this.resize();
     }
     if (this.character) void import('./character/furShell').then((m) => m.setFurQuality(this.character.object, lvl.fur));
-    const t = this.tracker as unknown as { maxHz?: number } | undefined;
-    if (t && 'maxHz' in t) t.maxHz = lvl.trackerHz;
+    this.qualityTrackerHz = lvl.trackerHz; // вместе с энергобюджетом — в frame()
     if (i > 0 || this.loggedQ) {
       this.loggedQ = true;
       this.director?.log(`качество: уровень ${i} (pixelRatio ${pr.toFixed(2)}, мех ×${lvl.fur}, трекер ${lvl.trackerHz || '—'} Гц)`);
     }
   }
   private loggedQ = false;
+  private qualityTrackerHz = 0;
+  private voiceBusy = false;
+  /** холст уже очищен кадром без кота — следующие пустые кадры не рисуем */
+  private blankDrawn = false;
+  private lastView: unknown = null;
+  private lastViewQuad: { x: number; y: number }[] | null = null;
+  private lastViewT = 0;
+  private lostAt = -1e9;
+  private wasTracking = false;
+  private lastClip = 'idle';
+  private clipSince = 0;
+  private dozing = false;
+
+  /**
+   * Энергобюджет кадра: что сейчас происходит → частота рендера, потолок трекера.
+   * Кадры сверх частоты пропускаются целиком (логика тоже): шаг анимаций — реальное время между кадрами.
+   */
+  private energyTick(now: number) {
+    const tr = this.tracker as unknown as { view?: { quad: { x: number; y: number }[] } | null; isLocked?: boolean; stats?: { mode: string }; maxHz?: number; detectEvery?: number };
+    // скорость карты на экране — по новым углам от трекера
+    const v = tr.view;
+    if (v && v !== this.lastView) {
+      if (this.lastViewQuad && now > this.lastViewT) {
+        const q = v.quad, p = this.lastViewQuad;
+        const diag = Math.max(1, Math.hypot(q[0].x - q[2].x, q[0].y - q[2].y));
+        let d = 0;
+        for (let k = 0; k < 4; k++) d = Math.max(d, Math.hypot(q[k].x - p[k].x, q[k].y - p[k].y));
+        this.energy.quadSample(d / diag / ((now - this.lastViewT) / 1000));
+      }
+      this.lastView = v;
+      this.lastViewQuad = v.quad.map((p) => ({ x: p.x, y: p.y }));
+      this.lastViewT = now;
+    }
+    if (this.wasTracking && !this.tracker.isTracking) this.lostAt = now;
+    this.wasTracking = this.tracker.isTracking;
+    const ch = this.character;
+    const clip = ch?.currentClip ?? 'idle';
+    if (clip !== this.lastClip) {
+      this.lastClip = clip;
+      this.clipSince = now;
+    }
+    // реакция (не idle-вариант и не сон) — первые 4 с клипа; длинные петли (танец, сон) дальше идут на обычной частоте
+    const reacting = !/^idle|sleep/.test(clip) && now - this.clipSince < 4000;
+    const fxLive = this.fx.parts.list.length > 0 || this.fx.activeIds.some((id) => id !== 'listen_ears' && id !== 'echo_wave');
+    const action = reacting || this.stage.walking || fxLive || this.fx.isPeeling || !!this.input?.touch.isStroking;
+    const out = this.energy.update({
+      now,
+      catVisible: this.stage.root.visible,
+      action,
+      talking: this.voiceBusy,
+      locked: !!tr.isLocked && this.tracker.isTracking,
+      trouble: (!this.tracker.isTracking && now - this.lostAt < 3000) || tr.stats?.mode === 'plane',
+    });
+    if ((out.mode === 'doze') !== this.dozing) {
+      this.dozing = out.mode === 'doze';
+      this.director?.log(this.dozing ? 'энергия: кот дремлет (60 с без касаний, речи и движения) — минимальные частоты' : 'энергия: проснулся');
+    }
+    if ('maxHz' in tr) {
+      const q = this.qualityTrackerHz, e = out.trackerHz;
+      tr.maxHz = q && e ? Math.min(q, e) : q || e;
+      tr.detectEvery = out.detectEvery;
+    }
+  }
 
   /** модели других характеров — в HTTP-кэш, когда кот уже на экране и сеть свободна (смена образа без ожидания) */
   private warmed = false;
@@ -442,6 +530,7 @@ export class App {
 
   private bindInput() {
     const i = this.input, d = this.director;
+    i.on('activity', () => this.energy.activity(performance.now()));
     i.on('tap_cat', (p) => this.touchCat(p.event, p));
     i.on('poke_combo', (p) => this.touchCat('poke_combo', p));
     i.on('poke_hard', (p) => this.touchCat('poke_hard', p));
@@ -524,11 +613,15 @@ export class App {
   }
 
   private frame() {
+    const now = performance.now();
+    this.energyTick(now);
+    if (!this.energy.due(now)) return;
+    perf.count('logic');
     perf.beginFrame();
     perf.section('tracker');
     const raw = this.clock.getDelta();
-    const dt = Math.min(0.05, raw);
-    this.quality.tick(raw);
+    const dt = Math.min(this.energy.maxDt, raw);
+    this.quality.tick(raw, this.energy.out.renderFps);
     this.elapsed += dt;
     this.frames++;
     this.fpsT += dt;
@@ -565,7 +658,13 @@ export class App {
     this.fx.draw();
     this.onFrame(dt);
     perf.section('render');
-    this.renderer.render(this.scene, this.tracker.camera);
+    // кота (и его тени) на экране нет: один кадр — очистить холст, дальше GPU не трогаем
+    const empty = !this.stage.root.visible && !this.stage.shadow.visible && this.params.tracker !== 'webxr';
+    if (!empty || !this.blankDrawn) {
+      this.renderer.render(this.scene, this.tracker.camera);
+      perf.count('render');
+    }
+    this.blankDrawn = empty;
     perf.endFrame();
     perf.mark('loop');
     if (this.stage.root.visible && !this.warmed) {
@@ -573,4 +672,10 @@ export class App {
       this.warmOthers();
     }
   }
+}
+
+function makeEnergy(): EnergyBudget {
+  const q = new URLSearchParams(typeof location !== 'undefined' ? location.search : '');
+  const e = q.get('energy');
+  return new EnergyBudget({ enabled: e === '1' || (e !== '0' && isMobileDevice()), fixedFps: Number(q.get('fps')) || 0, now: performance.now() });
 }

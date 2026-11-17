@@ -20,6 +20,8 @@ export interface CardWorkerIn {
   lock?: boolean;
   /** где карта должна быть (кадр детектора), пока её не видно */
   hint?: { x: number; y: number }[] | null;
+  /** энергобюджет: полный поиск раз в N кадров (кот посажен, телефон неподвижен — реже) */
+  detectEvery?: number;
 }
 export interface CardWorkerOut {
   quad: { x: number; y: number }[] | null;
@@ -37,6 +39,7 @@ self.onmessage = (e: MessageEvent<CardWorkerIn>) => {
   }
   if (m.lock !== undefined) det.locked = m.lock;
   if (m.hint !== undefined) det.hint = (m.hint as never) ?? null;
+  if (m.detectEvery) det.params.detectEvery = m.detectEvery;
   let out: CardWorkerOut;
   if (m.frame) {
     const px = readFrame(m.frame, m.w, m.h);

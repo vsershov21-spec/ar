@@ -19,12 +19,19 @@ export interface FurParams {
 
 const DEF: FurParams = { layers: 4, density: 150, tip: [1.06, 1.06, 1.08] };
 
-/** слабое устройство: меньше слоёв */
+/**
+ * Число оболочек: телефон — 2 (каждая оболочка — ещё один проход скинованного тела с discard: GPU и нагрев),
+ * слабое устройство — тоже не больше 2, ПК — все. ?fur=N — вручную (сравнить на телефоне: ?fur=4).
+ */
 export function furLayersFor(n: number) {
   const nav = typeof navigator !== 'undefined' ? navigator : undefined;
+  const q = typeof location !== 'undefined' ? Number(new URLSearchParams(location.search).get('fur')) : NaN;
+  if (q >= 1) return Math.min(8, Math.round(q));
   const cores = nav?.hardwareConcurrency ?? 8;
   const mem = (nav as { deviceMemory?: number } | undefined)?.deviceMemory ?? 8;
-  return cores <= 4 || mem <= 3 ? Math.max(2, n - 2) : n;
+  const ua = nav?.userAgent ?? '';
+  const mobile = /iPhone|iPad|iPod|Android|Mobile/i.test(ua) || (/Macintosh/.test(ua) && (nav?.maxTouchPoints ?? 0) > 1);
+  return mobile || cores <= 4 || mem <= 3 ? Math.min(n, 2) : n;
 }
 
 export function buildFurShells(model: THREE.Object3D, body?: THREE.MeshStandardMaterial): THREE.SkinnedMesh[] {

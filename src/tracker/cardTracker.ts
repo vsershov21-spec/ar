@@ -83,7 +83,8 @@ export class CardTracker extends TrackerBase implements Tracker {
     if (!navigator.mediaDevices?.getUserMedia) throw new Error('no-getusermedia');
     const stream = await navigator.mediaDevices.getUserMedia({
       audio: false,
-      video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
+      // 720p и 30 к/с: больше трекеру (320 px) и экрану не нужно, а камера 60 к/с / 4K греет телефон
+      video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } },
     });
     await new Promise<void>((resolve) => {
       video.addEventListener('loadedmetadata', () => resolve(), { once: true });
@@ -180,6 +181,8 @@ export class CardTracker extends TrackerBase implements Tracker {
    * (адаптивное качество на слабых телефонах, 0 — без потолка).
    */
   maxHz = 0;
+  /** энергобюджет: полный поиск карты раз в N кадров трекера (0 — по умолчанию детектора) */
+  detectEvery = 0;
   private frameSeq = 0;
   private sentSeq = -1;
   private rvfc = false;
@@ -243,6 +246,7 @@ export class CardTracker extends TrackerBase implements Tracker {
 
   private message(rgba: ArrayBuffer): CardWorkerIn {
     const msg: CardWorkerIn = { rgba, w: this.dw, h: this.dh, focal: this.K.f, lock: this.locked };
+    if (this.detectEvery > 0) msg.detectEvery = this.detectEvery;
     // карты не видно, кот держится по гироскопу: подсказываем детектору, где её ждать (только там её и примем)
     if (this.locked) msg.hint = this.isTracking ? null : this.heldQuad();
     return msg;
@@ -255,6 +259,7 @@ export class CardTracker extends TrackerBase implements Tracker {
       return;
     }
     perf.add('tracker.worker', r.ms);
+    perf.count('tracker');
     this.stats.ms = r.ms;
     this.stats.score = r.score;
     this.stats.mode = r.mode;

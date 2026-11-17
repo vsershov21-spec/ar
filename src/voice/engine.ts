@@ -103,6 +103,9 @@ export class VoiceEngine extends Emitter<EngineEvents> {
   /** текущая фраза: почему слушали, сколько длился голос (VAD), — для classifyUtterance */
   private utter = { reason: null as ListenReason, speechMs: 0 };
   private lastUnknownAt = -1e9;
+  /** энергия: в окне ответа звук идёт в распознаватель, только пока в микрофоне есть голос (до этой отметки, мс) */
+  private voiceUntil = 0;
+  private readonly asrGate = () => this.vad.speaking || performance.now() < this.voiceUntil;
   private st = { asrState: 'idle' as AsrState, modelProgress: 0, lastText: '', lastIntent: '', lastConfidence: 0, lastEvent: '' };
   /** пресет повтора текущего характера (app.ts: из persona.voice) */
   echoPreset: () => EchoPreset = () => ({ echoPitchSemitones: 5, echoRate: 1.05 });
@@ -209,6 +212,8 @@ export class VoiceEngine extends Emitter<EngineEvents> {
     // VAD уже насчитал начало фразы (120 мс) до старта распознавания
     this.utter = { reason, speechMs: reason === 'vad' || reason === 'barge' ? this.vad.durMs : 0 };
     this.asr.paused = this.selfMuted;
+    // окно ответа (кот спросил и ждёт до 8 с): тишину в Vosk не гоним — распознавание только с голосом
+    this.asr.gate = reason === 'window' ? this.asrGate : null;
     this.audio.duck(true, 'mic');
     this.asr.start(reason === 'barge' || reason === 'vad' ? this.ring.slice() : undefined);
     this.pushState();
@@ -330,6 +335,9 @@ export class VoiceEngine extends Emitter<EngineEvents> {
         continue;
       }
       if (this.selfMuted) continue;
+      // лёгкий порог для распознавания в окне ответа: ниже порога VAD (+6 дБ над шумом), чтобы тихое «да» не терялось
+      const fd = db(f.rms);
+      if (fd > this.mic.floor.floorDb + 6 && fd > -58) this.voiceUntil = performance.now() + 700;
       this.mic.floor.push(f, this.vad.speaking);
       const ev = this.vad.push(f);
       if (ev?.type === 'start' && !this.echo.active) {
