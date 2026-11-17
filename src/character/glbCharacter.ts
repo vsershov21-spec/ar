@@ -12,7 +12,8 @@ import type { Character, ClipName, Emote, PlayOptions, TouchZone } from './types
 import { procFor, type ProcPose } from './procedural';
 import type { Persona } from '../persona/types';
 import { asset, clamp } from '../core/util';
-import { VISEME_TO_BLENDSHAPES, type MouthShape, type Viseme } from '../lipsync/visemes';
+import { type MouthShape, type Viseme } from '../lipsync/visemes';
+import { FaceLife } from './faceLife';
 import { ClipState } from './clipState';
 import { TailRig, type TailOutput } from './tailRig';
 import { PropRig } from './props';
@@ -115,6 +116,8 @@ export class GlbCharacter implements Character {
   private q = new THREE.Quaternion();
   private e = new THREE.Euler();
   private visemeW: Record<string, number> = {};
+  /** живость: микромимика в покое, движения головы во время речи, дыхание (faceLife.ts) */
+  readonly life = new FaceLife();
 
   constructor(private url = 'models/character.glb', private animsUrl?: string) {
     this.object.name = 'character-glb';
@@ -304,11 +307,13 @@ export class GlbCharacter implements Character {
     this.look = world ? world.clone() : null;
   }
 
+  /**
+   * Липсинк → блендшейпы. Берём не только доминирующую визему, а сглаженные параметры рта (open/wide/round —
+   * уже смешаны с коартикуляцией): рот открывается плавно и заметно, «О»/«У» — из округлости.
+   */
   setMouth(v: Viseme, w: number, shape: MouthShape) {
     this.mouth = clamp(shape.open, 0, 1);
-    const bs = VISEME_TO_BLENDSHAPES[v];
-    this.visemeW = {};
-    for (const key of ['mouth_A', 'mouth_E', 'mouth_O', 'mouth_U', 'mouth_M']) this.visemeW[key] = (bs[key] ?? 0) * w;
+    this.visemeW = FaceLife.mouthWeights(v, w, shape);
   }
 
   private applyPose(pose: ProcPose, w: number, root: THREE.Vector3, rootRot: THREE.Vector3, s: { v: number }) {
@@ -353,14 +358,15 @@ export class GlbCharacter implements Character {
       if (rot.x) this.inner.position.y += 0.5 - 0.5 * Math.cos(rot.x);
     }
 
-    // лицо: блендшейпы пресета + моргание + липсинк (mouth_* поверх)
+    // лицо: блендшейпы пресета + микромимика + моргание + липсинк (mouth_* поверх)
+    const lw = this.life.update(dt, { persona: this.personaId, preset: this.faceMix.preset, open: this.mouth, idle: cs.idleMode });
     for (const m of this.morphMeshes) {
       const d = m.morphTargetDictionary!;
       const inf = m.morphTargetInfluences!;
       for (const key of MORPH_TARGETS) {
         const i = d[key];
         if (i === undefined) continue;
-        let v = f.weights[key] ?? 0;
+        let v = Math.max(f.weights[key] ?? 0, lw[key] ?? 0);
         if (key === 'blink_L' || key === 'blink_R') v = Math.max(v, f.blink);
         if (key in this.visemeW) v = Math.max(v * 0.5, this.visemeW[key]);
         inf[i] = v;
@@ -373,11 +379,28 @@ export class GlbCharacter implements Character {
 
     const head = this.bones.get('Head');
     if (head) {
+      // взгляд на камеру + движения головы во время речи — вокруг осей персонажа в мире
+      // (локальные оси кости Head у моделей Tripo повёрнуты: локальный X смотрит вперёд, поворот по нему — крен)
       const target = this.look ?? camera.getWorldPosition(new THREE.Vector3());
       const local = this.object.worldToLocal(target.clone());
       const yaw = clamp(Math.atan2(local.x, local.z), -0.6, 0.6);
       const pitch = clamp(Math.atan2(local.y - 0.85, Math.hypot(local.x, local.z)), -0.4, 0.4);
-      head.quaternion.multiply(this.q.setFromEuler(this.e.set(-pitch * 0.5, yaw * 0.6, 0)));
+      const mq = (this.model ?? this.object).getWorldQuaternion(this.tq2);
+      const up = this.tv.set(0, 1, 0).applyQuaternion(mq).clone();
+      const side = new THREE.Vector3(1, 0, 0).applyQuaternion(mq);
+      const fwd = new THREE.Vector3(0, 0, 1).applyQuaternion(mq);
+      const h = this.life.head;
+      const neck = this.bones.get('Neck');
+      // часть движения — шеей: голова не «отламывается»
+      if (neck) {
+        this.rotWorld(neck, up, yaw * 0.25 + h.yaw * 0.4);
+        this.rotWorld(neck, side, -(pitch * 0.15 + h.pitch * 0.4));
+      }
+      this.rotWorld(head, up, yaw * 0.4 + h.yaw * 0.6);
+      this.rotWorld(head, side, -(pitch * 0.35 + h.pitch * 0.6));
+      this.rotWorld(head, fwd, h.roll);
+      const chest = this.bones.get('Spine2');
+      if (chest) this.rotWorld(chest, side, h.breath);
     }
   }
 
