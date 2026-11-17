@@ -308,6 +308,21 @@ class Front:
         return pos, nrm, uv
 
 
+def bleed(img, painted, empty, n=4):
+    """растянуть закраску на пустые тексели вокруг (поля островов атласа): иначе при фильтрации текстуры
+    по краям островов проступает старый цвет тонкой линией"""
+    done = painted.copy()
+    for _ in range(n):
+        acc = np.zeros(img.shape, np.float32); cnt = np.zeros(img.shape[:2], np.float32)
+        for dy, dx in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            sh = np.roll(done, (dy, dx), (0, 1))
+            acc += np.roll(img * done[..., None], (dy, dx), (0, 1)); cnt += sh
+        grow = (cnt > 0) & ~done & empty
+        img[grow] = acc[grow] / cnt[grow, None]
+        done |= grow
+    return img
+
+
 def sample_tex(img, uv):
     h, w = img.shape[:2]
     x = np.clip((uv[:, 0] % 1) * w, 0, w - 1).astype(int)
@@ -1031,6 +1046,8 @@ def paint_eyes(g, persona, F, eyes, P, N, UV, I, fr):
     fill *= (1 - 0.3 * sk)[:, None]
     k = region[yy, xx][:, None]
     base[yy, xx] = base[yy, xx] * (1 - k) + fill * k
+    painted = np.zeros(base.shape[:2], bool); painted[yy, xx] = region[yy, xx] > 0.5
+    base = bleed(base, painted, tid < 0)
     g.set_image(i_base, Image.fromarray(np.clip(base, 0, 255).astype(np.uint8)))
     g.jpeg_q[i_base] = 92
     # карты шероховатости и нормалей могут быть другого размера (стадия тела держит rm в 1024)
@@ -1111,6 +1128,63 @@ def merge_bake(g, persona, prefix, P, N, UV, I, hw_v):
     print(f'  запечённое с high-poly: голова {int(head.sum())} текселей, мех {len(idx[0])}')
 
 
+# рот нарисован Tripo приоткрытым (у Блёстки): закрасить мехом и провести тонкую линию рта — полость открывает накладка Mouth
+PAINT_MOUTH = {'glitter': {'below': 0.03, 'above': 0.004, 'line': (84, 56, 80)}}
+
+
+def paint_mouth(g, persona, F, P, N, UV, I, fr):
+    cfg = PAINT_MOUTH.get(persona)
+    if not cfg:
+        return
+    mi, pr = g.main_mesh()
+    mat = g.j['materials'][pr['material']]
+    i_base = g.j['textures'][mat['pbrMetallicRoughness']['baseColorTexture']['index']]['source']
+    base = np.asarray(g.image(i_base).convert('RGB')).astype(np.float32)
+    S = base.shape[0]
+    key = f'/tmp/face_detail_{persona}_{S}_{len(P)}_{float(np.abs(P).sum()):.4f}.npz'
+    if os.path.exists(key):
+        d = np.load(key); pos, tid = d['pos'], d['tid']
+    else:
+        pos, nrm_, tid = raster_uv(P, N, UV, I, S)
+        np.savez_compressed(key, pos=pos, tid=tid)
+    m = F['mouth']
+    ML = np.array(m['line']); ML = ML[np.argsort(ML[:, 0])]
+    x0, x1 = ML[0, 0] - 0.004, ML[-1, 0] + 0.004
+    px, py, pz = pos[..., 0], pos[..., 1], pos[..., 2]
+    near = (tid >= 0) & (px > x0 - 0.02) & (px < x1 + 0.02) & (py > ML[:, 1].min() - cfg['below'] - 0.02) & (py < ML[:, 1].max() + 0.02)
+    idx = np.where(near)
+    fpos, _, _ = fr.hit(np.stack([px[idx], py[idx]], 1))
+    front = (np.abs(fpos[:, 2] - pz[idx]) < 0.004) | (pz[idx] > m['center3'][1] * -1 - 0.03)
+    yy, xx = idx[0][front], idx[1][front]
+    X, Y = px[yy, xx], py[yy, xx]
+    ly = np.interp(np.clip(X, ML[0, 0], ML[-1, 0]), ML[:, 0], ML[:, 1])
+    dx = np.maximum(x0 - X, X - x1)
+    dy = np.maximum(Y - ly - cfg['above'], ly - cfg['below'] - Y)
+    dout = np.maximum(dx, dy)
+    inside = dout < 0.002
+    ring = (dout > 0.003) & (dout < 0.008)
+    rc = base[yy[ring], xx[ring]]; rp = np.stack([X[ring], Y[ring]], 1)
+    ok = rc[:, 2] > rc[:, 0] + 6  # только мех (голубоватый), без розовых губ вокруг
+    rc, rp = rc[ok], rp[ok]
+    q = np.stack([X[inside], Y[inside]], 1)
+    d2 = ((q[:, None, :] - rp[None]) ** 2).sum(-1)
+    w = 1 / (d2 + 1e-6) ** 1.5
+    fill = (w[..., None] * rc[None]).sum(1) / w.sum(1, keepdims=True)
+    k = (1 - smooth(-0.001, 0.002, dout[inside]))[:, None]
+    yi, xi = yy[inside], xx[inside]
+    col = base[yi, xi] * (1 - k) + fill * k
+    # тонкая линия рта по нарисованной линии (кривая «ω» Tripo)
+    dl = np.abs(Y[inside] - ly[inside]) + np.maximum(dx[inside], 0)
+    lk = (1 - smooth(0.0005, 0.0013, dl))[:, None] * ((X[inside] > ML[0, 0] - 0.001) & (X[inside] < ML[-1, 0] + 0.001))[:, None]
+    col = col * (1 - lk * 0.85) + np.array(cfg['line'], np.float32) * lk * 0.85
+    base[yi, xi] = col
+    painted = np.zeros(base.shape[:2], bool); painted[yi, xi] = True
+    base = bleed(base, painted, tid < 0)
+    g.set_image(i_base, Image.fromarray(np.clip(base, 0, 255).astype(np.uint8)))
+    g.jpeg_q[i_base] = 92
+    print(f'  закраска нарисованного рта: {int(inside.sum())} текселей')
+
+
 def main():
     persona, src, dst = sys.argv[1:4]
     bake = sys.argv[sys.argv.index('--bake') + 1] if '--bake' in sys.argv else None
@@ -1144,6 +1218,7 @@ def main():
     if bake:
         merge_bake(g, persona, bake, P, N, UV, I, (Wt * (Jt == head_j)).sum(1))
     paint_eyes(g, persona, F, eyes, P, N, UV, I, fr)
+    paint_mouth(g, persona, F, P, N, UV, I, fr)
     j.setdefault('asset', {}).setdefault('extras', {})[TAG] = VERSION
     total = g.save(dst)
     print(f'{persona}: → {dst} {total / 1e6:.2f} MB')
