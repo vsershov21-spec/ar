@@ -30,7 +30,7 @@ const V = (a: number[]) => new THREE.Vector3(a[0], a[1], a[2]);
 export class FaceWrinkles {
   readonly uniforms = {
     uWrA: { value: new THREE.Vector4() }, // смех/прищур, нос, между бровей, улыбка
-    uWrB: { value: new THREE.Vector4() }, // брови вверх, щёки вверх, —, общий масштаб
+    uWrB: { value: new THREE.Vector4() }, // брови вверх, щёки вверх, румянец, общий масштаб
     uWrEyeL: { value: new THREE.Vector3() },
     uWrEyeR: { value: new THREE.Vector3() },
     uWrBotL: { value: new THREE.Vector3() },
@@ -80,6 +80,7 @@ export class FaceWrinkles {
     this.uniforms.uWrA.value.set(laugh, Math.max(g('nose_wrinkle'), 0.5 * g('brow_down')), g('brow_down'), Math.max(g('smile'), 0.7 * g('smirk')));
     this.uniforms.uWrB.value.x = g('brow_up');
     this.uniforms.uWrB.value.y = Math.max(g('cheek_up'), 0.8 * g('eyes_laugh'));
+    this.uniforms.uWrB.value.z = g('blush');
   }
 
   private patch(m: THREE.MeshStandardMaterial) {
@@ -158,6 +159,20 @@ vec3 wrPerturb(vec3 surfPos, vec3 n, float fd, float hh) {
 }
 ` +
         sh.fragmentShader.replace(
+          '#include <map_fragment>',
+          `#include <map_fragment>
+  if (uWrB.z > 0.01) {
+    // румянец: мягкие розовые пятна на щеках (как на референсе — крупнее накладки Blush)
+    float s = uWrB.w;
+    float bl = 0.0;
+    for (int i = 0; i < 2; i++) {
+      vec3 bc = i == 0 ? uWrBotL : uWrBotR;
+      vec2 c = (vWrP.xy - (bc.xy + vec2((i == 0 ? 1.0 : -1.0) * 0.012 * s, -0.026 * s))) / s;
+      bl += exp(-pow(c.x / 0.03, 2.0) - pow(c.y / 0.018, 2.0));
+    }
+    diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.98, 0.42, 0.5) * 0.95, clamp(bl, 0.0, 1.0) * 0.55 * uWrB.z * step(0.0, vWrP.z - uWrMouthL.z + 0.04));
+  }`,
+        ).replace(
           '#include <normal_fragment_maps>',
           `#include <normal_fragment_maps>
   if (uWrA.x + uWrA.y + uWrA.z + uWrA.w + uWrB.x + uWrB.y > 0.02 && vWrP.y > uWrMouthL.y - 0.05) {
@@ -168,7 +183,7 @@ vec3 wrPerturb(vec3 surfPos, vec3 n, float fd, float hh) {
         );
     };
     const prevKey = m.customProgramCacheKey?.bind(m);
-    m.customProgramCacheKey = () => (prevKey ? prevKey() : '') + '|face-wrinkles-v1';
+    m.customProgramCacheKey = () => (prevKey ? prevKey() : '') + '|face-wrinkles-v2';
     m.needsUpdate = true;
   }
 }

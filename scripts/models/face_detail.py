@@ -41,7 +41,7 @@ IRIS = {
     'kind': ((24, 78, 40), (64, 156, 70), (156, 216, 104)),
     'glitter': ((18, 70, 40), (46, 150, 78), (140, 220, 120)),
 }
-BROW = {'hooligan': {'dark': 0.45, 'thick': 0.95}, 'kind': {'dark': 0.5, 'thick': 0.8}, 'glitter': {'dark': 0.55, 'thick': 0.7}}
+BROW = {'hooligan': {'dark': 0.42, 'thick': 1.0}, 'kind': {'dark': 0.46, 'thick': 0.9}, 'glitter': {'dark': 0.5, 'thick': 0.8}}
 # радужка: диаметр в долях высоты разреза (референс — радужка заметно меньше разреза, белок виден)
 IRIS_K = {'hooligan': 0.9, 'kind': 0.78, 'glitter': 0.8}
 
@@ -685,7 +685,7 @@ def build_brows(g, persona, F, fr, base_lin, eyes, head_node, IBM, marks=None):
                 wi = (1 - t) ** 1.3
                 allpts['brow_up'].append(p + np.array([inner * 0.0015 * s * wi, 0.012 * s * (1 - 0.3 * t)]))
                 allpts['brow_down'].append(p + np.array([inner * 0.004 * s * wi, -0.009 * s * wi - 0.0015 * s]))
-                allpts['brow_sad'].append(p + np.array([inner * 0.002 * s * wi, 0.011 * s * wi - 0.004 * s * t ** 1.5]))
+                allpts['brow_sad'].append(p + np.array([inner * 0.003 * s * wi, 0.016 * s * wi - 0.005 * s * t ** 1.5]))
                 C.append((v, t))
         pos = {}
         for k, pts in allpts.items():
