@@ -570,3 +570,4 @@ body > .toast { position: fixed; }
 @media (prefers-reduced-motion: reduce) { .coach-hand, .chips.attn .act-ico { animation: none; } }
 @media (orientation: landscape) and (max-height: 520px) { .act { width: 56px; } .act-ico { width: 46px; height: 46px; } .act-ico svg { width: 24px; height: 24px; } }
 .stack:has(.kids-sheet:not(.hidden)) .kids, .stack:has(.kids-sheet:not(.hidden)) .chips { display: none; }
+@media (max-height: 700px) and (orientation: portrait) { .act { width: 56px; font-size: 11px; } .act-ico { width: 46px; height: 46px; } .act-ico svg { width: 24px; height: 24px; } }

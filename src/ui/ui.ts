@@ -372,7 +372,9 @@ export class UI {
       // палец гладит по голове-спине: чуть ниже центра головы, подпись — над панелью действий
       const x = r ? r.cx : W / 2, y = r ? r.headY + (r.bottom - r.headY) * 0.18 : H * 0.42;
       c.style.left = `${Math.round(Math.max(70, Math.min(W - 70, x)))}px`;
-      c.style.top = `${Math.round(Math.max(120, Math.min(H - 300, y)))}px`;
+      // подпись не налезает на панель действий (маленькие экраны)
+      const panelTop = this.chips.classList.contains('hidden') ? H - 200 : this.chips.getBoundingClientRect().top - this.root.getBoundingClientRect().top;
+      c.style.top = `${Math.round(Math.max(110, Math.min(panelTop - 100, y)))}px`;
     };
     place();
     c.classList.remove('hidden');
