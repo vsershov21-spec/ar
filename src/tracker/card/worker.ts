@@ -14,6 +14,10 @@ export interface CardWorkerIn {
   focal: number;
   debug?: boolean;
   reset?: boolean;
+  /** кот посажен: держаться этой карты */
+  lock?: boolean;
+  /** где карта должна быть (кадр детектора), пока её не видно */
+  hint?: { x: number; y: number }[] | null;
 }
 export interface CardWorkerOut {
   quad: { x: number; y: number }[] | null;
@@ -29,6 +33,8 @@ self.onmessage = (e: MessageEvent<CardWorkerIn>) => {
     det.reset();
     if (m.w <= 1) return; // только сброс (сменился размер кадра) — без ответа
   }
+  if (m.lock !== undefined) det.locked = m.lock;
+  if (m.hint !== undefined) det.hint = (m.hint as never) ?? null;
   let out: CardWorkerOut;
   try {
     const r = det.process(new Uint8ClampedArray(m.rgba), m.w, m.h, { focal: m.focal });

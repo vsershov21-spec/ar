@@ -10,7 +10,7 @@
 import * as THREE from 'three';
 import { TrackerBase } from './base';
 import type { Tracker } from './types';
-import { CARD_ASPECT, labelCard, poseFromQuad, type Intrinsics, type Pose, type Pt, type Quad } from './card/geometry';
+import { CARD_ASPECT, labelCard, poseFromQuad, quadDiag, type Intrinsics, type Pose, type Pt, type Quad } from './card/geometry';
 import { focalFromFov } from './card/detector';
 import type { CardWorkerIn, CardWorkerOut } from './card/worker';
 import { CardOverlay } from './card/overlay';
@@ -57,8 +57,8 @@ export class CardTracker extends TrackerBase implements Tracker {
 
   constructor(private container: HTMLElement) {
     super();
-    // кот держится по поверхности и гироскопу; «карта потеряна» (кот спрашивает, где карта) — только после 2,5 с
-    this.lostDebounceMs = 2500;
+    // кот посажен и держится по поверхности и гироскопу; «карта потеряна» (кот спрашивает, где карта) — только после 6 с
+    this.lostDebounceMs = 6000;
     this.overlay = new CardOverlay(container);
   }
 
@@ -147,7 +147,9 @@ export class CardTracker extends TrackerBase implements Tracker {
       this.ctx.drawImage(v, 0, 0, this.dw, this.dh);
       const img = this.ctx.getImageData(0, 0, this.dw, this.dh);
       this.busy = true;
-      const msg: CardWorkerIn = { rgba: img.data.buffer as ArrayBuffer, w: this.dw, h: this.dh, focal: this.K.f };
+      const msg: CardWorkerIn = { rgba: img.data.buffer as ArrayBuffer, w: this.dw, h: this.dh, focal: this.K.f, lock: this.locked };
+      // карты не видно, кот держится по гироскопу: подсказываем детектору, где её ждать (только там её и примем)
+      if (this.locked) msg.hint = this.isTracking ? null : this.heldQuad();
       this.worker.postMessage(msg, [msg.rgba]);
     }
     requestAnimationFrame(this.pump);
@@ -173,17 +175,25 @@ export class CardTracker extends TrackerBase implements Tracker {
       if (pose && (pose.err > 4 || pose.t[2] > -0.5)) pose = null; // перепроецирование плохое или «карта за камерой»
     }
     if (pose && quad) {
+      // качество перед посадкой: несколько кадров подряд с маленькой ошибкой и без дрожания углов
+      const jitter = this.prevQuad ? Math.max(...quad.map((p, i) => Math.hypot(p.x - this.prevQuad![i].x, p.y - this.prevQuad![i].y))) / quadDiag(quad) : 1;
       this.prevQuad = quad;
       this.orientRef = quad;
       this.orientAt = performance.now();
       this.misses = 0;
+      if (!this.locked) {
+        this.stable = pose.err < 2.5 && jitter < 0.04 ? this.stable + 1 : 0;
+        if (this.stable < LOCK_FRAMES) return;
+        this.locked = true;
+      }
       this.hits++;
       this.target = poseMatrix(pose);
       this.view = { quad: quad.map((p) => this.toScreen(p)) as Quad, pose, project: (x, y) => this.projectModel(pose!, x, y) };
-      if (this.hits >= 2) this.setFound(true);
+      this.setFound(true);
       if (this.isTracking) this.overlay.track(this.view);
     } else {
       this.hits = 0;
+      this.stable = 0;
       this.misses++;
       if (this.misses >= 8) {
         this.prevQuad = null;
@@ -192,6 +202,38 @@ export class CardTracker extends TrackerBase implements Tracker {
         this.overlay.lost();
       }
     }
+  }
+
+  /** кот посажен на карту — новые прямоугольники его не утаскивают */
+  private locked = false;
+  private stable = 0;
+  get isLocked() {
+    return this.locked;
+  }
+
+  /** «Пересадить кота»: забыть карту и посадить заново на ту, что сейчас в кадре (кот держится на месте, пока не найдём) */
+  reanchor() {
+    this.locked = false;
+    this.stable = 0;
+    this.prevQuad = null;
+    this.orientRef = null;
+    if (this.isTracking) this.setFound(false);
+    this.overlay.lost();
+    this.overlay.forgetRecent();
+    this.worker?.postMessage({ rgba: new ArrayBuffer(4), w: 1, h: 1, focal: 1, reset: true, lock: false });
+  }
+
+  /** где карта сейчас по удерживаемой (гироскоп) позе якоря — в пикселях кадра детектора */
+  private heldQuad(): Pt[] | null {
+    const m = this.anchor.matrix.elements;
+    const hw = 0.5, hh = 0.5 / CARD_ASPECT;
+    const out: Pt[] = [];
+    for (const [X, Y] of [[-hw, hh], [hw, hh], [hw, -hh], [-hw, -hh]]) {
+      const x = m[0] * X + m[4] * Y + m[12], y = m[1] * X + m[5] * Y + m[13], z = m[2] * X + m[6] * Y + m[14];
+      if (z > -1e-3) return null;
+      out.push({ x: this.K.cx + (this.K.f * x) / -z, y: this.K.cy - (this.K.f * y) / -z });
+    }
+    return out;
   }
 
   /** px кадра детектора → px экрана (видео растянуто object-fit: cover и отцентровано) */
@@ -239,6 +281,9 @@ export class CardTracker extends TrackerBase implements Tracker {
 }
 
 /** поза (R — столбцы осей карты в системе камеры, t — центр, единица = ширина карты) → матрица якоря */
+/** сколько устойчивых кадров подряд нужно, чтобы посадить кота (~0,3 с) */
+const LOCK_FRAMES = 6;
+
 export function poseMatrix(p: Pose): THREE.Matrix4 {
   const R = p.R, t = p.t;
   return new THREE.Matrix4().set(R[0], R[1], R[2], t[0], R[3], R[4], R[5], t[1], R[6], R[7], R[8], t[2], 0, 0, 0, 1);

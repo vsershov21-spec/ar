@@ -180,7 +180,13 @@ export class CardDetector {
   }
 
   /** забыть прошлый кадр (сброс трекинга) */
+  /** Кот посажен: новые прямоугольники в кадре кота не утаскивают. Возврат к карте — только рядом с ожидаемым местом
+   *  (hint — где карта должна быть по гироскопу), пересадка — только явно (reset). */
+  locked = false;
+  hint: Quad | null = null;
   reset() {
+    this.locked = false;
+    this.hint = null;
     this.lastH = null;
     this.anchored = false;
     this.planeFrames = 0;
@@ -249,6 +255,17 @@ export class CardDetector {
       detectOut = this.detect();
       this.sinceDetect = 0;
       let d: Candidate | undefined = detectOut.candidates[0];
+      if (d && this.locked) {
+        // посаженный кот: принимаем только «ту же» карту — рядом с текущей/ожидаемой позицией и того же размера
+        const ref = best ? best.quad : this.hint;
+        if (!ref) d = undefined;
+        else {
+          const dq = alignQuad(d.quad, ref);
+          const a0 = Math.abs(signedArea(ref)), a1 = Math.abs(signedArea(dq));
+          const near = quadDistance(dq, ref) < (best ? 0.35 : 0.6) * quadDiag(ref);
+          if (!near || a1 < a0 * 0.5 || a1 > a0 * 2) d = undefined;
+        }
+      }
       // карта ведётся по поверхности — чужой прямоугольник (книга, телефон) кота не утащит: только рядом с ожидаемым местом
       if (d && mode === 'plane' && best && quadDistance(alignQuad(d.quad, best.quad), best.quad) > 0.35 * quadDiag(best.quad)) d = undefined;
       if (d) {
@@ -269,7 +286,7 @@ export class CardDetector {
       this.anchored = true;
       this.planeFrames = 0;
     } else if (mode === 'plane') this.planeFrames++;
-    else this.anchored = false;
+    else if (!this.locked) this.anchored = false;
 
     const res: DetectResult = { quad: best ? best.quad : null, score: best ? best.score : 0, mode: best ? mode : 'none', ms: now() - t0, edgeThreshold: this.thr };
     if (opts.debug) {

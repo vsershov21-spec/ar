@@ -49,10 +49,16 @@ export abstract class TrackerBase {
       this.holding = true;
       this.lostAt = this.clock;
     } else {
+      const wasHolding = this.holding;
       this.holding = false;
-      // после потери — не «доезжаем» плавно из старой позы, а прыгаем сразу
-      this.pos.reset();
-      this.hasPose = false;
+      if (wasHolding && this.hasPose) {
+        // вернулись к той же карте: доезжаем плавно от удерживаемой позы, без скачка
+        this.anchor.matrix.decompose(this.cp, this.cq, this.cs);
+        this.pos.reset();
+      } else {
+        this.pos.reset();
+        this.hasPose = false;
+      }
       if (this.lostAt !== null) {
         this.lostAt = null; // короткое моргание — событий нет
         return;

@@ -127,6 +127,11 @@ export class App {
       onWake: () => void this.wake(),
       onMicDown: () => this.engine.pttDown(),
       onMicUp: () => this.engine.pttUp(),
+      onReanchor: () => {
+        const t = this.tracker as unknown as { reanchor?: () => void };
+        t.reanchor?.();
+        this.ui.toast('Наведи камеру на карту и подержи телефон ровно — пересажу кота', 3000);
+      },
       onMicMode: (m) => {
         this.engine.setMode(m);
         if (m === 'auto') this.engine.resumeAuto();
@@ -148,6 +153,7 @@ export class App {
       },
     }, { micSupported: this.engine.asr.supported, posterUrl: posterUrl() });
     this.ui.setMicMode(this.engine.mode);
+    if (typeof (this.tracker as unknown as { reanchor?: unknown }).reanchor === 'function') this.tracker.onFound(() => this.ui.showReanchor(true));
 
     // пузырь реплик держится над котом / сбоку от головы, не закрывая морду
     this.ui.catRect = () => {

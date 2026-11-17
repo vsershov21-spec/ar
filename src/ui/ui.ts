@@ -17,6 +17,8 @@ export interface UiHandlers {
   onMute(m: boolean): void;
   /** «слушаю всегда» ↔ «по кнопке» */
   onMicMode(m: 'auto' | 'ptt'): void;
+  /** «Пересадить кота» на карту, которая сейчас в кадре */
+  onReanchor?(): void;
 }
 
 /** вариант в листе выбора характера */
@@ -59,6 +61,7 @@ const ICON = {
   shield: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.8 4.5 5.6v6.1c0 4.6 3.1 8.3 7.5 9.5 4.4-1.2 7.5-4.9 7.5-9.5V5.6z" fill="currentColor" stroke="none"/><path d="m8.6 12 2.4 2.4 4.6-4.8" stroke="#fff" stroke-width="2.4"/></svg>',
   kid: '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="9" r="4.2"/><path d="M4.5 21c.6-4 3.6-6.3 7.5-6.3s6.9 2.3 7.5 6.3z"/></svg>',
   adult: '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="7.5" r="4"/><path d="M3.5 22c.7-5 4.1-8 8.5-8s7.8 3 8.5 8z"/></svg>',
+  repin: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="13" width="16" height="7" rx="2"/><path d="M12 2.5v7M8.8 6.3 12 9.5l3.2-3.2"/></svg>',
   paw: '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><ellipse cx="12" cy="16" rx="5" ry="4.2"/><ellipse cx="5.5" cy="10.5" rx="2.1" ry="2.6"/><ellipse cx="9.5" cy="6.5" rx="2.1" ry="2.7"/><ellipse cx="14.5" cy="6.5" rx="2.1" ry="2.7"/><ellipse cx="18.5" cy="10.5" rx="2.1" ry="2.6"/></svg>',
   camoff: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7.5h3l2-2.5h8l2 2.5h3v11H3z"/><circle cx="12" cy="13" r="3.5"/><path d="M3 3l18 18"/></svg>',
 };
@@ -153,6 +156,7 @@ export class UI {
         </div>
       </div>
       <div class="scan hidden"><span>${ICON.paw}<em>Наведи камеру на карту</em></span></div>
+      <button class="iconbtn reanchor hidden" data-a="reanchor" type="button" aria-label="Пересадить кота">${ICON.repin}<span>Пересадить</span></button>
       <div class="bubble" role="status" aria-live="polite"><span class="who"></span><span class="txt"></span></div>
       <div class="stack">
         <div class="sheet name-sheet namebox hidden">
@@ -206,6 +210,7 @@ export class UI {
       const btn = (e.target as HTMLElement).closest('[data-a]') as HTMLElement | null;
       const a = btn?.getAttribute('data-a');
       if (a === 'wake') h.onWake();
+      if (a === 'reanchor') h.onReanchor?.();
       if (a === 'ob-next') this.obGo(this.obStep + 1);
       if (a === 'terms') this.start.querySelector('.terms')!.classList.remove('hidden');
       if (a === 'terms-close') this.start.querySelector('.terms')!.classList.add('hidden');
@@ -300,6 +305,11 @@ export class UI {
       const dx = e.clientX - x0, dy = e.clientY - y0;
       if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) this.obGo(this.obStep + (dx < 0 ? 1 : -1));
     });
+  }
+
+  /** кнопка «Пересадить» видна, когда кот на карте */
+  showReanchor(v: boolean) {
+    this.root.querySelector('.reanchor')?.classList.toggle('hidden', !v);
   }
 
   hideStart() {

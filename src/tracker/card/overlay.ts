@@ -62,6 +62,10 @@ export class CardOverlay {
   }
 
   private lostAt = -1e9;
+  /** пересадка: следующая находка — с полной анимацией */
+  forgetRecent() {
+    this.lostAt = -1e9;
+  }
   lost() {
     if (this.state !== 'search') this.lostAt = performance.now();
     this.view = null;

@@ -523,3 +523,9 @@ body > .toast { position: fixed; }
 .terms-body b { color: var(--green-text); }
 .terms-body .terms-note { color: var(--ink-2); font-size: 12px; }
 @media (max-height: 700px) { .art-safe .ava { width: 34px; height: 34px; } .art-safe .a-kid { width: 28px; height: 28px; } .art-safe .sf-fam { padding: 6px 10px; } }
+
+/* «Пересадить кота»: маленькая конфетная кнопка слева сверху */
+.iconbtn.reanchor { position: absolute; left: var(--edge); top: calc(var(--s-3) + var(--safe-t)); width: auto; height: 40px; padding: 0 14px 0 10px; border-radius: 999px;
+  display: inline-flex; gap: 6px; align-items: center; font-size: 13px; font-weight: 800; color: var(--green-text); z-index: 3; }
+.iconbtn.reanchor svg { width: 20px; height: 20px; color: var(--green); }
+.ui:has(.bubble.show) .iconbtn.reanchor { opacity: 0; pointer-events: none; }
