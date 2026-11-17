@@ -7,3 +7,4 @@ public/external/
 public/models/vosk-ru-small/
 scripts/voice/.tmp/
 public/voice/el/
+__pycache__/
