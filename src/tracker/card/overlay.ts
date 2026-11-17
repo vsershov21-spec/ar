@@ -163,6 +163,54 @@ export class CardOverlay {
     g.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
   }
 
+  /** карта видна, но кот ещё не посажен: пунктир по карте + прогресс «держи ровно» */
+  private cand: { pts: Pt[]; k: number; at: number } | null = null;
+  candidate(v: CardView, k: number) {
+    if (this.state !== 'search') return;
+    this.cand = { pts: v.quad, k: Math.max(0, Math.min(1, k)), at: performance.now() };
+  }
+  private drawCandidate() {
+    const c = this.cand;
+    if (!c || this.state !== 'search' || performance.now() - c.at > 250) return;
+    const g = this.g;
+    g.save();
+    g.lineJoin = 'round';
+    g.setLineDash([10, 8]);
+    g.lineDashOffset = -performance.now() / 40;
+    g.strokeStyle = 'rgba(255,255,255,0.9)';
+    g.lineWidth = 2.5;
+    path(g, c.pts);
+    g.stroke();
+    g.setLineDash([]);
+    // кольцо прогресса в центре карты
+    const cx = c.pts.reduce((s, p) => s + p.x, 0) / 4, cy = c.pts.reduce((s, p) => s + p.y, 0) / 4;
+    g.lineWidth = 5;
+    g.strokeStyle = 'rgba(255,255,255,0.35)';
+    g.beginPath();
+    g.arc(cx, cy, 20, 0, Math.PI * 2);
+    g.stroke();
+    g.strokeStyle = '#B5E36A';
+    g.lineCap = 'round';
+    g.beginPath();
+    g.arc(cx, cy, 20, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * c.k);
+    g.stroke();
+    // подпись
+    const text = 'Держи телефон ровно…';
+    g.font = '800 14px "SB Sans Text", system-ui, sans-serif';
+    const tw = g.measureText(text).width;
+    const top = c.pts.reduce((a, p) => (p.y < a.y ? p : a), c.pts[0]);
+    const y = Math.max(28, top.y - 22);
+    g.fillStyle = '#fff';
+    g.beginPath();
+    g.roundRect(cx - tw / 2 - 14, y - 14, tw + 28, 28, 14);
+    g.fill();
+    g.fillStyle = '#157a2c';
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.fillText(text, cx, y + 1);
+    g.restore();
+  }
+
   update(dt: number) {
     this.t += dt;
     const g = this.g;
@@ -179,6 +227,7 @@ export class CardOverlay {
       this.t = 0;
     }
     this.drawBurst(dt);
+    this.drawCandidate();
     let alpha = 0;
     let pts = this.outline();
     if (this.state === 'snap' && pts) {

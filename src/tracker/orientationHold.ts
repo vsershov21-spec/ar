@@ -32,8 +32,23 @@ export class OrientationHold {
     window.addEventListener('deviceorientation', (e) => {
       if (e.alpha == null || e.beta == null || e.gamma == null) return;
       const so = (screen.orientation?.angle ?? (window as any).orientation ?? 0) as number;
+      const prev = this.current ? this.current.clone() : null;
       this.current = deviceQuaternion(e.alpha, e.beta, e.gamma, so, this.current ?? new THREE.Quaternion());
+      const now = performance.now();
+      if (prev && this.lastT) {
+        const dt = Math.max(0.005, (now - this.lastT) / 1000);
+        const w = prev.angleTo(this.current) / dt;
+        this.speed += (w - this.speed) * 0.3;
+      }
+      this.lastT = now;
     });
+  }
+
+  /** угловая скорость телефона, рад/с (сглаженная); NaN — гироскопа нет */
+  private speed = 0;
+  private lastT = 0;
+  get angularSpeed() {
+    return this.current ? this.speed : NaN;
   }
 
   get available() {

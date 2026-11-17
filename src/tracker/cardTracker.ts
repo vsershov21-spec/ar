@@ -281,7 +281,11 @@ export class CardTracker extends TrackerBase implements Tracker {
       this.misses = 0;
       if (pose.err < 2) this.calibrate(quad);
       if (!this.locked) {
-        this.stable = pose.err < 2.5 && jitter < 0.04 ? this.stable + 1 : 0;
+        // телефон должен почти не двигаться (гироскоп), иначе кот сядет «с опозданием» мимо карты
+        const w = this.hold.angularSpeed;
+        const still = !(w > 0.6);
+        this.stable = pose.err < 2.5 && jitter < 0.04 && still ? this.stable + 1 : Math.max(0, this.stable - 2);
+        this.overlay.candidate({ quad: quad.map((p) => this.toScreen(p)) as Quad, pose, project: () => null }, this.stable / LOCK_FRAMES);
         if (this.stable < LOCK_FRAMES) return;
         this.locked = true;
       }
@@ -399,7 +403,7 @@ function grabFrame(v: HTMLVideoElement): VideoFrame | null {
 
 /** поза (R — столбцы осей карты в системе камеры, t — центр, единица = ширина карты) → матрица якоря */
 /** сколько устойчивых кадров подряд нужно, чтобы посадить кота (~0,3 с) */
-const LOCK_FRAMES = 6;
+const LOCK_FRAMES = 10;
 const FOCAL_KEY = 'ar.focal.v1';
 
 export function poseMatrix(p: Pose): THREE.Matrix4 {
