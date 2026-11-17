@@ -617,7 +617,7 @@ body > .toast { position: fixed; }
 .cat-item .act-ico { width: 54px; height: 54px; }
 .cat-item .act-ico svg { width: 28px; height: 28px; }
 .cat-phrase { min-height: 48px; }
-.cat-ui { white-space: nowrap; }
+.cat-ui { white-space: normal; max-width: 136px; text-align: left; line-height: 1.15; }
 .cat-sep[data-sec="more"] { color: var(--teal); }
 @media (max-width: 380px) and (orientation: portrait) { .stack .catalog { width: calc(100% + 16px); margin: 0 -8px; } }
 @media (max-height: 700px) and (orientation: portrait) {

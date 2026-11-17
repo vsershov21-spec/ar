@@ -201,6 +201,8 @@ const STATES = {
     await window_fast(page);
     // фейковый микрофон Chrome пищит — кот слышит «хлопки» и отвечает; в снимке — только тишина
     await page.evaluate(() => window.__voice?.mode?.('ptt'));
+    // визиты копятся в localStorage общего профиля браузера — для снимка «первый визит»
+    await page.evaluate(() => { const d = window.__app.director; d.state = { ...d.state, visits: 1 }; });
     await until(page, () => document.querySelector('.bubble.hint.show'), 25000);
     await shot(page, 'first_hint', vp);
   },
