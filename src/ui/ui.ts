@@ -56,6 +56,9 @@ const ICON = {
   hints: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5.5h16v10H10l-4.5 4v-4H4z"/><path d="M8 10.5h.01M12 10.5h.01M16 10.5h.01" stroke-width="3"/></svg>',
   lock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="10.5" width="14" height="10" rx="2.5"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/></svg>',
   cam: '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8h3.5l2-2.5h7l2 2.5H21v11H3z"/><circle cx="12" cy="13" r="3.5"/></svg>',
+  shield: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.8 4.5 5.6v6.1c0 4.6 3.1 8.3 7.5 9.5 4.4-1.2 7.5-4.9 7.5-9.5V5.6z" fill="currentColor" stroke="none"/><path d="m8.6 12 2.4 2.4 4.6-4.8" stroke="#fff" stroke-width="2.4"/></svg>',
+  kid: '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="9" r="4.2"/><path d="M4.5 21c.6-4 3.6-6.3 7.5-6.3s6.9 2.3 7.5 6.3z"/></svg>',
+  adult: '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="7.5" r="4"/><path d="M3.5 22c.7-5 4.1-8 8.5-8s7.8 3 8.5 8z"/></svg>',
   paw: '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><ellipse cx="12" cy="16" rx="5" ry="4.2"/><ellipse cx="5.5" cy="10.5" rx="2.1" ry="2.6"/><ellipse cx="9.5" cy="6.5" rx="2.1" ry="2.7"/><ellipse cx="14.5" cy="6.5" rx="2.1" ry="2.7"/><ellipse cx="18.5" cy="10.5" rx="2.1" ry="2.6"/></svg>',
   camoff: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7.5h3l2-2.5h8l2 2.5h3v11H3z"/><circle cx="12" cy="13" r="3.5"/><path d="M3 3l18 18"/></svg>',
 };
@@ -93,7 +96,7 @@ export class UI {
       <div class="screen start ob" data-step="0">
         <div class="ob-sky" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
         <div class="ob-track">
-          <section class="ob-slide" aria-label="Шаг 1 из 3">
+          <section class="ob-slide" aria-label="Шаг 1 из 4">
             <div class="ob-art art-mystery" aria-hidden="true">
               <div class="kc">
                 <div class="kc-chip"></div><div class="kc-logo">СБЕР KIDS</div>
@@ -104,7 +107,15 @@ export class UI {
             </div>
             <div class="screen-text"><h1>Привет! В&nbsp;твоей карте кто-то живёт</h1><p>Он давно ждёт, когда ты заглянешь. Познакомимся?</p></div>
           </section>
-          <section class="ob-slide" aria-label="Шаг 2 из 3">
+          <section class="ob-slide" aria-label="Шаг 2 из 4">
+            <div class="ob-art art-safe" aria-hidden="true">
+              <div class="sf-card"><div class="kc-chip"></div><div class="kc-logo">СБЕР KIDS</div></div>
+              <div class="sf-shield">${ICON.shield}</div>
+              <div class="sf-fam"><span class="ava a-kid">${ICON.kid}</span><span class="ava a-mom">${ICON.adult}</span><span class="ava a-dad">${ICON.adult}</span></div>
+            </div>
+            <div class="screen-text"><h1>Карта — только твоя</h1><p>Никому её не давай и&nbsp;не&nbsp;показывай. Только маме или папе. Цифры на&nbsp;карте мне не&nbsp;нужны&nbsp;— я&nbsp;их не&nbsp;читаю.</p></div>
+          </section>
+          <section class="ob-slide" aria-label="Шаг 3 из 4">
             <div class="ob-art art-table" aria-hidden="true">
               <div class="tbl"></div>
               <div class="tc-shadow"></div>
@@ -112,7 +123,7 @@ export class UI {
             </div>
             <div class="screen-text"><h1>Положи карту на&nbsp;стол</h1><p>Подойдёт любая карта Сбера. На&nbsp;столе с&nbsp;рисунком другу будет проще держаться.</p></div>
           </section>
-          <section class="ob-slide" aria-label="Шаг 3 из 3">
+          <section class="ob-slide" aria-label="Шаг 4 из 4">
             <div class="ob-art art-phone" aria-hidden="true">
               <div class="ph"><div class="ph-scr"><div class="ph-tbl"></div><div class="ph-card"></div><div class="ph-frame"></div></div><div class="ph-notch"></div></div>
               <div class="ph-perm">${ICON.cam}<span>Разрешить камеру</span></div>
@@ -121,10 +132,24 @@ export class UI {
           </section>
         </div>
         <div class="ob-foot">
-          <div class="ob-dots" aria-hidden="true"><i class="on"></i><i></i><i></i></div>
+          <div class="ob-dots" aria-hidden="true"><i class="on"></i><i></i><i></i><i></i></div>
           <button class="btn btn-primary btn-block ob-next" data-a="ob-next" type="button">Познакомиться</button>
           <button class="btn btn-primary btn-block ob-wake hidden" data-a="wake" type="button">${ICON.cam}<span>Открыть камеру</span></button>
-          <div class="fine">${ICON.lock}<span>Видео и голос остаются в телефоне и никуда не отправляются. Микрофон спросим отдельно.</span></div>
+          <div class="fine">${ICON.lock}<span>Видео и голос остаются в телефоне. Номер, срок и код карты не считываются и не сохраняются. <button class="linkbtn" type="button" data-a="terms">Условия</button></span></div>
+        </div>
+        <div class="terms hidden" role="dialog" aria-modal="true" aria-label="Условия">
+          <div class="terms-card">
+            <div class="sheet-title">Условия и безопасность</div>
+            <div class="terms-body">
+              <p><b>Для детей.</b> Карта — личная. Не давай её и не показывай никому, кроме мамы, папы или того, кто о тебе заботится. Не фотографируй карту и не отправляй её фото.</p>
+              <p><b>Данные карты не считываются.</b> Камера ищет только форму карты на столе, чтобы посадить на неё персонажа. Номер, имя, срок действия и код (CVC) не распознаются, не сохраняются и никуда не передаются.</p>
+              <p><b>Видео и звук.</b> Изображение с камеры и голос обрабатываются только на устройстве и не записываются. Распознавание речи работает без отправки звука на сервер.</p>
+              <p><b>Разрешения.</b> Камера нужна, чтобы показать персонажа на карте. Микрофон — по желанию, чтобы с персонажем можно было поговорить. Оба доступа можно отключить в настройках браузера.</p>
+              <p><b>Родителям.</b> Это демонстрационный прототип. Покупки, переводы и доступ к счёту из него невозможны. Если в будущем появится узнавание карты для входа в аккаунт, оно будет работать только после отдельного согласия родителя.</p>
+              <p class="terms-note">Черновик для согласования с юристами, не публичная оферта.</p>
+            </div>
+            <button class="btn btn-primary btn-block" type="button" data-a="terms-close">Понятно</button>
+          </div>
         </div>
       </div>
       <div class="scan hidden"><span>${ICON.paw}<em>Наведи камеру на карту</em></span></div>
@@ -182,6 +207,8 @@ export class UI {
       const a = btn?.getAttribute('data-a');
       if (a === 'wake') h.onWake();
       if (a === 'ob-next') this.obGo(this.obStep + 1);
+      if (a === 'terms') this.start.querySelector('.terms')!.classList.remove('hidden');
+      if (a === 'terms-close') this.start.querySelector('.terms')!.classList.add('hidden');
       if (a === 'kids') h.onKids();
       if (a === 'shake') h.onShakeButton();
       if (a === 'skip') h.onSkipName();
@@ -253,14 +280,14 @@ export class UI {
   /** онбординг: три шага, свайп и кнопка «дальше»; на последнем — «Открыть камеру» (жест для iOS) */
   private obStep = 0;
   private obGo(i: number) {
-    const n = 3;
+    const n = 4;
     i = Math.max(0, Math.min(n - 1, i));
     this.obStep = i;
     this.start.dataset.step = String(i);
     (this.start.querySelector('.ob-track') as HTMLElement).style.transform = `translateX(${-i * 100}%)`;
     this.start.querySelectorAll('.ob-dots i').forEach((d, k) => d.classList.toggle('on', k === i));
     const next = this.start.querySelector('.ob-next') as HTMLElement;
-    next.textContent = ['Познакомиться', 'Готово, лежит', ''][i];
+    next.textContent = ['Познакомиться', 'Понятно, не покажу', 'Готово, лежит', ''][i];
     next.classList.toggle('hidden', i === n - 1);
     this.start.querySelector('.ob-wake')!.classList.toggle('hidden', i !== n - 1);
   }
@@ -268,7 +295,7 @@ export class UI {
     let x0 = 0, y0 = 0, on = false;
     this.start.addEventListener('pointerdown', (e) => ((x0 = e.clientX), (y0 = e.clientY), (on = true)));
     this.start.addEventListener('pointerup', (e) => {
-      if (!on) return;
+      if (!on || !this.start.querySelector('.terms')!.classList.contains('hidden')) return;
       on = false;
       const dx = e.clientX - x0, dy = e.clientY - y0;
       if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) this.obGo(this.obStep + (dx < 0 ? 1 : -1));

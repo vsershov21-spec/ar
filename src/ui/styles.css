@@ -493,3 +493,33 @@ body > .toast { position: fixed; }
   .mic-mode { bottom: auto; left: auto; right: calc(100% + 12px); top: 50%; transform: translateY(-50%); }
   .mic-mode:active { transform: translateY(-50%) translateY(2px); }
 }
+
+/* онбординг, шаг «Карта — только твоя»: карта под щитом, рядом ребёнок, мама и папа */
+.art-safe .sf-card { position: absolute; left: 10%; right: 26%; top: 12%; aspect-ratio: 1.586; border-radius: 18px; overflow: hidden; transform: rotate(-6deg);
+  background: radial-gradient(90% 120% at 85% 8%, rgba(255,255,255,.4), transparent 55%), linear-gradient(135deg, #b5e36a 0%, #42c35b 48%, #21a038 100%);
+  box-shadow: 0 22px 44px rgba(0,0,0,.32), inset 0 0 0 1.5px rgba(255,255,255,.3); }
+.art-safe .sf-card::after { content: '•••• ••••'; position: absolute; left: 9%; top: 56%; font: 800 14px/1 var(--font); letter-spacing: .12em; color: rgba(255,255,255,.75); }
+.art-safe .sf-shield { position: absolute; right: 8%; top: 2%; width: 30%; aspect-ratio: .9; display: grid; place-items: center; color: #fff;
+  filter: drop-shadow(0 6px 0 #13742a) drop-shadow(0 14px 20px rgba(0,0,0,.3)); animation: shield 2.8s var(--ease) infinite; }
+.art-safe .sf-shield svg { width: 100%; height: 100%; color: #21a038; }
+@keyframes shield { 0%, 100% { transform: rotate(4deg) scale(1); } 50% { transform: rotate(-2deg) scale(1.06); } }
+.art-safe .sf-fam { position: absolute; left: 50%; bottom: 0; transform: translateX(-50%); display: flex; gap: 10px; padding: 8px 12px; border-radius: 999px;
+  background: #fff; box-shadow: 0 4px 0 #c5d6cc, 0 12px 22px rgba(0,0,0,.22); }
+.art-safe .ava { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; }
+.art-safe .ava svg { width: 24px; height: 24px; }
+.art-safe .a-kid { background: #e6f4ec; color: #21a038; width: 34px; height: 34px; align-self: flex-end; }
+.art-safe .a-kid svg { width: 20px; height: 20px; }
+.art-safe .a-mom { background: #fde9da; color: #e0783c; }
+.art-safe .a-dad { background: #e3eef9; color: #3f7fc4; }
+
+/* ссылка «Условия» и лист условий */
+.linkbtn { appearance: none; border: 0; background: none; padding: 0; color: #fff; font: inherit; font-weight: 700; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+.terms { position: absolute; inset: 0; z-index: 5; display: flex; align-items: flex-end; justify-content: center; background: rgba(3, 25, 28, .55);
+  padding: var(--safe-t) var(--s-3) calc(var(--s-3) + var(--safe-b)); animation: rise var(--t-med) var(--ease); }
+.terms-card { width: min(100%, 460px); max-height: 86%; display: flex; flex-direction: column; gap: var(--s-3); padding: var(--s-5) var(--s-4) var(--s-4);
+  border-radius: 30px; background: #fff; color: var(--ink); text-align: left; box-shadow: 0 6px 0 rgba(0,0,0,.08), var(--sh-3); }
+.terms-body { overflow-y: auto; -webkit-overflow-scrolling: touch; touch-action: pan-y; display: flex; flex-direction: column; gap: var(--s-3); }
+.terms-body p { margin: 0; color: var(--ink); font-size: 15px; line-height: 1.45; max-width: none; }
+.terms-body b { color: var(--green-text); }
+.terms-body .terms-note { color: var(--ink-2); font-size: 12px; }
+@media (max-height: 700px) { .art-safe .ava { width: 34px; height: 34px; } .art-safe .a-kid { width: 28px; height: 28px; } .art-safe .sf-fam { padding: 6px 10px; } }
