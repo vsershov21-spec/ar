@@ -870,8 +870,8 @@ export class Director extends Emitter<DirectorEvents> {
     const quiet = playing && this.state.cardVisible && !this.dozing && !this.paused && !this.state.paused && !this.state.dialog && !this.queue.busy && !this.d.voice.speaking && !this.d.stage.walking && !t.userSpeaking;
     const step = this.ladder.due(now, { quiet, lastCatEnd: this.lastCatEnd });
     if (!step) return;
+    this.log(`тишина ${(this.ladder.quietFor(now) / 1000).toFixed(0)} с → ${step}`);
     this.ladder.fired(now);
-    this.log(`тишина ${((now - (this.lastUserAct > 0 ? this.lastUserAct : now)) / 1000).toFixed(0)} с → ${step}`);
     this.idleStep(step);
   }
 

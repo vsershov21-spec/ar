@@ -113,6 +113,10 @@ export class IdleLadder {
   get step() {
     return this.i;
   }
+  /** сколько длится тишина */
+  quietFor(now: number) {
+    return now - this.since;
+  }
   get finished() {
     return this.i >= this.plan.length;
   }
