@@ -9,7 +9,13 @@ await page.setViewport({ width: 2000, height: 2000 });
 await page.goto(`http://localhost:${port}/tools/${process.env.PAGE || "face-preview"}.html?${query}`, { waitUntil: 'load' });
 await page.waitForFunction(() => window.__ready, { timeout: 120000 }).catch(() => {});
 const info = await page.evaluate(() => ({ labels: window.__labels, morphs: window.__morphs }));
-const el = await page.$('canvas');
-await el.screenshot({ path: out });
+if (process.env.ALPHA) {
+  // PNG с прозрачностью прямо из WebGL-холста (для наложения на фото)
+  const url = await page.evaluate(() => document.querySelector('canvas').toDataURL('image/png'));
+  (await import('node:fs')).writeFileSync(out, Buffer.from(url.split(',')[1], 'base64'));
+} else {
+  const el = await page.$('canvas');
+  await el.screenshot({ path: out });
+}
 console.log(JSON.stringify(info), errs.join('\n'));
 await browser.close();

@@ -93,6 +93,11 @@ export const TRIPO_ALIAS: Record<string, string[]> = {
   'knock on glass': ['knock_glass'],
 };
 
+/** постоянный минимум весов лица по характеру (поверх пресета; хмурость его гасит) */
+const PERSONA_FACE: Record<string, Record<string, number>> = {
+  glitter: { blush: 0.32, smile: 0.12 },
+};
+
 let ENV: THREE.Texture | null = null;
 /** маленькая equirect-карта «комната»: светлый верх, тёплый горизонт, тёмный низ (стол); PMREM делает рендерер */
 function softEnv() {
@@ -513,6 +518,9 @@ export class GlbCharacter implements Character {
       W.blink_L = Math.max(W.blink_L ?? 0, f.blink);
       W.blink_R = Math.max(W.blink_R ?? 0, f.blink);
     }
+    // характер в покое (референс): у Блёстки всегда чуть розовые щёчки и мягкая полуулыбка
+    const base = PERSONA_FACE[this.personaId];
+    if (base) for (const k in base) W[k] = Math.max(W[k] ?? 0, base[k] * (1 - (W.frown ?? 0)));
     // складки и мягкость: щёки поднимаются при улыбке, морщинка у носа при хмурых бровях
     W.cheek_up = Math.max(W.cheek_up ?? 0, 0.5 * (W.smile ?? 0), 0.3 * (W.smirk ?? 0));
     W.nose_wrinkle = Math.max(W.nose_wrinkle ?? 0, 0.35 * (W.brow_down ?? 0));

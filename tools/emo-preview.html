@@ -17,10 +17,15 @@ const cols = +(q.get('cols') || Math.min(4, states.length));
 const T = +(q.get('tile') || 360), zoom = +(q.get('zoom') || 1);
 const yaw = +(q.get('yaw') || 0) * Math.PI / 180, pitch = +(q.get('pitch') || 0) * Math.PI / 180;
 const rows = Math.ceil(states.length / cols);
-const r = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+const r = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true, alpha: q.get('bg') === 'none' });
+// KTX2 в сжатых моделях (dist/models/opt) — транскодер выбирает формат по рендереру, как в приложении
+(await import('../src/core/glRenderer.ts')).setGlRenderer(r);
 r.setPixelRatio(1); r.setSize(cols * T, rows * T); r.setScissorTest(true); document.body.appendChild(r.domElement);
 r.outputColorSpace = THREE.SRGBColorSpace;
 const sc = new THREE.Scene(); sc.background = new THREE.Color('#' + (q.get('bg') || 'e6e6ea'));
+// фон-фото (кадр камеры со стола): ?bgimg=/tmpgl/table.jpg — проверка на «живом» фоне, свет и цвет как в приложении
+if (q.get('bg') === 'none') { sc.background = null; r.setClearColor(0x000000, 0); }
+if (q.get('bgimg')) { const t = await new THREE.TextureLoader().loadAsync(q.get('bgimg')); t.colorSpace = THREE.SRGBColorSpace; sc.background = t; }
 sc.add(new THREE.HemisphereLight(0xffffff, 0x8899aa, 2.2));
 const dl = new THREE.DirectionalLight(0xffffff, 1.6); dl.position.set(0.5, 1, 1); sc.add(dl);
 const ch = new GlbCharacter(url, q.get('anims') === '0' ? undefined : '/models/anims_v1.glb');
