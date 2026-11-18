@@ -342,6 +342,77 @@ body > .toast { position: fixed; }
 .ph-perm svg { width: 20px; height: 20px; color: var(--green); }
 @keyframes permpop { 0%, 15% { transform: scale(.6); opacity: 0; } 25%, 85% { transform: scale(1); opacity: 1; } 100% { opacity: 0; } }
 
+/* восстановлено: базовые стили онбординга пропали в 24dabed (вариант А) — без них картинка карты растягивалась на весь экран и закрывала текст */
+/* ═════════════════════ онбординг (3 шага) ═════════════════════
+   Сбер: бирюза → зелёный → лайм, SB Sans, много воздуха. Кот Том: пухлые «конфетные» кнопки с нижней гранью,
+   всё круглое и мягкое, иллюстрации живые. Карта на первом шаге — с секретом: из окошка смотрят глаза. */
+.screen.ob { justify-content: space-between; overflow: hidden; touch-action: pan-y;
+  padding: calc(var(--s-4) + var(--safe-t)) 0 calc(var(--s-4) + var(--safe-b));
+  background: radial-gradient(90% 55% at 50% 30%, rgba(181,227,106,.30), transparent 70%),
+    radial-gradient(60% 40% at 90% 100%, rgba(33,160,56,.45), transparent 70%),
+    linear-gradient(165deg, #0b5e6b 0%, #0a6b62 40%, #0e7c5a 75%, #1a8f45 100%); }
+.ob-sky { position: absolute; inset: 0; pointer-events: none; }
+.ob-sky::before, .ob-sky::after { content: ''; position: absolute; border-radius: 50%; border: 1.5px solid rgba(255,255,255,.08); }
+.ob-sky::before { width: 140vmax; height: 140vmax; left: 50%; top: 32%; transform: translate(-50%, -50%); }
+.ob-sky::after { width: 90vmax; height: 90vmax; left: 50%; top: 32%; transform: translate(-50%, -50%); border-color: rgba(181,227,106,.12); }
+.ob-sky i { position: absolute; width: 6px; height: 6px; border-radius: 50%; background: #fff; opacity: .0; animation: twinkle 3.6s ease-in-out infinite; }
+.ob-sky i:nth-child(1) { left: 12%; top: 14%; } .ob-sky i:nth-child(2) { left: 84%; top: 10%; animation-delay: .7s; }
+.ob-sky i:nth-child(3) { left: 72%; top: 34%; animation-delay: 1.4s; width: 4px; height: 4px; } .ob-sky i:nth-child(4) { left: 20%; top: 40%; animation-delay: 2.1s; width: 4px; height: 4px; }
+.ob-sky i:nth-child(5) { left: 46%; top: 6%; animation-delay: 2.8s; } .ob-sky i:nth-child(6) { left: 90%; top: 52%; animation-delay: 1s; width: 5px; height: 5px; background: var(--lime); }
+.ob-sky i:nth-child(7) { left: 6%; top: 60%; animation-delay: 1.9s; background: var(--lime); } .ob-sky i:nth-child(8) { left: 60%; top: 18%; animation-delay: 3.1s; width: 4px; height: 4px; }
+@keyframes twinkle { 0%, 100% { opacity: 0; transform: scale(.4); } 50% { opacity: .9; transform: scale(1); } }
+
+.ob-track { position: relative; flex: 1; width: 100%; display: flex; transition: transform .45s var(--ease); }
+.ob-slide { flex: 0 0 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--s-5);
+  padding: 0 calc(var(--s-5) + var(--safe-r)) 0 calc(var(--s-5) + var(--safe-l)); text-align: center; }
+.ob-slide .screen-text { max-width: 400px; }
+.ob-slide h1 { font-size: clamp(23px, 7vw, 30px); line-height: 1.12; text-wrap: balance; overflow-wrap: anywhere; }
+.ob-slide p { font-size: 17px; max-width: 30ch; }
+.ob-foot { position: relative; width: min(100%, 440px); padding: 0 calc(var(--s-5) + var(--safe-r)) 0 calc(var(--s-5) + var(--safe-l));
+  display: flex; flex-direction: column; align-items: center; gap: var(--s-3); }
+.ob-dots { display: flex; gap: 8px; margin-bottom: var(--s-1); }
+.ob-dots i { width: 8px; height: 8px; border-radius: 999px; background: rgba(255,255,255,.35); transition: width .3s var(--ease), background-color .3s; }
+.ob-dots i.on { width: 26px; background: var(--white); }
+.ob .fine { display: flex; gap: var(--s-2); align-items: flex-start; text-align: left; color: rgba(255,255,255,.7); font-size: var(--fs-xs); line-height: 1.45; max-width: 36ch; }
+.ob .fine svg { flex: none; width: 16px; height: 16px; margin-top: 1px; opacity: .8; }
+.ob .btn-primary { min-height: 60px; font-size: 19px; }
+
+/* общая детская карта */
+.kc, .tc { position: absolute; border-radius: 18px; overflow: hidden;
+  background: radial-gradient(90% 120% at 85% 8%, rgba(255,255,255,.4), transparent 55%), linear-gradient(135deg, #b5e36a 0%, #42c35b 48%, #21a038 100%);
+  box-shadow: inset 0 0 0 1.5px rgba(255,255,255,.3); }
+.kc-chip { position: absolute; left: 9%; top: 26%; width: 15%; aspect-ratio: 1.3; border-radius: 6px; background: linear-gradient(135deg, #f6ecbd, #cdb76a); box-shadow: inset 0 0 0 1px rgba(0,0,0,.12); }
+.kc-logo { position: absolute; left: 9%; bottom: 12%; font-size: 12px; font-weight: 800; letter-spacing: .14em; color: rgba(255,255,255,.95); }
+
+/* шаг 1: карта с секретом */
+.ob-art { position: relative; width: min(76vw, 300px); aspect-ratio: 1.25; flex: none; }
+.art-mystery .kc { left: 4%; right: 4%; top: 26%; aspect-ratio: 1.586; transform: rotate(-5deg); box-shadow: 0 26px 50px rgba(0,0,0,.35), inset 0 0 0 1.5px rgba(255,255,255,.3);
+  animation: kcfloat 3.4s ease-in-out infinite; }
+@keyframes kcfloat { 50% { transform: rotate(-3deg) translateY(-8px); } }
+.kc-portal { position: absolute; right: 12%; top: 50%; width: 34%; aspect-ratio: 1; transform: translateY(-50%); border-radius: 50%;
+  background: radial-gradient(circle at 50% 55%, #0d2b30 0%, #071a1d 62%, #0b5e6b 63%, #0b5e6b 70%, rgba(181,227,106,.9) 72%, rgba(181,227,106,0) 86%);
+  box-shadow: 0 0 22px 6px rgba(181,227,106,.55); display: flex; align-items: center; justify-content: center; gap: 14%; animation: portal 2.2s ease-in-out infinite; }
+@keyframes portal { 50% { box-shadow: 0 0 34px 12px rgba(181,227,106,.75); } }
+.kc-portal .eye { width: 17%; aspect-ratio: .72; border-radius: 50%; background: radial-gradient(circle at 40% 35%, #fff 0 22%, #d9ff8a 24% 60%, #8cd43a 62%);
+  box-shadow: 0 0 10px rgba(217,255,138,.9); animation: blink 4s infinite, peek 6s ease-in-out infinite; transform-origin: 50% 50%; }
+@keyframes blink { 0%, 44%, 50%, 100% { transform: scaleY(1); } 47% { transform: scaleY(.08); } }
+@keyframes peek { 0%, 30% { translate: 0 0; } 40%, 60% { translate: -3px 1px; } 70%, 100% { translate: 2px 0; } }
+.kc-portal { overflow: visible; }
+.m-ears { position: absolute; left: 14%; right: 14%; top: -14%; height: 34%; animation: ears 3.4s ease-in-out infinite; z-index: -1; }
+.m-ears b { position: absolute; bottom: 0; width: 36%; height: 100%; background: #0b2226; clip-path: polygon(50% 0, 100% 100%, 0 100%); border-radius: 4px; }
+.m-ears b::after { content: ''; position: absolute; inset: 30% 25% 0; background: #f2a3b4; clip-path: polygon(50% 0, 100% 100%, 0 100%); opacity: .8; }
+.m-ears b:first-child { left: 2%; transform: rotate(-12deg); } .m-ears b:last-child { right: 2%; transform: rotate(12deg); animation: earflick 5s ease-in-out infinite; transform-origin: 50% 100%; }
+@keyframes ears { 0%, 100% { translate: 0 3px; } 50% { translate: 0 -3px; } }
+@keyframes earflick { 0%, 80%, 100% { transform: rotate(12deg); } 85% { transform: rotate(26deg); } 90% { transform: rotate(8deg); } }
+.spk { position: absolute; width: 22px; aspect-ratio: 1; background: #fff; clip-path: polygon(50% 0, 61% 39%, 100% 50%, 61% 61%, 50% 100%, 39% 61%, 0 50%, 39% 39%);
+  animation: spark 2.4s ease-in-out infinite; filter: drop-shadow(0 0 6px rgba(255,255,255,.8)); }
+.spk.s1 { left: 2%; top: 12%; } .spk.s2 { right: 0; top: 4%; width: 16px; background: var(--lime); animation-delay: .6s; }
+.spk.s3 { right: 6%; bottom: 6%; width: 18px; animation-delay: 1.2s; } .spk.s4 { left: 10%; bottom: 2%; width: 14px; background: #ffe27a; animation-delay: 1.8s; }
+@keyframes spark { 0%, 100% { transform: scale(.3) rotate(0); opacity: .2; } 50% { transform: scale(1) rotate(45deg); opacity: 1; } }
+.m-q { position: absolute; left: 8%; top: 8%; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: #fff; color: var(--green);
+  font: 900 26px/1 var(--font-display); box-shadow: 0 4px 0 #c7d8cf, 0 10px 20px rgba(0,0,0,.2); transform: rotate(-10deg); animation: qbob 2.6s var(--ease) infinite; }
+@keyframes qbob { 50% { transform: rotate(6deg) translateY(-6px); } }
+
 @media (max-height: 700px) {
   .ob-art { width: min(60vw, 230px); }
   .ob-slide { gap: var(--s-3); }
