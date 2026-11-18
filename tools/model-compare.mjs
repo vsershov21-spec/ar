@@ -9,7 +9,7 @@ fs.mkdirSync(outdir, { recursive: true });
 const browser = await puppeteer.launch({ executablePath: process.env.CHROME || '/usr/bin/google-chrome', headless: true, protocolTimeout: 900000, args: ['--no-sandbox', '--no-first-run', '--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
 for (const p of list) {
   const page = await browser.newPage();
-  const errs = []; page.on('pageerror', (e) => errs.push(e.message)); page.on('console', (m) => m.type() === 'error' && errs.push(m.text()));
+  const errs = []; page.on('pageerror', (e) => errs.push(e.message)); page.on('console', (m) => (m.type() === 'error' || (process.env.LOG && new RegExp(process.env.LOG).test(m.text()))) && errs.push(m.text()));
   await page.setViewport({ width: 1600, height: 500 });
   const perf = process.env.PERF ? `&perf=${process.env.PERF}` : '';
   await page.goto(`http://localhost:${port}/tools/model-compare.html?p=${p}${perf}&${process.env.Q || ''}`, { waitUntil: 'load' });

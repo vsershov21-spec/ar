@@ -122,7 +122,7 @@ export const TRIPO_ALIAS: Record<string, string[]> = {
 
 /** постоянный минимум весов лица по характеру (поверх пресета; хмурость его гасит) */
 const PERSONA_FACE: Record<string, Record<string, number>> = {
-  glitter: { blush: 0.32, smile: 0.12 },
+  glitter: { blush: 0.14, smile: 0.12 },
 };
 
 let ENV: THREE.Texture | null = null;

@@ -50,9 +50,15 @@ function look(target, yawDeg, pitchDeg, dist, fov = 22) {
 const full = (yaw) => { const d = (size.y * 1.12) / 2 / Math.tan((22 * Math.PI) / 360); look(ctr, yaw, 3, d); };
 const yawOf = { front: 0, three_quarter: +(q.get('tq') || -35), side: +(q.get('sd') || -90), back: 180 };
 function setView(v) {
-  if (v === 'face' || v === 'face34') {
+  if (v === 'face' || v === 'face34' || v === 'face34m') {
+    // face34m — 3/4 в другую сторону (как официальный рендер design/refs/sbercat_1_jacket.png)
     const c = hp.clone().lerp(tp, 0.55);
-    look(c, v === 'face34' ? -28 : 0, 4, hp.distanceTo(tp) * +(q.get('fz') || 10));
+    look(c, v === 'face34' ? -28 : v === 'face34m' ? 26 : 0, 4, hp.distanceTo(tp) * +(q.get('fz') || 10));
+  } else if (v.startsWith('h_')) {
+    // h_<yaw>_<pitch>_<zoom>[_<up>]: голова с кепкой/ушами (центр — между Head и HeadTop_End, сдвиг up в долях)
+    const [, yw, pt, zm, up] = v.split('_').map(Number);
+    const c = hp.clone().lerp(tp, 0.55 + (up || 0));
+    look(c, yw, pt, hp.distanceTo(tp) * (zm || 12));
   } else full(yawOf[v] ?? 0);
 }
 views.forEach((v, i) => {

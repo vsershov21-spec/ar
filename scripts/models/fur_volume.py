@@ -21,7 +21,7 @@ from glb_io import Glb
 
 HEAD_LEN = {'hooligan': 0.0115, 'kind': 0.0125, 'glitter': 0.011}
 # верхнее веко в покое (eyeRig: доля закрытия) — тяжёлое веко рефов: Хулиган «с ленцой», Добряк мягче, Блёстка открытая
-REST_UP = {'hooligan': 0.3, 'kind': 0.27, 'glitter': 0.17}
+REST_UP = {'hooligan': 0.4, 'kind': 0.34, 'glitter': 0.22}
 CHEEK_K = {'hooligan': 1.55, 'kind': 1.6, 'glitter': 1.45}
 
 
@@ -31,7 +31,9 @@ def smoothstep(a, b, x):
 
 
 def main():
+    global ANIMS
     persona, src, dst = sys.argv[1], sys.argv[2], sys.argv[3]
+    ANIMS = sys.argv[sys.argv.index('--anims') + 1] if '--anims' in sys.argv else None
     dbg = sys.argv[sys.argv.index('--debug') + 1] if '--debug' in sys.argv else None
     g = Glb(src)
     j = g.j
@@ -153,6 +155,11 @@ def main():
     new = np.where(hv > 0.55, Lv, np.where(hv > 0.4, 0.0, old))
     new[new < 0.0008] = 0
     tri = np.where((new[I] > 0.0008).all(1))[0]
+    # оболочки не режут одежду: длина 0 там, где внешний слой проходит сквозь кепку/худи/наушники/шарф/юбку
+    new, nhit = prune_shells(g, persona, body, P, N, I, J, Wt, new, I[tri])
+    new[new < 0.0008] = 0
+    tri = np.where((new[I] > 0.0008).all(1))[0]
+    print(f'  оболочки: обнулено у одежды {nhit} вершин')
     print(f'{persona}: треугольников меха {len(tri)} (было {len(g.acc(sh["indices"])) // 3}), голова {int(((new[I] > 0).all(1) & (hv[I] > 0.55).all(1)).sum())}, длина головы ≤ {L.max():.4f}')
 
     def replace(ai_key, arr, ctype, target):
@@ -217,19 +224,20 @@ def cards(g, persona, bi, body, si, P, N, UV, J, Wt, I, weld, nW, Pw, Nw, fur, h
     cheek = lat * low * (Nw[:, 2] > -0.35) * (np.abs(Nw[:, 0]) > 0.35)
     crown = (Pw[:, 1] > R['ytop'] - 0.25 * eyeD) * (np.abs(Pw[:, 0] - nose[0]) < 0.28 * eyeD) * (Nw[:, 1] > 0.5)
     chin = (Pw[:, 1] < R['mouth'][1] - 0.32 * eyeD) * (Nw[:, 2] > 0.1) * (np.abs(Pw[:, 0] - nose[0]) < 0.55 * eyeD)
-    base = {'hooligan': 0.024, 'kind': 0.026, 'glitter': 0.022}[persona]
-    for w in np.where(headfur & (front < 0.25) & (R['k'] > 0.75) & (R['lo'] > 0.9))[0]:
+    # v2: короче и шире, гуще на щеках-«баках», макушке и подбородке — мягкий объём, а не бахрома
+    base = {'hooligan': 0.0165, 'kind': 0.0175, 'glitter': 0.0155}[persona]
+    for w in np.where(headfur & (front < 0.3) & (R['k'] > 0.7) & (R['lo'] > 0.85))[0]:
         n = Nw[w]
-        if cheek[w] > 0.3:
-            L = base * (1.4 + 0.9 * cheek[w]); d = n * 0.8 + down * 0.45 + np.array([sx[w] * 0.5, 0, 0]); kind = 'cheek'
+        if cheek[w] > 0.25:
+            L = base * (1.35 + 0.75 * cheek[w]); d = n * 0.85 + down * 0.4 + np.array([sx[w] * 0.45, 0, 0]); kind = 'cheek'
         elif crown[w]:
-            L = base * 1.25; d = n + up * 0.6 + back * 0.15; kind = 'crown'
+            L = base * 1.05; d = n + up * 0.45 + back * 0.2; kind = 'crown'
         elif chin[w]:
-            L = base * 0.8; d = n * 0.8 + down * 0.5; kind = 'chin'
+            L = base * 0.85; d = n * 0.85 + down * 0.45; kind = 'chin'
         elif Pw[w, 1] > R['ytop'] + 0.02 * eyeD:
             continue  # уши — отдельно
         else:
-            L = base * (0.6 + 0.2 * (Nw[w, 2] < 0)); d = n * 0.75 + down * 0.35 + back * 0.35; kind = 'head'
+            L = base * (0.7 + 0.15 * (Nw[w, 2] < 0)); d = n * 0.8 + down * 0.3 + back * 0.3; kind = 'head'
         cand.append((w, L, d, kind))
     # 2) уши: светлые пучки из розовой внутренности (не мех по цвету, на голове, выше макушки, смотрит вперёд)
     rr, gg_, bb = to_w(col[:, 0]), to_w(col[:, 1]), to_w(col[:, 2])
@@ -241,12 +249,21 @@ def cards(g, persona, bi, body, si, P, N, UV, J, Wt, I, weld, nW, Pw, Nw, fur, h
     tipw = to_w(wsum(lambda n: n.startswith('Tail') and n[-1:] in '34567' or n.startswith('TailEnd')))
     hw = to_w(wsum(lambda n: 'Hand' in n and 'Thumb' not in n and 'Index' not in n and 'Middle' not in n and 'Ring' not in n and 'Pinky' not in n))
     furw = smooth(to_w(furc.astype(np.float64)), 2) > 0.5
+    # ось хвоста: от корня (центр вершин Tail1) к кончику (центр вершин кончика)
+    tw1 = to_w(wsum(lambda n: n == 'Tail1'))
+    tr = Pw[tw1 > 0.5].mean(0) if (tw1 > 0.5).any() else Pw[tw > 0.5].mean(0)
+    tt = Pw[tipw > 0.5].mean(0) if (tipw > 0.5).any() else tr
     for w in np.where((tw > 0.5) & (furw | (persona == 'glitter')))[0]:
-        cand.append((w, base * (0.7 + 0.6 * min(1, tipw[w])), Nw[w] * 0.8 + down * 0.3, 'tail'))
+        k_ = min(1, tipw[w])
+        ax_ = Pw[w] - tr; ax_ /= max(np.linalg.norm(ax_), 1e-9)
+        if persona == 'glitter':  # пушистый длинный хвост (на рефе — пышный, с блёстками): кончик — вдоль оси
+            cand.append((w, base * (1.2 + 1.6 * k_), Nw[w] * (0.9 - 0.4 * k_) + ax_ * (0.3 + 0.9 * k_), 'tail'))
+        else:
+            cand.append((w, base * (1.0 + 0.8 * k_), Nw[w] * 0.8 + ax_ * 0.4 * k_ + down * 0.2, 'tail'))
     for w in np.where((hw > 0.6) & furw)[0]:
         cand.append((w, base * 0.45, Nw[w] * 0.8 + down * 0.3, 'paw'))
     # прореживание: не ближе spacing (по виду), случайный порядок
-    SP = {'cheek': 0.42, 'crown': 0.5, 'chin': 0.5, 'head': 0.75, 'ear': 0.6, 'tail': 0.55, 'paw': 0.8}
+    SP = {'cheek': 0.3, 'crown': 0.36, 'chin': 0.4, 'head': 0.5, 'ear': 0.6, 'tail': 0.38 if persona == 'glitter' else 0.5, 'paw': 0.8}
     order = rng.permutation(len(cand))
     keep = []
     grid = {}
@@ -266,34 +283,83 @@ def cards(g, persona, bi, body, si, P, N, UV, J, Wt, I, weld, nW, Pw, Nw, fur, h
             if not ok: break
         if ok:
             keep.append(o); grid.setdefault(cell, []).append((w, sp))
+    # цвет пряди: тексель не у самого корня (там бывает обводка глаза, складка, тёмная линия), а светлый «меховой»
+    # среди соседей в радиусе 6 мм — ближе к 70-му перцентилю яркости (без тёмных точек на морде)
+    from scipy.spatial import cKDTree
+    urep = rep
+    lum = to_w(col @ np.array([0.299, 0.587, 0.114]))
+    okc = (smooth(to_w(furc.astype(np.float64)), 1) > 0.6) & (R['eye'] > 0.8)
+    UVw = UV[rep]
+    UVc = UVw.copy()
+    tree_ = cKDTree(Pw)
+    roots = sorted(set(cand[o][0] for o in keep))
+    for w in roots:
+        nb_ = np.array(tree_.query_ball_point(Pw[w], 0.006))
+        nb_ = nb_[okc[nb_]] if okc[nb_].any() else nb_
+        tgt = np.percentile(lum[nb_], 70)
+        UVc[w] = UVw[nb_[np.argmin(np.abs(lum[nb_] - tgt))]]
+    # пучкование: каждый ~5-й пучок — «центр пряди», остальные клонятся кончиком к ближайшему центру
+    clump = {}
+    kp = np.array([cand[o][0] for o in keep])
+    centers = np.arange(0, len(keep), 5)
+    if len(centers):
+        ct = cKDTree(Pw[kp[centers]])
+        for ii, o in enumerate(keep):
+            dist, ci = ct.query(Pw[kp[ii]])
+            L_ = cand[o][1]
+            if 1e-6 < dist < 2.5 * L_:
+                vv = Pw[kp[centers[ci]]] - Pw[kp[ii]]
+                clump[o] = vv / dist * min(1.0, dist / L_)
+            else:
+                clump[o] = None
     SEG = 2
-    V, NN, U0, U1, JJ, WW, ROOT, F = [], [], [], [], [], [], [], []
+    V, NN, U0, U1, JJ, WW, ROOT, F, TID = [], [], [], [], [], [], [], [], []
     for o in keep:
         w, L, d, kd = cand[o]
-        L *= 0.8 + 0.4 * rng.random()
+        L *= 0.88 + 0.24 * rng.random()  # без редких длинных «выбившихся» прядей
         d = d / np.linalg.norm(d)
+        # пучкование: кончик клонится к соседнему «центру пряди» (сосед по сетке пучков)
+        if clump is not None:
+            cj = clump[o]
+            if cj is not None:
+                d = d + 0.35 * cj; d /= np.linalg.norm(d)
         n = Nw[w]
-        v = rep[w]
+        nsoft = n * 0.6 + d * 0.4; nsoft /= np.linalg.norm(nsoft)  # освещение: мягко наружу
+        v = urep[w]
         a1 = np.cross(d, np.array([0, 0, 1.0]) if abs(d[2]) < 0.9 else np.array([1.0, 0, 0])); a1 /= np.linalg.norm(a1)
         a2 = np.cross(d, a1); a2 /= np.linalg.norm(a2)
         rot = rng.random() * np.pi
         a1, a2 = a1 * np.cos(rot) + a2 * np.sin(rot), -a1 * np.sin(rot) + a2 * np.cos(rot)
-        wid = L * (0.5 if kd in ('cheek', 'chin') else 0.42)
+        wid = L * (0.95 if kd in ('cheek', 'chin', 'crown') else 0.8 if kd != 'tail' else 0.85)
         root = Pw[w] - n * 0.0025
         for ax in (a1, a2):
             b0 = len(V)
+            TID += [o] * (2 * (SEG + 1))
             for s_ in range(SEG + 1):
                 t = s_ / SEG
                 c_ = root + d * L * t + down * L * 0.3 * t * t
-                hw_ = wid * 0.5 * (1 - 0.35 * t)
+                hw_ = wid * 0.5 * (1 - 0.45 * t)
                 for side in (-1, 1):
-                    V.append(c_ + ax * hw_ * side); NN.append(n); U0.append(UV[v]); U1.append([(side + 1) / 2, t])
+                    V.append(c_ + ax * hw_ * side); NN.append(nsoft); U0.append(UVc[w]); U1.append([(side + 1) / 2, t])
                     JJ.append(J[v]); WW.append(Wt[v]); ROOT.append(v)
             for s_ in range(SEG):
                 q = b0 + 2 * s_
                 F += [[q, q + 1, q + 3], [q, q + 3, q + 2]]
-    V = np.array(V, np.float32); NN = np.array(NN, np.float32); F = np.array(F, np.uint32 if len(V) > 65000 else np.uint16)
-    ROOT = np.array(ROOT)
+    V = np.array(V, np.float32); NN = np.array(NN, np.float32); F = np.array(F, np.int64)
+    ROOT = np.array(ROOT); TID = np.array(TID)
+    # без проникновений: пучки, режущие одежду (кепка, худи, наушники, шарф, бант, юбка) в покое и крайних позах — прочь
+    bad = prune_cards(g, persona, body, P, I, J, Wt, V, F, TID, JJ, WW)
+    if len(bad):
+        keepv = ~np.isin(TID, list(bad))
+        remap = np.cumsum(keepv) - 1
+        F = F[keepv[F].all(1)]
+        F = remap[F]
+        V, NN, ROOT, TID = V[keepv], NN[keepv], ROOT[keepv], TID[keepv]
+        U0 = [u for u, k_ in zip(U0, keepv) if k_]; U1 = [u for u, k_ in zip(U1, keepv) if k_]
+        JJ = [u for u, k_ in zip(JJ, keepv) if k_]; WW = [u for u, k_ in zip(WW, keepv) if k_]
+        keep = [o for o in keep if o not in bad]
+        print(f'  пряди: убрано {len(bad)} пучков, режущих одежду')
+    F = F.astype(np.uint32 if len(V) > 65000 else np.uint16)
     kinds = {}
     for o in keep:
         kinds[cand[o][3]] = kinds.get(cand[o][3], 0) + 1
@@ -305,11 +371,14 @@ def cards(g, persona, bi, body, si, P, N, UV, J, Wt, I, weld, nW, Pw, Nw, fur, h
     attrs = {
         'POSITION': g.add_acc(V, 5126, 'VEC3', 34962),
         'NORMAL': g.add_acc(NN, 5126, 'VEC3', 34962),
-        'TEXCOORD_0': g.add_acc(np.array(U0, np.float32), 5126, 'VEC2', 34962),
-        'TEXCOORD_1': g.add_acc(np.array(U1, np.float32), 5126, 'VEC2', 34962),
+        # UV квантованы (core glTF: normalized unsigned short / byte) — карточек тысячи, файл ≤ 4.5 МБ
+        'TEXCOORD_0': g.add_acc(np.round(np.clip(np.array(U0, np.float64), 0, 1) * 65535).astype(np.uint16), 5123, 'VEC2', 34962),
+        'TEXCOORD_1': g.add_acc(np.round(np.clip(np.array(U1, np.float64), 0, 1) * 255).astype(np.uint8), 5121, 'VEC2', 34962),
         'JOINTS_0': g.add_acc(np.array(JJ, np.uint8 if max(map(max, JJ)) < 256 else np.uint16), 5121 if max(map(max, JJ)) < 256 else 5123, 'VEC4', 34962),
         'WEIGHTS_0': wq,
     }
+    for k_ in ('TEXCOORD_0', 'TEXCOORD_1'):
+        g.j['accessors'][attrs[k_]]['normalized'] = True
     prim = {'attributes': attrs, 'indices': g.add_acc(F.ravel(), 5125 if F.dtype == np.uint32 else 5123, 'SCALAR', 34963)}
     if body.get('targets'):
         tg = []
@@ -356,6 +425,96 @@ def cards(g, persona, bi, body, si, P, N, UV, J, Wt, I, weld, nW, Pw, Nw, fur, h
             parent['children'].append(ni)
         else:
             j['scenes'][0]['nodes'].append(ni)
+
+
+ANIMS = None  # --anims anims_raw.glb (без meshopt): проверять пряди и оболочки ещё и в крайних позах
+PRUNE_POSES = [('cheer', 0.3), ('sit', 0.6), ('cover_ears', 0.4), ('fold_arms', 0.6), ('scared_01', 0.5), ('idle_hooligan_headphones', 0.4)]
+
+
+def _poses(g):
+    from penetration import Rig, sample_clip
+    rig = Rig(g)
+    out = [rig.skin_mats(None)]
+    if ANIMS:
+        ga = Glb(ANIMS)
+        for c_, f_ in PRUNE_POSES:
+            ov = sample_clip(ga, c_, f_, rig)
+            if ov is not None:
+                out.append(rig.skin_mats(ov))
+    return out
+
+
+def prune_cards(g, persona, body, P, I, J, Wt, V, F, TID, JJ, WW):
+    from penetration import tri_pairs_intersect, lbs
+    from mesh_parts import label_parts
+    lab = label_parts(persona, g, body, P, I)
+    from mesh_parts import tri_label
+    cl = np.where(tri_label(lab, I) > 0)[0]
+    JJa = np.array(JJ, np.int64); WWa = np.array(WW, np.float64)
+    if WWa.max() > 1.5:
+        WWa /= 255
+    WWa /= WWa.sum(1, keepdims=True)
+    bad = set()
+    tul = _tulle(g)
+    for M in _poses(g):
+        Vb = lbs(M, P, J, Wt); Vc = lbs(M, V.astype(np.float64), JJa, WWa)
+        pp = tri_pairs_intersect(Vc, F, Vb, I[cl])
+        bad.update(TID[F[pp[:, 0], 0]].tolist())
+        if tul is not None:
+            Pt, It_, Jt, Wtt = tul
+            pp = tri_pairs_intersect(Vc, F, lbs(M, Pt, Jt, Wtt), It_)
+            bad.update(TID[F[pp[:, 0], 0]].tolist())
+    return bad
+
+
+def _tulle(g):
+    """отдельные твёрдые детали (фатин, наушники) одной сеткой: позиции, треугольники, кости, веса"""
+    Ps, Is, Js, Ws, off = [], [], [], [], 0
+    for n in g.j['nodes']:
+        ex = n.get('extras', {})
+        if 'mesh' not in n or not (ex.get('tulle') or ex.get('headphones')):
+            continue
+        for pr in g.j['meshes'][n['mesh']]['primitives']:
+            W_ = g.acc(pr['attributes']['WEIGHTS_0']).astype(np.float64)
+            W_ /= 255 if W_.max() > 1.5 else 1
+            P_ = g.acc(pr['attributes']['POSITION']).astype(np.float64)
+            Ps.append(P_); Is.append(g.acc(pr['indices']).reshape(-1, 3).astype(np.int64) + off); off += len(P_)
+            Js.append(g.acc(pr['attributes']['JOINTS_0']).astype(np.int64)); Ws.append(W_)
+    if not Ps:
+        return None
+    return np.vstack(Ps), np.vstack(Is), np.vstack(Js), np.vstack(Ws)
+
+
+def prune_shells(g, persona, body, P, N, I, J, Wt, L, Ish):
+    """длина шерсти → 0 там, где внешняя оболочка режет одежду (покой и позы); 2 прохода с соседями"""
+    from penetration import tri_pairs_intersect, lbs
+    from mesh_parts import label_parts
+    lab = label_parts(persona, g, body, P, I)
+    from mesh_parts import tri_label
+    cl = np.where(tri_label(lab, I) > 0)[0]
+    total = 0
+    for _ in range(3):
+        hit = set()
+        Po = P + N * L[:, None]; Po[:, 1] -= 0.45 * L
+        tul = _tulle(g)
+        for M in _poses(g):
+            Vb = lbs(M, P, J, Wt); Vo = lbs(M, Po, J, Wt)
+            T = Ish[(L[Ish] > 0).all(1)]
+            pp = tri_pairs_intersect(Vo, T, Vb, I[cl])
+            hit.update(T[pp[:, 0]].ravel().tolist())
+            if tul is not None:
+                pp = tri_pairs_intersect(Vo, T, lbs(M, tul[0], tul[2], tul[3]), tul[1])
+                hit.update(T[pp[:, 0]].ravel().tolist())
+        if not hit:
+            break
+        total += len(hit)
+        h = np.array(sorted(hit))
+        L = L.copy(); L[h] = 0
+        # соседи по треугольникам оболочки — вдвое короче (плавный край)
+        nbm = np.isin(Ish, h).any(1)
+        nbv = np.unique(Ish[nbm])
+        L[nbv] *= 0.5
+    return L, total
 
 
 if __name__ == '__main__':

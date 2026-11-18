@@ -97,7 +97,7 @@ export class FurTone {
 
   /** чьи материалы тонировать: тело и всё «меховое»; не глаза, рот, нос-накладки, румянец, усы, подушечки */
   static isFur(name: string) {
-    return !/^(EyeBall|Mouth|Blush|Whiskers|BD_Pads|BD_Metal|BD_Cloth|Emblem|Tear)/.test(name);
+    return !/^(EyeBall|Mouth|Blush|Whiskers|BD_Pads|BD_Metal|BD_Cloth|Emblem|Tear|Headphones|Skirt)/.test(name);
   }
 
   /** маска лица — только у сеток в координатах покоя тела: само тело (скин, морфы), оболочки, карточки */
@@ -162,7 +162,7 @@ export class FurTone {
       ftC = mix(ftC, vec3(0.36, 0.37, 0.44) + (ftS - uFtSrc) * 0.3, brow * uFtBrow);
       // уши выше макушки — розовые, ниже — нос лососевый
       float ear = smoothstep(0.35, 0.6, (p.y - uFtEyeL.y) / D);
-      ftP = mix(vec3(0.8, 0.54, 0.52) + (ftS - vec3(0.6, 0.38, 0.45)) * 0.35, vec3(0.92, 0.55, 0.63) + (ftS - vec3(0.6, 0.38, 0.45)) * 0.6, ear);
+      ftP = mix(vec3(0.64, 0.44, 0.45) + (ftS - vec3(0.6, 0.38, 0.45)) * 0.25, vec3(0.92, 0.55, 0.63) + (ftS - vec3(0.6, 0.38, 0.45)) * 0.6, ear);
     }
 #endif
     ftC = mix(ftC, ftP, ftN);

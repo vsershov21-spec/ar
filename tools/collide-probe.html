@@ -1,0 +1,49 @@
+<!doctype html><html><head><meta charset="utf-8"><title>collide probe</title></head>
+<body><script type="module">
+// Позы клипов до и после рантайм-коррекции BodyCollider (src/character/bodyCollide.ts, прокси из <кот>_colliders.json):
+// локальные повороты/сдвиги всех костей → window.__poses (tools/collide-probe.mjs → scripts/models/penetration.py --pose-json).
+// ?p=hooligan&m=/models/hooligan_v1.glb&clips=scratch,poke_head&frames=8
+import * as THREE from 'three';
+const { GlbCharacter } = await import('../src/character/glbCharacter.ts');
+const q = new URLSearchParams(location.search);
+const persona = q.get('p') || 'hooligan';
+const ch = new GlbCharacter(q.get('m') || `/models/${persona}_v1.glb`, '/models/anims_v1.glb');
+await ch.load();
+ch.setPersona?.({ id: persona });
+// дождаться коллайдеров из json (loadColliders — асинхронно после загрузки)
+for (let i = 0; i < 60 && !(ch.collider?.proxies?.some((p) => /_cup_|_band_|^hull|^pocket|^thigh_L$/.test(p.name) && p.fromJson !== false)); i++) await new Promise((r) => setTimeout(r, 100));
+await new Promise((r) => setTimeout(r, 1500));
+const model = ch.model;
+const bones = [];
+model.traverse((o) => { if (o.isBone) bones.push(o); });
+const inv = new THREE.Matrix4();
+const wp = (b) => { model.updateMatrixWorld(true); inv.copy(model.matrixWorld).invert(); return b.getWorldPosition(new THREE.Vector3()).applyMatrix4(inv).toArray().map((x) => +x.toFixed(5)); };
+const snap = () => Object.fromEntries(bones.map((b) => [b.name, { r: b.quaternion.toArray().map((x) => +x.toFixed(6)), t: b.position.toArray().map((x) => +x.toFixed(6)), w: /Hand$|Head$|ForeArm$/.test(b.name) ? wp(b) : undefined }]));
+const out = { proxies: ch.collider?.proxies?.map((p) => p.name) ?? [], clips: {} };
+const frames = +(q.get('frames') || 8);
+for (const id of (q.get('clips') || 'scratch').split(',')) {
+  const act = ch.actions?.get(id);
+  if (!act) { out.clips[id] = null; continue; }
+  const clip = act.getClip();
+  const saved = [];
+  model.traverse((o) => saved.push([o, o.quaternion.clone(), o.position.clone()]));
+  const mx = new THREE.AnimationMixer(model);
+  const a = mx.clipAction(clip); a.play();
+  const res = [];
+  for (let i = 0; i < frames; i++) {
+    mx.setTime((clip.duration * (i + 0.5)) / frames);
+    model.updateMatrixWorld(true);
+    const before = snap();
+    const pairsBefore = ch.collider.measurePairs();
+    ch.collider.reset(); ch.collider.apply(0);
+    model.updateMatrixWorld(true);
+    const pairs = ch.collider.measurePairs();
+    res.push({ t: +((clip.duration * (i + 0.5)) / frames).toFixed(3), before, after: snap(), pairs, pairsBefore });
+  }
+  a.stop(); mx.uncacheRoot(model);
+  for (const [o, qq, p] of saved) { o.quaternion.copy(qq); o.position.copy(p); }
+  out.clips[id] = res;
+}
+window.__poses = out;
+window.__ready = true;
+</script></body></html>

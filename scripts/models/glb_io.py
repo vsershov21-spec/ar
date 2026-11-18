@@ -122,10 +122,57 @@ class Glb:
 
     def main_mesh(self):
         """самый большой меш (тело Tripo): (mesh_index, primitive)"""
-        best = max(range(len(self.j['meshes'])), key=lambda i: self.j['accessors'][self.j['meshes'][i]['primitives'][0]['attributes']['POSITION']]['count'])
-        return best, self.j['meshes'][best]['primitives'][0]
+        # части одежды (split_parts.py) делят буферы с телом — при равенстве вершин тело то, у кого больше треугольников
+        M = self.j['meshes']
+        # не накладки BD_* (пряди, оболочки) и не отделённые детали (одежда, наушники, фатин)
+        skip = {n['mesh'] for n in self.j['nodes'] if 'mesh' in n and any(k in n.get('extras', {}) for k in ('part', 'tulle', 'headphones'))}
+        cand = [i for i in range(len(M)) if i not in skip and not M[i]['name'].startswith('BD_')] or list(range(len(M)))
+        best = max(cand, key=lambda i: (self.j['accessors'][M[i]['primitives'][0]['attributes']['POSITION']]['count'],
+                                        self.j['accessors'][M[i]['primitives'][0]['indices']]['count']))
+        return best, M[best]['primitives'][0]
+
+    def merged_body(self):
+        """тело + отделённые части одежды (split_parts.py: узлы с extras.part, свои буферы) одной сеткой: временный примитив
+        (accessors добавляются в память, файл не меняется) → (prim, I). Без частей — примитив тела как есть."""
+        bi, b = self.main_mesh()
+        parts = [n for n in self.j['nodes'] if 'mesh' in n and n.get('extras', {}).get('part')]
+        I0 = self.acc(b['indices']).reshape(-1, 3).astype(np.int64)
+        if not parts:
+            return b, I0
+        keys = ['POSITION', 'NORMAL', 'TEXCOORD_0', 'JOINTS_0', 'WEIGHTS_0']
+        arrs = {k: [self.acc(b['attributes'][k])] for k in keys}
+        Is = [I0]; off = len(arrs['POSITION'][0])
+        for n in parts:
+            pr = self.j['meshes'][n['mesh']]['primitives'][0]
+            for k in keys:
+                arrs[k].append(self.acc(pr['attributes'][k]))
+            Is.append(self.acc(pr['indices']).reshape(-1, 3).astype(np.int64) + off)
+            off += len(arrs['POSITION'][-1])
+        prim = {'attributes': {}, 'material': b['material']}
+        for k in keys:
+            acc = self.j['accessors'][b['attributes'][k]]
+            a = np.concatenate(arrs[k])
+            ai = self.add_acc(a, acc['componentType'], acc['type'])
+            if acc.get('normalized'):
+                self.j['accessors'][ai]['normalized'] = True
+            prim['attributes'][k] = ai
+        I = np.concatenate(Is)
+        prim['indices'] = self.add_acc(I.ravel().astype(np.uint32), 5125, 'SCALAR')
+        return prim, I
+
+    def body_indices(self):
+        """все треугольники сетки тела, включая отделённые части одежды на тех же буферах (без BD_FurShell)"""
+        bi, b = self.main_mesh()
+        pa = b['attributes']['POSITION']
+        out = []
+        for m in self.j['meshes']:
+            for p in m['primitives']:
+                if p['attributes']['POSITION'] == pa and m['name'] != 'BD_FurShell':
+                    out.append(self.acc(p['indices']).reshape(-1, 3))
+        return np.concatenate(out).astype(np.int64)
 
     def save(self, path, fmt='PNG'):
+        self._compact()
         out = bytearray()
         img_views = {im['bufferView']: i for i, im in enumerate(self.j['images'])}
         new_views = []
@@ -158,11 +205,66 @@ class Glb:
             f.write(struct.pack('<I', len(out)) + b'BIN\x00' + out)
         return total
 
+    def _compact(self):
+        """убрать accessors и bufferViews без ссылок (заменённые атрибуты, прежние карточки/фатин, старые ключи), перенумеровать:
+        иначе gltf-transform (scripts/build/model-opt.mjs) пишет их в сжатый файл и тот пухнет"""
+        j = self.j
+        used = []
+        def mark(a):
+            if a not in amap:
+                amap[a] = len(used); used.append(a)
+            return amap[a]
+        amap = {}
+        for m in j['meshes']:
+            for p in m['primitives']:
+                p['attributes'] = {k: mark(v) for k, v in p['attributes'].items()}
+                if 'indices' in p:
+                    p['indices'] = mark(p['indices'])
+                for t in p.get('targets', []):
+                    for k in t:
+                        t[k] = mark(t[k])
+        for sk in j.get('skins', []):
+            if 'inverseBindMatrices' in sk:
+                sk['inverseBindMatrices'] = mark(sk['inverseBindMatrices'])
+        for an in j.get('animations', []):
+            for sm in an['samplers']:
+                sm['input'] = mark(sm['input']); sm['output'] = mark(sm['output'])
+        accs = [j['accessors'][a] for a in used]
+        vmap = {}; views = []; data = {}
+        def vmark(v):
+            if v not in vmap:
+                vmap[v] = len(views); views.append(v)
+            return vmap[v]
+        for a in accs:
+            if 'bufferView' in a:
+                a['bufferView'] = vmark(a['bufferView'])
+            if 'sparse' in a:
+                a['sparse']['indices']['bufferView'] = vmark(a['sparse']['indices']['bufferView'])
+                a['sparse']['values']['bufferView'] = vmark(a['sparse']['values']['bufferView'])
+        img_new = {}
+        for ii, im in enumerate(j.get('images', [])):
+            if im.get('bufferView', -1) >= 0:
+                im['bufferView'] = vmark(im['bufferView'])
+        newviews = []
+        newextra = {}
+        for nv, ov in enumerate(views):
+            newviews.append(j['bufferViews'][ov])
+            newextra[nv] = self.view(ov)
+        j['accessors'] = accs
+        j['bufferViews'] = newviews
+        self.extra = newextra
+
     def _encode(self, ii):
         buf = io.BytesIO()
+        if self.j['images'][ii].get('mimeType') == 'image/jpeg':  # JPEG остаётся JPEG (размер файла)
+            q = self.j['images'][ii].get('extras', {}).get('requant', self.jpeg_q)
+            self.images[ii].convert('RGB').save(buf, 'JPEG', quality=q, optimize=True)
+            return buf.getvalue()
         self.images[ii].convert('RGB').save(buf, 'PNG')
         self.j['images'][ii]['mimeType'] = 'image/png'
         return buf.getvalue()
+
+    jpeg_q = 88
 
 
 def raster_uv(P, N, UV, tris, size):
