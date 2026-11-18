@@ -814,6 +814,7 @@ export class App {
   private lastClip = 'idle';
   private clipSince = 0;
   private dozing = false;
+  private furMode = '';
 
   /**
    * Энергобюджет кадра: что сейчас происходит → частота рендера, потолок трекера.
@@ -857,6 +858,11 @@ export class App {
       locked: !!tr.isLocked && this.tracker.isTracking,
       trouble: !this.home?.active && ((!this.tracker.isTracking && now - this.lostAt < 3000) || tr.stats?.mode === 'plane'),
     });
+    // мех: в «спокойном» и «дрёме» меньше слоёв оболочек, в дрёме не колышется (src/character/furShell.ts)
+    if (out.mode !== this.furMode) {
+      this.furMode = out.mode;
+      void import('./character/furShell').then((m) => m.setFurEnergy(out.mode));
+    }
     if ((out.mode === 'doze') !== this.dozing) {
       this.dozing = out.mode === 'doze';
       this.director?.log(this.dozing ? 'энергия: кот дремлет (60 с без касаний, речи и движения) — минимальные частоты' : 'энергия: проснулся');

@@ -28,6 +28,8 @@ class Glb:
 
     def acc(self, ai):
         a = self.j['accessors'][ai]
+        if 'sparse' in a or 'bufferView' not in a:
+            return self._sparse(a)
         v = self.j['bufferViews'][a['bufferView']]
         n = NC[a['type']]
         dt = np.dtype(CT[a['componentType']])
@@ -36,6 +38,31 @@ class Glb:
         off = a.get('byteOffset', 0)
         arr = np.ndarray((a['count'], n), dtype=dt, buffer=raw, offset=off, strides=(stride, dt.itemsize)).copy()
         return arr if n > 1 else arr[:, 0]
+
+    def _sparse(self, a):
+        """accessor без bufferView (нули) и/или sparse (glTF 2.0 §3.6.2.3)"""
+        n = NC[a['type']]
+        dt = np.dtype(CT[a['componentType']])
+        if 'bufferView' in a:
+            b = dict(a); b.pop('sparse')
+            out = self.acc_dict(b)
+        else:
+            out = np.zeros((a['count'], n), dtype=dt)
+        sp = a.get('sparse')
+        if sp:
+            ii, vv = sp['indices'], sp['values']
+            idt = np.dtype(CT[ii['componentType']])
+            idx = np.frombuffer(self.view(ii['bufferView']), dtype=idt, count=sp['count'], offset=ii.get('byteOffset', 0))
+            val = np.frombuffer(self.view(vv['bufferView']), dtype=dt, count=sp['count'] * n, offset=vv.get('byteOffset', 0)).reshape(-1, n)
+            out[idx.astype(np.int64)] = val
+        return out if n > 1 else out[:, 0]
+
+    def acc_dict(self, a):
+        self.j['accessors'].append(a)
+        try:
+            return self.acc(len(self.j['accessors']) - 1).reshape(a['count'], -1)
+        finally:
+            self.j['accessors'].pop()
 
     def add_acc(self, arr, ctype, typ, target=None):
         """новый accessor (свой bufferView) → индекс"""

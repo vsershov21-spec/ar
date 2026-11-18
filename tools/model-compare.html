@@ -1,0 +1,93 @@
+<!doctype html><html><head><meta charset="utf-8"><title>model compare</title>
+<style>html,body{margin:0;background:#ececee;color:#222;font:13px sans-serif}canvas{display:block}</style></head>
+<body><script type="module">
+// Разворот кота через рантайм GlbCharacter и свет приложения (src/app.ts: полусфера 2.2 + направленный 1.6,
+// без тонмаппинга, sRGB) — для сравнения с референсами design/cut/<p>/turn/*.png (tools/model-compare.mjs).
+// ?p=glitter&m=/models/glitter_v1.glb&v=front,three_quarter,side,back,face&w=300&h=440&fur=4&pose=rest|idle
+// &perf=1 — после снимка замер: N кадров вида front, gl.finish, среднее мс (SwiftShader — только относительно).
+import * as THREE from 'three';
+let seed = 12345; Math.random = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+const { GlbCharacter } = await import('../src/character/glbCharacter.ts');
+const q = new URLSearchParams(location.search);
+const persona = q.get('p') || 'glitter';
+const url = q.get('m') || `/models/${persona}_v1.glb`;
+const views = (q.get('v') || 'front,three_quarter,side,back,face').split(',');
+const W = +(q.get('w') || 300), H = +(q.get('h') || 440);
+const r = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+(await import('../src/core/glRenderer.ts')).setGlRenderer(r);
+r.setPixelRatio(+(q.get('dpr') || 1)); r.setSize(views.length * W, H); r.setScissorTest(true); document.body.appendChild(r.domElement);
+r.outputColorSpace = THREE.SRGBColorSpace;
+const sc = new THREE.Scene(); sc.background = new THREE.Color(0xececee);
+sc.add(new THREE.HemisphereLight(0xffffff, 0x8899aa, 2.2));
+const dl = new THREE.DirectionalLight(0xffffff, 1.6); dl.position.set(0.5, 1, 1); sc.add(dl);
+const ch = new GlbCharacter(url, '/models/anims_v1.glb');
+await ch.load();
+ch.setPersona?.({ id: persona });
+ch.clips?.setIdles?.(['idle'], persona);
+sc.add(ch.object);
+if (q.get('ft') === '0') ch.furTone.uniforms.uFtOn.value = 0;
+if (q.get('a2c') === '0') ch.object.traverse((o) => { if (/^BD_Fur/.test(o.name) && o.material) o.material.alphaToCoverage = false; });
+if (q.get('hide')) ch.object.traverse((o) => { if (new RegExp(q.get('hide')).test(o.name)) o.visible = false; });
+ch.play?.('idle');
+// взгляд и голова — вперёд (как на рефах), а не на камеру: ?look=cam — на камеру
+if (q.get('look') !== 'cam') ch.lookAt(new THREE.Vector3(0, 0.75, 4));
+if (ch.faceMix) ch.faceMix.nextBlink = 1e9;
+if (ch.life) ch.life.nextMicro = 1e9;
+const bone = (n) => { let b = null; ch.object.traverse((o) => { if (!b && o.name.replace(/^mixamorig:?/, '') === n) b = o; }); return b; };
+const cam = new THREE.PerspectiveCamera(22, W / H, 0.01, 50);
+for (let k = 0; k < 20; k++) ch.update(1 / 30, cam);
+ch.object.updateMatrixWorld(true);
+const box = new THREE.Box3();
+ch.object.traverse((o) => { if (o.isSkinnedMesh && o.visible && !/^BD_FurShell_/.test(o.name)) { o.computeBoundingBox?.(); box.expandByObject(o, true); } });
+const size = box.getSize(new THREE.Vector3()), ctr = box.getCenter(new THREE.Vector3());
+const hp = bone('Head').getWorldPosition(new THREE.Vector3()), tp = bone('HeadTop_End').getWorldPosition(new THREE.Vector3());
+function look(target, yawDeg, pitchDeg, dist, fov = 22) {
+  const y = yawDeg * Math.PI / 180, p = pitchDeg * Math.PI / 180;
+  cam.fov = fov; cam.aspect = W / H; cam.updateProjectionMatrix();
+  cam.position.set(target.x + Math.sin(y) * Math.cos(p) * dist, target.y + Math.sin(p) * dist, target.z + Math.cos(y) * Math.cos(p) * dist);
+  cam.lookAt(target);
+}
+const full = (yaw) => { const d = (size.y * 1.12) / 2 / Math.tan((22 * Math.PI) / 360); look(ctr, yaw, 3, d); };
+const yawOf = { front: 0, three_quarter: +(q.get('tq') || -35), side: +(q.get('sd') || -90), back: 180 };
+function setView(v) {
+  if (v === 'face' || v === 'face34') {
+    const c = hp.clone().lerp(tp, 0.55);
+    look(c, v === 'face34' ? -28 : 0, 4, hp.distanceTo(tp) * +(q.get('fz') || 10));
+  } else full(yawOf[v] ?? 0);
+}
+views.forEach((v, i) => {
+  setView(v);
+  ch.update(0.001, cam); setView(v);
+  const x = i * W;
+  r.setViewport(x, 0, W, H); r.setScissor(x, 0, W, H); r.render(sc, cam);
+});
+window.__info = { size: size.toArray(), shells: (() => { let n = 0; ch.object.traverse((o) => { if (/^BD_FurShell_\d/.test(o.name) && o.visible) n++; }); return n; })() };
+if (q.get('perf')) {
+  const gl = r.getContext();
+  const N = +(q.get('perf'));
+  setView(q.get('pv') || 'front');
+  r.setViewport(0, 0, W, H); r.setScissor(0, 0, W, H);
+  const px = new Uint8Array(4);
+  // только рендер (CPU-логика кота не в замере): кадр + readPixels — ждём GPU
+  const one = () => { r.render(sc, cam); gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px); };
+  for (let k = 0; k < 3; k++) one();
+  const t0 = performance.now();
+  for (let k = 0; k < N; k++) one();
+  window.__info.ms = (performance.now() - t0) / N;
+  // уровни вперемешку (машина шумная): оболочек 0/4/8/12 (+ карточки), медиана по раундам
+  const lod = ch.model?.userData?.furLod;
+  if (lod && q.get('levels')) {
+    const { setFurQuality } = await import('../src/character/furShell.ts');
+    const L = [0, 4, 8, 12].filter((x) => x <= lod.shells.length), res = Object.fromEntries(L.map((x) => [x, []]));
+    for (let round = 0; round < +(q.get('levels')); round++) for (const x of L) {
+      setFurQuality(ch.object, x / lod.shells.length); one();
+      const t = performance.now(); one(); one(); res[x].push((performance.now() - t) / 2);
+    }
+    const med = (a) => a.sort((u, v) => u - v)[a.length >> 1];
+    window.__info.levels = Object.fromEntries(L.map((x) => [x, Math.round(med(res[x]))]));
+    window.__info.callsAt12 = r.info.render.calls;
+  }
+  window.__info.calls = r.info.render.calls; window.__info.tris = r.info.render.triangles;
+}
+window.__ready = true;
+</script></body></html>
