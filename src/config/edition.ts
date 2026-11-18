@@ -44,6 +44,8 @@ export const FEATURES = {
   home: { mvp: true, lab: true, note: 'мир кота, базовый: пункт «Мой дом» и комната (app.ts withHome / src/home)' },
   awake: { mvp: true, lab: true, note: 'пробуждение-катсцена и салют при находке карты (app.ts → src/awake, fx/salute)' },
   'progress.server': { mvp: true, lab: true, note: 'прогресс на сервере по id устройства (progress/index.ts bootProgress)' },
+  'catalog.sheet': { mvp: true, lab: true, note: 'каталог на телефоне — лист снизу: вкладки-группы и сетка 4 в ряд, кот сдвигается над листом (ui.ts openSheet, ui/catalogGroups.ts)' },
+  'desktop.panel': { mvp: true, lab: true, note: 'десктоп-панель умений и «Тест» справа (ui/deskPanel.ts); только ?desktop на устройстве без касания и окне ≥ 900 px' },
   // ── только lab ──
   'games.new': { mvp: false, lab: true, note: 'мини-игры «Угадай рожицу», «Камень-ножницы», «Делай как я» (emo/rps/simon): persona/content.ts убирает их диалоги' },
   'stickers.pack': { mvp: false, lab: true, note: 'новый пак наклеек СберКота и коллекция (fx/stickerPack, fxLayer)' },

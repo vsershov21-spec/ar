@@ -1,6 +1,6 @@
 // редакция (docs/EDITIONS.md) — первым импортом: свои ключи localStorage в lab, без отладочных параметров в MVP
 import './config/boot';
-import { EDITION, showEditionBadge } from './config/edition';
+import { EDITION, feature, showEditionBadge } from './config/edition';
 import './ui/styles.css';
 import { App, readParams } from './app';
 import { installCatApi } from './debug/catApi';
@@ -22,6 +22,11 @@ app
   .then(async () => {
     installCatApi(app); // window.__cat: проверка реплик и событий с телефона/консоли
     trackSession(app.director);
+    // десктоп-просмотр (?desktop, без касаний): панель умений и «Тест» справа (src/ui/deskPanel.ts, feature 'desktop.panel')
+    if (app.desktopView && feature('desktop.panel')) {
+      const { DeskPanel } = await import('./ui/deskPanel');
+      new DeskPanel(app);
+    }
     if (params.debug) {
       (await import('./progress/debugTab')).registerProgressTab();
       const { DebugPanel } = await import('./debug/debugPanel');

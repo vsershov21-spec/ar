@@ -37,6 +37,8 @@ import { EnergyBudget, defaultPixelRatio, fxNeedsBoost, isMobileDevice } from '.
 import { isPersonaId } from './persona/types';
 import { prepareFlowMemory, runFlow } from './debug/flows';
 import { feature } from './config/edition';
+import { NO_SHIFT, fitShift, shiftCss, shiftPoint, unshiftPoint, type ViewShift } from './ui/catalogGroups';
+import { ZONES } from './home/zones';
 import { OrbitPointers, OrbitView, bindOrbitKeys, bindOrbitWheel, isDesktopView, isTouchDevice, noCardCameraOff, showOrbitHint, type ViewPose } from './input/orbit';
 
 export type CharacterMode = 'sprite' | 'rig' | 'glb';
@@ -209,6 +211,9 @@ export class App {
       // новые мини-игры — только когда их начало озвучено (иначе игра идёт молча: director.hasVoiced('rps_start'))
       catalog: () => (this.director ? { who: this.director.persona.name, sections: this.withHome(this.voicedOnly(buildCatalog(this.director.persona, catEnv))) } : null),
       onCatalogPick: (item) => this.runCatalogItem(item),
+      // лист каталога открыт — кот уезжает в область над ним (ui/catalogGroups.ts fitShift), закрыт — обратно
+      onCatalogLayout: (free) => this.setShiftArea(free),
+      extraItems: () => this.extraItems(),
       onSkipName: () => this.director.dispatch({ type: 'skip_name' }),
       onShakeButton: () => this.input.simulateShake(),
       onKids: () => this.ui.showKids(true, ASSETS.sberKidsUrl),
@@ -234,11 +239,13 @@ export class App {
     this.catEnv = catEnv;
 
     // пузырь реплик держится над котом / сбоку от головы, не закрывая морду
+    // (с учётом сдвига кота из-под листа каталога)
     this.ui.catRect = () => {
-      if (!this.stage?.root.visible) return null;
-      const w = this.root.clientWidth, h = this.root.clientHeight;
-      const top = this.stage.headScreen(w, h, 1.02), feet = this.stage.headScreen(w, h, 0), head = this.stage.anchorScreen('head', w, h);
-      return { top: top.y, bottom: feet.y, cx: head.x, headY: head.y, half: Math.max(40, Math.abs(feet.y - top.y) * 0.32) };
+      const r = this.rawCatRect();
+      const v = this.shift;
+      if (!r || v === NO_SHIFT) return r;
+      const t = shiftPoint(v, r.cx, r.top), b = shiftPoint(v, r.cx, r.bottom), hd = shiftPoint(v, r.cx, r.headY);
+      return { top: t.y, bottom: b.y, cx: t.x, headY: hd.y, half: r.half * v.s };
     };
     this.bindVoice();
 
@@ -306,7 +313,13 @@ export class App {
     const fx = this.fx;
     fx.onSound = (id, v) => this.audio.play(id, v ?? 1);
     fx.onLog = (m) => this.director.log(m);
-    fx.anchorFn = (n) => this.stage.anchorScreen(n, this.root.clientWidth, this.root.clientHeight);
+    fx.anchorFn = (n) => {
+      const a = this.stage.anchorScreen(n, this.root.clientWidth, this.root.clientHeight);
+      const v = this.shift;
+      if (v === NO_SHIFT) return a;
+      const p = shiftPoint(v, a.x, a.y);
+      return { ...a, x: p.x, y: p.y, s: a.s * v.s };
+    };
     // голос: уровень микрофона для echo_wave; «ушки» у кнопки, пока кот слушает; волна у уха в режиме повтора
     fx.levelFn = () => (this.engine?.mic.isOpen ? this.engine.mic.level : 0);
     let listening = false, echo = false;
@@ -484,7 +497,7 @@ export class App {
     }
   }
   /** чип кота: действие — как кнопка каталога, фраза — как сказанная голосом */
-  private runChip(c: Chip) {
+  runChip(c: Chip) {
     this.input.activity();
     if (c.id.startsWith('home:')) return void this.home.act(c.id);
     if ('action' in c.run) {
@@ -501,7 +514,53 @@ export class App {
     if (g) return secs.map((s) => (s === g ? { ...s, items: [item, ...s.items] } : s));
     return [...secs, { id: 'games' as const, title: 'Игры', icon: 'quest', items: [item] }];
   }
-  private runCatalogItem(item: CatalogItem) {
+  /** кот на экране без сдвига (px) */
+  rawCatRect() {
+    if (!this.stage?.root.visible) return null;
+    const w = this.root.clientWidth, h = this.root.clientHeight;
+    const top = this.stage.headScreen(w, h, 1.02), feet = this.stage.headScreen(w, h, 0), head = this.stage.anchorScreen('head', w, h);
+    return { top: top.y, bottom: feet.y, cx: head.x, headY: head.y, half: Math.max(40, Math.abs(feet.y - top.y) * 0.32) };
+  }
+  /** сдвиг кота из-под листа каталога (transform холста) и тот, по которому сейчас попадаем касанием (на время анимации — старый) */
+  shift: ViewShift = NO_SHIFT;
+  private hitShift: ViewShift = NO_SHIFT;
+  private hitShiftTimer = 0;
+  private shiftArea: { top: number; bottom: number; left: number; right: number } | null = null;
+  private shiftT = 0;
+  setShiftArea(free: { top: number; bottom: number; left: number; right: number } | null) {
+    this.shiftArea = free;
+    this.applyShift();
+  }
+  private applyShift() {
+    const v = this.shiftArea ? fitShift(this.rawCatRect(), this.shiftArea, 10, !this.home?.inRoom) : NO_SHIFT;
+    const same = (a: ViewShift, b: ViewShift) => Math.abs(a.dx - b.dx) < 2 && Math.abs(a.dy - b.dy) < 2 && Math.abs(a.s - b.s) < 0.01;
+    if (same(v, this.shift) && (v === NO_SHIFT) === (this.shift === NO_SHIFT)) return;
+    const prev = this.shift;
+    this.shift = v;
+    const c = this.renderer.domElement;
+    c.style.transform = shiftCss(v);
+    c.classList.toggle('shifted', v !== NO_SHIFT);
+    if (v === NO_SHIFT) {
+      // кот плавно возвращается: касание первые 0,35 с ещё попадает по нему там, где он виден
+      c.classList.add('unshifting');
+      clearTimeout(this.hitShiftTimer);
+      this.hitShift = prev;
+      this.hitShiftTimer = window.setTimeout(() => {
+        this.hitShift = NO_SHIFT;
+        c.classList.remove('unshifting');
+      }, 350);
+    } else this.hitShift = v;
+    this.director?.log(v === NO_SHIFT ? 'каталог: кот на месте' : `каталог: кот сдвинут (${Math.round(v.dx)}, ${Math.round(v.dy)}) ×${v.s.toFixed(2)}`);
+  }
+  /** пункты листа/панели сверх каталога: комнаты дома (когда кот дома), «Сдёрнуть наклейки» (десктоп — вместо встряски) */
+  extraItems(): { item: CatalogItem; section: string }[] {
+    const out: { item: CatalogItem; section: string }[] = [];
+    if (this.home?.phase === 'home')
+      for (const z of ZONES) if (z.id !== this.home.zone) out.push({ item: { id: `zone:${z.id}`, label: z.title, icon: z.icon, run: { ui: 'zone' } }, section: 'world' });
+    if (this.desktopView) out.push({ item: { id: 'ui:unstick', label: 'Сдёрнуть наклейки', icon: 'sticker', run: { ui: 'unstick' } }, section: 'magic' });
+    return out;
+  }
+  runCatalogItem(item: CatalogItem) {
     this.input.activity();
     if (item.id.startsWith('home:')) return void this.home.act(item.id);
     if ('action' in item.run) this.suggest.note(item.run.action);
@@ -510,6 +569,9 @@ export class App {
       say: (t) => this.engine.handleText(t, 'chip'),
       ui: (id) => {
         if (id === 'reanchor') this.reanchor();
+        else if (id === 'home') void this.home.act(item.id);
+        else if (id === 'unstick') this.input.simulateShake();
+        else if (id === 'zone') this.home.go(item.id.slice(5) as (typeof ZONES)[number]['id']);
         else {
           const m = this.engine.mode === 'auto' ? 'ptt' : 'auto';
           this.engine.setMode(m);
@@ -716,6 +778,8 @@ export class App {
     if (!coarse && c && now - c.t < 400 && Math.abs(c.x - x) <= 4 && Math.abs(c.y - y) <= 4) return c.zone;
     const ray = this.ray;
     const w = this.root.clientWidth, h = this.root.clientHeight;
+    // кот сдвинут из-под листа каталога — точка касания обратно в «несдвинутый» экран
+    if (this.hitShift !== NO_SHIFT) ({ x, y } = unshiftPoint(this.hitShift, x, y));
     ray.setFromCamera(this.rayPt.set((x / w) * 2 - 1, -(y / h) * 2 + 1), this.stage.camera);
     this.stage.root.updateMatrixWorld(true);
     if (coarse) return (this.character.hitCoarse?.(ray) ?? this.character.hitTest(ray)) ? 'body' : null;
@@ -984,6 +1048,11 @@ export class App {
     this.fx.update(dt);
     this.fx.draw();
     this.onFrame(dt);
+    // лист каталога открыт: кот мог пойти — сдвиг пересчитываем 4 раза в секунду
+    if (this.shiftArea && (this.shiftT += dt) > 0.25) {
+      this.shiftT = 0;
+      this.applyShift();
+    }
     perf.section('render');
     // кота (и его тени) на экране нет: один кадр — очистить холст, дальше GPU не трогаем
     const empty = !this.stage.root.visible && !this.stage.shadow.visible && !this.awake?.active && this.params.tracker !== 'webxr';

@@ -15,8 +15,10 @@ export interface CatalogItem {
   label: string;
   icon: string;
   /** ui — пункт раздела «Ещё» (пересадить на другую карту, режим микрофона): не умение кота, в «открыто N из M» не считается */
-  run: { action: ActionId } | { say: string } | { ui: 'reanchor' | 'micmode' | 'home' };
+  run: { action: ActionId } | { say: string } | { ui: UiRun };
 }
+/** служебные пункты: пересадить, микрофон, дом; unstick — «Сдёрнуть наклейки», zone — комната дома (десктоп-панель, лист) */
+export type UiRun = 'reanchor' | 'micmode' | 'home' | 'unstick' | 'zone';
 export interface CatalogSection { id: SectionId; title: string; icon: string; items: CatalogItem[] }
 
 interface ActionSpec { id: ActionId; label: string; icon: string; /** подпись и иконка по эффекту реакции характера */ byFx?: { event: string; map: Record<string, [string, string]> } }
@@ -157,7 +159,7 @@ export function catalogEnv(intents: { intent: string }[], triggers: Record<strin
 }
 
 /** тап по пункту → куда отправить: в режиссёр (действие) или в голосовой вход (фраза) */
-export function routeItem(item: CatalogItem, to: { action(id: ActionId): void; say(text: string): void; ui?(id: 'reanchor' | 'micmode' | 'home'): void }) {
+export function routeItem(item: CatalogItem, to: { action(id: ActionId): void; say(text: string): void; ui?(id: UiRun): void }) {
   if ('action' in item.run) to.action(item.run.action);
   else if ('say' in item.run) to.say(item.run.say);
   else to.ui?.(item.run.ui);

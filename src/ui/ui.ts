@@ -11,6 +11,7 @@ import type { Chip } from '../scenario/suggest';
 import { CAT_ICON } from './catalogIcons';
 import { collection as stickerCollection } from '../fx/stickerPack';
 import { feature } from '../config/edition';
+import { GROUP_META, RecentStore, groupCatalog, oftenGroup, type CatalogGroup } from './catalogGroups';
 
 export interface UiHandlers {
   onWake(): void;
@@ -36,6 +37,10 @@ export interface UiHandlers {
   catalog?(): { who: string; sections: CatalogSection[] } | null;
   /** выбор в каталоге (лист уже закрыт — ребёнок видит реакцию) */
   onCatalogPick?(item: CatalogItem): void;
+  /** лист каталога (feature 'catalog.sheet') открыт: свободная от него область экрана (кот сдвигается туда); null — закрыт */
+  onCatalogLayout?(free: { top: number; bottom: number; left: number; right: number } | null): void;
+  /** пункты сверх каталога (комнаты дома, «Сдёрнуть наклейки» на десктопе): раздел — для группы по умолчанию */
+  extraItems?(): { item: CatalogItem; section: string }[];
 }
 
 /** вариант в листе выбора характера */
@@ -230,6 +235,8 @@ export class UI {
         <button class="btn btn-light shakebtn hidden" data-a="shake">Сдёрнуть наклейки</button>
         <div class="chips suggest hidden" role="toolbar" aria-label="Кот предлагает"></div>
         <div class="catalog hidden" role="dialog" aria-label="Что умеет кот">
+          <div class="cs-handle" aria-hidden="true"><i></i></div>
+          <div class="cs-tip hidden" role="tooltip"></div>
           <div class="cat-top"><div class="cat-tabs" role="tablist"></div></div>
           <div class="cat-row" role="list"></div>
         </div>
@@ -277,6 +284,7 @@ export class UI {
       if (a === 'paw') {
         // до конца знакомства каталога нет: кнопка видна (приглушена), а кот объясняет, что сначала познакомимся
         if (this.dock.classList.contains('no-play')) this.micHintText('Сначала познакомимся — потом покажу, что умею');
+        else if (this.deskToggle) this.deskToggle();
         else if (this.catalogOpen) this.closeCatalog();
         else this.openCatalog();
       }
@@ -519,6 +527,7 @@ export class UI {
     if (key === this.sugKey) return;
     this.sugKey = key;
     this.sugCount = chips.length;
+    this.lastChips = chips;
     const box = this.chips;
     box.innerHTML = '';
     for (const c of chips) {
@@ -604,7 +613,7 @@ export class UI {
   private get catalogEl() {
     return this.root.querySelector('.catalog') as HTMLDivElement;
   }
-  private catIcon(id: string) {
+  catIcon(id: string) {
     return CAT_ICON[id] ?? (ICON as Record<string, string>)[id] ?? '';
   }
   /** точка на лапке, если в каталоге есть непробованное */
@@ -617,8 +626,192 @@ export class UI {
   get isCatalogOpen() {
     return this.catalogOpen;
   }
+
+  // ───────────── лист каталога (телефон, feature 'catalog.sheet') и общие группы с десктоп-панелью ─────────────
+  /** десктоп-панель (src/ui/deskPanel.ts) забирает лапку: она открывает/сворачивает панель, лист не нужен */
+  deskToggle: (() => void) | null = null;
+  /** последние выбранные пункты — раздел «Часто» */
+  readonly recent = new RecentStore();
+  /** текущие чипы кота (для «Часто» и цифр 1–9 на десктопе) */
+  lastChips: Chip[] = [];
+  /** лист снизу: вкладки-группы и сетка 4 в ряд (без горизонтальной ленты) */
+  get sheetMode() {
+    return feature('catalog.sheet') && !this.deskToggle;
+  }
+  /** все группы каталога (тот же источник, что у ленты): разделы характера + «Ещё» + дополнительные пункты */
+  catalogGroups(o: { mergeService?: boolean } = {}): CatalogGroup[] {
+    const c = this.h.catalog?.();
+    if (!c) return [];
+    const more = moreSection({ reanchor: this.canReanchor && !!this.h.onReanchor, mic: this.mic.dataset.unsupported ? null : this.micModeNow });
+    const groups = groupCatalog(more ? [...c.sections, more] : c.sections, this.h.extraItems?.() ?? []);
+    if (!o.mergeService) return groups;
+    // телефон: шесть вкладок — служебное (микрофон) уходит в «Мир»
+    const svc = groups.find((g) => g.id === 'service');
+    if (!svc) return groups;
+    const rest = groups.filter((g) => g !== svc);
+    const world = rest.find((g) => g.id === 'world');
+    if (world) world.items = [...world.items, ...svc.items];
+    else rest.push({ ...svc, id: 'world', ...GROUP_META.world });
+    return rest;
+  }
+  /** id предложений кота как пунктов каталога */
+  get suggestedIds(): string[] {
+    return this.lastChips.map((c) => ('action' in c.run ? c.run.action : c.id));
+  }
+  private sheetGroupsList: CatalogGroup[] = [];
+  private sheetTab: string = 'often';
+  private sheetIdle = 0;
+  private sheetTipTimer = 0;
+  /** лист закрывается сам после стольких мс без касаний */
+  static readonly SHEET_IDLE_MS = 8000;
+  private openSheet() {
+    const groups = this.catalogGroups({ mergeService: true });
+    if (!groups.length) return;
+    // «Часто» — снимок на открытие: пока лист открыт, порядок не прыгает
+    const often = oftenGroup(groups, this.recent.list, this.suggestedIds);
+    this.sheetGroupsList = often ? [often, ...groups] : groups;
+    if (!this.sheetGroupsList.some((g) => g.id === this.sheetTab)) this.sheetTab = this.sheetGroupsList[0].id;
+    const el = this.catalogEl;
+    const c = this.h.catalog?.();
+    el.setAttribute('aria-label', `Что умеет ${c?.who ?? 'кот'}`);
+    this.catalogOpen = true;
+    this.root.classList.add('cat-open', 'sheet-open');
+    this.chips.classList.add('hidden');
+    this.pawBtn.classList.add('on');
+    this.pawBtn.setAttribute('aria-expanded', 'true');
+    el.classList.add('sheet-mode');
+    el.classList.remove('hidden', 'compact', 'leaving');
+    el.style.transform = '';
+    this.root.querySelector('.coach')?.classList.add('hidden');
+    this.renderSheet();
+    this.bumpSheetIdle();
+    // область над листом — App сдвигает туда кота (после раскладки)
+    requestAnimationFrame(() => this.sheetLayout());
+    this.layoutBubble();
+  }
+  /** свободная от листа область (кот сдвигается туда) */
+  sheetFree(): { top: number; bottom: number; left: number; right: number } | null {
+    if (!this.catalogOpen || !this.sheetMode) return null;
+    const root = this.root.getBoundingClientRect(), box = this.catalogEl.getBoundingClientRect();
+    const land = this.root.clientWidth > this.root.clientHeight && this.root.clientHeight <= 520;
+    const topPad = 24;
+    if (land) return { top: topPad, bottom: root.height - 8, left: box.right - root.left, right: root.width };
+    return { top: topPad, bottom: box.top - root.top, left: 0, right: root.width };
+  }
+  private sheetLayout() {
+    if (!this.catalogOpen || !this.sheetMode) return;
+    this.h.onCatalogLayout?.(this.sheetFree());
+  }
+  private bumpSheetIdle() {
+    clearTimeout(this.sheetIdle);
+    this.sheetIdle = window.setTimeout(() => {
+      if (this.catalogOpen && this.sheetMode) this.closeCatalog();
+    }, UI.SHEET_IDLE_MS);
+  }
+  private renderSheet() {
+    const el = this.catalogEl;
+    const tabs = el.querySelector('.cat-tabs') as HTMLDivElement;
+    const row = el.querySelector('.cat-row') as HTMLDivElement;
+    tabs.innerHTML = '';
+    for (const g of this.sheetGroupsList) {
+      const t = document.createElement('button');
+      t.type = 'button';
+      t.className = 'cat-tab cs-tab';
+      t.dataset.tab = g.id;
+      t.setAttribute('role', 'tab');
+      t.setAttribute('aria-selected', String(g.id === this.sheetTab));
+      t.classList.toggle('on', g.id === this.sheetTab);
+      t.classList.toggle('new', g.id !== 'often' && g.items.some((i) => !('ui' in i.run) && !this.tried.has(i.id)));
+      t.innerHTML = `<span class="cat-tab-ico">${this.catIcon(g.icon)}</span><span class="cat-tab-l"></span>`;
+      (t.querySelector('.cat-tab-l') as HTMLElement).textContent = g.title;
+      t.onclick = () => {
+        this.sheetTab = g.id;
+        this.bumpSheetIdle();
+        this.renderSheet();
+        row.scrollTo?.({ top: 0 });
+      };
+      tabs.appendChild(t);
+    }
+    const g = this.sheetGroupsList.find((x) => x.id === this.sheetTab) ?? this.sheetGroupsList[0];
+    row.innerHTML = '';
+    row.className = 'cat-row cs-grid';
+    row.dataset.sec = g.id;
+    for (const it of g.items) row.appendChild(this.gridItem(it, () => this.pickSheet(it)));
+  }
+  /** кнопка сетки (лист и десктоп-панель): иконка, подпись до двух строк, точка «новое», долгое нажатие — подсказка */
+  gridItem(it: CatalogItem, pick: () => void, extra = ''): HTMLButtonElement {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'cs-item';
+    b.dataset.item = it.id;
+    if ('action' in it.run) b.dataset.act = it.run.action;
+    const kind = 'ui' in it.run ? 'ui' : 'say' in it.run ? 'say' : 'act';
+    b.dataset.kind = kind;
+    b.innerHTML = `<span class="cs-ico">${this.catIcon(kind === 'say' ? 'chat' : it.icon) || this.catIcon('star')}</span><span class="cs-l"></span>${extra}`;
+    (b.querySelector('.cs-l') as HTMLElement).textContent = it.label;
+    if (it.id === 'sticker' && feature('stickers.pack')) {
+      const c = stickerCollection();
+      const n = document.createElement('span');
+      n.className = 'cat-count';
+      n.textContent = `${c.n}/${c.total}`;
+      b.setAttribute('aria-label', `${it.label}: собрано ${c.n} из ${c.total}`);
+      b.querySelector('.cs-ico')?.appendChild(n);
+    }
+    b.classList.toggle('new', kind !== 'ui' && !this.tried.has(it.id));
+    // долгое нажатие — короткая подсказка (что это), без выбора
+    let tipFired = false;
+    b.addEventListener('pointerdown', () => {
+      tipFired = false;
+      clearTimeout(this.sheetTipTimer);
+      this.sheetTipTimer = window.setTimeout(() => {
+        tipFired = true;
+        this.showSheetTip(b, it);
+      }, 480);
+    });
+    const cancel = () => clearTimeout(this.sheetTipTimer);
+    b.addEventListener('pointerup', cancel);
+    b.addEventListener('pointerleave', cancel);
+    b.addEventListener('pointercancel', cancel);
+    b.addEventListener('contextmenu', (e) => e.preventDefault());
+    b.onclick = () => {
+      if (tipFired) {
+        tipFired = false;
+        return;
+      }
+      if (this.catDragged) return;
+      b.classList.remove('tapped');
+      void b.offsetWidth;
+      b.classList.add('tapped');
+      pick();
+    };
+    return b;
+  }
+  private showSheetTip(b: HTMLElement, it: CatalogItem) {
+    const tip = this.catalogEl.querySelector('.cs-tip') as HTMLElement;
+    const how = 'say' in it.run ? 'кот услышит фразу, как будто ты её сказал' : 'ui' in it.run ? 'настройка' : this.tried.has(it.id) ? 'уже пробовал — можно ещё' : 'ещё не пробовал';
+    tip.textContent = `${it.label} — ${how}`;
+    const r = b.getBoundingClientRect(), box = this.catalogEl.getBoundingClientRect();
+    tip.style.left = `${Math.round(Math.min(Math.max(8, r.left - box.left + r.width / 2), box.width - 8))}px`;
+    tip.style.top = `${Math.round(r.top - box.top - 6)}px`;
+    tip.classList.remove('hidden');
+    this.bumpSheetIdle();
+    setTimeout(() => {
+      tip.classList.add('hidden');
+    }, 1800);
+  }
+  /** выбор в листе: лист остаётся (можно попробовать ещё), точка «новое» гаснет, таймер сворачивания — заново */
+  private pickSheet(it: CatalogItem) {
+    if (!('ui' in it.run)) this.tried.mark(it.id);
+    this.recent.push(it.id);
+    this.bumpSheetIdle();
+    this.renderSheet();
+    this.syncMoreDot();
+    this.h.onCatalogPick?.(it);
+  }
   /** каталог на месте чипов: крупные вкладки-разделы и один ряд иконок; кот и пузырь остаются видны. В конце — «Ещё» */
   openCatalog(tab?: SectionId) {
+    if (this.deskToggle) return this.deskToggle();
+    if (this.sheetMode) return this.openSheet();
     const c = this.h.catalog?.();
     if (!c || !c.sections.length) return;
     const more = moreSection({ reanchor: this.canReanchor && !!this.h.onReanchor, mic: this.mic.dataset.unsupported ? null : this.micModeNow });
@@ -652,7 +845,14 @@ export class UI {
   closeCatalog() {
     if (!this.catalogOpen) return;
     this.catalogOpen = false;
-    this.root.classList.remove('cat-open');
+    clearTimeout(this.sheetIdle);
+    if (this.catalogEl.classList.contains('sheet-mode')) {
+      this.catalogEl.classList.remove('sheet-mode');
+      this.catalogEl.querySelector('.cs-tip')?.classList.add('hidden');
+      (this.catalogEl.querySelector('.cat-row') as HTMLElement).className = 'cat-row';
+      this.h.onCatalogLayout?.(null);
+    }
+    this.root.classList.remove('cat-open', 'sheet-open');
     this.catalogEl.classList.add('hidden');
     this.catalogEl.style.transform = '';
     this.pawBtn.classList.remove('on');
@@ -740,6 +940,7 @@ export class UI {
   /** кот низко на экране (или у края в альбомной) — панель поджимается до одного ряда без вкладок */
   private fitCatalog() {
     if (!this.catalogOpen) return;
+    if (this.sheetMode) return this.sheetLayout();
     const el = this.catalogEl;
     const r = this.catRect();
     const box = el.getBoundingClientRect(), rootBox = this.root.getBoundingClientRect();
@@ -770,8 +971,14 @@ export class UI {
     el.addEventListener('pointerdown', (e) => {
       x0 = e.clientX;
       y0 = e.clientY;
-      on = true;
       this.catDragged = false;
+      if (this.sheetMode) {
+        this.bumpSheetIdle();
+        // лист: тянуть вниз — за ручку или вкладки (сетка листается сама); в альбомной — к краю откуда угодно
+        on = land() || !!(e.target as HTMLElement).closest?.('.cs-handle, .cat-top');
+        return;
+      }
+      on = true;
     });
     el.addEventListener('pointermove', (e) => {
       if (!on) return;
