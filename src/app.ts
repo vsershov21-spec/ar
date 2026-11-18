@@ -28,6 +28,7 @@ import { CardMonitor, LumaSampler, cardScreenFrac, type CardEvent } from './trac
 import { perf, AdaptiveQuality, type QualityLevel } from './core/perf';
 import { prefetchModel, warmModel } from './core/modelUrl';
 import { loadMemory } from './scenario/memory';
+import { progressReady } from './progress';
 import { PERSONA_IDS } from './persona/types';
 import { setGlRenderer } from './core/glRenderer';
 import { EnergyBudget, defaultPixelRatio, fxNeedsBoost, isMobileDevice } from './core/energy';
@@ -223,6 +224,7 @@ export class App {
     };
     this.bindVoice();
 
+    await progressReady(); // память с сервера (≤ 1,5 с от старта страницы; обычно уже готова к этому моменту)
     this.director = new Director({
       tracker: this.tracker, stage: this.stage, fx: this.fx, audio: this.audio, voice: this.voice, ui: this.ui,
       content, glCanvas: this.renderer.domElement, size: () => ({ w: this.root.clientWidth, h: this.root.clientHeight }),

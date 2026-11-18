@@ -31,6 +31,7 @@ try {
     for (const e of fs.readdirSync(path.join(src, rel), { withFileTypes: true })) {
       if (e.name.startsWith('.') || e.name.endsWith('.mp3.json')) continue; // .mp3.json — кэш сборки озвучки
       if (!rel && e.name === 'voice-el') continue; // сырьё ElevenLabs: в сайт его кладёт pull-server-voice (voice/el/)
+      if (!rel && e.name === 'progress') continue; // данные сервиса прогресса (server/progress) — НЕ публиковать
       const r = path.join(rel, e.name);
       if (e.isDirectory()) {
         fs.mkdirSync(path.join(dist, r), { recursive: true });

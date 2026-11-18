@@ -2,10 +2,13 @@ import './ui/styles.css';
 import { App, readParams } from './app';
 import { installCatApi } from './debug/catApi';
 import { perf } from './core/perf';
+import { bootProgress, trackSession } from './progress';
 
 perf.enabled = new URLSearchParams(location.search).has('perf');
 (window as any).__perf = perf;
 
+// прогресс на сервере по признаку устройства (src/progress, server/progress): до App — ?reset=1 чистит память раньше, чем её прочтут
+bootProgress();
 const params = readParams();
 const app = new App(document.getElementById('app')!, params);
 (window as any).__app = app;
@@ -13,7 +16,9 @@ app
   .init()
   .then(async () => {
     installCatApi(app); // window.__cat: проверка реплик и событий с телефона/консоли
+    trackSession(app.director);
     if (params.debug) {
+      (await import('./progress/debugTab')).registerProgressTab();
       const { DebugPanel } = await import('./debug/debugPanel');
       new DebugPanel(app);
     }

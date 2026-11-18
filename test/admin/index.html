@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex" />
+  <title>AR-кот — сброс прогресса по коду</title>
+  <style>
+    body { font: 15px/1.4 system-ui, sans-serif; max-width: 520px; margin: 24px auto; padding: 0 16px; color: #1b1b1b; }
+    input { font: 16px ui-monospace, monospace; padding: 10px; border-radius: 8px; border: 1px solid #bbb; width: 100%; box-sizing: border-box; margin: 4px 0 10px; }
+    button { padding: 10px 14px; border-radius: 10px; border: 0; font: 600 14px system-ui; margin-right: 8px; background: #21a038; color: #fff; }
+    button.danger { background: #c62828; }
+    pre { background: #f4f4f4; padding: 10px; border-radius: 8px; white-space: pre-wrap; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <h2>Сброс прогресса по коду устройства</h2>
+  <p>Код (6 символов) виден на странице <a href="/test/">/test</a> и в <code>?debug</code> → вкладка «Прогресс».</p>
+  <label>Токен администратора (PROGRESS_ADMIN_TOKEN; хранится только в этой вкладке)
+    <input id="token" type="password" autocomplete="off" /></label>
+  <label>Код устройства <input id="code" maxlength="6" placeholder="A1B2C3" autocapitalize="characters" /></label>
+  <label><input id="all" type="checkbox" style="width:auto" /> стереть и историю сессий</label>
+  <p><button id="find">Найти</button><button id="reset" class="danger">Сбросить</button></p>
+  <pre id="out"></pre>
+  <script type="module" src="../../src/progress/adminPage.ts"></script>
+</body>
+</html>

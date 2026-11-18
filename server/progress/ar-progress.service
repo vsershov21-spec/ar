@@ -1,0 +1,39 @@
+# AR-кот: сервис прогресса по устройствам. Установка — docs/DEPLOY.md, раздел «Сервис прогресса».
+#   /opt/ar-progress/{server.mjs,store.mjs}  — код (копия server/progress из репозитория)
+#   /srv/ar-extra/progress                   — данные (sqlite или JSON-файлы), TTL 90 дней
+#   /etc/ar-progress.env                     — PROGRESS_ADMIN_TOKEN=… (root, 0600; в git не кладём)
+[Unit]
+Description=AR cat progress service (127.0.0.1:8787)
+After=network.target
+
+[Service]
+Type=simple
+User=vershov-commander
+Group=vershov-commander
+Environment=NODE_ENV=production
+Environment=PROGRESS_HOST=127.0.0.1
+Environment=PROGRESS_PORT=8787
+Environment=PROGRESS_DATA=/srv/ar-extra/progress
+Environment=PROGRESS_STORE=auto
+Environment=PROGRESS_TTL_DAYS=90
+Environment=PROGRESS_ORIGINS=https://ar.vershov.com
+EnvironmentFile=-/etc/ar-progress.env
+# путь к node: `command -v node` (если не /usr/bin/node — поправить строку)
+ExecStart=/usr/bin/node --disable-warning=ExperimentalWarning /opt/ar-progress/server.mjs
+Restart=on-failure
+RestartSec=3
+UMask=0077
+MemoryMax=128M
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/srv/ar-extra/progress
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+LockPersonality=true
+
+[Install]
+WantedBy=multi-user.target

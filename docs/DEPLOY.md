@@ -108,3 +108,62 @@ sudo chown -R vershov-commander:caddy /srv/ar-extra && sudo chmod -R g+rX /srv/a
 - `public/external/xr/` — 8th Wall engine binary (проприетарная лицензия, `npm run setup-8thwall` вручную);
 - озвучка и модель Vosk — см. выше (`/srv/ar-extra`);
 - `bench-out/` — артефакты стенда распознавания.
+
+## Сервис прогресса (`server/progress`, порт 127.0.0.1:8787)
+
+Прогресс кота (знакомство, имя-прозвище, выбранный кот, что ребёнок пробовал, калибровка камеры) хранится и на телефоне
+(localStorage), и на сервере — по случайному id устройства. Это даёт продакту сброс прогресса любого телефона по коду.
+Сервис без npm-зависимостей: Node 20.11+ (на 22.5+ — SQLite через `node:sqlite`, иначе JSON-файлы с атомарной записью).
+Сайт работает и без сервиса: запрос к `/api/progress` не ответил за 1,5 с — только localStorage, как раньше.
+
+**Установка (один раз, под root на swe):**
+
+```bash
+sudo -i
+# 1) код сервиса — копия server/progress из main
+install -d -m 755 /opt/ar-progress
+for f in server.mjs store.mjs ar-progress.service; do
+  curl -fsSL "https://raw.githubusercontent.com/vsershov21-spec/ar/main/server/progress/$f" -o "/opt/ar-progress/$f"
+done
+# 2) папка данных (сборка сайта папку progress/ в dist не копирует — scripts/voice/attach-extra.mjs)
+install -d -o vershov-commander -g vershov-commander -m 700 /srv/ar-extra/progress
+# 3) токен админ-сброса: генерируется в файл, на экран не выводится
+( umask 077; [ -f /etc/ar-progress.env ] || printf 'PROGRESS_ADMIN_TOKEN=%s\n' "$(openssl rand -hex 24)" > /etc/ar-progress.env )
+# 4) node: нужен 20.11+; если он не в /usr/bin/node — подставить путь в юнит
+node --version; command -v node
+[ "$(command -v node)" = /usr/bin/node ] || sed -i "s#/usr/bin/node#$(command -v node)#" /opt/ar-progress/ar-progress.service
+# 5) юнит
+cp /opt/ar-progress/ar-progress.service /etc/systemd/system/ar-progress.service
+systemctl daemon-reload && systemctl enable --now ar-progress
+systemctl status ar-progress --no-pager | head -5
+curl -s http://127.0.0.1:8787/api/progress/health        # {"ok":true,"store":"sqlite"}
+# 6) Caddy: в блок ar.vershov.com { … } добавить (до file_server) — см. server/progress/Caddyfile.snippet
+#      handle /api/progress/* {
+#          reverse_proxy 127.0.0.1:8787
+#      }
+nano /etc/caddy/Caddyfile
+caddy validate --config /etc/caddy/Caddyfile && systemctl reload caddy
+curl -s https://ar.vershov.com/api/progress/health
+```
+
+Токен для страницы `/test/admin/` продакт смотрит сам, когда нужно: `sudo cat /etc/ar-progress.env`. Сменить токен —
+удалить файл, повторить шаг 3, `systemctl restart ar-progress`. Без файла админ-сброс выключен (ответ 503), остальное работает.
+
+**Обновить код сервиса** (после изменений в `server/progress` — сервер сам их не подтягивает):
+повторить шаг 1 и `systemctl restart ar-progress`. Логи: `journalctl -u ar-progress -n 50`.
+
+**API** (подробно — шапка `server/progress/server.mjs`): `GET|PUT|DELETE /api/progress/:device`,
+`POST /api/progress/:device` (то же, что PUT, для sendBeacon), `GET /api/progress/:device/sessions`,
+`POST /api/progress/:device/session`, `GET|DELETE /api/progress/admin/code/:code` (Bearer-токен), `GET /api/progress/health`.
+Ограничения: прогресс ≤ 16 КБ и ≤ 40 ключей на устройство, 30 последних сессий × 80 коротких событий,
+120 запросов/мин с IP, 30 записей/мин на устройство, 10 неверных токенов за 10 мин с IP; CORS — только
+`PROGRESS_ORIGINS` (по умолчанию `https://ar.vershov.com`); документы, не менявшиеся 90 дней (`PROGRESS_TTL_DAYS`), удаляются.
+
+**Как сбросить прогресс телефона:**
+- на самом телефоне — `https://ar.vershov.com/?reset=1` (или кнопка «Сбросить прогресс этого устройства» на `/test`,
+  или `?debug` → вкладка «Прогресс»);
+- по коду — `https://ar.vershov.com/test/admin/`: токен + код из 6 символов (код видно на `/test` и в `?debug` → «Прогресс»).
+  Телефон узнаёт о сбросе при следующем запуске (если игра открыта — перестаёт записывать до перезапуска).
+
+Локально: `PROGRESS_DATA=/tmp/progress PROGRESS_ORIGINS=http://localhost:5173 node server/progress/server.mjs` и `npm run dev`
+(в vite настроен прокси `/api/progress` → 8787). Тесты — `tests/progress/`.

@@ -1,0 +1,4 @@
+# вставить внутрь блока сайта ar.vershov.com { … } (перед file_server / другими handle)
+handle /api/progress/* {
+	reverse_proxy 127.0.0.1:8787
+}

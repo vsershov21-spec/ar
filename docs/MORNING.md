@@ -34,3 +34,10 @@ cd /tmp && git clone -q https://github.com/vsershov21-spec/ar && cd ar && git co
 ## После пилота
 - Перевыпустить ключ ElevenLabs (он был в чате).
 - Удалить лишние голоса в ElevenLabs (оставить Хулиган 1, Добряк моложе 4, Блёстка 3).
+
+## Сервис прогресса (≈3 минуты, под root, один раз)
+Прогресс кота теперь пишется и на сервер (по случайному id устройства) — чтобы сбрасывать его телефону по коду.
+Команды — docs/DEPLOY.md, раздел «Сервис прогресса»: скопировать `server/progress` в `/opt/ar-progress`, создать
+`/srv/ar-extra/progress`, сгенерировать токен в `/etc/ar-progress.env`, `systemctl enable --now ar-progress`, добавить в Caddyfile
+`handle /api/progress/* { reverse_proxy 127.0.0.1:8787 }` и `systemctl reload caddy`. Пока не сделано — сайт работает как раньше (только localStorage).
+Сброс: `https://ar.vershov.com/?reset=1` на телефоне или `https://ar.vershov.com/test/admin/` по коду устройства.
