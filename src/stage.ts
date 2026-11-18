@@ -19,6 +19,70 @@ const defaultAnchor = (n: AnchorName, out: THREE.Vector3) => out.set(...(ANCHOR_
 
 export type StageMode = 'card' | 'glass';
 
+/**
+ * Сглаживание позы карты в сцене (не в трекере): воркер карты отдаёт позу 15–30 раз в секунду, а кадр рисуется 60 —
+ * без сглаживания кот «ступенькой» перескакивает на каждом обновлении и дрожит на остаточном шуме. Здесь поза якоря
+ * догоняется экспоненциально с адаптивной постоянной: на месте и медленно — 70 мс (дрожь и ступеньки уходят), быстро
+ * (телефон ведут) — до 12 мм-эквивалента запаздывания, рывок/новая посадка (> 0,6 ширины карты или > 0,5 рад) — сразу.
+ * Единицы — ширины карты (масштаб якоря). Чистая математика (tests/reactions.test.ts).
+ */
+export class AnchorSmoother {
+  readonly p = new THREE.Vector3();
+  readonly q = new THREE.Quaternion();
+  readonly s = new THREE.Vector3(1, 1, 1);
+  private have = false;
+  private tp = new THREE.Vector3();
+  private tq = new THREE.Quaternion();
+  private ts = new THREE.Vector3();
+  private lp = new THREE.Vector3();
+  private lq = new THREE.Quaternion();
+  /** оценка скорости цели (ширин карты/с, рад/с) */
+  private v = 0;
+  private w = 0;
+  constructor(public slowTau = 0.07, public fastTau = 0.012) {}
+  reset() {
+    this.have = false;
+  }
+  update(target: THREE.Matrix4, dt: number, out: THREE.Matrix4): THREE.Matrix4 {
+    target.decompose(this.tp, this.tq, this.ts);
+    const unit = Math.max(1e-6, this.ts.x);
+    if (!this.have || !(dt > 0)) {
+      this.p.copy(this.tp);
+      this.q.copy(this.tq);
+      this.s.copy(this.ts);
+      this.lp.copy(this.tp);
+      this.lq.copy(this.tq);
+      this.have = true;
+      return out.copy(target);
+    }
+    dt = Math.min(dt, 0.1);
+    // скорость цели — по сдвигу цели за кадр, сглаженная (обновления трекера идут ступеньками)
+    const dv = this.tp.distanceTo(this.lp) / unit / dt;
+    const dw = this.tq.angleTo(this.lq) / dt;
+    this.lp.copy(this.tp);
+    this.lq.copy(this.tq);
+    const a = 1 - Math.exp(-dt / 0.1);
+    this.v += (dv - this.v) * a;
+    this.w += (dw - this.w) * a;
+    const gap = this.p.distanceTo(this.tp) / unit;
+    const ang = this.q.angleTo(this.tq);
+    if (gap > 0.6 || ang > 0.5) {
+      this.p.copy(this.tp);
+      this.q.copy(this.tq);
+      this.s.copy(this.ts);
+    } else {
+      // 0,05 карты/с (дрожь) → медленно; 1,5 карты/с и быстрее (телефон ведут) → быстро
+      const fast = Math.min(1, Math.max(this.v / 1.5, this.w / 2));
+      const tau = this.slowTau + (this.fastTau - this.slowTau) * fast;
+      const k = 1 - Math.exp(-dt / tau);
+      this.p.lerp(this.tp, k);
+      this.q.slerp(this.tq, k);
+      this.s.lerp(this.ts, k);
+    }
+    return out.compose(this.p, this.q, this.s);
+  }
+}
+
 export class Stage {
   readonly root = new THREE.Group(); // сюда кладётся character.object; matrix задаётся вручную
   readonly shadow: THREE.Mesh;
@@ -175,12 +239,17 @@ export class Stage {
   }
 
   /** поза центра карты → поза кота на карте */
+  /** поза карты для кота — сглаженная (AnchorSmoother); в «Мире кота» пол неподвижен — без сглаживания */
+  readonly smoother = new AnchorSmoother();
+  private aM = new THREE.Matrix4();
+  private aInv = new THREE.Matrix4();
   private cardPose(out: THREE.Matrix4, dt: number) {
     const c = this.cfg;
     const a = this.anchor;
     a.updateMatrixWorld(true);
+    const aw = this.view ? a.matrixWorld : this.smoother.update(a.matrixWorld, dt, this.aM);
     // камера в координатах карты → yaw кота к зрителю вокруг нормали карты
-    const camLocal = a.worldToLocal(this.camera.getWorldPosition(this.tmpA));
+    const camLocal = this.camera.getWorldPosition(this.tmpA).applyMatrix4(this.aInv.copy(aw).invert());
     const dx = camLocal.x - this.pos.x, dy = camLocal.y - this.pos.y;
     // после поворота на +90° по X «вперёд» кота (+Z модели) смотрит в -Y карты
     const targetYaw = this.walkYaw ?? (c.yawFollow ? Math.atan2(dx, -dy) : 0);
@@ -192,7 +261,7 @@ export class Stage {
       this.q3.setFromEuler(this.e1.set(Math.PI / 2, this.yaw, 0, 'XYZ')),
       this.tmpC.set(c.height, c.height, c.height),
     );
-    out.multiplyMatrices(a.matrixWorld, local);
+    out.multiplyMatrices(aw, local);
   }
 
   /**

@@ -15,7 +15,20 @@ export const EVENT_EMOTION: Record<string, EmotionCue> = {
   poke_combo: ['pout', 1, 2200],
   poke_hard: ['pout', 1, 2600],
   stroke: ['shy', 1, 2600],
+  // «Обнять» (долгая глажка / кнопка): тёплое лицо, глаза прищурены
+  stroke_long: ['purr', 1, 3000],
   double_tap: ['wink_l', 1, 1300],
+  // угощение: радость, рот «жуёт» (mouth_* — FaceLife не трогает, эмоция happy с открытым ртом)
+  treat: ['excited', 1, 2200],
+  // фирменные действия пилота: скейт, какао, зеркальце, пузыри/блёстки (gum), «к стеклу» (longpress)
+  skate: ['excited', 1, 2500],
+  cocoa: ['caring', 1, 3000],
+  mirror: ['proud', 1, 2600],
+  gum: ['cheeks_gum', 1, 2000],
+  longpress: ['squished', 1, 2200],
+  // стекло пальцем: царапины — кот удивлён и смеётся, стук — прислушивается
+  swipe: ['surprised', 0.9, 1100],
+  tap_screen: ['listen', 0.8, 900],
   // камера и карта
   card_found: ['surprised', 1, 1300],
   card_lost: ['sad', 0.8, 2000],
@@ -37,13 +50,22 @@ export const EVENT_EMOTION: Record<string, EmotionCue> = {
   jump: ['happy', 1, 1300],
   dance: ['happy', 1, 1800],
   sticker_peel: ['surprised', 0.8, 900],
+  // смена кота: «Другого?» — удивлён, «Тряси!» — азарт, новый кот — радость
+  switch_ask: ['surprised', 0.9, 1600],
+  switch_start: ['excited', 1, 1500],
+  shake_prompt: ['excited', 0.8, 1500],
+  hello_new: ['happy', 1, 1800],
+  // загадка / повторялка: думает, слушает
+  riddle: ['think', 1, 2000],
+  echo_start: ['listen', 1, 1800],
   no_name: ['wink_r', 1, 1200],
 };
 
 /** характер подменяет эмоцию события: Хулиган на тап ухмыляется, Блёстка подмигивает на двойной тап */
 export const PERSONA_EMOTION: Record<string, Partial<Record<string, EmotionCue>>> = {
-  hooligan: { tap_cat_head: ['smug', 1, 1500], double_tap: ['smug', 1, 1500], thanks: ['smug', 0.9, 1400] },
-  glitter: { tap_cat_head: ['wink_r', 1, 1200], double_tap: ['wink_r', 1, 1300] },
+  hooligan: { tap_cat_head: ['smug', 1, 1500], double_tap: ['smug', 1, 1500], thanks: ['smug', 0.9, 1400], skate: ['smug', 1, 2500], longpress: ['cheeky', 1, 2200], stroke_long: ['shy', 1, 2600] },
+  kind: { stroke_long: ['caring', 1, 3200], treat: ['smile_big', 1, 2400], gum: ['happy', 1, 2200] },
+  glitter: { tap_cat_head: ['wink_r', 1, 1200], double_tap: ['wink_r', 1, 1300], mirror: ['wink_r', 1, 2400], gum: ['excited', 1, 2000], longpress: ['shy', 1, 2200] },
 };
 
 export function emotionFor(event: string, persona: string): EmotionCue | null {

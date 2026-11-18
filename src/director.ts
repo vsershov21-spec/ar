@@ -93,6 +93,8 @@ const TAP_CLIP_HOLD_MS = 350;
 /** петли, которые держатся законно: сон, ходьба, покой, мурчание (его снимает stroke_end); остальные петли реакций — до конца реплики */
 const LOOP_KEEP = /^(idle|sleep_loop|walk|run|purr_stroke)/;
 const LOOP_MAX_MS = 3000;
+/** «Погладить»/«Обнять» кнопкой: столько мурчит, потом покой */
+const BUTTON_PURR_MS = 3200;
 const DANCE_MAX_MS = 8000;
 
 /** панель действий и каталог «Что умеет кот»: кнопка → событие режиссёра (таблица — scenario/actions.ts) */
@@ -387,6 +389,17 @@ export class Director extends Emitter<DirectorEvents> {
     } finally {
       this.fromButton = false;
     }
+    if (r.touch === 'stroke' || r.touch === 'stroke_long') {
+      // «Погладить» / «Обнять» кнопкой: пальца нет — stroke_end не придёт, а мурчание (purr_stroke) держится петлёй;
+      // кот мурчит BUTTON_PURR_MS и сам возвращается в покой (аудит реакций: «не вернулся в покой»)
+      clearTimeout(this.purrTimer);
+      this.purrTimer = window.setTimeout(() => {
+        if (this.character && /purr_stroke|hug_screen/.test(this.character.currentClip) && !this.d.stage.walking) {
+          this.character.play('idle');
+          (this.character as Character & { clearEmotion?: () => void }).clearEmotion?.();
+        }
+      }, BUTTON_PURR_MS);
+    }
     if (r.touch === 'sleep') {
       // «Усыпи»: подремлет и проснётся сам, если ребёнок ничего не нажал
       const at = this.lastUserAct;
@@ -396,6 +409,20 @@ export class Director extends Emitter<DirectorEvents> {
     }
   }
   private sleepTimer = 0;
+  private purrTimer = 0;
+
+  /**
+   * Ребёнок что-то сделал со стеклом (запотело, царапины): кот сразу смотрит туда и удивляется/радуется — лицо и взгляд
+   * в тот же кадр (аудит реакций: на запотевшее стекло кот не реагировал вовсе). Клип — у реакции свайпа (react).
+   */
+  glassMoment(kind: 'fog' | 'claws', p: { x: number; y: number }) {
+    if (!this.character || this.dozing) return;
+    const { w, h } = this.d.size();
+    const head = this.d.stage.anchorScreen('head', w, h);
+    this.character.reach?.({ dx: (p.x - head.x) / head.s, dy: (p.y - head.y) / head.s });
+    const ch = this.character as Character & { setEmotion?: (n: string, w?: number, ms?: number) => void };
+    ch.setEmotion?.(kind === 'fog' ? (this.persona.id === 'hooligan' ? 'cheeky' : 'excited') : 'surprised', 1, 1600);
+  }
 
   /** петля «Zzz» над спящим котом — только пока спит */
   private stopSleepFx() {
@@ -875,6 +902,12 @@ export class Director extends Emitter<DirectorEvents> {
       this.lastCatEnd = performance.now();
       this.d.ui.hideBubble?.(shown);
       if (talk && this.character.currentClip === 'talk') this.character.play('idle');
+      // лицо реплики — на время реплики: сон и мурчание держат своё (их снимает пробуждение / конец глажки)
+      if (pk.face && this.lineFace === pk.face && !this.dozing && !/purr|sleep/.test(pk.face)) {
+        this.lineFace = null;
+        const ch = this.character as Character & { setFace?: (p: string) => void };
+        ch.setFace?.('neutral');
+      }
     }
   }
 
@@ -940,8 +973,11 @@ export class Director extends Emitter<DirectorEvents> {
     if (cue && ch?.setEmotion) ch.setEmotion(cue[0], cue[1], cue[2]);
   }
 
+  /** последний пресет лица реплики: по концу реплики лицо возвращается к нейтральному (а не держит «annoyed» до следующей) */
+  private lineFace: string | null = null;
   private face(preset: string | undefined) {
     if (!preset || !this.character) return;
+    this.lineFace = preset;
     const ch = this.character as Character & { setFace?: (p: string) => void };
     if (ch.setFace) ch.setFace(preset);
     else if (FACE_EMOTE[preset]) ch.emote(FACE_EMOTE[preset], 1400);

@@ -25,6 +25,8 @@ export type InputEvents = {
   drag: { x: number; y: number; px: number; py: number };
   shake: void;
   spam: void;
+  /** палец опустился на кота (до распознавания жеста): кот замечает касание сразу — app.ts → character.notice */
+  touch_down: { x: number; y: number; zone: TouchZone };
   silence: void;
   activity: void;
   /** тап по наклейке-выбору */
@@ -205,6 +207,8 @@ export class Input extends Emitter<InputEvents> {
         return this.emit('swipe', { x: e.x, y: e.y, path: e.path, speed: e.speed, dir: e.dir });
       case 'spam':
         return this.emit('spam', undefined);
+      case 'touch_down':
+        return this.emit('touch_down', { x: e.x, y: e.y, zone: e.zone });
     }
   }
 

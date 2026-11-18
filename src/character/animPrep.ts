@@ -457,3 +457,64 @@ function prepareOne(c: THREE.AnimationClip, names: Set<string>, pr: ReturnType<t
     info.set(c, i);
   }
 }
+
+/**
+ * Монтаж клипа по окнам (content/animations.json, поле cut): из исходного клипа берутся куски keep [[от, до], …] (секунды
+ * исходника), склеиваются подряд, на каждом стыке разрыв позы снимается за blendS по smootherstep (как инерциальный
+ * переход: стык непрерывен, движение второго куска сохраняется). Так тычок T2M (≈ 5 с: удар 0,6 с, стоит 3 с, возврат)
+ * становится «удар + возврат» за 1,5 с, а скрещённые лапы 17 с — жестом на 2,5 с. Исходный клип не меняется — новый
+ * клип под именем id (псевдонимы того же пресета не задеты). Чистая функция.
+ */
+export function spliceClip(src: THREE.AnimationClip, keep: [number, number][], name: string, opts: { fps?: number; blendS?: number } = {}): THREE.AnimationClip {
+  const fps = opts.fps ?? FPS;
+  const W = Math.max(1, Math.round((opts.blendS ?? 0.25) * fps));
+  const dur = src.duration;
+  const segs = keep
+    .map(([a, b]) => [Math.max(0, Math.min(dur, a)), Math.max(0, Math.min(dur, b))] as [number, number])
+    .filter(([a, b]) => b - a > 1 / fps);
+  if (!segs.length) return src.clone();
+  const frames: number[] = []; // время исходника для каждого кадра результата
+  const joins: number[] = []; // индексы первых кадров кусков (кроме первого)
+  for (let s = 0; s < segs.length; s++) {
+    const [a, b] = segs[s];
+    if (s > 0) joins.push(frames.length);
+    const n = Math.max(1, Math.round((b - a) * fps));
+    for (let i = s > 0 ? 1 : 0; i <= n; i++) frames.push(a + ((b - a) * i) / n);
+  }
+  const n = frames.length;
+  const times = new Float32Array(n);
+  for (let i = 0; i < n; i++) times[i] = i / fps;
+  const tracks = src.tracks.map((t) => {
+    const stride = t.getValueSize();
+    const it = (t as unknown as { createInterpolant(): THREE.Interpolant }).createInterpolant();
+    const v = new Float32Array(n * stride);
+    for (let i = 0; i < n; i++) v.set(it.evaluate(frames[i]).slice(0, stride), i * stride);
+    if (stride === 4) for (let i = 1; i < n; i++) alignQuat(v, (i - 1) * 4, v, i * 4);
+    // стыки: смещение «конец прошлого куска − начало следующего» затухает за W кадров
+    for (const j of joins) {
+      const pv = v.slice((j - 1) * stride, j * stride);
+      if (stride === 4) {
+        qa.fromArray(pv, 0);
+        qb.fromArray(v, j * 4);
+        if (qa.dot(qb) < 0) qa.set(-qa.x, -qa.y, -qa.z, -qa.w);
+        const off = qa.multiply(qb.clone().invert()); // off·B = A
+        const I = new THREE.Quaternion();
+        for (let k = 0; k < W && j + k < n; k++) {
+          const w = 1 - smooth01((k + 1) / (W + 1));
+          qc.copy(I).slerp(off, w);
+          qb.fromArray(v, (j + k) * 4).premultiply(qc).toArray(v, (j + k) * 4);
+        }
+        for (let i = j; i < Math.min(n, j + W + 1); i++) alignQuat(v, (i - 1) * 4, v, i * 4);
+      } else {
+        const d = Array.from({ length: stride }, (_, c) => pv[c] - v[j * stride + c]);
+        for (let k = 0; k < W && j + k < n; k++) {
+          const w = 1 - smooth01((k + 1) / (W + 1));
+          for (let c = 0; c < stride; c++) v[(j + k) * stride + c] += d[c] * w;
+        }
+      }
+    }
+    const T = stride === 4 ? THREE.QuaternionKeyframeTrack : THREE.VectorKeyframeTrack;
+    return new T(t.name, times, v);
+  });
+  return new THREE.AnimationClip(name, (n - 1) / fps, tracks);
+}

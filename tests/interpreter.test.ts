@@ -20,7 +20,7 @@ const mk = () => {
     it.up(x, y, t + 60);
     it.tick(t + 61);
   };
-  const types = () => ev.filter((e) => e.type !== 'drag').map((e) => (e.type === 'tap_cat' ? e.event : e.type));
+  const types = () => ev.filter((e) => e.type !== 'drag' && e.type !== 'touch_down').map((e) => (e.type === 'tap_cat' ? e.event : e.type));
   return { ev, it, tap, types };
 };
 
@@ -166,7 +166,7 @@ describe('антиспам', () => {
 
   it('пороги по ТЗ', () => {
     const c = defaultInterpreterConfig;
-    expect([c.strokeMinPx, c.strokeLongMs, c.comboTaps, c.comboWindowMs, c.sulkMs, c.spamTaps, c.spamWindowMs, c.spamIgnoreMs]).toEqual([80, 4000, 3, 2000, 2000, 5, 2000, 3000]);
+    expect([c.strokeMinPx, c.strokeLongMs, c.comboTaps, c.comboWindowMs, c.sulkMs, c.spamTaps, c.spamWindowMs, c.spamIgnoreMs]).toEqual([45, 4000, 3, 2000, 2000, 5, 2000, 3000]);
   });
 });
 

@@ -957,6 +957,12 @@ export class App {
     const i = this.input, d = this.director;
     i.on('activity', () => this.energy.activity(performance.now()));
     i.on('tap_cat', (p) => this.touchCat(p.event, p));
+    // палец на коте (жест ещё не распознан): кот сразу замечает — взгляд на палец, брови вверх (character notice)
+    i.on('touch_down', (p) => {
+      if (this.stage.walking || this.home?.catInBed || this.director.dozing) return;
+      const h = this.stage.anchorScreen('head', this.root.clientWidth, this.root.clientHeight);
+      (this.character as Character & { notice?: (t: { dx: number; dy: number }) => void }).notice?.({ dx: (p.x - h.x) / h.s, dy: (p.y - h.y) / h.s });
+    });
     i.on('poke_combo', (p) => {
       this.suggest.upset(performance.now());
       this.touchCat('poke_combo', p);
@@ -997,6 +1003,7 @@ export class App {
       if (glass() && !p.onCat) {
         d.activity();
         this.fx.play('steam_draw');
+        d.glassMoment('fog', p);
         this.audio.play('breath', 0.7);
         d.log('стекло: запотело — рисуй пальцем (steam_draw)');
         return;
@@ -1009,6 +1016,7 @@ export class App {
       if (glass()) {
         // царапины ребёнка, а кот отвечает своим клипом и репликой на свайп — без своего эффекта поверх
         this.fx.claws(s.path[0], { x: s.x, y: s.y });
+        d.glassMoment('claws', s);
         this.audio.play('claws_glass', 0.8);
         d.muteFx(400);
       }

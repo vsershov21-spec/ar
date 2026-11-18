@@ -39,7 +39,7 @@ export const defaultInterpreterConfig: InterpreterConfig = {
   doubleTapPx: 40,
   comboTaps: 3,
   comboWindowMs: 2000,
-  strokeMinPx: 80,
+  strokeMinPx: 45,
   strokeMaxSpeed: 650,
   strokeLongMs: 4000,
   strokeGapMs: 400,
@@ -65,6 +65,8 @@ export type TouchEvent =
   | { type: 'swipe'; x: number; y: number; path: Pt[]; speed: number; dir: string }
   | { type: 'drag'; x: number; y: number }
   | { type: 'spam' }
+  /** палец опустился на кота: жест ещё не распознан — кот уже замечает касание (взгляд, уши) */
+  | { type: 'touch_down'; x: number; y: number; zone: TouchZone }
   | { type: 'ignored'; reason: 'spam' | 'sulk' };
 
 /** зона → событие тапа по коту */
@@ -116,7 +118,10 @@ export class TouchInterpreter {
     this.strokeLongSent = false;
     this.last = { x, y, t };
     this.recent = [{ x, y, t }];
-    if (this.downZone) this.lastOnCat = t;
+    if (this.downZone) {
+      this.lastOnCat = t;
+      this.emit({ type: 'touch_down', x, y, zone: this.downZone });
+    }
     this.rec.down(x, y, t);
   }
 

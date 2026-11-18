@@ -815,14 +815,19 @@
    "trigger": "double_tap/«трюк» Хулигана (вариант к gum_blow)"
   },
   "tumble": {
-   "priority": "P2",
+   "priority": "P1",
    "group": "Касания",
    "durationS": 1.4,
    "loop": false,
    "start": "стойка idle",
    "end": "стойка idle",
    "replaces": "пресет `defeat_02` 6,2 с",
-   "trigger": "spam (Хулиган)"
+   "trigger": "spam (Хулиган): частые тапы — пилот (аудит docs/qa/REACTIONS.md: сейчас смонтированный defeat_02)",
+   "meshy": {
+    "prompt": "Starts standing upright facing forward with arms relaxed at the sides. Wobbles dizzily, tucks and does one small forward roll on the spot, pops back up to standing and brushes off the chest with both hands; then returns to the same relaxed standing pose and holds still, in place, no turning.",
+    "duration": 2.5,
+    "mode": "prime"
+   }
   },
   "sticker_react": {
    "priority": "P2",
@@ -1323,6 +1328,21 @@
    "meshy": {
     "prompt": "Shakes a spray can in the right hand twice at chest height, then leans forward and sprays the ground just in front of the feet in wide arcs left and right, bobbing the head to a beat; left hand on the hip. Feet stay planted. Seamless loop, in place, no turning.",
     "duration": 2.0,
+    "mode": "prime"
+   }
+  },
+  "press_glass": {
+   "priority": "P1",
+   "group": "Стекло",
+   "durationS": 2.5,
+   "loop": false,
+   "start": "стойка idle",
+   "end": "стойка idle",
+   "replaces": "`press_glass` T2M 5 с петлёй (Хулиган «К стеклу», долгое нажатие на кота)",
+   "trigger": "longpress на коте, кнопка «К стеклу» (пилот, Хулиган)",
+   "meshy": {
+    "prompt": "Starts standing upright facing forward with arms relaxed at the sides. Leans forward and presses both open palms flat against an invisible glass wall in front at face height, squishes the face forward against it for a moment, then pushes back off and returns to the same relaxed standing pose and holds still, in place, no turning.",
+    "duration": 3.0,
     "mode": "prime"
    }
   }

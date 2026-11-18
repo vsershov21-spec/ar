@@ -61,7 +61,7 @@ function harness() {
     active = null;
     touch.up(e.clientX, e.clientY, e.timeStamp);
   };
-  return { ev, touch, view, target, down, move, up, types: () => ev.map((e) => e.type) };
+  return { ev, touch, view, target, down, move, up, types: () => ev.map((e) => e.type).filter((t) => t !== 'touch_down') };
 }
 
 describe('вращение мышью не ломает тапы по коту', () => {

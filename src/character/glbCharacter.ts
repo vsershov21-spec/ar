@@ -16,14 +16,15 @@ import { makeGltfLoader } from './gltfLoad';
 import { type MouthShape, type Viseme } from '../lipsync/visemes';
 import { FaceLife } from './faceLife';
 import { ClipState } from './clipState';
-import { clipDef, FALLBACK_CLIPS } from './clips';
-import { prepareClipsAsync, type ClipPrepInfo } from './animPrep';
+import { clipDef, CUT_CLIPS, FALLBACK_CLIPS } from './clips';
+import { prepareClipsAsync, spliceClip, type ClipPrepInfo } from './animPrep';
 import { loadMeshyClips, meshyWanted, skelFrom, type Skel } from './meshyClips';
 import { feature } from '../config/edition';
 import { AnimBlender } from './animBlend';
 import { TailRig, type TailOutput } from './tailRig';
 import { PropRig } from './props';
 import { BodyCollider } from './bodyCollide';
+import { FootPin } from './footPin';
 import { buildFurShells } from './furShell';
 import { FaceMixer, EMOTE_FACE, MORPH_TARGETS, facePreset, type FacePreset } from './face';
 import { EyeRig } from './eyeRig';
@@ -53,6 +54,8 @@ const CAPSULE_R: [RegExp, number][] = [
 ];
 /** клипы «через голову»: держим голову и лапы над полом (groundClamp) */
 const ACRO = /flip|tumble|cartwheel|somersault/;
+/** без удержания лап: лёжа, сон, кровать, прыжки с места, ходьба/бег */
+const NO_PIN = /sleep|bed|lie_|walk|run|jump|dive|appear|fall|sit_/;
 /** кости и их «радиус» (рост модели ≈ 1) */
 const GROUND_BONES: [string, number][] = [['Head', 0.15], ['Neck', 0.08], ['LeftHand', 0.04], ['RightHand', 0.04], ['Spine2', 0.12]];
 const FINGER = /Thumb|Index|Middle|Ring|Pinky|_End$|Eye|Jaw|Tongue/;
@@ -223,12 +226,14 @@ export class GlbCharacter implements Character {
   /** рот-накладка с шейдером (модели после face_detail v3); null — старая полость Mouth */
   mouthRig: MouthRig | null = null;
   /** эмоция поверх пресета реплики (setEmotion) */
-  private emo: { p: FacePreset; w: number; t: number; dur: number; from: number } | null = null;
+  private emo: { p: FacePreset; w: number; t: number; dur: number; from: number; inS?: number } | null = null;
   /** слой эмоции: сглаженные веса пресета (смена эмоции — перетекание весов, а не провал в нейтраль) и его сила */
   private emoL: { w: Record<string, number>; pupils: number; ears: number; s: number } = { w: {}, pupils: 1, ears: 0, s: 0 };
   /** итоговые веса лица за кадр (для глаз, debug и тестов) */
   readonly W: Record<string, number> = {};
   private gazeV = new THREE.Vector3();
+  private lookYaw = 0;
+  private lookPitch = 0;
 
   constructor(private url = 'models/character.glb', private animsUrl?: string) {
     this.object.name = 'character-glb';
@@ -310,11 +315,18 @@ export class GlbCharacter implements Character {
       // перепривязка, сглаживание, обрезка, швы петель, высота корня, темп (animPrep.ts)
       // ?anim=raw — как было (для сравнения в debug)
       const raw = typeof location !== 'undefined' && /[?&]anim=raw/.test(location.search);
+      // монтаж по каталогу (cut): короткие реакции из длинных T2M-клипов — до подготовки, из сырого клипа
+      const cuts = raw ? [] : GlbCharacter.cutClips(anims);
+      anims = [...anims, ...cuts.map((c) => c.clip)];
       if (!raw) {
         this.animInfo = await prepareClipsAsync(model, this.inner, anims, {
           isLoop: (n) => GlbCharacter.aliasIds(n).some((id) => clipDef(id)?.loop),
           keepSpeed: (n) => /dance|run|jump|flip|dive|fall|tumble|celebrate|cheer/.test(n),
         });
+      }
+      for (const { clip, speed } of cuts) {
+        const inf = this.animInfo.get(clip);
+        if (inf && speed) inf.timeScale *= speed;
       }
       for (const clip of anims) this.addClip(clip);
       this.addFallbacks();
@@ -475,6 +487,25 @@ export class GlbCharacter implements Character {
     return true;
   }
 
+  /**
+   * Клипы с монтажом (content/animations.json, cut): исходник — cut.src, иначе клип с именем id, иначе первый пресет
+   * Tripo, который по TRIPO_ALIAS играет этот id. Новый клип называется id и регистрируется последним — своё имя
+   * важнее и исходника, и псевдонима.
+   */
+  static cutClips(anims: THREE.AnimationClip[]): { clip: THREE.AnimationClip; speed?: number }[] {
+    const byKey = new Map<string, THREE.AnimationClip>();
+    for (const c of anims) byKey.set(c.name.toLowerCase().replace(/^.*\|/, ''), c);
+    const out: { clip: THREE.AnimationClip; speed?: number }[] = [];
+    for (const d of CUT_CLIPS) {
+      const cut = d.cut!;
+      const alias = Object.keys(TRIPO_ALIAS).find((k) => TRIPO_ALIAS[k].includes(d.id) && byKey.has(k));
+      const src = byKey.get(cut.src ?? '') ?? byKey.get(d.id) ?? (alias ? byKey.get(alias) : undefined);
+      if (!src) continue;
+      out.push({ clip: spliceClip(src, cut.keep, d.id), speed: cut.speed });
+    }
+    return out;
+  }
+
   /** имя клипа GLB → id каталога (своё имя + TRIPO_ALIAS) */
   static aliasIds(name: string) {
     const key = name.toLowerCase().replace(/^.*\|/, '');
@@ -546,11 +577,11 @@ export class GlbCharacter implements Character {
    * Эмоция поверх текущего пресета лица: пресет content/face.json (happy, laugh, smug, wink_l, wink_r, surprised, pout,
    * shy, sad, sleepy, dizzy, sleep…), сила 0..1, длительность мс (0 — пока не сменят). Плавно входит и уходит.
    */
-  setEmotion(name: string, weight = 1, durationMs = 1500) {
+  setEmotion(name: string, weight = 1, durationMs = 1500, inS = 0.18) {
     const p = facePreset(name);
     if (!p) return;
     // сила стартует с текущей (смена эмоции на ходу — без провала), веса перетекают в слое emoL
-    this.emo = { p, w: clamp(weight, 0, 1), t: 0, dur: durationMs / 1000, from: this.emoL.s };
+    this.emo = { p, w: clamp(weight, 0, 1), t: 0, dur: durationMs / 1000, from: this.emoL.s, inS };
   }
 
   clearEmotion() {
@@ -569,6 +600,16 @@ export class GlbCharacter implements Character {
 
   reach(target: { dx: number; dy: number } | null) {
     if (target) this.eyes?.glanceAt(target.dx, target.dy);
+  }
+
+  /**
+   * Палец коснулся кота (до распознавания жеста, app.ts touch_down): глаза на палец и лёгкое «ой?» бровями за 1–2 кадра —
+   * отклик виден сразу, а реакция жеста (тап, глажка) приходит следом и плавно перекрывает эмоцию.
+   */
+  notice(target: { dx: number; dy: number }) {
+    this.eyes?.glanceAt(target.dx, target.dy);
+    if (this.emo && this.emoL.s > 0.4) return; // уже есть эмоция (мурчит, смеётся) — не сбиваем
+    this.setEmotion('surprised', 0.55, 450, 0.08);
   }
 
   emote(e: Emote, ms = 1200) {
@@ -616,6 +657,7 @@ export class GlbCharacter implements Character {
       this.mixer.update(dt);
       this.anim?.post(dt, cs, this.model ?? this.object);
       this.groundClamp(dt, cs.cur.id);
+      this.pinFeet(dt, cs.cur.id);
     } else {
       this.lift = 0;
       this.mixer?.update(dt);
@@ -641,7 +683,7 @@ export class GlbCharacter implements Character {
     if (emo) {
       emo.t += dt;
       // вход ~0.3 с и выход ~0.5 с по smoothstep: эмоция «наплывает», а не щёлкает
-      const kin = clamp(emo.t / 0.3, 0, 1), kout = emo.dur ? clamp((emo.dur - emo.t) / 0.5, 0, 1) : 1;
+      const kin = clamp(emo.t / (emo.inS ?? 0.3), 0, 1), kout = emo.dur ? clamp((emo.dur - emo.t) / 0.5, 0, 1) : 1;
       const sin = kin * kin * (3 - 2 * kin);
       ee = (emo.from + (emo.w - emo.from) * sin) * kout * kout * (3 - 2 * kout);
       // веса слоя тянутся к пресету (~0.12 с): из смеха в удивление лицо перетекает, а не перескакивает
@@ -703,8 +745,14 @@ export class GlbCharacter implements Character {
       // взгляд на камеру + движения головы во время речи — вокруг осей персонажа в мире
       // (локальные оси кости Head у моделей Tripo повёрнуты: локальный X смотрит вперёд, поворот по нему — крен)
       const local = this.object.worldToLocal(this.tLocal.copy(this.look ?? camera.getWorldPosition(this.tLocal)));
-      const yaw = clamp(Math.atan2(local.x, local.z), -0.6, 0.6);
-      const pitch = clamp(Math.atan2(local.y - 0.85, Math.hypot(local.x, local.z)), -0.4, 0.4);
+      // поворот головы к камере/точке — сглаженно (≈ 0,12 с, не быстрее 3 рад/с): дрожь позы карты и смена цели
+      // (палец → камера) не дёргают голову
+      const yawT = clamp(Math.atan2(local.x, local.z), -0.6, 0.6);
+      const pitchT = clamp(Math.atan2(local.y - 0.85, Math.hypot(local.x, local.z)), -0.4, 0.4);
+      const lk = 1 - Math.exp(-dt / 0.12), vmax = 3 * dt;
+      this.lookYaw += clamp((yawT - this.lookYaw) * lk, -vmax, vmax);
+      this.lookPitch += clamp((pitchT - this.lookPitch) * lk, -vmax, vmax);
+      const yaw = this.lookYaw, pitch = this.lookPitch;
       const { up, side, fwd } = this.modelAxes();
       const h = this.life.head;
       const neck = this.bones.get('Neck');
@@ -757,6 +805,29 @@ export class GlbCharacter implements Character {
     this.lift = want > this.lift ? want : this.lift + (want - this.lift) * Math.min(1, dt / 0.15);
     if (this.lift < 1e-4) this.lift = 0;
     this.inner.position.y = this.lift;
+  }
+
+  /** опорные лапы не едут (footPin.ts): сдвиг тела по горизонтали; выкл. — ходьба, акробатика, лёжа, кровать */
+  readonly footPin = new FootPin();
+  private footBuf: [number, number, number][] = [[0, 0, 0], [0, 0, 0]];
+  private pinFeet(dt: number, id: string) {
+    const L = this.bones.get('LeftFoot'), R = this.bones.get('RightFoot');
+    if (!L || !R) return;
+    const moving = ((this.object.userData.moveSpeed as number) ?? 0) > 0;
+    const enabled = !moving && !this.poseTweak && !ACRO.test(id) && !NO_PIN.test(id) && this.lift < 0.01;
+    // положения стоп без прошлого сдвига
+    this.inner.position.x = this.inner.position.z = 0;
+    this.inner.updateMatrixWorld(true);
+    [L, R].forEach((b, i) => {
+      const p = this.object.worldToLocal(b.getWorldPosition(this.tLocal));
+      this.footBuf[i][0] = p.x;
+      this.footBuf[i][1] = p.y;
+      this.footBuf[i][2] = p.z;
+    });
+    const off = this.footPin.update(dt, this.footBuf, enabled);
+    this.inner.position.x = off.x;
+    this.inner.position.z = off.z;
+    this.inner.updateMatrixWorld(true);
   }
 
   /** хвост и уши: сброс к покою и вторичная анимация TailRig поверх тела */

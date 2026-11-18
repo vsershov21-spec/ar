@@ -31,6 +31,8 @@ export type Emote = 'neutral' | 'happy' | 'angry' | 'wink' | 'blink' | 'smirk';
 export interface PlayOptions {
   loop?: boolean;
   onEnd?: () => void;
+  /** сменить клип сразу, даже если идёт «номер» в защищённом окне (ClipState.protects) */
+  force?: boolean;
 }
 
 /**

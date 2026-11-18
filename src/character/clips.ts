@@ -22,6 +22,13 @@ export interface ClipDef {
    * в GLB сам займёт место (своё имя важнее опоры).
    */
   fallback?: string;
+  /**
+   * Монтаж клипа из библиотеки (animPrep.spliceClip): src — имя клипа в GLB (по умолчанию свой id или пресет Tripo,
+   * который сейчас играет под этим id), keep — куски [от, до] в секундах исходника, speed — темп поверх animPrep.
+   * Так длинные T2M-клипы (тычки ≈ 5 с, скрещённые лапы 17 с) становятся реакциями на 1,5–3 с без новой генерации.
+   * Настоящий клип нужной длины (Meshy) с этим id — cut снять.
+   */
+  cut?: { src?: string; keep: [number, number][]; speed?: number };
 }
 
 const DEFS = new Map<string, ClipDef>();
@@ -31,6 +38,8 @@ export const CLIP_IDS: readonly string[] = [...DEFS.keys()];
 export const clipDef = (id: string): ClipDef | undefined => DEFS.get(id);
 /** клипы каталога с опорой fallback (их ещё нет в библиотеке движений) */
 export const FALLBACK_CLIPS: readonly ClipDef[] = [...DEFS.values()].filter((d) => !!d.fallback);
+/** клипы каталога с монтажом cut (собираются из клипа библиотеки при загрузке GLB) */
+export const CUT_CLIPS: readonly ClipDef[] = [...DEFS.values()].filter((d) => !!d.cut?.keep?.length);
 
 /** старые имена клипов (director, спрайт-манифест) → id каталога. 'idle' — особый: выбор по весам характера */
 export const LEGACY_CLIP: Record<string, string> = {

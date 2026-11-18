@@ -189,6 +189,9 @@ describe('хаос: найденные баги (docs/qa/BUGS.md № 19–25)', 
     await c.boot();
     await c.until(c.quiet, 10_000);
     await c.longpress();
+    // идёт «номер» (фирменное после приветствия) — прижаться к стеклу ждёт конца его окна (ClipState: очередь);
+    // стенд хаоса не ведёт время клипов — доигрываем окно сами
+    for (let i = 0; i < 150 && c.cs.queued; i++) c.cs.update(1 / 30);
     expect(c.cs.cur.loop && !c.cs.idleMode).toBe(true);
     await c.settle(5000);
     expect(c.stuckClip()).toBeNull();
