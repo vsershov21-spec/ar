@@ -214,6 +214,9 @@ for pid in PERSONAS:
     p = json.loads((C / "personas" / f"{pid}.json").read_text(encoding="utf-8"))
     used |= {r.get("clip") for r in p["reactions"].values()} | {i["clip"] for i in p["idles"]} | {p["signature"]["clip"]}
 for cid, c in clips.items():
+    # клип Meshy с правилом meshy.on играет вместо клипа реакции, когда пришёл (src/character/clips.ts meshyUpgrade)
+    if c.get("meshy", {}).get("on"):
+        continue
     if cid not in used and not any(u.startswith(("*", "code:")) for u in c["usedBy"]) and c["layer"] == "body":
         warns.append(f"клип {cid} не используется ни одной репликой — проверь usedBy")
 

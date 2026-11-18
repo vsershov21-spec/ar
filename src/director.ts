@@ -22,7 +22,7 @@ import type { ContentLine, FxName, PersonaId, Riddle } from './persona/types';
 import { isPersonaId, PERSONA_IDS } from './persona/types';
 import { runtimeClip, runtimeFx, runtimeSound } from './persona/runtimeMap';
 import { CLIPS, type Character, type Emote } from './character/types';
-import { resolveClip } from './character/clips';
+import { meshyChain, meshyUpgrade, resolveClip } from './character/clips';
 import type { Stage } from './stage';
 import type { FxLayer } from './fx/fxLayer';
 import type { Audio } from './audio/audio';
@@ -111,6 +111,23 @@ export class Director extends Emitter<DirectorEvents> {
   readonly cfg: ScenarioConfig;
   private timers = new Map<string, number>();
   private listenTimer = 0;
+  /**
+   * Поворот к зрителю на месте (stage.turnErr > 25°): клип Meshy turn_step (переступает), пока не довернулся; без клипа —
+   * как было (сцена поворачивает кота в idle).
+   */
+  private turnStep(playing: boolean) {
+    const ch = this.character;
+    if (!ch) return;
+    const e = (this.d.stage as { turnErr?: number }).turnErr ?? 0;
+    if (ch.currentClip === 'turn_step') {
+      if (e < 0.1 || this.d.stage.walking || !playing) ch.play('idle');
+      return;
+    }
+    if (!playing || this.dozing || e < 0.44 || ch.currentClip !== 'idle' || this.d.stage.walking) return;
+    const clip = meshyUpgrade('code:stage.turn', undefined, this.persona.id, (id) => this.isMeshy(id));
+    if (clip) ch.play(clip, { loop: true });
+  }
+
   /** лестница тишины: что кот делает сам, пока ребёнок ничего не делает (scenario/initiative.ts, docs/scenario/LOGIC.md) */
   readonly ladder = new IdleLadder(performance.now());
   /** кот дремлет (сам после долгой тишины или кнопкой «Усыпи»): молчит, первое касание будит */
@@ -143,6 +160,35 @@ export class Director extends Emitter<DirectorEvents> {
   /** идёт обработка тапа пальцем (не кнопки): реакции действует удержание TAP_*_HOLD_MS */
   private fingerTap = false;
   private fromButton = false;
+  /** кнопка, которая сейчас обрабатывается (Director.action): клип Meshy «action:<id>» (Почесать → scratch_enjoy) */
+  private curAction: string | null = null;
+  private chainTimer = 0;
+
+  /** у кота есть настоящий клип Meshy с этим id (GlbCharacter.clipSource) */
+  private isMeshy(id: string): boolean {
+    const ch = this.character as (Character & { clipSource?: (id: string) => string | null }) | undefined;
+    return ch?.clipSource?.(id) === 'meshy';
+  }
+
+  /**
+   * Клип + цепочка Meshy (content/animations.json meshy.then): sit_down → sit_idle (петля holdS с) → stand_up,
+   * fall_asleep → sleep_loop. Цепочка — только если оба клипа настоящие; иначе один клип, как раньше.
+   */
+  private playChained(clip: string) {
+    clearTimeout(this.chainTimer);
+    const real = (id: string) => this.isMeshy(id) || (this.character as Character & { clipSource?: (id: string) => string | null })?.clipSource?.(id) === 'own';
+    const ch = meshyChain(clip, real);
+    if (!ch || !this.isMeshy(clip)) return this.character.play(clip);
+    const next = () => {
+      if (this.character?.currentClip !== clip) return; // перебили — цепочка обрывается
+      this.playChained(ch.then);
+    };
+    const def = resolveClip(clip, this.persona.id);
+    if (def?.meshy?.loop) {
+      this.character.play(clip, { loop: true });
+      this.chainTimer = window.setTimeout(next, (ch.holdS ?? 4) * 1000);
+    } else this.character.play(clip, { onEnd: () => this.playChained(ch.then) });
+  }
   private lastTapLineAt = -1e9;
   private lastTapClipAt = -1e9;
   private loopTimer = 0;
@@ -384,10 +430,12 @@ export class Director extends Emitter<DirectorEvents> {
       return this.interaction('swipe', { from: path[0], path, x: path[8].x, y: path[8].y });
     }
     this.fromButton = true;
+    this.curAction = id;
     try {
       this.interaction(r.touch as InteractionKind);
     } finally {
       this.fromButton = false;
+      this.curAction = null;
     }
     if (r.touch === 'stroke' || r.touch === 'stroke_long') {
       // «Погладить» / «Обнять» кнопкой: пальца нет — stroke_end не придёт, а мурчание (purr_stroke) держится петлёй;
@@ -602,7 +650,8 @@ export class Director extends Emitter<DirectorEvents> {
         d.ui.toast(this.cfg.dialogs.adultHint ?? 'Позови взрослого.', 10_000);
         break;
       case 'goodbye':
-        this.character.play('run_home');
+        // клип Meshy «ныряет в карту» (code:goodbye) — вместо бега
+        this.character.play(meshyUpgrade('code:goodbye', 'run_home', this.persona.id, (id) => this.isMeshy(id)) ?? 'run_home');
         window.setTimeout(() => {
           if (this.state.phase === 'gone') d.stage.show(false);
         }, 1500);
@@ -629,7 +678,7 @@ export class Director extends Emitter<DirectorEvents> {
     const ch = this.character as Character & { setEmotion?: (n: string, w?: number, ms?: number) => void };
     if (a.event) {
       const def = this.persona.reactions[a.event];
-      this.playVisual({ clip: def?.clip ?? a.clip, fx: def?.fx ? [def.fx] : [], sound: def?.sound });
+      this.playVisual({ clip: def?.clip ?? a.clip, fx: def?.fx ? [def.fx] : [], sound: def?.sound, ev: a.event });
     } else this.playVisual({ clip: a.clip });
     if (a.face && ch?.setEmotion) ch.setEmotion(a.face, 1, 7000);
     this.log(`🎲 показ ${a.event ?? a.face ?? a.clip}`);
@@ -739,14 +788,14 @@ export class Director extends Emitter<DirectorEvents> {
     if (quiet) {
       // знакомство / мини-игра: касание видно (клип, эффект, эмоция), но слова не перебивают шаг
       const def = this.persona.reactions[event];
-      if (def) this.playVisual({ clip: def.clip, fx: def.fx ? [def.fx] : [], sound: def.sound, tap });
+      if (def) this.playVisual({ clip: def.clip, fx: def.fx ? [def.fx] : [], sound: def.sound, tap, ev: event });
       return;
     }
     // тап, пока кот ещё говорит ответ на прошлый тап: без новой реплики (и без перебивания её на полуслове)
     const cur = this.queue.current;
     if (tap && cur?.priority === 1 && performance.now() - this.lastTapLineAt < TAP_LINE_HOLD_MS) {
       const def = this.persona.reactions[event];
-      if (def) this.playVisual({ clip: def.clip, sound: def.sound, tap });
+      if (def) this.playVisual({ clip: def.clip, sound: def.sound, tap, ev: event });
       return;
     }
     const o = { name: this.state.name, prefer: this.prefer, strict: this.strictVoice };
@@ -758,11 +807,11 @@ export class Director extends Emitter<DirectorEvents> {
     if (!pk) {
       if (this.picker.coolingDown(event)) return;
       const def = this.persona.reactions[event];
-      if (def) this.playVisual({ clip: def.clip, fx: def.fx ? [def.fx] : [], sound: def.sound, tap });
+      if (def) this.playVisual({ clip: def.clip, fx: def.fx ? [def.fx] : [], sound: def.sound, tap, ev: event });
       else this.log(`нет реакции «${event}» у ${this.persona.id}`);
       return;
     }
-    this.playVisual({ clip: pk.clip, fx: pk.fx ? [pk.fx] : [], sound: pk.sound, face: pk.face, tap });
+    this.playVisual({ clip: pk.clip, fx: pk.fx ? [pk.fx] : [], sound: pk.sound, face: pk.face, tap, ev: event });
     if (this.enqueue(pk, false) && tap) this.lastTapLineAt = performance.now();
   }
 
@@ -880,7 +929,7 @@ export class Director extends Emitter<DirectorEvents> {
       this.log(`🔇 нет записи ${lineId} — пропуск`);
       return;
     }
-    if (visuals) this.playVisual({ clip: pk.clip, fx: pk.fx ? [pk.fx] : [], sound: pk.sound, face: pk.face });
+    if (visuals) this.playVisual({ clip: pk.clip, fx: pk.fx ? [pk.fx] : [], sound: pk.sound, face: pk.face, ev: pk.event });
     else this.face(pk.face);
     // пузырь живёт ровно столько, сколько звучит реплика (скрывается в конце, а не по таймеру длины текста)
     const shown = this.bubbleText(pk);
@@ -983,16 +1032,20 @@ export class Director extends Emitter<DirectorEvents> {
     else if (FACE_EMOTE[preset]) ch.emote(FACE_EMOTE[preset], 1400);
   }
 
-  private playVisual(v: { clip?: string; fx?: string[]; sound?: string; face?: string; tap?: boolean }) {
+  private playVisual(v: { clip?: string; fx?: string[]; sound?: string; face?: string; tap?: boolean; ev?: string }) {
     const d = this.d;
     const snd = runtimeSound(v.sound, (s) => d.audio.has(s));
     if (snd) d.audio.play(snd);
-    const clip = runtimeClip(v.clip);
+    // клип Meshy на этом событии / кнопке (content/animations.json meshy.on), если он пришёл; иначе — как было
+    const where = [v.ev, this.curAction ? `action:${this.curAction}` : undefined].filter((x): x is string => !!x);
+    const up = where.length ? meshyUpgrade(where, v.clip, this.persona.id, (id) => this.isMeshy(id)) : v.clip;
+    if (up !== v.clip) this.log(`🎞 Meshy: ${v.clip ?? '—'} → ${up} (${where.join(', ')})`);
+    const clip = runtimeClip(up);
     const now = performance.now();
     // тапы чаще TAP_CLIP_HOLD_MS — клип прошлого тапа доигрывает (а не 5 смен позы за 0,3 с)
     const held = v.tap && now - this.lastTapClipAt < TAP_CLIP_HOLD_MS;
     if (clip && !d.stage.walking && !held) {
-      this.character.play(clip);
+      this.playChained(clip);
       if (v.tap) this.lastTapClipAt = now;
       this.guardLoop(clip);
     }
@@ -1011,6 +1064,7 @@ export class Director extends Emitter<DirectorEvents> {
     clearTimeout(this.loopTimer);
     this.loopTimer = 0;
     if (!def?.loop || LOOP_KEEP.test(def.id)) return;
+    if (meshyChain(def.id, (id) => this.isMeshy(id))?.holdS) return; // петля цепочки Meshy (sit_idle) уходит сама — playChained
     const t0 = performance.now();
     const check = () => {
       this.loopTimer = 0;
@@ -1172,6 +1226,7 @@ export class Director extends Emitter<DirectorEvents> {
       this.character?.emote('blink', 150);
     }
     const playing = this.state.phase === 'play' || this.state.phase === 'free';
+    this.turnStep(playing);
     // idle-набор характера с весами (в дрёме — нет)
     if (playing && !this.dozing && !v.speaking && this.character?.currentClip === 'idle' && !this.d.stage.walking) {
       if ((this.idleT += dt) > 8 + Math.random() * 4) {

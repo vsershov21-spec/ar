@@ -518,3 +518,28 @@ export function spliceClip(src: THREE.AnimationClip, keep: [number, number][], n
   });
   return new THREE.AnimationClip(name, (n - 1) / fps, tracks);
 }
+
+/**
+ * Неподвижный «хвост» одноразового клипа (Meshy генерирует не меньше 2 с: короткая реакция, дальше «стоит», но чуть
+ * плывёт — порог prepareClip по отклонению от последнего кадра его не ловит). Здесь — по скорости: с последнего кадра,
+ * где кости тела двигались быстрее speed рад/с, + pad с; клип не короче minS. Возвращает срезанные секунды (0 — нет).
+ */
+export function trimStill(clip: THREE.AnimationClip, opts: { speed?: number; pad?: number; minS?: number; fps?: number } = {}): number {
+  const fps = opts.fps ?? FPS, thr = opts.speed ?? 0.4, pad = opts.pad ?? 0.2, minS = opts.minS ?? 0.6;
+  const dur = clip.duration;
+  const body = clip.tracks.filter((t) => t.getValueSize() === 4 && BODY_RX.test(nodeOf(t.name).replace(/^mixamorig:?/, '')));
+  if (!body.length || dur <= minS + 0.25) return 0;
+  const n = Math.max(2, Math.round(dur * fps) + 1);
+  const S = body.map((t) => resample(t, dur, fps).v);
+  let last = 0;
+  for (let i = 1; i < n; i++) {
+    let m = 0;
+    for (const v of S) m = Math.max(m, angleAt(v, i, i - 1) * fps);
+    if (m > thr) last = i;
+  }
+  const end = Math.min(dur, Math.max(minS, last / fps + pad));
+  if (dur - end < 0.25) return 0;
+  for (const t of clip.tracks) t.trim(0, end);
+  clip.duration = end;
+  return dur - end;
+}

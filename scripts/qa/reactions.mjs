@@ -8,6 +8,8 @@
 //   node scripts/qa/reactions.mjs --tag before       — имя прогона (до/после): bench-out/reactions/<tag>.json
 //   node scripts/qa/reactions.mjs --cats kind --only act_pet,zone_head --no-sheets
 //   node scripts/qa/reactions.mjs --report before,after — только отчёт из двух сохранённых прогонов (до → после)
+//   node scripts/qa/reactions.mjs --params collide=legacy — добавить параметры в адрес (коррекция рук как до 18.11)
+//   node scripts/qa/reactions.mjs --meshy DIR — отдавать /models/anims/meshy/* из DIR (клипы Meshy локально; scripts/qa/meshy-check.mjs)
 //
 // Как устроено: Chrome headless (swiftshader), ?from=test&nocard=off&debug — кот на столе без камеры. Время в странице
 // виртуальное (scripts/qa/reactions-clock.js): кадр приложения = ровно 1/30 с, таймеры режиссёра в той же шкале, рендер
@@ -37,6 +39,10 @@ const TAG = arg('--tag', 'now');
 const CATS = arg('--cats', 'hooligan,kind,glitter').split(',');
 const ONLY = arg('--only', '') ? arg('--only').split(',') : null;
 const SHEET = !flag('--no-sheets');
+const PARAMS_EXTRA = arg('--params', '');
+const MESHY_DIR = arg('--meshy', '') ? path.resolve(arg('--meshy')) : '';
+/** порог проникновения руки/ноги в тело или одежду после коррекции BodyCollider, мм на карте — больше = «плохо» */
+const PEN_BAD_MM = 2;
 const log = (...a) => console.log(`[rx ${new Date().toISOString().slice(11, 19)}]`, ...a);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 fs.mkdirSync(OUT, { recursive: true });
@@ -142,8 +148,10 @@ function serve() {
     .createServer((q, r) => {
       let p = decodeURIComponent(q.url.split('?')[0]);
       if (p.endsWith('/')) p += 'index.html';
-      const f = path.join(DIST, path.normalize(p));
-      if (!f.startsWith(DIST) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) {
+      // клипы Meshy из локальной папки (--meshy DIR): /models/anims/meshy/<файл> → DIR/<файл>
+      const mm = MESHY_DIR && p.match(/^\/models\/anims\/meshy\/([\w.-]+)$/);
+      const f = mm ? path.join(MESHY_DIR, mm[1]) : path.join(DIST, path.normalize(p));
+      if ((!mm && !f.startsWith(DIST)) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) {
         r.statusCode = 404;
         return r.end();
       }
@@ -159,10 +167,25 @@ async function runCat(browser, cat) {
   await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 1, isMobile: true, hasTouch: true });
   page.on('pageerror', (e) => log(`  [${cat}] pageerror`, e.message.slice(0, 200)));
   await page.evaluateOnNewDocument(reactionClock, { persona: cat });
-  await page.goto(`http://localhost:${PORT}/?from=test&nocard=off&debug`, { waitUntil: 'load' });
+  await page.goto(`http://localhost:${PORT}/?from=test&nocard=off&debug${PARAMS_EXTRA ? '&' + PARAMS_EXTRA : ''}`, { waitUntil: 'load' });
   await page.waitForFunction(() => window.__app?.director && window.__app.character?.kind === 'glb' && window.__app.character.mixer, { timeout: 120000 });
   await page.waitForFunction(() => !!document.querySelector('[data-a="wake"]'), { timeout: 60000 });
   await page.evaluate(() => window.__debugPanel?.open?.(false));
+  // клипы Meshy из --meshy: дождаться загрузки (грузятся после кота) и записать состояния
+  let meshy = null;
+  if (MESHY_DIR) {
+    let prev = -1, still = 0;
+    for (let i = 0; i < 120 && still < 4; i++) {
+      await sleep(500);
+      const n = await page.evaluate(() => window.__meshyStatus?.size ?? 0);
+      still = n > 0 && n === prev ? still + 1 : 0;
+      prev = n;
+    }
+    meshy = await page.evaluate(() => [...(window.__meshyStatus?.values() ?? [])]);
+    const k = (s) => meshy.filter((m) => m.state === s).length;
+    log(`  [${cat}] Meshy: загружено ${k('loaded')}, нет ${k('missing')}, отвергнуто ${k('rejected')}`);
+    for (const m of meshy) if (m.state === 'rejected') log(`    ✗ ${m.id}: ${m.reason}`);
+  }
   // кадры листа — только 3D и эффекты (интерфейс прячется на время снимка)
   await page.addStyleTag({ content: 'html.rxshot *{visibility:hidden!important} html.rxshot canvas{visibility:visible!important}' });
   // ручное время: дальше кадр = 1/30 с
@@ -202,7 +225,7 @@ async function runCat(browser, cat) {
     log(`[${cat}] ${sc.id}: ${a.verdict} lat ${a.lat ?? '—'} мс, pop ${a.pop}, slide ${a.slide} мм, ${a.notes.join('; ')}`);
   }
   await page.close();
-  return { cat, cal, durs, results };
+  return { cat, cal, durs, results, meshy };
 }
 
 /** спокойная стойка перед сценарием: диалог закрыт, очередь пуста, кот в покое на карте */
@@ -355,6 +378,9 @@ export function analyze(r, durs = {}, cuts = null) {
   const calm = after.filter((f) => f.vis && !f.glass && f.fh?.length && !AIR.test(f.clip));
   const floatP = calm.length > 10 ? median(calm.map((f) => Math.min(...f.fh))) : 0;
   const pen = Math.max(0, ...after.map((f) => f.pen));
+  // проникновение, мм (BodyCollider.measurePairs после коррекции): самая глубокая пара за сценарий
+  let penMM = 0, penPair = '';
+  for (const f of after) if ((f.penMM ?? 0) > penMM) [penMM, penPair] = [f.penMM, `${f.penPair}@${f.clip}`];
   // переход стоя ↔ лёжа за время инерциального смешивания (нет клипа «лечь»/«встать»)
   const lieTrans = segs0(after).some((s, i, a) => i > 0 && LIE.test(s.clip) !== LIE.test(a[i - 1].clip) && !/bed/.test(s.clip + a[i - 1].clip));
   const bind = Math.max(0, ...after.map((f) => f.bind));
@@ -425,7 +451,8 @@ export function analyze(r, durs = {}, cuts = null) {
     else if (sink < -2.5) tol(`провал лап ${sink.toFixed(1)} мм`);
     if (floatP > 4) tol(`парит ${floatP.toFixed(1)} мм`);
   }
-  if (pen > 0.12) tol(`рука в теле ${(pen * 100).toFixed(0)}%`);
+  if (penMM > PEN_BAD_MM) bad(`проникновение ${penMM.toFixed(1)} мм (${penPair})`);
+  else if (pen > 0.12 && after[0]?.penMM === undefined) tol(`рука в теле ${(pen * 100).toFixed(0)}%`);
   if (lieTrans) tol('лечь/встать — переход смешиванием (нужен клип fall_asleep / wake_up)');
   if (fight.length) bad(`клипы дерутся: ${[...new Set(fight)].slice(0, 2).join(', ')}`);
   if (cut.length && r.id !== 'chaos' && r.id !== 'tap_spam') tol(`обрыв: ${cut.slice(0, 2).join(', ')}`);
@@ -437,7 +464,7 @@ export function analyze(r, durs = {}, cuts = null) {
   if (r.id === 'chaos' && switchesPerS > 4) tol(`дёргается: ${switchesPerS.toFixed(1)} смен клипа/с`);
   return {
     id: r.id, verdict, notes, lat, latBody, latIn, lats, pop: +pop.toFixed(1), popAt, hipPop: +hipPop.toFixed(1), w99: +wAll.toFixed(1),
-    slide: +slideIn.toFixed(1), slideWalk: +slideWalk.toFixed(1), sink: +sink.toFixed(1), float: +floatP.toFixed(1), pen: +pen.toFixed(3), bind,
+    slide: +slideIn.toFixed(1), slideWalk: +slideWalk.toFixed(1), sink: +sink.toFixed(1), float: +floatP.toFixed(1), pen: +pen.toFixed(3), penMM: +penMM.toFixed(1), penPair, penPairs: r.penPairs ?? {}, bind,
     clips: [...new Set(react.map((s) => s.clip))], stub, redo, cut, fight: [...new Set(fight)], idleAt, emos, faceOk, switchesPerS: +switchesPerS.toFixed(1),
     errors: r.errors?.length ?? 0,
   };
@@ -471,7 +498,7 @@ function renderReport(runs) {
   L.push('- **отклик, мс** — от касания/кнопки до первого видимого ответа: тело (ключевая кость повернулась ≥ 0,12 рад от позы в момент события), лицо (вес мимики ≥ 0,25) или эффект; в скобках — тело. Цель ≤ 150 мс.');
   L.push('- **щелчок, рад/с** — пик угловой скорости костей тела в 0,3 с после смены клипа (стык смешивания). ≤ 10,5 ok (инерциальный переход AnimBlender рассчитан на пик ≈ 10 рад/с: быстрая реакция без «телепорта»), ≤ 15 терпимо.');
   L.push('- **лапы, мм** — скольжение опорной лапы по плоскости опоры (лапа ниже 4 мм над опорой два кадра подряд), в масштабе кота на карте (рост кота ≈ 0,9 карты ≈ 77 мм); провал — самая низкая лапа ниже опоры; парение — медиана самой низкой лапы в спокойных клипах.');
-  L.push('- **рука в теле** — остаток проникновения руки в объёмы тела после BodyCollider (доля полуоси эллипсоида).');
+  L.push(`- **проникновение, мм** — самая глубокая точка руки (плечо, локоть, предплечье, кисть, кончик лапы) или голени/колена внутри прокси тела и одежды (торс, шея, голова, кепка/наушники/шарф/бант/юбка, уши, бёдра/голени другой ноги) после коррекции BodyCollider, мм на карте; > ${PEN_BAD_MM} мм — «плохо».`);
   L.push('- **заглушка** — клип играет опорой/псевдонимом (docs/animations/INVENTORY.md: «заглушка»), **обрыв** — реакцию сменили раньше 55 % её длины без нового действия, **драка** — два разных клипа реакции за 400 мс без нового действия, **покой** — кот вернулся в idle к концу записи.');
   L.push('- **лицо** — эмоция/пресет в первые 1,5 с против ожидаемого семейства (FACE_OK в стенде).');
   L.push('');
@@ -492,17 +519,37 @@ function renderReport(runs) {
   L.push('');
   L.push('В ячейке: вердикт · отклик (тело) · щелчок рад/с · скольжение лап мм.');
   L.push('');
+  // проникновение рук/ног в тело и одежду (после коррекции BodyCollider), мм: до → после
+  if (cur.cats.some((c) => c.results.some((r) => r.frames?.some((f) => f.penMM !== undefined)))) {
+    L.push(`## Проникновение (руки/ноги сквозь тело и одежду), мм — порог «плохо» > ${PEN_BAD_MM} мм`);
+    L.push('');
+    L.push(`Глубина самой глубокой пары «часть тела : прокси» за сценарий после коррекции (BodyCollider.measurePairs, прокси: торс, шея, голова, одежда, уши, бёдра/голени)${prev ? `; «было» — прогон \`${prev.tag}\`` : ''}.`);
+    L.push('');
+    L.push(`| действие | ${cats.join(' | ')} |`);
+    L.push(`|---|${cats.map(() => '---').join('|')}|`);
+    for (const id of ids) {
+      const cells = cats.map((cat) => {
+        const a = A(cur, cat, id);
+        if (!a) return '—';
+        const b = prev ? A(prev, cat, id) : null;
+        const mark = a.penMM > PEN_BAD_MM ? '**' : '';
+        return `${mark}${a.penMM}${mark}${b && b.penMM !== undefined ? ` (было ${b.penMM})` : ''}${a.penMM > 0.5 ? ` · ${a.penPair}` : ''}`;
+      });
+      L.push(`| ${LABEL[id] ?? id} | ${cells.join(' | ')} |`);
+    }
+    L.push('');
+  }
   for (const cat of cats) {
     L.push(`## ${cat}: подробно`);
     L.push('');
-    L.push('| действие | вердикт | отклик, мс (тело) | щелчок | бедро | лапы мм | провал / парит мм | рука в теле | клипы | лицо | покой, с | замечания |');
+    L.push('| действие | вердикт | отклик, мс (тело) | щелчок | бедро | лапы мм | провал / парит мм | проникн., мм | клипы | лицо | покой, с | замечания |');
     L.push('|---|---|---|---|---|---|---|---|---|---|---|---|');
     for (const id of ids) {
       const a = A(cur, cat, id);
       if (!a) continue;
       const b = prev ? A(prev, cat, id) : null;
       const arrow = (x, y) => (b && y !== undefined && y !== null && x !== y ? `${x} (было ${y})` : `${x ?? '—'}`);
-      L.push(`| ${LABEL[id] ?? id} | ${V[a.verdict]}${b ? ` (было ${V[b.verdict].replace(/\*/g, '')})` : ''} | ${arrow(a.lat, b?.lat)} (${a.latBody ?? '—'}) | ${arrow(a.pop, b?.pop)} | ${a.hipPop} | ${arrow(a.slide, b?.slide)} | ${a.sink} / ${a.float} | ${(a.pen * 100).toFixed(0)}% | ${a.clips.join(', ') || '—'} | ${a.emos.slice(0, 3).join(', ') || '—'} | ${a.idleAt !== null ? (a.idleAt / 1000).toFixed(1) : '—'} | ${a.notes.join('; ') || '—'} |`);
+      L.push(`| ${LABEL[id] ?? id} | ${V[a.verdict]}${b ? ` (было ${V[b.verdict].replace(/\*/g, '')})` : ''} | ${arrow(a.lat, b?.lat)} (${a.latBody ?? '—'}) | ${arrow(a.pop, b?.pop)} | ${a.hipPop} | ${arrow(a.slide, b?.slide)} | ${a.sink} / ${a.float} | ${a.penMM !== undefined ? arrow(a.penMM, b?.penMM) : `${(a.pen * 100).toFixed(0)}%`} | ${a.clips.join(', ') || '—'} | ${a.emos.slice(0, 3).join(', ') || '—'} | ${a.idleAt !== null ? (a.idleAt / 1000).toFixed(1) : '—'} | ${a.notes.join('; ') || '—'} |`);
     }
     L.push('');
   }

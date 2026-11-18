@@ -18,6 +18,8 @@ import type { CatalogItem } from './actionCatalog';
 import { CAT_ICON } from './catalogIcons';
 import { filterGroups, firstMatch, type CatalogGroup } from './catalogGroups';
 import { IS_LAB, feature, fromTestPage } from '../config/edition';
+import { meshyStatus } from '../character/meshyClips';
+import { MESHY_STATE_LABEL, meshyReportText, meshyReportWanted, meshyRows } from '../character/meshyReport';
 import { PERSONA_IDS } from '../persona/types';
 import { FACE_IDS } from '../character/face';
 import { ZONES } from '../home/zones';
@@ -431,6 +433,34 @@ export class DeskPanel {
           app.character.play(c.id);
           this.note(`клип Meshy ${c.id}`);
         }, `${c.src}; play('${c.id}')`);
+    }
+
+    // ?meshyreport (lab; пилот — с from=test): ожидаемые клипы Meshy → загружен / нет / отвергнут (причина) / где играет
+    if (feature('anims.meshy') && meshyReportWanted(location.search, IS_LAB, fromTestPage(location.search, document.referrer))) {
+      const ch = app.character as unknown as { meshyPen?: Map<string, number> };
+      const reactions: Record<string, Record<string, { clip?: string }>> = {};
+      for (const p of PERSONA_IDS) reactions[p] = (d.personas.get(p)?.reactions ?? {}) as Record<string, { clip?: string }>;
+      const rows = meshyRows(meshyStatus, reactions, ch.meshyPen);
+      const s2 = document.createElement('section');
+      s2.className = 'dp-sec';
+      const txt = meshyReportText(rows);
+      s2.innerHTML = `<h3>Отчёт Meshy</h3><div class="dp-note">${esc(txt.split('\n')[0])}</div>`;
+      const t = document.createElement('table');
+      t.className = 'dp-table';
+      t.style.cssText = 'width:100%;font-size:11px;border-collapse:collapse';
+      t.innerHTML = '<tr><th>id</th><th>состояние</th><th>с</th><th>мм</th><th>играет на</th><th>без клипа</th></tr>' +
+        rows.map((r) => `<tr style="border-top:1px solid #8884"><td>${esc(r.id)}</td><td style="color:${r.state === 'loaded' ? '#3a3' : r.state === 'rejected' ? '#d44' : '#999'}">${esc(MESHY_STATE_LABEL[r.state])}${r.reason ? ': ' + esc(r.reason) : ''}</td><td>${r.dur ?? '—'}</td><td>${r.pen ?? '—'}</td><td>${esc(r.usedBy.join(', ') || '—')}</td><td>${esc(r.fallback)}</td></tr>`).join('');
+      s2.appendChild(t);
+      const upd = document.createElement('button');
+      upd.type = 'button';
+      upd.className = 'dp-btn';
+      upd.textContent = 'Обновить · в консоль';
+      upd.onclick = () => {
+        console.info(meshyReportText(meshyRows(meshyStatus, reactions, ch.meshyPen)));
+        this.renderTest();
+      };
+      s2.appendChild(upd);
+      box.appendChild(s2);
     }
 
     // события и реплики: поиск

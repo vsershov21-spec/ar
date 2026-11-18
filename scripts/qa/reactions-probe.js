@@ -110,6 +110,7 @@ export function installProbe() {
     rx.name = name;
     rx.t0 = performance.now();
     rx.frames = [];
+    rx.penPairs = {};
     rx.plays = [];
     rx.fx = [];
     rx.events = [];
@@ -186,6 +187,14 @@ export function installProbe() {
     const switched = cs.cur !== rx.lastTrack;
     rx.lastTrack = cs.cur;
     const pen = c.collider?.measure ? c.collider.measure() : 0;
+    // проникновение по парам «часть тела : прокси», мм (BodyCollider.measurePairs, после коррекции)
+    let penMM = 0, penPair = '';
+    const pairs = c.collider?.measurePairs ? c.collider.measurePairs() : null;
+    if (pairs) for (const k in pairs) {
+      const v = pairs[k] * catMM;
+      if (v > penMM) [penMM, penPair] = [v, k];
+      if (v > 0.5) rx.penPairs[k] = Math.max(rx.penPairs[k] ?? 0, +v.toFixed(1));
+    }
     const r = {
       t: rx.t(),
       clip: cs.cur.id,
@@ -209,6 +218,8 @@ export function installProbe() {
       Dsw: +Dsw.toFixed(3),
       slide: +slide.toFixed(2),
       pen: +pen.toFixed(3),
+      penMM: +penMM.toFixed(1),
+      penPair,
       hits: c.collider?.hits ?? 0,
       bind: +(nb / bones.length).toFixed(2),
       proc: c.procedural?.has(cs.cur.id) || !c.actions?.has(cs.cur.id) ? 1 : 0,
@@ -225,6 +236,7 @@ export function installProbe() {
   };
   rx.end = () => ({
     name: rx.name,
+    penPairs: rx.penPairs,
     frames: rx.frames,
     plays: rx.plays,
     fx: rx.fx,

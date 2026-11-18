@@ -29,6 +29,31 @@ export interface ClipDef {
    * Настоящий клип нужной длины (Meshy) с этим id — cut снять.
    */
   cut?: { src?: string; keep: [number, number][]; speed?: number };
+  /** переход в покой после конца клипа, мс (больше blendInMs покоя — мягче возврат) */
+  blendOutMs?: number;
+  /**
+   * Клип Meshy (docs/animations/MESHY.md, scripts/models/t2m_prompts_v2.json specs[id].meshy): как играть, когда он
+   * пришёл (meshyClips.ts → GlbCharacter.addExternalClip). Нет клипа — ничего из этого не действует, играет как раньше.
+   */
+  meshy?: MeshyRule;
+}
+
+export interface MeshyRule {
+  /** петля (из спеки Meshy; главнее loop каталога и манифеста) */
+  loop: boolean;
+  blendInMs?: number;
+  blendOutMs?: number;
+  /**
+   * Где этот клип заменяет текущий, когда пришёл настоящий: события реакций ('treat'), кнопки ('action:scratch'),
+   * точки кода ('code:goodbye', 'code:stage.turn'). Для клипов, которые уже стоят на своём месте (poke_*, wave, кровать),
+   * не нужно — их id и так играют.
+   */
+  on?: string[];
+  /** заменяет только эти клипы реакции (иначе любой) */
+  from?: string[];
+  /** цепочка: после конца (петля — через holdS) играет этот клип, если он тоже настоящий */
+  then?: string;
+  holdS?: number;
 }
 
 const DEFS = new Map<string, ClipDef>();
@@ -40,6 +65,50 @@ export const clipDef = (id: string): ClipDef | undefined => DEFS.get(id);
 export const FALLBACK_CLIPS: readonly ClipDef[] = [...DEFS.values()].filter((d) => !!d.fallback);
 /** клипы каталога с монтажом cut (собираются из клипа библиотеки при загрузке GLB) */
 export const CUT_CLIPS: readonly ClipDef[] = [...DEFS.values()].filter((d) => !!d.cut?.keep?.length);
+
+/** клипы с правилами Meshy (ожидаемые id; совпадают со specs[*].meshy в t2m_prompts_v2.json — tests/meshyMap.test.ts) */
+export const MESHY_IDS: readonly string[] = [...DEFS.values()].filter((d) => !!d.meshy).map((d) => d.id);
+
+/**
+ * Какой клип играть на событии/кнопке/точке кода: настоящий клип Meshy (есть у персонажа — real(id)) с правилом
+ * meshy.on для этого места и характера — вместо clip; иначе clip как есть (опора, монтаж cut, псевдоним — всё как было).
+ * where — 'treat' | 'action:scratch' | 'code:goodbye'; несколько мест — первое совпадение.
+ */
+export function meshyUpgrade(where: string | string[], clip: string | undefined, personaId: string, real: (id: string) => boolean): string | undefined {
+  const keys = Array.isArray(where) ? where : [where];
+  for (const d of DEFS.values()) {
+    const r = d.meshy;
+    if (!r?.on || (d.persona !== 'all' && d.persona !== personaId)) continue;
+    if (!keys.some((k) => r.on!.includes(k))) continue;
+    if (r.from && (!clip || !r.from.includes(LEGACY_CLIP[clip] ?? clip))) continue;
+    if (!real(d.id)) continue;
+    return d.id;
+  }
+  return clip;
+}
+
+/** цепочка клипа Meshy (sit_down → sit_idle → stand_up, fall_asleep → sleep_loop): следующий, только если он настоящий */
+export function meshyChain(id: string, real: (id: string) => boolean): { then: string; holdS?: number } | null {
+  const r = DEFS.get(id)?.meshy;
+  if (!r?.then || !real(id) || !real(r.then)) return null;
+  return { then: r.then, holdS: r.holdS };
+}
+
+/**
+ * Определение клипа, когда играет клип Meshy: монтаж cut и опора fallback — для старого клипа, снимаются; петля и
+ * переходы — из правила meshy; длительность — реальная (dur, после animPrep).
+ */
+export function meshyDef(def: ClipDef, dur?: number): ClipDef {
+  const r = def.meshy;
+  const out: ClipDef = { ...def, cut: undefined, fallback: undefined };
+  if (r) {
+    out.loop = r.loop;
+    if (r.blendInMs !== undefined) out.blendInMs = r.blendInMs;
+    if (r.blendOutMs !== undefined) out.blendOutMs = r.blendOutMs;
+  }
+  if (dur && dur > 0) out.durationS = dur;
+  return out;
+}
 
 /** старые имена клипов (director, спрайт-манифест) → id каталога. 'idle' — особый: выбор по весам характера */
 export const LEGACY_CLIP: Record<string, string> = {

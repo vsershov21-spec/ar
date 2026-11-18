@@ -103,6 +103,31 @@
       "notes": "Подкидывает мини-скейт ногой и ловит; без скейта — делает вид, что катится."
     },
     {
+      "id": "skate_ride",
+      "durationS": 4.0,
+      "loop": false,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 150,
+      "persona": "hooligan",
+      "priority": "P1",
+      "usedBy": [
+        "skate"
+      ],
+      "notes": "«Скейт» (Хулиган): катится на месте. Только Meshy; без клипа — idle_hooligan_skate.",
+      "meshy": {
+        "loop": false,
+        "blendInMs": 200,
+        "blendOutMs": 350,
+        "on": [
+          "skate"
+        ],
+        "from": [
+          "idle_hooligan_skate"
+        ]
+      }
+    },
+    {
       "id": "idle_hooligan_headphones",
       "durationS": 4.0,
       "loop": true,
@@ -114,7 +139,10 @@
       "usedBy": [
         "idle"
       ],
-      "notes": "Качает головой в такт музыке в наушниках, щёлкает пальцами."
+      "notes": "Качает головой в такт музыке в наушниках, щёлкает пальцами.",
+      "meshy": {
+        "loop": true
+      }
     },
     {
       "id": "idle_kind_hug_self",
@@ -142,7 +170,10 @@
       "usedBy": [
         "idle"
       ],
-      "notes": "Достаёт кружку какао, дует, пьёт, пар поднимается."
+      "notes": "Достаёт кружку какао, дует, пьёт, пар поднимается.",
+      "meshy": {
+        "loop": false
+      }
     },
     {
       "id": "idle_glitter_mirror",
@@ -156,7 +187,10 @@
       "usedBy": [
         "idle"
       ],
-      "notes": "Смотрится в экран как в зеркало, поправляет бантик и ушки."
+      "notes": "Смотрится в экран как в зеркало, поправляет бантик и ушки.",
+      "meshy": {
+        "loop": false
+      }
     },
     {
       "id": "idle_glitter_twirl",
@@ -170,7 +204,10 @@
       "usedBy": [
         "idle"
       ],
-      "notes": "Кружится на месте, юбка/худи разлетается, блёстки с хвоста."
+      "notes": "Кружится на месте, юбка/худи разлетается, блёстки с хвоста.",
+      "meshy": {
+        "loop": false
+      }
     },
     {
       "id": "appear_jump_in",
@@ -185,7 +222,12 @@
         "intro",
         "card_found"
       ],
-      "notes": "Выпрыгивает из карты: из-под поверхности вверх, приземление со сквошем, отряхивается."
+      "notes": "Выпрыгивает из карты: из-под поверхности вверх, приземление со сквошем, отряхивается.",
+      "meshy": {
+        "loop": false,
+        "blendInMs": 0,
+        "blendOutMs": 250
+      }
     },
     {
       "id": "dive_out",
@@ -200,7 +242,14 @@
         "goodbye",
         "outro"
       ],
-      "notes": "Машет и ныряет обратно в карту."
+      "notes": "Машет и ныряет обратно в карту.",
+      "meshy": {
+        "loop": false,
+        "blendInMs": 100,
+        "on": [
+          "code:goodbye"
+        ]
+      }
     },
     {
       "id": "fall_off_card",
@@ -244,7 +293,10 @@
       "usedBy": [
         "walk_to"
       ],
-      "notes": "Цикл шага на двух лапах, хвост для баланса. Скорость в коде."
+      "notes": "Цикл шага на двух лапах, хвост для баланса. Скорость в коде.",
+      "meshy": {
+        "loop": true
+      }
     },
     {
       "id": "run",
@@ -270,6 +322,9 @@
           ]
         ],
         "speed": 1.6
+      },
+      "meshy": {
+        "loop": true
       }
     },
     {
@@ -303,6 +358,28 @@
       "notes": "Поворот на 90° вправо."
     },
     {
+      "id": "turn_step",
+      "durationS": 0.8,
+      "loop": true,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 150,
+      "persona": "all",
+      "priority": "P0",
+      "usedBy": [
+        "code:stage.turn"
+      ],
+      "notes": "Переступает на месте, пока сцена поворачивает кота к зрителю (> 25°). Только Meshy; без клипа — idle.",
+      "meshy": {
+        "loop": true,
+        "blendInMs": 150,
+        "blendOutMs": 200,
+        "on": [
+          "code:stage.turn"
+        ]
+      }
+    },
+    {
       "id": "jump",
       "durationS": 1.0,
       "loop": false,
@@ -315,7 +392,10 @@
         "jump",
         "clap"
       ],
-      "notes": "Присед, прыжок, приземление со сквошем."
+      "notes": "Присед, прыжок, приземление со сквошем.",
+      "meshy": {
+        "loop": false
+      }
     },
     {
       "id": "flip",
@@ -330,7 +410,10 @@
         "flip",
         "double_tap"
       ],
-      "notes": "Сальто назад, приземление в ту же точку, поза «та-да»."
+      "notes": "Сальто назад, приземление в ту же точку, поза «та-да».",
+      "meshy": {
+        "loop": false
+      }
     },
     {
       "id": "tumble",
@@ -358,6 +441,11 @@
             6.4
           ]
         ]
+      },
+      "meshy": {
+        "loop": false,
+        "blendInMs": 100,
+        "blendOutMs": 350
       }
     },
     {
@@ -385,6 +473,11 @@
             4.96
           ]
         ]
+      },
+      "meshy": {
+        "loop": false,
+        "blendInMs": 150,
+        "blendOutMs": 350
       }
     },
     {
@@ -399,7 +492,12 @@
       "usedBy": [
         "sit"
       ],
-      "notes": "Садится на попу, хвост обвивает лапы."
+      "notes": "Садится на попу, хвост обвивает лапы.",
+      "meshy": {
+        "loop": false,
+        "blendInMs": 150,
+        "then": "sit_idle"
+      }
     },
     {
       "id": "sit_idle",
@@ -414,7 +512,13 @@
         "sit",
         "code:after_sit_down"
       ],
-      "notes": "Сидит, болтает лапами."
+      "notes": "Сидит, болтает лапами.",
+      "meshy": {
+        "loop": true,
+        "blendInMs": 80,
+        "holdS": 5,
+        "then": "stand_up"
+      }
     },
     {
       "id": "stand_up",
@@ -429,7 +533,12 @@
         "sit",
         "code:leave_sit"
       ],
-      "notes": "Встаёт из сидячей позы."
+      "notes": "Встаёт из сидячей позы.",
+      "meshy": {
+        "loop": false,
+        "blendInMs": 80,
+        "blendOutMs": 300
+      }
     },
     {
       "id": "sleep_loop",
@@ -444,6 +553,32 @@
         "sleep"
       ],
       "notes": "Сворачивается клубком на карте, бок поднимается от дыхания."
+    },
+    {
+      "id": "fall_asleep",
+      "durationS": 2.2,
+      "loop": false,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 150,
+      "persona": "all",
+      "priority": "P0",
+      "usedBy": [
+        "sleep"
+      ],
+      "notes": "Засыпает: садится/ложится → дальше sleep_loop. Только Meshy; без клипа — сразу sleep_loop.",
+      "meshy": {
+        "loop": false,
+        "blendInMs": 250,
+        "blendOutMs": 400,
+        "on": [
+          "sleep"
+        ],
+        "from": [
+          "sleep_loop"
+        ],
+        "then": "sleep_loop"
+      }
     },
     {
       "id": "wake_startle",
@@ -468,6 +603,31 @@
       }
     },
     {
+      "id": "wake_up",
+      "durationS": 2.0,
+      "loop": false,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 150,
+      "persona": "all",
+      "priority": "P0",
+      "usedBy": [
+        "wake_up"
+      ],
+      "notes": "Просыпается из позы сна, встаёт. Только Meshy; без клипа — wake_startle.",
+      "meshy": {
+        "loop": false,
+        "blendInMs": 150,
+        "blendOutMs": 300,
+        "on": [
+          "wake_up"
+        ],
+        "from": [
+          "wake_startle"
+        ]
+      }
+    },
+    {
       "id": "walk_to_bedside",
       "durationS": 1.2,
       "loop": true,
@@ -480,7 +640,11 @@
         "code:home.bed"
       ],
       "fallback": "walk",
-      "notes": "Подходит к длинному краю кровати (сонная походка, по желанию) и поворачивается к ней. Root motion — путь сцены. Нет в GLB — опора `walk`."
+      "notes": "Подходит к длинному краю кровати (сонная походка, по желанию) и поворачивается к ней. Root motion — путь сцены. Нет в GLB — опора `walk`.",
+      "meshy": {
+        "loop": true,
+        "blendInMs": 200
+      }
     },
     {
       "id": "get_into_bed",
@@ -495,7 +659,11 @@
         "code:home.bed"
       ],
       "fallback": "jump",
-      "notes": "Забирается в кровать сбоку, с длинного края: передние лапы на матрас, подтягивается, встаёт на колени на матрасе. Root motion — путь сцены (src/home/bedFlow.ts), клип на месте. Нет в GLB — опора `jump` + дуга корня."
+      "notes": "Забирается в кровать сбоку, с длинного края: передние лапы на матрас, подтягивается, встаёт на колени на матрасе. Root motion — путь сцены (src/home/bedFlow.ts), клип на месте. Нет в GLB — опора `jump` + дуга корня.",
+      "meshy": {
+        "loop": false,
+        "blendInMs": 150
+      }
     },
     {
       "id": "lie_down_side",
@@ -510,7 +678,11 @@
         "code:home.bed"
       ],
       "fallback": "sleep_loop",
-      "notes": "Ложится на бок на матрасе головой к подушке. Нет в GLB — процедурно: `sleep_loop` + плавное опускание корня и крен на бок."
+      "notes": "Ложится на бок на матрасе головой к подушке. Нет в GLB — процедурно: `sleep_loop` + плавное опускание корня и крен на бок.",
+      "meshy": {
+        "loop": false,
+        "blendInMs": 150
+      }
     },
     {
       "id": "sleep_loop_bed",
@@ -525,7 +697,11 @@
         "code:home.bed"
       ],
       "fallback": "sleep_loop",
-      "notes": "Спит в кровати под одеялом на боку, бок поднимается от дыхания. Бесшовная петля. Нет в GLB — `sleep_loop` + дыхание корнем."
+      "notes": "Спит в кровати под одеялом на боку, бок поднимается от дыхания. Бесшовная петля. Нет в GLB — `sleep_loop` + дыхание корнем.",
+      "meshy": {
+        "loop": true,
+        "blendInMs": 200
+      }
     },
     {
       "id": "turn_over_sleep",
@@ -540,7 +716,11 @@
         "code:home.bed"
       ],
       "fallback": "sleep_loop",
-      "notes": "Во сне переворачивается/ворочается от касания, бормочет, не просыпается; начало и конец — поза sleep_loop_bed. Нет в GLB — `sleep_loop` + приподнять и покачать корень."
+      "notes": "Во сне переворачивается/ворочается от касания, бормочет, не просыпается; начало и конец — поза sleep_loop_bed. Нет в GLB — `sleep_loop` + приподнять и покачать корень.",
+      "meshy": {
+        "loop": false,
+        "blendInMs": 200
+      }
     },
     {
       "id": "wake_stretch_in_bed",
@@ -555,7 +735,11 @@
         "code:home.bed"
       ],
       "fallback": "wake_startle",
-      "notes": "После того как одеяло откинуто: потягивается и зевает лёжа, садится на край кровати лицом к зрителю. Нет в GLB — опора `wake_startle` + подъём из крена сценой."
+      "notes": "После того как одеяло откинуто: потягивается и зевает лёжа, садится на край кровати лицом к зрителю. Нет в GLB — опора `wake_startle` + подъём из крена сценой.",
+      "meshy": {
+        "loop": false,
+        "blendInMs": 200
+      }
     },
     {
       "id": "hop_out_of_bed",
@@ -570,7 +754,12 @@
         "code:home.bed"
       ],
       "fallback": "jump",
-      "notes": "Сидя на краю кровати, спрыгивает вбок на пол у кровати и встаёт лицом к зрителю. Root motion — путь сцены. Нет в GLB — опора `jump` + дуга корня с матраса на пол."
+      "notes": "Сидя на краю кровати, спрыгивает вбок на пол у кровати и встаёт лицом к зрителю. Root motion — путь сцены. Нет в GLB — опора `jump` + дуга корня с матраса на пол.",
+      "meshy": {
+        "loop": false,
+        "blendInMs": 150,
+        "blendOutMs": 250
+      }
     },
     {
       "id": "paint_brush",
@@ -585,7 +774,11 @@
         "code:card.paint"
       ],
       "fallback": "breath_draw",
-      "notes": "Раскраска карты (Добряк, Блёстка): наклоняется к карте под ногами и широко мажет кистью в правой лапе влево-вправо, левая лапа в стороне для равновесия. Кисть — процедурный реквизит PropRig (paint_brush). Нет в GLB — опора `breath_draw`."
+      "notes": "Раскраска карты (Добряк, Блёстка): наклоняется к карте под ногами и широко мажет кистью в правой лапе влево-вправо, левая лапа в стороне для равновесия. Кисть — процедурный реквизит PropRig (paint_brush). Нет в GLB — опора `breath_draw`.",
+      "meshy": {
+        "loop": true,
+        "blendInMs": 200
+      }
     },
     {
       "id": "paint_spray",
@@ -600,7 +793,11 @@
         "code:card.paint"
       ],
       "fallback": "scratch_glass",
-      "notes": "Раскраска карты (Хулиган): трясёт баллончик в правой лапе, наклоняется и брызгает по карте под ногами дугами, качает головой в такт. Баллончик — процедурный реквизит PropRig (paint_spray). Нет в GLB — опора `scratch_glass`."
+      "notes": "Раскраска карты (Хулиган): трясёт баллончик в правой лапе, наклоняется и брызгает по карте под ногами дугами, качает головой в такт. Баллончик — процедурный реквизит PropRig (paint_spray). Нет в GLB — опора `scratch_glass`.",
+      "meshy": {
+        "loop": true,
+        "blendInMs": 200
+      }
     },
     {
       "id": "wave",
@@ -625,6 +822,11 @@
             2.6
           ]
         ]
+      },
+      "meshy": {
+        "loop": false,
+        "blendInMs": 120,
+        "blendOutMs": 300
       }
     },
     {
@@ -695,7 +897,11 @@
         "unknown",
         "echo_start"
       ],
-      "notes": "Прикладывает ухо к стеклу, уши торчком."
+      "notes": "Прикладывает ухо к стеклу, уши торчком.",
+      "meshy": {
+        "loop": true,
+        "blendInMs": 200
+      }
     },
     {
       "id": "think",
@@ -786,6 +992,81 @@
       "notes": "Отшатывается, уши вверх."
     },
     {
+      "id": "surprise_trick_hooligan",
+      "durationS": 2.0,
+      "loop": false,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 150,
+      "persona": "hooligan",
+      "priority": "P0",
+      "usedBy": [
+        "surprise"
+      ],
+      "notes": "«Удиви» (Хулиган): фокус-трюк. Только Meshy; без клипа — surprised.",
+      "meshy": {
+        "loop": false,
+        "blendInMs": 120,
+        "blendOutMs": 300,
+        "on": [
+          "surprise"
+        ],
+        "from": [
+          "surprised"
+        ]
+      }
+    },
+    {
+      "id": "surprise_trick_kind",
+      "durationS": 2.0,
+      "loop": false,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 150,
+      "persona": "kind",
+      "priority": "P0",
+      "usedBy": [
+        "surprise"
+      ],
+      "notes": "«Удиви» (Добряк): фокус-трюк. Только Meshy; без клипа — surprised.",
+      "meshy": {
+        "loop": false,
+        "blendInMs": 120,
+        "blendOutMs": 300,
+        "on": [
+          "surprise"
+        ],
+        "from": [
+          "surprised"
+        ]
+      }
+    },
+    {
+      "id": "surprise_trick_glitter",
+      "durationS": 2.0,
+      "loop": false,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 150,
+      "persona": "glitter",
+      "priority": "P0",
+      "usedBy": [
+        "surprise"
+      ],
+      "notes": "«Удиви» (Блёстка): фокус-трюк. Только Meshy; без клипа — surprised.",
+      "meshy": {
+        "loop": false,
+        "blendInMs": 120,
+        "blendOutMs": 300,
+        "on": [
+          "surprise"
+        ],
+        "from": [
+          "surprised"
+        ]
+      }
+    },
+    {
       "id": "offended",
       "durationS": 2.0,
       "loop": false,
@@ -812,6 +1093,77 @@
           ]
         ],
         "speed": 1.2
+      },
+      "meshy": {
+        "loop": false,
+        "blendInMs": 120,
+        "blendOutMs": 300
+      }
+    },
+    {
+      "id": "tease_hooligan",
+      "durationS": 1.8,
+      "loop": false,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 150,
+      "persona": "hooligan",
+      "priority": "P0",
+      "usedBy": [
+        "tease"
+      ],
+      "notes": "«Подразни» (Хулиган): дразнится в ответ. Только Meshy; без клипа — offended.",
+      "meshy": {
+        "loop": false,
+        "blendInMs": 120,
+        "blendOutMs": 300,
+        "on": [
+          "tease"
+        ]
+      }
+    },
+    {
+      "id": "tease_kind",
+      "durationS": 1.8,
+      "loop": false,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 150,
+      "persona": "kind",
+      "priority": "P0",
+      "usedBy": [
+        "tease"
+      ],
+      "notes": "«Подразни» (Добряк). Только Meshy; без клипа — offended.",
+      "meshy": {
+        "loop": false,
+        "blendInMs": 120,
+        "blendOutMs": 300,
+        "on": [
+          "tease"
+        ]
+      }
+    },
+    {
+      "id": "tease_glitter",
+      "durationS": 1.8,
+      "loop": false,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 150,
+      "persona": "glitter",
+      "priority": "P0",
+      "usedBy": [
+        "tease"
+      ],
+      "notes": "«Подразни» (Блёстка). Только Meshy; без клипа — offended.",
+      "meshy": {
+        "loop": false,
+        "blendInMs": 120,
+        "blendOutMs": 300,
+        "on": [
+          "tease"
+        ]
       }
     },
     {
@@ -830,6 +1182,35 @@
       "notes": "Поза победителя, лапы в боки."
     },
     {
+      "id": "rps_throw",
+      "durationS": 1.8,
+      "loop": false,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 150,
+      "persona": "all",
+      "priority": "P0",
+      "usedBy": [
+        "rps_is_rock",
+        "rps_is_paper",
+        "rps_is_scissors"
+      ],
+      "notes": "Камень-ножницы-бумага: трясёт кулаком и выбрасывает. Только Meshy; без клипа — proud.",
+      "meshy": {
+        "loop": false,
+        "blendInMs": 100,
+        "blendOutMs": 250,
+        "on": [
+          "rps_is_rock",
+          "rps_is_paper",
+          "rps_is_scissors"
+        ],
+        "from": [
+          "proud"
+        ]
+      }
+    },
+    {
       "id": "comfort",
       "durationS": 3.0,
       "loop": false,
@@ -842,7 +1223,34 @@
         "sad",
         "scared"
       ],
-      "notes": "Медленно подходит к стеклу, прикладывает лапу изнутри, мягко кивает."
+      "notes": "Медленно подходит к стеклу, прикладывает лапу изнутри, мягко кивает.",
+      "meshy": {
+        "loop": false,
+        "blendInMs": 250,
+        "blendOutMs": 350
+      }
+    },
+    {
+      "id": "sad_sigh",
+      "durationS": 2.5,
+      "loop": false,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 150,
+      "persona": "all",
+      "priority": "P0",
+      "usedBy": [
+        "emo_is_sad"
+      ],
+      "notes": "Грустный вздох всем телом (игра «угадай эмоцию»). Только Meshy; без клипа — ears_back (уши).",
+      "meshy": {
+        "loop": false,
+        "blendInMs": 200,
+        "blendOutMs": 350,
+        "on": [
+          "emo_is_sad"
+        ]
+      }
     },
     {
       "id": "cover_ears",
@@ -895,6 +1303,77 @@
             2.9
           ]
         ]
+      },
+      "meshy": {
+        "loop": false,
+        "blendInMs": 120,
+        "blendOutMs": 300
+      }
+    },
+    {
+      "id": "treat_eat_hooligan",
+      "durationS": 2.5,
+      "loop": false,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 150,
+      "persona": "hooligan",
+      "priority": "P0",
+      "usedBy": [
+        "treat"
+      ],
+      "notes": "Угостить (Хулиган): подкидывает рыбку, ловит ртом, жуёт, «класс». Только Meshy; без клипа — celebrate.",
+      "meshy": {
+        "loop": false,
+        "blendInMs": 120,
+        "blendOutMs": 300,
+        "on": [
+          "treat"
+        ]
+      }
+    },
+    {
+      "id": "treat_eat_kind",
+      "durationS": 2.5,
+      "loop": false,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 150,
+      "persona": "kind",
+      "priority": "P0",
+      "usedBy": [
+        "treat"
+      ],
+      "notes": "Угостить (Добряк): берёт двумя лапами, жуёт, гладит живот. Только Meshy; без клипа — celebrate.",
+      "meshy": {
+        "loop": false,
+        "blendInMs": 120,
+        "blendOutMs": 300,
+        "on": [
+          "treat"
+        ]
+      }
+    },
+    {
+      "id": "treat_eat_glitter",
+      "durationS": 2.5,
+      "loop": false,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 150,
+      "persona": "glitter",
+      "priority": "P0",
+      "usedBy": [
+        "treat"
+      ],
+      "notes": "Угостить (Блёстка): изящно откусывает, жуёт, воздушный поцелуй. Только Meshy; без клипа — celebrate.",
+      "meshy": {
+        "loop": false,
+        "blendInMs": 120,
+        "blendOutMs": 300,
+        "on": [
+          "treat"
+        ]
       }
     },
     {
@@ -909,7 +1388,10 @@
       "usedBy": [
         "sing"
       ],
-      "notes": "Поёт в воображаемый микрофон, качается."
+      "notes": "Поёт в воображаемый микрофон, качается.",
+      "meshy": {
+        "loop": true
+      }
     },
     {
       "id": "knock_glass",
@@ -923,7 +1405,12 @@
       "usedBy": [
         "tap_screen"
       ],
-      "notes": "Подходит вплотную и стучит костяшками в стекло дважды. Лапа попадает в точку тапа (IK)."
+      "notes": "Подходит вплотную и стучит костяшками в стекло дважды. Лапа попадает в точку тапа (IK).",
+      "meshy": {
+        "loop": false,
+        "blendInMs": 80,
+        "blendOutMs": 250
+      }
     },
     {
       "id": "press_glass",
@@ -937,7 +1424,12 @@
       "usedBy": [
         "longpress"
       ],
-      "notes": "Прижимается к стеклу носом и лапами, мордочка сплющена."
+      "notes": "Прижимается к стеклу носом и лапами, мордочка сплющена.",
+      "meshy": {
+        "loop": false,
+        "blendInMs": 150,
+        "blendOutMs": 300
+      }
     },
     {
       "id": "scratch_glass",
@@ -1035,7 +1527,10 @@
         "switch_start",
         "stickers"
       ],
-      "notes": "Хлопает наклейку на стекло изнутри. Повторяется серией."
+      "notes": "Хлопает наклейку на стекло изнутри. Повторяется серией.",
+      "meshy": {
+        "loop": false
+      }
     },
     {
       "id": "sticker_react",
@@ -1107,7 +1602,10 @@
       "usedBy": [
         "shake"
       ],
-      "notes": "Кот внутри «снежного шара»: прикрывает голову, вокруг кружатся блёстки."
+      "notes": "Кот внутри «снежного шара»: прикрывает голову, вокруг кружатся блёстки.",
+      "meshy": {
+        "loop": false
+      }
     },
     {
       "id": "purr_stroke",
@@ -1123,6 +1621,56 @@
         "stroke_long"
       ],
       "notes": "Тянется под ладонь, глаза прищурены, хвост дрожит."
+    },
+    {
+      "id": "hug_receive_hooligan",
+      "durationS": 2.5,
+      "loop": false,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 150,
+      "persona": "hooligan",
+      "priority": "P1",
+      "usedBy": [
+        "stroke_long"
+      ],
+      "notes": "«Обнять» (Хулиган): смущённо принимает объятие. Только Meshy; без клипа — purr_stroke.",
+      "meshy": {
+        "loop": false,
+        "blendInMs": 200,
+        "blendOutMs": 350,
+        "on": [
+          "stroke_long"
+        ],
+        "from": [
+          "purr_stroke"
+        ]
+      }
+    },
+    {
+      "id": "hug_receive_glitter",
+      "durationS": 2.5,
+      "loop": false,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 150,
+      "persona": "glitter",
+      "priority": "P1",
+      "usedBy": [
+        "stroke_long"
+      ],
+      "notes": "«Обнять» (Блёстка): обнимает в ответ. Только Meshy; без клипа — purr_stroke.",
+      "meshy": {
+        "loop": false,
+        "blendInMs": 200,
+        "blendOutMs": 350,
+        "on": [
+          "stroke_long"
+        ],
+        "from": [
+          "purr_stroke"
+        ]
+      }
     },
     {
       "id": "poke_head",
@@ -1149,6 +1697,11 @@
           ]
         ],
         "speed": 1.15
+      },
+      "meshy": {
+        "loop": false,
+        "blendInMs": 60,
+        "blendOutMs": 300
       }
     },
     {
@@ -1176,6 +1729,11 @@
           ]
         ],
         "speed": 1.1
+      },
+      "meshy": {
+        "loop": false,
+        "blendInMs": 60,
+        "blendOutMs": 300
       }
     },
     {
@@ -1202,6 +1760,11 @@
             4.96
           ]
         ]
+      },
+      "meshy": {
+        "loop": false,
+        "blendInMs": 60,
+        "blendOutMs": 300
       }
     },
     {
@@ -1228,6 +1791,11 @@
             2.8
           ]
         ]
+      },
+      "meshy": {
+        "loop": false,
+        "blendInMs": 60,
+        "blendOutMs": 300
       }
     },
     {
@@ -1255,6 +1823,36 @@
           ]
         ],
         "speed": 0.85
+      },
+      "meshy": {
+        "loop": false,
+        "blendInMs": 60,
+        "blendOutMs": 300
+      }
+    },
+    {
+      "id": "scratch_enjoy",
+      "durationS": 2.0,
+      "loop": false,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 150,
+      "persona": "all",
+      "priority": "P0",
+      "usedBy": [
+        "action:scratch"
+      ],
+      "notes": "«Почесать» кнопкой: голову под лапу, жмурится, ногой дрыг. Только Meshy; без клипа — poke_head.",
+      "meshy": {
+        "loop": false,
+        "blendInMs": 120,
+        "blendOutMs": 300,
+        "on": [
+          "action:scratch"
+        ],
+        "from": [
+          "poke_head"
+        ]
       }
     },
     {
@@ -1269,7 +1867,12 @@
       "usedBy": [
         "poke_hard"
       ],
-      "notes": "Резко отшатывается."
+      "notes": "Резко отшатывается.",
+      "meshy": {
+        "loop": false,
+        "blendInMs": 50,
+        "blendOutMs": 300
+      }
     },
     {
       "id": "dance_hooligan",

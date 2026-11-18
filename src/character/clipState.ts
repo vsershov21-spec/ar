@@ -76,7 +76,14 @@ export class ClipState {
   /** реальная длина клипов из модели (GLB): каталог даёт ориентир, а играть надо до конца движения */
   readonly realDuration = new Map<string, number>();
 
+  /**
+   * Определения поверх каталога по id: клип Meshy пришёл (GlbCharacter.addExternalClip → clips.meshyDef) — своя петля,
+   * переходы, без cut/fallback. Нет записи — каталог.
+   */
+  readonly defOverride = new Map<string, ClipDef>();
+
   private track(def: ClipDef, loop?: boolean, onEnd?: () => void): Track {
+    def = this.defOverride.get(def.id) ?? def;
     const real = this.realDuration.get(def.id);
     if (real && def.layer !== 'additive') def = { ...def, durationS: real };
     return { id: def.id, def, t: 0, loop: loop ?? def.loop, onEnd };
@@ -140,10 +147,12 @@ export class ClipState {
     this.blend = t.def.blendInMs > 0 ? 0 : 1;
   }
 
-  private startIdle(onEnd?: () => void, calm = false) {
+  private startIdle(onEnd?: () => void, calm = false, outMs = 0) {
     // после реакции — сначала спокойное дыхание (а не вариант покоя с большим движением: наушники, скейт, потягивание)
     const id = calm && clipDef('idle_breathe') ? 'idle_breathe' : this.picker.next(this.cur.def.persona !== undefined && this.cur.id.startsWith('idle') ? this.cur.id : undefined);
-    const def = clipDef(id) ?? FALLBACK;
+    let def = clipDef(id) ?? FALLBACK;
+    // мягкий возврат: переход в покой не короче blendOutMs кончившегося клипа
+    if (outMs > def.blendInMs) def = { ...def, blendInMs: outMs };
     // петлю idle держим 4–9 с, одноразовый — до конца клипа
     if (this.cur.id !== def.id || !this.cur.id.startsWith('idle')) this.switchTo(this.track(def, def.loop, onEnd));
     this.idleLeft = calm ? CALM_AFTER_S[0] + this.rnd() * (CALM_AFTER_S[1] - CALM_AFTER_S[0]) : def.loop ? this.picker.holdS() : def.durationS;
@@ -179,7 +188,7 @@ export class ClipState {
       const cb = this.cur.onEnd;
       this.requested = 'idle';
       this.idleMode = true;
-      this.startIdle(undefined, true);
+      this.startIdle(undefined, true, this.cur.def.blendOutMs ?? 0);
       cb?.();
     }
     // очередь: окно «номера» кончилось (или он сам кончился) — играет ждавший клип, если не устарел

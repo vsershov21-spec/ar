@@ -11,7 +11,7 @@
 | — Хулиган | 477 |
 | — Добряк | 462 |
 | — Блёстка | 473 |
-| Клипы тела | 80 (P0: 37) |
+| Клипы тела | 98 (P0: 52) |
 | Пресеты лица | 28 |
 | Экранные эффекты | 31 |
 | Звуки | 43 |
@@ -2821,6 +2821,7 @@
 | `dizzy` | P0 | all | 2.0 |  |  | spam, shake | Шатается, глаза-спирали (face dizzy), трясёт головой. |
 | `ear_twitch` | P0 | all | 0.5 |  |  | idle, loud | Подёргивание одного уха. Накладывается на любой клип. |
 | `echo_speak` | P0 | all | 2.0 | да |  | echo_done, code:echo_playback | Повторяет фразу: смешно гримасничает, лапами изображает собеседника. |
+| `fall_asleep` | P0 | all | 2.2 |  |  | sleep | Засыпает: садится/ложится → дальше sleep_loop. Только Meshy; без клипа — сразу sleep_loop. |
 | `flinch` | P0 | all | 0.7 |  |  | poke_hard | Резко отшатывается. |
 | `flip` | P0 | all | 1.2 |  | да | flip, double_tap | Сальто назад, приземление в ту же точку, поза «та-да». |
 | `get_into_bed` | P0 | all | 1.3 |  | да | code:home.bed | Забирается в кровать сбоку, с длинного края: передние лапы на матрас, подтягивается, встаёт на колени на матрасе. Root motion — путь сцены (src/home/bedFlow.ts), клип на месте. Нет в GLB — опора `jump` + дуга корня. |
@@ -2842,14 +2843,28 @@
 | `poke_head` | P0 | all | 0.8 |  |  | tap_cat_head | Голова качается от тычка, уши прижимаются. |
 | `press_glass` | P0 | all | 2.0 | да |  | longpress | Прижимается к стеклу носом и лапами, мордочка сплющена. |
 | `purr_stroke` | P0 | all | 2.0 | да |  | stroke, stroke_long | Тянется под ладонь, глаза прищурены, хвост дрожит. |
+| `rps_throw` | P0 | all | 1.8 |  |  | rps_is_rock, rps_is_paper, rps_is_scissors | Камень-ножницы-бумага: трясёт кулаком и выбрасывает. Только Meshy; без клипа — proud. |
+| `sad_sigh` | P0 | all | 2.5 |  |  | emo_is_sad | Грустный вздох всем телом (игра «угадай эмоцию»). Только Meshy; без клипа — ears_back (уши). |
+| `scratch_enjoy` | P0 | all | 2.0 |  |  | action:scratch | «Почесать» кнопкой: голову под лапу, жмурится, ногой дрыг. Только Meshy; без клипа — poke_head. |
 | `scratch_glass` | P0 | hooligan | 1.0 |  |  | swipe | Проводит когтями по стеклу по траектории свайпа. |
 | `sleep_loop_bed` | P0 | all | 4.0 | да |  | code:home.bed | Спит в кровати под одеялом на боку, бок поднимается от дыхания. Бесшовная петля. Нет в GLB — `sleep_loop` + дыхание корнем. |
 | `sticker_slap` | P0 | all | 0.7 |  |  | switch_start, stickers | Хлопает наклейку на стекло изнутри. Повторяется серией. |
+| `surprise_trick_glitter` | P0 | glitter | 2.0 |  |  | surprise | «Удиви» (Блёстка): фокус-трюк. Только Meshy; без клипа — surprised. |
+| `surprise_trick_hooligan` | P0 | hooligan | 2.0 |  |  | surprise | «Удиви» (Хулиган): фокус-трюк. Только Meshy; без клипа — surprised. |
+| `surprise_trick_kind` | P0 | kind | 2.0 |  |  | surprise | «Удиви» (Добряк): фокус-трюк. Только Meshy; без клипа — surprised. |
 | `surprised` | P0 | all | 1.0 |  |  | intro, clap, card_found | Отшатывается, уши вверх. |
 | `tail_wag` | P0 | all | 1.0 | да |  | *happy | Хвост ходит из стороны в сторону. |
 | `talk_casual` | P0 | all | 3.0 | да |  | *speech | Жестикулирует при разговоре, спокойно. Лицо и рот — липсинк поверх. |
+| `tease_glitter` | P0 | glitter | 1.8 |  |  | tease | «Подразни» (Блёстка). Только Meshy; без клипа — offended. |
+| `tease_hooligan` | P0 | hooligan | 1.8 |  |  | tease | «Подразни» (Хулиган): дразнится в ответ. Только Meshy; без клипа — offended. |
+| `tease_kind` | P0 | kind | 1.8 |  |  | tease | «Подразни» (Добряк). Только Meshy; без клипа — offended. |
+| `treat_eat_glitter` | P0 | glitter | 2.5 |  |  | treat | Угостить (Блёстка): изящно откусывает, жуёт, воздушный поцелуй. Только Meshy; без клипа — celebrate. |
+| `treat_eat_hooligan` | P0 | hooligan | 2.5 |  |  | treat | Угостить (Хулиган): подкидывает рыбку, ловит ртом, жуёт, «класс». Только Meshy; без клипа — celebrate. |
+| `treat_eat_kind` | P0 | kind | 2.5 |  |  | treat | Угостить (Добряк): берёт двумя лапами, жуёт, гладит живот. Только Meshy; без клипа — celebrate. |
 | `turn_over_sleep` | P0 | all | 1.4 |  |  | code:home.bed | Во сне переворачивается/ворочается от касания, бормочет, не просыпается; начало и конец — поза sleep_loop_bed. Нет в GLB — `sleep_loop` + приподнять и покачать корень. |
+| `turn_step` | P0 | all | 0.8 | да |  | code:stage.turn | Переступает на месте, пока сцена поворачивает кота к зрителю (> 25°). Только Meshy; без клипа — idle. |
 | `wake_stretch_in_bed` | P0 | all | 1.8 |  |  | code:home.bed | После того как одеяло откинуто: потягивается и зевает лёжа, садится на край кровати лицом к зрителю. Нет в GLB — опора `wake_startle` + подъём из крена сценой. |
+| `wake_up` | P0 | all | 2.0 |  |  | wake_up | Просыпается из позы сна, встаёт. Только Meshy; без клипа — wake_startle. |
 | `walk` | P0 | all | 1.0 | да |  | walk_to | Цикл шага на двух лапах, хвост для баланса. Скорость в коде. |
 | `wave` | P0 | all | 1.2 |  |  | wave, hello, goodbye | Машет лапой. |
 | `celebrate` | P1 | all | 2.0 |  |  | yes, nice_name, stickers_all_gone | Подпрыгивает с поднятыми лапами. |
@@ -2860,6 +2875,8 @@
 | `dance_kind` | P1 | kind | 4.0 | да |  | dance | Покачивается из стороны в сторону, хлопает в лапы. |
 | `ears_back` | P1 | all | 0.6 |  |  | loud, offended, card_lost | Уши прижаты назад. |
 | `fall_off_card` | P1 | all | 1.4 |  | да | card_lost, code:card_lost | Карта уехала — кот теряет опору, машет лапами, «прилипает» к стеклу. |
+| `hug_receive_glitter` | P1 | glitter | 2.5 |  |  | stroke_long | «Обнять» (Блёстка): обнимает в ответ. Только Meshy; без клипа — purr_stroke. |
+| `hug_receive_hooligan` | P1 | hooligan | 2.5 |  |  | stroke_long | «Обнять» (Хулиган): смущённо принимает объятие. Только Meshy; без клипа — purr_stroke. |
 | `idle_glitter_mirror` | P1 | glitter | 3.5 |  |  | idle | Смотрится в экран как в зеркало, поправляет бантик и ушки. |
 | `idle_glitter_twirl` | P1 | glitter | 2.5 |  |  | idle | Кружится на месте, юбка/худи разлетается, блёстки с хвоста. |
 | `idle_hooligan_headphones` | P1 | hooligan | 4.0 | да |  | idle | Качает головой в такт музыке в наушниках, щёлкает пальцами. |
@@ -2880,6 +2897,7 @@
 | `shy` | P1 | all | 2.0 |  |  | compliment, tap_cat_cheek | Смущается, ковыряет ногой, прячет мордочку. |
 | `sit_down` | P1 | all | 0.8 |  |  | sit | Садится на попу, хвост обвивает лапы. |
 | `sit_idle` | P1 | all | 4.0 | да |  | sit, code:after_sit_down | Сидит, болтает лапами. |
+| `skate_ride` | P1 | hooligan | 4.0 |  |  | skate | «Скейт» (Хулиган): катится на месте. Только Meshy; без клипа — idle_hooligan_skate. |
 | `sleep_loop` | P1 | all | 4.0 | да |  | sleep | Сворачивается клубком на карте, бок поднимается от дыхания. |
 | `snowglobe_shake` | P1 | glitter | 2.0 |  |  | shake | Кот внутри «снежного шара»: прикрывает голову, вокруг кружатся блёстки. |
 | `stand_up` | P1 | all | 0.7 |  |  | sit, code:leave_sit | Встаёт из сидячей позы. |

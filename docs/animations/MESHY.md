@@ -102,27 +102,67 @@ tail -f /var/lib/vershov-commander/ar/meshy.log
 сустава (обратная inverseBindMatrix) пишется в `extras.bindWorld` узла. Проверить вручную:
 `node /var/lib/vershov-commander/ar/meshy/motion.mjs --slim raw.glb out.glb`.
 
-## 7. Как клип попадает в кота (lab)
+## 7. Как клип попадает в кота (lab и пилот)
 
-`feature('anims.meshy')` (lab — вкл., MVP — выкл.) → `GlbCharacter.load()` после загрузки кота лениво:
+`feature('anims.meshy')` (lab и **пилот** — вкл. с 18.11, MVP — выкл.) → `GlbCharacter.load()` после загрузки кота лениво:
 
-1. `/models/anims/meshy/manifest.json` (нет — ничего, без ошибок);
+1. `/models/anims/meshy/manifest.json` (нет — ничего, без ошибок: пилот играет как раньше);
 2. каждый GLB → клип → `src/character/meshyClips.ts retargetClip`: кости по имени без `mixamorig:` (регистр не важен),
    пальцы / `_End` / `HeadTop` / глаза / челюсть выброшены; поворот переносится через мир относительно позы привязки
    (у нашего рига Tripo Hips повёрнут на −90°, у Meshy — нет: прямое копирование кватернионов перекосило бы кота);
-   смещение таза × (высота таза у нас / у Meshy);
-3. `animPrep` как у всех клипов: сглаживание, обрезка неподвижного начала/хвоста, шов петли, горизонталь корня = 0,
-   высота по самой низкой опоре, темп;
-4. регистрация под id ТЗ — **своё имя важнее всего**: заменяет клип-опору (`fallback` в `content/animations.json`,
-   кровать), псевдоним Tripo и старый клип `anims_v1` с тем же id (`poke_*`, `sit_down`, `stand_up`, `wave`…).
+   смещение таза × (высота таза у нас / у Meshy: человек 1,7 м → кот, `tests/meshyMap.test.ts`);
+3. **проверка** (`checkClip`): NaN/∞, длительность 0,3–15 с, таз уезжает больше 3 высот таза по горизонтали или 2 по
+   вертикали (ошибка единиц), поворот сустава от позы покоя за предел (шея/голова/стопа 100°, спина 110°, кисть 120°),
+   скачок больше 90° за кадр. Не прошёл — клип отвергается (лог `[meshy] id: отвергнут — …`), играет прежний клип;
+4. неподвижный хвост одноразового клипа срезается по скорости (`animPrep.trimStill`: Meshy генерирует ≥ 2 с), дальше
+   `animPrep` как у всех клипов: сглаживание, шов петли, горизонталь корня = 0, высота по самой низкой опоре, темп;
+5. **проникновение** (`GlbCharacter.penetration`, docs/animations/COLLISION.md): 8 кадров клипа → коррекция BodyCollider
+   → глубже 5 мм — отвергается;
+6. регистрация под id ТЗ — **своё имя важнее всего**: заменяет клип-опору (`fallback`), псевдоним Tripo, старый клип
+   `anims_v1` и монтаж `cut` с тем же id; определение клипа — `clips.meshyDef`: без `cut`/`fallback`, петля и переходы
+   (`blendInMs`, `blendOutMs` — мягкий возврат в покой) из правила `meshy` в `content/animations.json`;
+7. сцена снимает поправки для опор: кровать (`bedFlow`: крен на бок, дуги прыжков, покачивание «ворочается», ноги
+   вдоль тела — только для шага, который играет опорой), удержание лап (`footPin`) — как было: выкл. в ходьбе,
+   акробатике, лёжа, кровати, сидя, повороте на месте, скейте.
 
-`?meshy=0` — lab без клипов Meshy (сравнить с опорами). В консоли: `[meshy] клипы: …`.
+`?meshy=0` — без них (сравнить с опорами). В консоли: `[meshy] клипы: …`, `🎞 Meshy: celebrate → treat_eat_kind (treat)`.
 
-Клипы, которых ещё нет в каталоге `content/animations.json` (`treat_eat_*`, `surprise_trick_*`, `tease_*`, `scratch_enjoy`,
-`sad_sigh`, `rps_throw`, `turn_step`, `fall_asleep`, `wake_up`), загружаются и видны во вкладке «Тест», но играть их
-по имени сценарий начнёт, когда агент анимаций добавит их в каталог и в точки вызова (`anims.new`).
+### Где какой клип играет
 
-## 8. Проверка в lab
+Правило `meshy` у клипа в `content/animations.json` (`loop`, `blendInMs`, `blendOutMs`, `on`, `from`, `then`, `holdS`).
+Клипы с тем же id, что уже играет (тычки, `wave`, `sit_*`, кровать, раскраска, `tumble`, `dizzy`, `press_glass`,
+`listen`, `appear_jump_in`…), встают на своё место сами. Новые id (18 клипов «только Meshy») заменяют клип реакции по
+`meshy.on` (`clips.meshyUpgrade`, `director.playVisual`), **только когда клип пришёл**; иначе играет прежний клип:
+
+| клип Meshy | где | вместо |
+|---|---|---|
+| `treat_eat_hooligan` / `_kind` / `_glitter` | событие `treat` («Угостить»), свой у каждого кота | `celebrate` |
+| `scratch_enjoy` | кнопка «Почесать» (`action:scratch`) | `poke_head` (тап по голове пальцем — по-прежнему тычок) |
+| `surprise_trick_*` | `surprise` («Удиви») | `surprised` |
+| `tease_*` | `tease` («Подразни») | `offended` |
+| `sad_sigh` | `emo_is_sad` (игра «угадай эмоцию») | `ears_back` (только уши) |
+| `rps_throw` | `rps_is_rock / paper / scissors` | `proud` |
+| `hug_receive_hooligan` / `_glitter` | `stroke_long` («Обнять»; у Добряка — свой клип) | `purr_stroke` |
+| `skate_ride` | `skate` («Скейт», Хулиган) | `idle_hooligan_skate` |
+| `fall_asleep` → `sleep_loop` | `sleep` («Усыпи», дрёма) | сразу `sleep_loop` |
+| `wake_up` | `wake_up` (касание во сне) | `wake_startle` |
+| `turn_step` | поворот к зрителю на месте > 25° (`stage.turnErr`, `director.turnStep`) | idle |
+| `dive_out` | команда `goodbye` (`code:goodbye`) | `run_home` |
+| `sit_down` → `sit_idle` (5 с) → `stand_up` | «Сидеть» | `sit_down` и сразу покой |
+
+Цепочки (`then`) — только если оба клипа настоящие.
+
+## 8. Проверка
+
+**Отчёт:** `https://ar.vershov.com/lab/?desktop&meshyreport` (пилот — `https://ar.vershov.com/mvp/?from=test&desktop&meshyreport`)
+→ вкладка **«Тест»** → **«Отчёт Meshy»**: каждый ожидаемый id → загружен / нет / отвергнут (причина), длительность,
+остаток проникновения, где играет, что играет без него. Кнопка «Обновить · в консоль» печатает таблицу Markdown.
+
+**Локально, до выкладки:** скачать клипы (`scp swe:/srv/ar-extra/models/anims/meshy/* ~/meshy/`) →
+`node scripts/qa/meshy-check.mjs ~/meshy` — стенд реакций пилота (scripts/qa/reactions.mjs) с этими клипами (`--meshy`):
+в логе состояния клипов, в docs/qa/REACTIONS.md — сравнение с прогоном `before` (щелчки, лапы, заглушки, проникновение).
+`--dry` — только проверить папку; `--cats kind --only act_treat,act_hug` — часть сценариев.
+
 
 Десктоп: `https://ar.vershov.com/lab/?desktop` → панель справа → вкладка **«Тест»** → раздел **«Клипы Meshy»**: список
 загруженных клипов с длительностью, кнопка — сыграть.

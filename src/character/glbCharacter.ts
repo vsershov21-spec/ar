@@ -16,14 +16,14 @@ import { makeGltfLoader } from './gltfLoad';
 import { type MouthShape, type Viseme } from '../lipsync/visemes';
 import { FaceLife } from './faceLife';
 import { ClipState } from './clipState';
-import { clipDef, CUT_CLIPS, FALLBACK_CLIPS } from './clips';
-import { prepareClipsAsync, spliceClip, type ClipPrepInfo } from './animPrep';
-import { loadMeshyClips, meshyWanted, skelFrom, type Skel } from './meshyClips';
+import { clipDef, CUT_CLIPS, FALLBACK_CLIPS, MESHY_IDS, meshyDef } from './clips';
+import { prepareClipsAsync, spliceClip, trimStill, type ClipPrepInfo } from './animPrep';
+import { loadMeshyClips, meshyStatus, meshyWanted, skelFrom, type Skel } from './meshyClips';
 import { feature } from '../config/edition';
 import { AnimBlender } from './animBlend';
 import { TailRig, type TailOutput } from './tailRig';
 import { PropRig } from './props';
-import { BodyCollider } from './bodyCollide';
+import { BodyCollider, CAT_MM, worstPair, type CollidersJson } from './bodyCollide';
 import { FootPin } from './footPin';
 import { buildFurShells } from './furShell';
 import { FaceMixer, EMOTE_FACE, MORPH_TARGETS, facePreset, type FacePreset } from './face';
@@ -55,7 +55,9 @@ const CAPSULE_R: [RegExp, number][] = [
 /** клипы «через голову»: держим голову и лапы над полом (groundClamp) */
 const ACRO = /flip|tumble|cartwheel|somersault/;
 /** без удержания лап: лёжа, сон, кровать, прыжки с места, ходьба/бег */
-const NO_PIN = /sleep|bed|lie_|walk|run|jump|dive|appear|fall|sit_/;
+const NO_PIN = /sleep|bed|lie_|walk|run|jump|dive|appear|fall|sit_|stand_up|wake_up|turn_step|skate/;
+/** клип Meshy отвергается при загрузке, если рука/нога после коррекции BodyCollider глубже этого (мм на карте) */
+export const MESHY_PEN_MAX_MM = 5;
 /** кости и их «радиус» (рост модели ≈ 1) */
 const GROUND_BONES: [string, number][] = [['Head', 0.15], ['Neck', 0.08], ['LeftHand', 0.04], ['RightHand', 0.04], ['Spine2', 0.12]];
 const FINGER = /Thumb|Index|Middle|Ring|Pinky|_End$|Eye|Jaw|Tongue/;
@@ -343,7 +345,16 @@ export class GlbCharacter implements Character {
     this.wrinkles = FaceWrinkles.attach(model);
     if (this.eyes) console.info('[glb] 3D-глаза');
     this.collider = new BodyCollider(this.object, (n) => this.bones.get(n) ?? model.getObjectByName('mixamorig' + n) ?? undefined);
+    if (this.personaId) this.collider.setPersona(this.personaId);
+    // ?collide=legacy — коррекция рук как до 18.11 (сравнение на стенде), ?collide=0 — без коррекции
+    const cm = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('collide') : null;
+    this.collider.legacy = cm === 'legacy';
+    this.collider.enabled = cm !== '0';
     console.info('[glb] объёмы тела', this.collider.build(model));
+    // прокси одежды от модельщика (public/models/<кот>_colliders.json, docs/animations/COLLISION.md): есть — главнее
+    const restSnap: [THREE.Object3D, THREE.Quaternion, THREE.Vector3][] = [];
+    model.traverse((o) => restSnap.push([o, o.quaternion.clone(), o.position.clone()]));
+    void this.loadColliders(model, restSnap);
     const propLoader = makeGltfLoader();
     this.props = new PropRig(
       async (u) => (await propLoader.loadAsync(asset(modelUrl(u)))).scene,
@@ -354,6 +365,7 @@ export class GlbCharacter implements Character {
 
   setPersona(p: Persona) {
     this.personaId = p.id;
+    this.collider?.setPersona(p.id);
     this.furTone.setPersona(p.id);
     const meta = personaMeta(p.id);
     this.clips.setIdles(meta.idles, p.id);
@@ -429,6 +441,8 @@ export class GlbCharacter implements Character {
   readonly externalClips: { id: string; dur: number; src: string }[] = [];
 
   private async loadMeshy() {
+    // состояния клипов — стенду реакций и meshy-check (scripts/qa): window.__meshyStatus
+    (globalThis as { __meshyStatus?: typeof meshyStatus }).__meshyStatus = meshyStatus;
     try {
       await loadMeshyClips(this, {
         fetchJson: async (u) => {
@@ -441,6 +455,9 @@ export class GlbCharacter implements Character {
           return makeGltfLoader().parseAsync(await r.arrayBuffer(), asset(u).replace(/[^/]*$/, ''));
         },
         log: (m) => console.info(m),
+        expected: MESHY_IDS,
+        // петля — по правилу каталога (meshy.loop из спеки), иначе манифест
+        loopOf: (id, l) => clipDef(id)?.meshy?.loop ?? l,
       });
     } catch (e) {
       console.warn('[meshy] клипы не загрузились', e);
@@ -451,24 +468,112 @@ export class GlbCharacter implements Character {
    * Внешний клип (уже на наших костях) под id каталога: animPrep (обрезка, швы, высота корня, темп) и регистрация.
    * Своё имя важнее всего: заменяет и клип-опору (fallback), и псевдоним, и старый клип anims_v1 с тем же id.
    */
-  async addExternalClip(id: string, clip: THREE.AnimationClip, loop: boolean, src: string) {
-    if (!this.mixer || !this.model) return;
+  async addExternalClip(id: string, clip: THREE.AnimationClip, loop: boolean, src: string): Promise<string | void> {
+    if (!this.mixer || !this.model) return 'кот ещё не загружен';
     clip.name = id;
+    // Meshy генерирует не меньше 2 с: у коротких реакций срезаем «стоит и чуть плывёт» в конце
+    const trimmed = loop ? 0 : trimStill(clip);
     const info = await prepareClipsAsync(this.model, this.inner, [clip], {
-      isLoop: () => loop || !!clipDef(id)?.loop,
-      keepSpeed: (n) => /dance|run|jump|flip|dive|fall|tumble|celebrate|cheer/.test(n),
+      isLoop: () => loop,
+      keepSpeed: (n) => /dance|run|jump|flip|dive|fall|tumble|celebrate|cheer|skate/.test(n),
     });
-    if (!this.mixer) return; // кота сменили, пока готовили
+    if (!this.mixer || !this.model) return; // кота сменили, пока готовили
+    // руки/ноги сквозь тело и одежду даже после коррекции — клип не берём, играет прежний
+    const pen = this.penetration(clip);
+    this.meshyPen.set(id, +pen.mm.toFixed(1));
+    if (pen.mm > MESHY_PEN_MAX_MM) return `проникновение ${pen.mm.toFixed(1)} мм (${pen.pair}) после коррекции`;
     info.forEach((v, k) => this.animInfo.set(k, v));
     const action = this.mixer.clipAction(clip);
     this.actions.set(id, action);
     this.aliased.delete(id);
+    // клип пришёл — опора не нужна: сцена снимает свои поправки позы (bedFlow: крен, ноги; procedural.has(id) = false)
     this.procedural.delete(id);
-    this.clips.realDuration.set(id, this.anim?.realDuration(action) ?? clip.duration);
+    this.meshy.add(id);
+    const dur = this.anim?.realDuration(action) ?? clip.duration;
+    this.clips.realDuration.set(id, dur);
+    // монтаж cut и опора fallback — для старого клипа; петля и переходы — из правила meshy
+    const def = clipDef(id);
+    if (def) this.clips.defOverride.set(id, meshyDef({ ...def, meshy: def.meshy ? { ...def.meshy, loop } : undefined, loop }, dur));
     const i = this.externalClips.findIndex((e) => e.id === id);
-    const rec = { id, dur: +clip.duration.toFixed(2), src };
+    const rec = { id, dur: +clip.duration.toFixed(2), src: trimmed > 0 ? `${src}, −${trimmed.toFixed(1)} с хвоста` : src };
     if (i >= 0) this.externalClips[i] = rec;
     else this.externalClips.push(rec);
+  }
+
+  /** клипы Meshy, которые сейчас играют (своё имя) */
+  readonly meshy = new Set<string>();
+  /** остаток проникновения после коррекции по клипам Meshy, мм (проверка при загрузке) */
+  readonly meshyPen = new Map<string, number>();
+
+  /**
+   * Откуда клип id у этого кота: 'meshy' — клип Meshy; 'own' — свой клип библиотеки (или монтаж); 'alias' — пресет Tripo
+   * под чужим именем; 'fallback' — опора (procedural); null — нет (процедурная заглушка).
+   */
+  clipSource(id: string): 'meshy' | 'own' | 'alias' | 'fallback' | null {
+    if (this.meshy.has(id)) return 'meshy';
+    if (!this.actions.has(id)) return null;
+    if (this.procedural.has(id)) return 'fallback';
+    return this.aliased.has(id) ? 'alias' : 'own';
+  }
+
+  /**
+   * Проникновение рук/ног после коррекции BodyCollider на 8 кадрах клипа (временный миксер, поза модели потом
+   * восстанавливается): глубина самой глубокой пары, мм на карте (рост кота ≈ CAT_MM).
+   */
+  penetration(clip: THREE.AnimationClip, frames = 8): { mm: number; pair: string } {
+    const col = this.collider, model = this.model;
+    if (!col || !model || !col.proxies.length) return { mm: 0, pair: '' };
+    const saved: [THREE.Object3D, THREE.Quaternion, THREE.Vector3][] = [];
+    model.traverse((o) => saved.push([o, o.quaternion.clone(), o.position.clone()]));
+    const mx = new THREE.AnimationMixer(model);
+    const a = mx.clipAction(clip);
+    a.play();
+    let worst = { pair: '', depth: 0 };
+    try {
+      for (let i = 0; i < frames; i++) {
+        mx.setTime((clip.duration * (i + 0.5)) / frames);
+        col.reset();
+        col.apply(0);
+        const w = worstPair(col.measurePairs());
+        if (w.depth > worst.depth) worst = w;
+      }
+    } finally {
+      a.stop();
+      mx.uncacheRoot(model);
+      for (const [o, q, p] of saved) {
+        o.quaternion.copy(q);
+        o.position.copy(p);
+      }
+      col.reset();
+      model.updateMatrixWorld(true);
+    }
+    return { mm: worst.depth * CAT_MM, pair: worst.pair };
+  }
+
+  /** public/models/<кот>_colliders.json рядом с моделью (models/hooligan_v1.glb → models/hooligan_colliders.json) */
+  private async loadColliders(model: THREE.Object3D, restSnap: [THREE.Object3D, THREE.Quaternion, THREE.Vector3][]) {
+    const u = this.url.replace(/[^/]*$/, '') + (this.url.match(/([a-z]+)(?:_v\d+)?\.glb$/i)?.[1] ?? 'character') + '_colliders.json';
+    try {
+      const r = await fetch(asset(u));
+      if (!r.ok) return;
+      const j = (await r.json()) as CollidersJson;
+      if (this.model !== model || !this.collider) return;
+      // прокси строятся в позе покоя: снимок текущей позы → покой → build → назад
+      const saved: [THREE.Object3D, THREE.Quaternion, THREE.Vector3][] = [];
+      model.traverse((o) => saved.push([o, o.quaternion.clone(), o.position.clone()]));
+      for (const [o, q, p] of restSnap) {
+        o.quaternion.copy(q);
+        o.position.copy(p);
+      }
+      const names = this.collider.build(model, j);
+      for (const [o, q, p] of saved) {
+        o.quaternion.copy(q);
+        o.position.copy(p);
+      }
+      console.info('[glb] объёмы тела из', u, names);
+    } catch {
+      /* нет файла — прокси из меша */
+    }
   }
 
   /** id клипов, которые сейчас играют опорой (настоящего клипа в GLB нет) — для сцены и debug */
@@ -734,7 +839,6 @@ export class GlbCharacter implements Character {
         inf[i] = W[key] ?? 0;
       }
     }
-    this.collider?.apply();
     this.applyTailEars(dt, ears, facePresetId);
     this.props?.update(this.clips.cur.id);
     this.bones.get('LeftEye')?.scale.setScalar(pupils);
@@ -775,6 +879,9 @@ export class GlbCharacter implements Character {
         if (b) this.rotWorld(b, ax[a], ang);
       }, dt);
     }
+    // руки и голени — из тела и одежды (bodyCollide.ts): после клипа, взгляда головы и поправок сцены (кровать) —
+    // иначе поправка позы (потягивание лёжа) или поворот головы вносили руку обратно в тело
+    this.collider?.apply(dt);
     // глаза — после головы: взгляд на зрителя (или на точку lookAt), веки, зрачки
     if (this.eyes) {
       const tgt = this.look ?? camera.getWorldPosition(this.gazeV);

@@ -19,8 +19,12 @@ describe('редакции: таблица функций', () => {
   });
   it('пилот: кровать, пробуждение, прогресс, аналитика, раскраска-заглушка; без новых игр, пака наклеек и отладки', () => {
     expect(featuresOf('pilot')).toEqual(expect.arrayContaining(['home', 'home.bed', 'awake', 'progress.server', 'games.base', 'cat.switch', 'catalog.signature', 'pilot.catalog', 'pilot.fx', 'pilot.switchCooldown', 'glass.gestures', 'analytics', 'card.paint']));
-    for (const id of ['games.new', 'stickers.pack', 'anims.new', 'anims.meshy', 'debug.flows', 'card.anycard', 'card.grabExperimental', 'tracker.nocard', 'model.custom'] as FeatureId[]) expect(featureIn('pilot', id), id).toBe(false);
+    for (const id of ['games.new', 'stickers.pack', 'anims.new', 'debug.flows', 'card.anycard', 'card.grabExperimental', 'tracker.nocard', 'model.custom'] as FeatureId[]) expect(featureIn('pilot', id), id).toBe(false);
     expect(featureIn('mvp', 'card.paint')).toBe(false);
+    // клипы Meshy: пилот — целевой (без манифеста играет как раньше), MVP — после iPhone
+    expect(featureIn('pilot', 'anims.meshy')).toBe(true);
+    expect(featureIn('lab', 'anims.meshy')).toBe(true);
+    expect(featureIn('mvp', 'anims.meshy')).toBe(false);
     expect(featureIn('lab', 'card.paint')).toBe(true);
   });
   it('lab — надмножество MVP', () => {

@@ -269,8 +269,11 @@ export class Stage {
    * в ходьбе 5 рад/с), не зависит от частоты кадров. К зрителю — с гистерезисом: дрожание трекинга
    * не крутит кота, а сдвиг камеры больше ~7° он плавно догоняет до точного взгляда.
    */
+  /** сколько ещё довернуть к зрителю на месте, рад (0 — не поворачивается или идёт): клип turn_step (director) */
+  turnErr = 0;
   private turn(d: number, dt: number, walking: boolean) {
     if (!(dt > 0)) return;
+    this.turnErr = walking || !this.yawChase ? 0 : Math.abs(d);
     dt = Math.min(dt, 0.1);
     if (walking) this.yawChase = true;
     else {

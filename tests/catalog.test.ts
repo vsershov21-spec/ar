@@ -20,7 +20,7 @@ describe('каталоги content/', () => {
   });
 
   it('для каждого клипа каталога есть процедурная заглушка рига', () => {
-    expect(CLIP_IDS.length).toBe(80); // + paint_brush, paint_spray (раскраска карты)
+    expect(CLIP_IDS.length).toBe(98); // + 18 клипов только Meshy (treat_eat_*, tease_*, …; content/animations.json meshy)
     const missing = CLIP_IDS.filter((id) => !RIG_CLIPS[id]);
     expect(missing).toEqual([]);
     for (const id of CLIP_IDS) {

@@ -480,6 +480,25 @@ export const RIG_CLIPS: Record<string, ClipFn> = {
     };
     void k;
   },
+  // ── клипы Meshy без своей опоры (content/animations.json meshy.on): у рига — поза того клипа, который они заменяют ──
+  treat_eat_hooligan: (k, t) => RIG_CLIPS.celebrate(k, t),
+  treat_eat_kind: (k, t) => RIG_CLIPS.celebrate(k, t),
+  treat_eat_glitter: (k, t) => RIG_CLIPS.celebrate(k, t),
+  scratch_enjoy: (k, t) => RIG_CLIPS.poke_head(k, t),
+  surprise_trick_hooligan: (k, t) => RIG_CLIPS.surprised(k, t),
+  surprise_trick_kind: (k, t) => RIG_CLIPS.surprised(k, t),
+  surprise_trick_glitter: (k, t) => RIG_CLIPS.surprised(k, t),
+  tease_hooligan: (k, t) => RIG_CLIPS.offended(k, t),
+  tease_kind: (k, t) => RIG_CLIPS.offended(k, t),
+  tease_glitter: (k, t) => RIG_CLIPS.offended(k, t),
+  sad_sigh: (k, t) => RIG_CLIPS.comfort(k, t),
+  rps_throw: (k, t) => RIG_CLIPS.proud(k, t),
+  turn_step: (k, t) => ({ ...RIG_CLIPS.idle_breathe(k, t), b: { ...RIG_CLIPS.idle_breathe(k, t).b, LeftUpLeg: [0.3 * S(k * PI * 2), 0, 0], RightUpLeg: [-0.3 * S(k * PI * 2), 0, 0] } }),
+  fall_asleep: (k, t) => RIG_CLIPS.sleep_loop(k, t),
+  wake_up: (k, t) => RIG_CLIPS.wake_startle(k, t),
+  hug_receive_hooligan: (k, t) => RIG_CLIPS.purr_stroke(k, t),
+  hug_receive_glitter: (k, t) => RIG_CLIPS.purr_stroke(k, t),
+  skate_ride: (k, t) => RIG_CLIPS.idle_hooligan_skate(k, t),
   // ── additive (только уши/хвост) ──
   ear_twitch: (k) => ({ b: { LeftEar1: [0.5 * tri(k / 0.5) * (k < 0.5 ? 1 : 0), 0, -0.3 * S(k * 40) * tri(k)] } }),
   ears_back: (k) => ({ b: { LeftEar1: [-0.9 * win(k, 0, 0.9, 0.15), 0, 0], RightEar1: [-0.9 * win(k, 0, 0.9, 0.15), 0, 0] } }),

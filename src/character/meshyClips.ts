@@ -244,10 +244,89 @@ export function meshyWanted(on: boolean, search = typeof location !== 'undefined
   return on && new URLSearchParams(search).get('meshy') !== '0';
 }
 
-/** то, что нужно загрузчику от персонажа (GlbCharacter.addExternalClip) */
+// ───────────── проверка клипа ─────────────
+
+/** пределы поворота сустава от позы покоя, рад (локально): шея/голова/стопа ~100°, спина ~110°, кисть ~120° */
+const JOINT_LIMIT: [RegExp, number][] = [
+  [/^(neck|head)$/, 1.75],
+  [/^spine\d*$/, 1.9],
+  [/foot$/, 1.75],
+  [/hand$/, 2.1],
+  [/(leg|upleg)$/, 2.9],
+  [/(arm|forearm|shoulder)$/, Math.PI],
+];
+/** скачок за кадр (30 к/с), рад: больше — сломанный кадр (сальто — ~0,2 рад/кадр) */
+const SPIKE = 1.6;
+
+export interface ClipCheck {
+  ok: boolean;
+  reason?: string;
+}
+
+/**
+ * Санитарная проверка клипа после переноса на наш скелет (dst): NaN/∞, длительность, огромное смещение таза
+ * (> 3 высот таза по горизонтали, > 2 — по вертикали: ошибка масштаба, единицы см вместо м), поворот сустава за предел
+ * (JOINT_LIMIT от позы покоя) или скачок за кадр. Не прошёл — клип не регистрируем, играет опора (fallback).
+ */
+export function checkClip(clip: THREE.AnimationClip, dst: Skel): ClipCheck {
+  if (!Number.isFinite(clip.duration) || clip.duration < 0.3 || clip.duration > 15) return { ok: false, reason: `длительность ${clip.duration}` };
+  for (const t of clip.tracks) {
+    for (let i = 0; i < t.values.length; i++) if (!Number.isFinite(t.values[i])) return { ok: false, reason: `NaN в ${t.name}` };
+    for (let i = 0; i < t.times.length; i++) if (!Number.isFinite(t.times[i])) return { ok: false, reason: `NaN во времени ${t.name}` };
+  }
+  const byNode = new Map<string, SkelBone>();
+  dst.bones.forEach((b) => byNode.set(b.node, b));
+  const q = new THREE.Quaternion(), qp = new THREE.Quaternion();
+  for (const t of clip.tracks) {
+    const b = byNode.get(nodeOf(t.name));
+    if (!b) continue;
+    if (propOf(t.name) === 'position' && b.key === dst.hips) {
+      const p0 = new THREE.Vector3().fromArray(t.values, 0).applyMatrix4(b.parentRest);
+      const p = new THREE.Vector3();
+      let h = 0, v = 0;
+      for (let i = 0; i < t.values.length; i += 3) {
+        p.fromArray(t.values, i).applyMatrix4(b.parentRest).sub(p0);
+        h = Math.max(h, Math.hypot(p.x, p.z));
+        v = Math.max(v, Math.abs(p.y));
+      }
+      const H = dst.hipsH || 1;
+      if (h > 3 * H || v > 2 * H) return { ok: false, reason: `таз уезжает на ${(h / H).toFixed(1)}/${(v / H).toFixed(1)} высоты таза` };
+    }
+    if (propOf(t.name) !== 'quaternion') continue;
+    const lim = JOINT_LIMIT.find(([re]) => re.test(b.key))?.[1] ?? Math.PI;
+    for (let i = 0; i < t.values.length; i += 4) {
+      q.fromArray(t.values, i);
+      const len = Math.hypot(q.x, q.y, q.z, q.w);
+      if (Math.abs(len - 1) > 0.05) return { ok: false, reason: `${b.key}: ненормированный поворот` };
+      q.normalize();
+      if (b.key !== dst.hips && lim < Math.PI && q.angleTo(b.restQ) > lim) return { ok: false, reason: `${b.key}: поворот ${((q.angleTo(b.restQ) * 180) / Math.PI).toFixed(0)}° за предел ${((lim * 180) / Math.PI).toFixed(0)}°` };
+      if (i > 0 && q.angleTo(qp) > SPIKE) return { ok: false, reason: `${b.key}: скачок ${((q.angleTo(qp) * 180) / Math.PI).toFixed(0)}° за кадр (t=${t.times[i / 4]?.toFixed(2)})` };
+      qp.copy(q);
+    }
+  }
+  return { ok: true };
+}
+
+// ───────────── отчёт ─────────────
+
+export type MeshyState = 'loaded' | 'missing' | 'rejected';
+export interface MeshyStatus {
+  id: string;
+  state: MeshyState;
+  reason?: string;
+  dur?: number;
+  bones?: number;
+}
+/** что стало с каждым клипом (вкладка «Тест» ?meshyreport, deskPanel); общее для всех котов — последняя загрузка */
+export const meshyStatus = new Map<string, MeshyStatus>();
+function setStatus(s: MeshyStatus) {
+  meshyStatus.set(s.id, s);
+}
+
+/** то, что нужно загрузчику от персонажа (GlbCharacter.addExternalClip); строка — клип отвергнут (причина) */
 export interface ExternalClipHost {
   readonly skel: Skel | null;
-  addExternalClip(id: string, clip: THREE.AnimationClip, loop: boolean, src: string): Promise<void>;
+  addExternalClip(id: string, clip: THREE.AnimationClip, loop: boolean, src: string): Promise<string | void>;
 }
 
 type Parsed = { clip: THREE.AnimationClip; skel: Skel } | null;
@@ -256,6 +335,10 @@ const cache = new Map<string, Promise<Parsed>>();
 let manifestP: Promise<MeshyEntry[]> | null = null;
 
 export interface LoadDeps {
+  /** ожидаемые id (clips.MESHY_IDS): чего нет в манифесте — «missing» */
+  expected?: readonly string[];
+  /** петля клипа: правило каталога (meshy.loop) главнее манифеста */
+  loopOf?: (id: string, manifestLoop: boolean) => boolean;
   fetchJson: (url: string) => Promise<unknown | null>;
   loadGlb: (url: string) => Promise<{ scene: THREE.Object3D; animations: THREE.AnimationClip[] }>;
   log?: (m: string) => void;
@@ -289,18 +372,45 @@ export async function loadMeshyClips(host: ExternalClipHost, deps: LoadDeps, bas
   if (!host.skel) return [];
   manifestP ??= deps.fetchJson(base + 'manifest.json').then((j) => parseManifest(j)).catch(() => []);
   const list = await manifestP;
+  const inList = new Set(list.map((e) => e.id));
+  for (const id of deps.expected ?? []) if (!inList.has(id)) setStatus({ id, state: 'missing', reason: list.length ? 'нет в манифесте' : 'нет манифеста' });
   const done: string[] = [];
+  const errs = new Map<string, string>();
   for (const e of list) {
     const url = base + e.file;
-    if (!cache.has(url)) cache.set(url, deps.loadGlb(url).then(parse).catch((err) => (deps.log?.(`[meshy] ${e.id}: ${(err as Error).message ?? err}`), null)));
+    if (!cache.has(url))
+      cache.set(url, deps.loadGlb(url).then(parse).catch((err) => {
+        const m = String((err as Error)?.message ?? err);
+        errs.set(url, m);
+        deps.log?.(`[meshy] ${e.id}: ${m}`);
+        return null;
+      }));
     const p = await cache.get(url)!;
-    if (!p) continue;
+    if (!p) {
+      const m = errs.get(url) ?? 'GLB без клипа или костей';
+      setStatus({ id: e.id, state: /\b404\b/.test(m) ? 'missing' : 'rejected', reason: m });
+      continue;
+    }
     const { clip, info } = retargetClip(p.clip, p.skel, host.skel, e.id);
     if (!clip.tracks.length) {
       deps.log?.(`[meshy] ${e.id}: ни одной общей кости`);
+      setStatus({ id: e.id, state: 'rejected', reason: 'ни одной общей кости' });
       continue;
     }
-    await host.addExternalClip(e.id, clip, e.loop, `meshy ${info.matched.length} костей`);
+    const chk = checkClip(clip, host.skel);
+    if (!chk.ok) {
+      deps.log?.(`[meshy] ${e.id}: отвергнут — ${chk.reason}; играет прежний клип`);
+      setStatus({ id: e.id, state: 'rejected', reason: chk.reason });
+      continue;
+    }
+    const loop = deps.loopOf ? deps.loopOf(e.id, e.loop) : e.loop;
+    const why = await host.addExternalClip(e.id, clip, loop, `meshy ${info.matched.length} костей`);
+    if (typeof why === 'string') {
+      deps.log?.(`[meshy] ${e.id}: отвергнут — ${why}; играет прежний клип`);
+      setStatus({ id: e.id, state: 'rejected', reason: why });
+      continue;
+    }
+    setStatus({ id: e.id, state: 'loaded', dur: +clip.duration.toFixed(2), bones: info.matched.length });
     done.push(e.id);
   }
   if (done.length) deps.log?.(`[meshy] клипы: ${done.join(', ')}`);
@@ -311,4 +421,5 @@ export async function loadMeshyClips(host: ExternalClipHost, deps: LoadDeps, bas
 export function resetMeshyCache() {
   cache.clear();
   manifestP = null;
+  meshyStatus.clear();
 }

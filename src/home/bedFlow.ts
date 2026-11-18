@@ -623,13 +623,16 @@ export class BedFlow {
       const e = ease(k);
       x = lerp(side.x, lie.x, e);
       z = lerp(side.z, lie.z, e);
-      y = lerp(0, lie.y, ease(clamp01(k * 1.4))) + Math.sin(Math.PI * clamp01(k * 1.15)) * 0.3;
+      // дуга прыжка — для опоры jump; настоящий клип (Meshy) забирается сам — только путь
+      y = lerp(0, lie.y, ease(clamp01(k * 1.4))) + (this.isProc('get_into_bed') ? Math.sin(Math.PI * clamp01(k * 1.15)) * 0.3 : 0);
       yaw = lerp(Math.PI, lie.yaw > Math.PI / 4 ? lie.yaw : lie.yaw + Math.PI * 2, ease(clamp01((k - 0.4) / 0.6)));
     } else if (id === 'lie_down_side') {
       const e = ease(k);
       ({ x, y, z, yaw } = lie);
-      roll = lie.roll * e;
-      tilt = lie.tilt * e;
+      // крен на бок — для опоры; настоящий lie_down_side ложится на бок сам (крен сна — тот, что у позы сна)
+      const procLie = this.isProc('lie_down_side');
+      roll = procLie ? lie.roll * e : lie.roll;
+      tilt = procLie ? lie.tilt * e : lie.tilt;
       w = e;
     } else if (id === 'wake_stretch_in_bed') {
       // треть шага — лёжа (потягивается), потом садится на край лицом к зрителю
@@ -647,7 +650,7 @@ export class BedFlow {
       const e = ease(k);
       x = lerp(edge.x, side.x, e);
       z = lerp(edge.z, side.z, e);
-      y = lerp(edge.y, 0, ease(clamp01((k - 0.15) / 0.85))) + Math.sin(Math.PI * k) * 0.25;
+      y = lerp(edge.y, 0, ease(clamp01((k - 0.15) / 0.85))) + (this.isProc('hop_out_of_bed') ? Math.sin(Math.PI * k) * 0.25 : 0);
     } else if (id === 'walk_back') {
       // к своему месту у изножья (влево), в конце — лицом к зрителю
       const e = ease(clamp01(k / 0.8));
@@ -657,7 +660,8 @@ export class BedFlow {
     }
     // ворочается
     const t = this.turn;
-    if (t && p.state === 'asleep') {
+    // покачивание корня — опора «ворочается»; настоящий turn_over_sleep ворочается сам
+    if (t && p.state === 'asleep' && this.isProc(TURN_CLIP)) {
       const kt = clamp01((now - t.t0) / t.ms);
       const ww = Math.sin(Math.PI * kt);
       y += 0.04 * t.amp * ww;
@@ -733,7 +737,9 @@ export class BedFlow {
   private setTweak(step: BedStep['id'] | 'asleep' | null) {
     const ch = this.h.character() as unknown as TweakCh | null;
     if (!ch || !('poseTweak' in ch)) return;
-    if (!step || !ch.procedural?.has(SLEEP_CLIP)) {
+    // поправки — только для шага, который играет опорой (клип Meshy пришёл — без поправок)
+    const stepClip = step === 'asleep' ? SLEEP_CLIP : [...TUCK_STEPS, ...WAKE_STEPS].find((x) => x.id === step)?.clip ?? SLEEP_CLIP;
+    if (!step || !ch.procedural?.has(stepClip)) {
       this.tweak = null;
       ch.poseTweak = null;
       return;
@@ -745,7 +751,7 @@ export class BedFlow {
       const k = clamp01((performance.now() - tw.t0) / tw.dur);
       const w = Math.sin(Math.PI * k);
       // лёжа: бёдра назад вдоль тела, голени — в линию (подобрано по снимкам)
-      const lw = this.lieW;
+      const lw = ch.procedural?.has(SLEEP_CLIP) ? this.lieW : 0;
       if (lw > 0.01) {
         rot('LeftUpLeg', 'side', 1.3 * lw);
         rot('RightUpLeg', 'side', 1.3 * lw);
