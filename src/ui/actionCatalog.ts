@@ -15,7 +15,7 @@ export interface CatalogItem {
   label: string;
   icon: string;
   /** ui — пункт раздела «Ещё» (пересадить на другую карту, режим микрофона): не умение кота, в «открыто N из M» не считается */
-  run: { action: ActionId } | { say: string } | { ui: 'reanchor' | 'micmode' };
+  run: { action: ActionId } | { say: string } | { ui: 'reanchor' | 'micmode' | 'home' };
 }
 export interface CatalogSection { id: SectionId; title: string; icon: string; items: CatalogItem[] }
 
@@ -157,7 +157,7 @@ export function catalogEnv(intents: { intent: string }[], triggers: Record<strin
 }
 
 /** тап по пункту → куда отправить: в режиссёр (действие) или в голосовой вход (фраза) */
-export function routeItem(item: CatalogItem, to: { action(id: ActionId): void; say(text: string): void; ui?(id: 'reanchor' | 'micmode'): void }) {
+export function routeItem(item: CatalogItem, to: { action(id: ActionId): void; say(text: string): void; ui?(id: 'reanchor' | 'micmode' | 'home'): void }) {
   if ('action' in item.run) to.action(item.run.action);
   else if ('say' in item.run) to.say(item.run.say);
   else to.ui?.(item.run.ui);

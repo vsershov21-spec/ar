@@ -22,6 +22,7 @@ import { buildCatalog, catalogEnv, routeItem, type CatalogItem } from './ui/acti
 import { Suggester, VOICE_GATED, type Chip } from './scenario/suggest';
 import { turn } from './voice/turn';
 import { Director, type ActionId } from './director';
+import { HomeMode, prepareHomeFlow, type HomeHost } from './home/homeMode';
 import { NAMES, normalize } from './voice/intents';
 import { personaMeta } from './character/personaMeta';
 import { CardMonitor, LumaSampler, cardScreenFrac, type CardEvent } from './tracker/cardMonitor';
@@ -106,6 +107,8 @@ export class App {
   private frames = 0;
   private fpsT = 0;
   onFrame: (dt: number) => void = () => {};
+  /** «Мир кота» без камеры: комната-хаб, зоны, портал (src/home) */
+  home!: HomeMode;
   /** адаптивное качество (src/core/perf.ts): ?q=0..3 — зафиксировать уровень */
   readonly quality = new AdaptiveQuality(new URLSearchParams(location.search).get('q'));
   /** энергобюджет (src/core/energy.ts): частота рендера и трекера по тому, что происходит; ?fps=N, ?energy=0|1 */
@@ -130,6 +133,7 @@ export class App {
 
   async init() {
     const p = this.params;
+    prepareHomeFlow(); // ?flow=home — без знакомства, до режиссёра (src/home)
     this.quality.onChange = (lvl, i) => this.applyQuality(lvl, i);
     document.addEventListener('visibilitychange', () => this.quality.pause());
     // энергобюджет: поворот телефона (гироскоп; на iOS — после разрешения «Движение и ориентация»)
@@ -196,7 +200,7 @@ export class App {
       },
       // каталог «Что умеет кот»: только то, что работает у текущего характера; тап — как кнопка или как сказанная фраза
       // новые мини-игры — только когда их начало озвучено (иначе игра идёт молча: director.hasVoiced('rps_start'))
-      catalog: () => (this.director ? { who: this.director.persona.name, sections: this.voicedOnly(buildCatalog(this.director.persona, catEnv)) } : null),
+      catalog: () => (this.director ? { who: this.director.persona.name, sections: this.withHome(this.voicedOnly(buildCatalog(this.director.persona, catEnv))) } : null),
       onCatalogPick: (item) => this.runCatalogItem(item),
       onSkipName: () => this.director.dispatch({ type: 'skip_name' }),
       onShakeButton: () => this.input.simulateShake(),
@@ -255,6 +259,12 @@ export class App {
       isChoiceSticker: (x, y) => !!this.fx.stickerAt(x, y)?.choice,
     });
     this.bindInput();
+    this.home = new HomeMode({
+      root: this.root, scene: this.scene, renderer: this.renderer, tracker: this.tracker as unknown as HomeHost['tracker'], stage: this.stage,
+      director: this.director as unknown as HomeHost['director'], character: () => this.character, ui: this.ui, audio: this.audio,
+      energy: this.energy, suggest: () => this.kickSuggest(),
+    });
+    this.home.runFlow(new URLSearchParams(location.search));
     // чипы кота и подсказка (scenario/suggest.ts): по событиям режиссёра (фаза, лог = любое событие сценария),
     // пока идёт игра — ещё и шагом 330 мс (пороги тишины). В дрёме, вне игры и в скрытой вкладке опрос стоит
     this.director.on('log', () => this.kickSuggest());
@@ -435,7 +445,7 @@ export class App {
       quietMs: d.ladder.quietFor(now), visits: st.visits, available: this.available(), tried: (id) => this.ui.tried.has(id),
       voiced: (ev) => this.voiced(ev),
     });
-    this.ui.setSuggestions(r.chips);
+    this.ui.setSuggestions(this.home ? this.home.chips(r.chips) : r.chips);
     // подсказка — один раз на тишину и без немого пузыря: в первые визиты кот говорит её озвученной репликой
     // («Погладь меня пальцем или нажми кнопку внизу», событие help) — чипы подпрыгивают; голоса нет
     // (или визит не первый, кот и так предлагает занятия лестницей тишины) — палец стучит по чипу
@@ -453,13 +463,24 @@ export class App {
   /** чип кота: действие — как кнопка каталога, фраза — как сказанная голосом */
   private runChip(c: Chip) {
     this.input.activity();
+    if (c.id.startsWith('home:')) return void this.home.act(c.id);
     if ('action' in c.run) {
       this.suggest.note(c.run.action);
       this.director.action(c.run.action);
     } else this.engine.handleText(c.run.say, 'chip');
   }
+  /** «Мой дом» (на карте) / «На карту» (дома) — первым пунктом раздела «Игры» */
+  private withHome(secs: ReturnType<typeof buildCatalog>): ReturnType<typeof buildCatalog> {
+    const it = this.home?.catalogItem();
+    if (!it) return secs;
+    const item: CatalogItem = { ...it, run: { ui: 'home' } };
+    const g = secs.find((s) => s.id === 'games');
+    if (g) return secs.map((s) => (s === g ? { ...s, items: [item, ...s.items] } : s));
+    return [...secs, { id: 'games' as const, title: 'Игры', icon: 'quest', items: [item] }];
+  }
   private runCatalogItem(item: CatalogItem) {
     this.input.activity();
+    if (item.id.startsWith('home:')) return void this.home.act(item.id);
     if ('action' in item.run) this.suggest.note(item.run.action);
     routeItem(item, {
       action: (id) => this.director.action(id),
@@ -600,7 +621,9 @@ export class App {
     const tr = this.tracker as unknown as { view?: { quad: { x: number; y: number }[] } | null; isLocked?: boolean; stats?: { mode: string }; maxHz?: number; detectEvery?: number };
     // скорость карты на экране — по новым углам от трекера
     const v = tr.view;
-    if (v && v !== this.lastView) {
+    // дома камеры нет: карта «не едет», трекер не в беде
+    if (this.home?.active) this.energy.quadSample(0);
+    else if (v && v !== this.lastView) {
       if (this.lastViewQuad && now > this.lastViewT) {
         const q = v.quad, p = this.lastViewQuad;
         const diag = Math.max(1, Math.hypot(q[0].x - q[2].x, q[0].y - q[2].y));
@@ -630,7 +653,7 @@ export class App {
       action,
       talking: this.voiceBusy,
       locked: !!tr.isLocked && this.tracker.isTracking,
-      trouble: (!this.tracker.isTracking && now - this.lostAt < 3000) || tr.stats?.mode === 'plane',
+      trouble: !this.home?.active && ((!this.tracker.isTracking && now - this.lostAt < 3000) || tr.stats?.mode === 'plane'),
     });
     if ((out.mode === 'doze') !== this.dozing) {
       this.dozing = out.mode === 'doze';
@@ -670,7 +693,7 @@ export class App {
     if (!coarse && c && now - c.t < 400 && Math.abs(c.x - x) <= 4 && Math.abs(c.y - y) <= 4) return c.zone;
     const ray = this.ray;
     const w = this.root.clientWidth, h = this.root.clientHeight;
-    ray.setFromCamera(this.rayPt.set((x / w) * 2 - 1, -(y / h) * 2 + 1), this.tracker.camera);
+    ray.setFromCamera(this.rayPt.set((x / w) * 2 - 1, -(y / h) * 2 + 1), this.stage.camera);
     this.stage.root.updateMatrixWorld(true);
     if (coarse) return (this.character.hitCoarse?.(ray) ?? this.character.hitTest(ray)) ? 'body' : null;
     if (!this.character.hitZone) return this.character.hitTest(ray) ? 'body' : null;
@@ -742,10 +765,14 @@ export class App {
     // долгое нажатие на кота / карту: меню «Пересадить на другую карту» (эффект «к стеклу» — в каталоге, «Чудеса»);
     // трекер не умеет пересаживать — как раньше, эффект на стекле
     i.on('longpress', (p) => {
-      if (d.state.appeared && this.ui.pressMenu(p.x, p.y)) return;
+      if (d.state.appeared && !this.home?.active && this.ui.pressMenu(p.x, p.y)) return;
       d.interaction('longpress', p);
     });
-    i.on('swipe', (s) => d.interaction('swipe', { x: s.x, y: s.y, from: s.path[0], path: s.path }));
+    i.on('swipe', (s) => {
+      // дома: влево/вправо — соседняя комната (кот перебегает), не рисунок на стекле
+      if (this.home?.onSwipe(s.dir)) return;
+      d.interaction('swipe', { x: s.x, y: s.y, from: s.path[0], path: s.path });
+    });
     i.on('shake', () => {
       if (d.state.phase !== 'switching') this.suggest.upset(performance.now());
       d.interaction('shake');
@@ -810,6 +837,7 @@ export class App {
 
   resize() {
     const w = this.root.clientWidth, h = this.root.clientHeight;
+    this.home?.resize(w, h);
     this.renderer.setSize(w, h, false);
     this.tracker.resize(w, h);
     this.fx.resize(w, h);
@@ -854,8 +882,11 @@ export class App {
       this.frames = 0;
       this.fpsT = 0;
     }
-    this.tracker.update(dt, this.elapsed);
-    if (this.director.state.appeared) {
+    // дома трекер и камера стоят (src/home): ни кадров камеры, ни освещённости карты
+    const atHome = this.home?.inRoom ?? false;
+    if (!atHome) this.tracker.update(dt, this.elapsed);
+    this.home?.update(dt, now);
+    if (this.director.state.appeared && !atHome) {
       this.cardMonitor.card(cardScreenFrac(this.tracker), dt * 1000);
       // освещённость меняется медленно: раз в секунду (кадр камеры 1280×720 → 32×24 — полное чтение кадра с GPU на iOS)
       if ((this.lumaT += dt) >= 1) {
@@ -878,7 +909,7 @@ export class App {
     perf.section('director');
     this.director.update(dt);
     perf.section('character');
-    this.character.update(dt, this.tracker.camera);
+    this.character.update(dt, this.stage.camera);
     perf.section('fx');
     this.fx.update(dt);
     this.fx.draw();
@@ -887,7 +918,7 @@ export class App {
     // кота (и его тени) на экране нет: один кадр — очистить холст, дальше GPU не трогаем
     const empty = !this.stage.root.visible && !this.stage.shadow.visible && this.params.tracker !== 'webxr';
     if (!empty || !this.blankDrawn) {
-      this.renderer.render(this.scene, this.tracker.camera);
+      this.renderer.render(this.scene, this.stage.camera);
       perf.count('render');
     }
     this.blankDrawn = empty;

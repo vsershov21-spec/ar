@@ -632,6 +632,28 @@
     },
     "game_bye": {
       "clip": "wave"
+    },
+    "home_offer": {
+      "clip": "point_button"
+    },
+    "home_enter": {
+      "clip": "wave"
+    },
+    "home_living": {
+      "clip": "point_button"
+    },
+    "home_kitchen": {
+      "clip": "point_button"
+    },
+    "home_bedroom": {
+      "clip": "point_button"
+    },
+    "home_back": {},
+    "home_cocoa": {
+      "clip": "idle_kind_cocoa"
+    },
+    "home_ball": {
+      "clip": "jump"
     }
   },
   "lines": {
@@ -3347,6 +3369,136 @@
         "text": "Хватит так хватит. Ещё сыграем.",
         "emotion": "neutral",
         "face": "neutral"
+      }
+    ],
+    "home_offer": [
+      {
+        "id": "hooligan.home_offer.01",
+        "text": "Карты нет? Пойдём, покажу мой дом!",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.home_offer.02",
+        "text": "Йо, пошли ко мне в гости? Покажу свою берлогу.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.home_offer.03",
+        "text": "Скучно? Пойдём, покажу мой дом? Там круто!",
+        "emotion": "excited",
+        "face": "excited"
+      }
+    ],
+    "home_enter": [
+      {
+        "id": "hooligan.home_enter.01",
+        "text": "Та-дам! Это мой дом. Располагайся!",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.home_enter.02",
+        "text": "Добро пожаловать в мою берлогу! Тут всё моё.",
+        "emotion": "excited",
+        "face": "excited"
+      },
+      {
+        "id": "hooligan.home_enter.03",
+        "text": "Вот тут я и живу. Норм хата, да?",
+        "emotion": "cheeky",
+        "face": "smirk"
+      }
+    ],
+    "home_living": [
+      {
+        "id": "hooligan.home_living.01",
+        "text": "Это моя гостиная. Тут я танцую и валяюсь.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.home_living.02",
+        "text": "Гостиная! Мячик, кубики и мой мешок-кресло.",
+        "emotion": "neutral",
+        "face": "neutral"
+      }
+    ],
+    "home_kitchen": [
+      {
+        "id": "hooligan.home_kitchen.01",
+        "text": "Это моя кухня. Тут водятся вкусняшки!",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.home_kitchen.02",
+        "text": "Кухня! Угостишь меня? Я не откажусь.",
+        "emotion": "excited",
+        "face": "excited"
+      }
+    ],
+    "home_bedroom": [
+      {
+        "id": "hooligan.home_bedroom.01",
+        "text": "Тут я сплю. Ну, иногда. Чаще катаюсь.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.home_bedroom.02",
+        "text": "Моя лежанка. Тут я дрыхну после скейта.",
+        "emotion": "sleepy",
+        "face": "sleepy"
+      }
+    ],
+    "home_back": [
+      {
+        "id": "hooligan.home_back.01",
+        "text": "Вернёмся к карте? Погнали!",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.home_back.02",
+        "text": "Всё, прыгаем обратно в карту!",
+        "emotion": "excited",
+        "face": "excited"
+      },
+      {
+        "id": "hooligan.home_back.03",
+        "text": "Пошли к карте. Наведи на неё камеру!",
+        "emotion": "cheeky",
+        "face": "smirk"
+      }
+    ],
+    "home_cocoa": [
+      {
+        "id": "hooligan.home_cocoa.01",
+        "text": "Какао! Горячее, с зефиркой. Кайф.",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "hooligan.home_cocoa.02",
+        "text": "Хлюп! Какао — топливо для скейтера.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      }
+    ],
+    "home_ball": [
+      {
+        "id": "hooligan.home_ball.01",
+        "text": "Лови мячик! Хоп-хоп!",
+        "emotion": "excited",
+        "face": "excited"
+      },
+      {
+        "id": "hooligan.home_ball.02",
+        "text": "Мячик, стой! Ну куда он скачет?",
+        "emotion": "cheeky",
+        "face": "smirk"
       }
     ]
   },

@@ -623,6 +623,28 @@
     },
     "game_bye": {
       "clip": "wave"
+    },
+    "home_offer": {
+      "clip": "point_button"
+    },
+    "home_enter": {
+      "clip": "wave"
+    },
+    "home_living": {
+      "clip": "point_button"
+    },
+    "home_kitchen": {
+      "clip": "point_button"
+    },
+    "home_bedroom": {
+      "clip": "point_button"
+    },
+    "home_back": {},
+    "home_cocoa": {
+      "clip": "idle_kind_cocoa"
+    },
+    "home_ball": {
+      "clip": "jump"
     }
   },
   "lines": {
@@ -3248,6 +3270,136 @@
         "text": "Ладно, поиграем потом.",
         "emotion": "neutral",
         "face": "neutral"
+      }
+    ],
+    "home_offer": [
+      {
+        "id": "kind.home_offer.01",
+        "text": "Карта спряталась? Пойдём, покажу мой дом?",
+        "emotion": "caring",
+        "face": "caring"
+      },
+      {
+        "id": "kind.home_offer.02",
+        "text": "Хочешь в гости? Пойдём, покажу мой дом!",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "kind.home_offer.03",
+        "text": "Пойдём ко мне домой? Там тепло и уютно.",
+        "emotion": "caring",
+        "face": "caring"
+      }
+    ],
+    "home_enter": [
+      {
+        "id": "kind.home_enter.01",
+        "text": "Это мой дом! Проходи, чувствуй себя как дома.",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "kind.home_enter.02",
+        "text": "Вот тут я живу. Я так рад, что ты в гостях!",
+        "emotion": "caring",
+        "face": "caring"
+      },
+      {
+        "id": "kind.home_enter.03",
+        "text": "Добро пожаловать! Это мой уютный домик.",
+        "emotion": "happy",
+        "face": "happy"
+      }
+    ],
+    "home_living": [
+      {
+        "id": "kind.home_living.01",
+        "text": "Это моя гостиная. Тут мы играем и танцуем.",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "kind.home_living.02",
+        "text": "Гостиная! Садись на мягкий пуфик.",
+        "emotion": "caring",
+        "face": "caring"
+      }
+    ],
+    "home_kitchen": [
+      {
+        "id": "kind.home_kitchen.01",
+        "text": "Это моя кухня. Тут я варю какао.",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "kind.home_kitchen.02",
+        "text": "Кухня! Хочешь, угостим друг друга?",
+        "emotion": "caring",
+        "face": "caring"
+      }
+    ],
+    "home_bedroom": [
+      {
+        "id": "kind.home_bedroom.01",
+        "text": "Тут я сплю. Лежанка мягкая-мягкая.",
+        "emotion": "sleepy",
+        "face": "sleepy"
+      },
+      {
+        "id": "kind.home_bedroom.02",
+        "text": "Моя спальня. Тут я вижу добрые сны.",
+        "emotion": "caring",
+        "face": "caring"
+      }
+    ],
+    "home_back": [
+      {
+        "id": "kind.home_back.01",
+        "text": "Вернёмся к карте? Пойдём!",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "kind.home_back.02",
+        "text": "Пора обратно в карту. Наведи на неё камеру.",
+        "emotion": "caring",
+        "face": "caring"
+      },
+      {
+        "id": "kind.home_back.03",
+        "text": "Возвращаемся! Я прыгну в карту первым.",
+        "emotion": "happy",
+        "face": "happy"
+      }
+    ],
+    "home_cocoa": [
+      {
+        "id": "kind.home_cocoa.01",
+        "text": "Какао! Тёплое, как обнимашки.",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "kind.home_cocoa.02",
+        "text": "Мм, какао. Я бы и тебе налил.",
+        "emotion": "caring",
+        "face": "caring"
+      }
+    ],
+    "home_ball": [
+      {
+        "id": "kind.home_ball.01",
+        "text": "Лови мячик! Хоп!",
+        "emotion": "excited",
+        "face": "excited"
+      },
+      {
+        "id": "kind.home_ball.02",
+        "text": "Мячик прыгает, и я прыгаю!",
+        "emotion": "happy",
+        "face": "happy"
       }
     ]
   },

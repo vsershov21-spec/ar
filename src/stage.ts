@@ -68,6 +68,27 @@ export class Stage {
     this.pos.set(cfg.footX, cfg.footY);
   }
 
+  /**
+   * «Мир кота» (src/home): вместо карты и камеры трекера — пол комнаты и камера сцены. Плоскость пола — то же «XY карты»
+   * (якорь повёрнут так, что +Z карты смотрит вверх), поэтому ходьба, поворот к зрителю, «у стекла» и тень работают
+   * как на карте. null — снова карта.
+   */
+  private view: { anchor: THREE.Object3D; camera: THREE.PerspectiveCamera } | null = null;
+  get anchor(): THREE.Object3D {
+    return this.view?.anchor ?? this.tracker.anchor;
+  }
+  get camera(): THREE.PerspectiveCamera {
+    return this.view?.camera ?? this.tracker.camera;
+  }
+  get inView() {
+    return !!this.view;
+  }
+  useView(v: { anchor: THREE.Object3D; camera: THREE.PerspectiveCamera } | null) {
+    this.view = v;
+    this.anchor.add(this.shadow);
+    this.yawChase = true;
+  }
+
   /** сбросить позицию в точку опоры из конфига */
   resetPosition() {
     this.pos.set(this.cfg.footX, this.cfg.footY);
@@ -76,10 +97,10 @@ export class Stage {
 
   /** экранная точка → точка на плоскости карты/стола (в ширинах карты) или null */
   screenToCard(x: number, y: number, w: number, h: number): THREE.Vector2 | null {
-    const a = this.tracker.anchor;
+    const a = this.anchor;
     a.updateMatrixWorld(true);
     const ray = new THREE.Raycaster();
-    ray.setFromCamera(new THREE.Vector2((x / w) * 2 - 1, -(y / h) * 2 + 1), this.tracker.camera);
+    ray.setFromCamera(new THREE.Vector2((x / w) * 2 - 1, -(y / h) * 2 + 1), this.camera);
     const n = new THREE.Vector3(0, 0, 1).transformDirection(a.matrixWorld);
     const p0 = new THREE.Vector3().setFromMatrixPosition(a.matrixWorld);
     const hit = ray.ray.intersectPlane(new THREE.Plane().setFromNormalAndCoplanarPoint(n, p0), new THREE.Vector3());
@@ -139,10 +160,10 @@ export class Stage {
   /** поза центра карты → поза кота на карте */
   private cardPose(out: THREE.Matrix4, dt: number) {
     const c = this.cfg;
-    const a = this.tracker.anchor;
+    const a = this.anchor;
     a.updateMatrixWorld(true);
     // камера в координатах карты → yaw кота к зрителю вокруг нормали карты
-    const camLocal = a.worldToLocal(this.tracker.camera.getWorldPosition(this.tmpA));
+    const camLocal = a.worldToLocal(this.camera.getWorldPosition(this.tmpA));
     const dx = camLocal.x - this.pos.x, dy = camLocal.y - this.pos.y;
     // после поворота на +90° по X «вперёд» кота (+Z модели) смотрит в -Y карты
     const targetYaw = this.walkYaw ?? (c.yawFollow ? Math.atan2(dx, -dy) : 0);
@@ -181,10 +202,11 @@ export class Stage {
 
   /** «у стекла»: прямо перед камерой, ноги у нижнего края экрана, рост = glassHeightFrac экрана */
   private glassPose(out: THREE.Matrix4) {
-    const cam = this.tracker.camera;
-    const a = this.tracker.anchor;
+    const cam = this.camera;
+    const a = this.anchor;
     const anchorPos = this.tmpA.setFromMatrixPosition(a.matrixWorld);
-    const D = Math.max(cam.near * 4, anchorPos.length() * 0.5);
+    // камера трекера — в начале координат; камера комнаты стоит в мире
+    const D = Math.max(cam.near * 4, (this.view ? anchorPos.distanceTo(cam.position) : anchorPos.length()) * 0.5);
     const halfH = D * Math.tan(THREE.MathUtils.degToRad(cam.fov / 2));
     const H = 2 * halfH * this.cfg.glassHeightFrac;
     // лапы на ~76% высоты экрана — над нижней панелью интерфейса (микрофон, чипы)
@@ -258,7 +280,7 @@ export class Stage {
     // updateMatrixWorld(true) всего поддерева кота (все кости и меши) на каждый запрос точки: эффекты и пузырь
     // спрашивают её по нескольку раз за кадр
     this.root.updateWorldMatrix(true, false);
-    const cam = this.tracker.camera;
+    const cam = this.camera;
     const local = this.character?.anchorLocal?.(name) ?? defaultAnchor(name, this.tmpA);
     const p = this.tmpA.copy(local).applyMatrix4(this.root.matrixWorld).project(cam);
     const f = this.tmpB.set(0, 0, 0).applyMatrix4(this.root.matrixWorld).project(cam);
@@ -279,7 +301,7 @@ export class Stage {
   headScreen(w: number, h: number, frac = 0.78): { x: number; y: number } {
     this.root.updateWorldMatrix(true, false);
     const p = this.tmpA.set(0, frac, 0).applyMatrix4(this.root.matrixWorld);
-    p.project(this.tracker.camera);
+    p.project(this.camera);
     return { x: ((p.x + 1) / 2) * w, y: ((1 - p.y) / 2) * h };
   }
 }

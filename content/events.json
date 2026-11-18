@@ -146,6 +146,14 @@
     { "id": "simon_is_wave", "group": "game", "priority": 2, "cooldownMs": 0, "interruptible": true, "trigger": "Повтори движение: второй раз мимо или тишина — кот называет движение (помахать)." },
     { "id": "simon_is_sit", "group": "game", "priority": 2, "cooldownMs": 0, "interruptible": true, "trigger": "Повтори движение: второй раз мимо или тишина — кот называет движение (сесть)." },
     { "id": "game_more", "group": "game", "priority": 2, "cooldownMs": 0, "interruptible": true, "trigger": "Мини-игры (emo, rps, simon): «Ещё раунд?» Окно ответа 5 с; да — ещё, нет или тишина — game_bye." },
-    { "id": "game_bye", "group": "game", "priority": 2, "cooldownMs": 0, "interruptible": true, "trigger": "Мини-игры: конец игры словами (нет / тишина на «ещё?»)." }
+    { "id": "game_bye", "group": "game", "priority": 2, "cooldownMs": 0, "interruptible": true, "trigger": "Мини-игры: конец игры словами (нет / тишина на «ещё?»)." },
+    { "id": "home_offer", "group": "scenario", "priority": 2, "cooldownMs": 30000, "interruptible": true, "trigger": "«Мир кота»: карта потеряна дольше 6 с или долгая тишина на карте — кот зовёт к себе домой (чипы «Пойдём!» / «Найду карту»)." },
+    { "id": "home_enter", "group": "scenario", "priority": 2, "cooldownMs": 0, "interruptible": true, "trigger": "«Мир кота»: первый вход в дом за сессию (после портала)." },
+    { "id": "home_living", "group": "scenario", "priority": 1, "cooldownMs": 20000, "interruptible": true, "trigger": "«Мир кота»: кот привёл в гостиную (свайп / стрелка)." },
+    { "id": "home_kitchen", "group": "scenario", "priority": 1, "cooldownMs": 20000, "interruptible": true, "trigger": "«Мир кота»: кот привёл на кухню." },
+    { "id": "home_bedroom", "group": "scenario", "priority": 1, "cooldownMs": 20000, "interruptible": true, "trigger": "«Мир кота»: кот привёл в спальню." },
+    { "id": "home_back", "group": "scenario", "priority": 2, "cooldownMs": 0, "interruptible": true, "trigger": "«Мир кота»: кнопка «На карту» — кот прыгает обратно в карту, камера снова." },
+    { "id": "home_cocoa", "group": "scenario", "priority": 1, "cooldownMs": 8000, "interruptible": true, "trigger": "«Мир кота», кухня: чип «Какао» — кот пьёт какао." },
+    { "id": "home_ball", "group": "scenario", "priority": 1, "cooldownMs": 6000, "interruptible": true, "trigger": "«Мир кота», гостиная: чип «Мячик» — мячик прыгает, кот за ним." }
   ]
 }

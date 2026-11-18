@@ -6,7 +6,9 @@
 import type { PersonaId } from '../persona/types';
 import { isPersonaId } from '../persona/types';
 
-export interface Memory { name: string | null; persona: PersonaId | null; visits: number; lastVisitAt: number | null; met?: boolean }
+export interface Memory { name: string | null; persona: PersonaId | null; visits: number; lastVisitAt: number | null; met?: boolean; home?: HomePlace }
+/** где кот: на карте (AR) или у себя дома («Мир кота», src/home) и в какой комнате */
+export interface HomePlace { where: 'ar' | 'home'; zone: string }
 const KEY = 'sber-ar-cat:v1';
 
 export function loadMemory(storage: Pick<Storage, 'getItem'> | null = safeStorage()): Memory {
@@ -21,6 +23,7 @@ export function loadMemory(storage: Pick<Storage, 'getItem'> | null = safeStorag
       visits: Number.isFinite(o.visits) ? o.visits : 0,
       lastVisitAt: Number.isFinite(o.lastVisitAt) ? o.lastVisitAt : null,
       ...(o.met === true ? { met: true } : {}),
+      ...(o.home && (o.home.where === 'ar' || o.home.where === 'home') && typeof o.home.zone === 'string' ? { home: { where: o.home.where, zone: o.home.zone.slice(0, 20) } } : {}),
     };
   } catch {
     return def;

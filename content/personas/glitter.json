@@ -636,6 +636,28 @@
     },
     "game_bye": {
       "clip": "wave"
+    },
+    "home_offer": {
+      "clip": "point_button"
+    },
+    "home_enter": {
+      "clip": "wave"
+    },
+    "home_living": {
+      "clip": "point_button"
+    },
+    "home_kitchen": {
+      "clip": "point_button"
+    },
+    "home_bedroom": {
+      "clip": "point_button"
+    },
+    "home_back": {},
+    "home_cocoa": {
+      "clip": "idle_kind_cocoa"
+    },
+    "home_ball": {
+      "clip": "jump"
     }
   },
   "lines": {
@@ -3327,6 +3349,136 @@
         "text": "Игра окончена! Поклон!",
         "emotion": "excited",
         "face": "excited"
+      }
+    ],
+    "home_offer": [
+      {
+        "id": "glitter.home_offer.01",
+        "text": "Карты нет? Пойдём, покажу мой дом!",
+        "emotion": "excited",
+        "face": "excited"
+      },
+      {
+        "id": "glitter.home_offer.02",
+        "text": "Хочешь в гости? Пойдём, покажу мой блестящий дом?",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "glitter.home_offer.03",
+        "text": "Пойдём ко мне? У меня там всё сверкает!",
+        "emotion": "excited",
+        "face": "excited"
+      }
+    ],
+    "home_enter": [
+      {
+        "id": "glitter.home_enter.01",
+        "text": "Та-дам! Это мой дом. Правда, блестит?",
+        "emotion": "excited",
+        "face": "excited"
+      },
+      {
+        "id": "glitter.home_enter.02",
+        "text": "Вот тут я живу! Добро пожаловать в гости.",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "glitter.home_enter.03",
+        "text": "Мой дом! Каждую звёздочку я повесила сама.",
+        "emotion": "proud",
+        "face": "proud"
+      }
+    ],
+    "home_living": [
+      {
+        "id": "glitter.home_living.01",
+        "text": "Это моя гостиная. Тут я кружусь и танцую.",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "glitter.home_living.02",
+        "text": "Гостиная! Видишь гирлянду? Нет, это в спальне.",
+        "emotion": "excited",
+        "face": "excited"
+      }
+    ],
+    "home_kitchen": [
+      {
+        "id": "glitter.home_kitchen.01",
+        "text": "Это моя кухня. Тут пахнет печеньками.",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "glitter.home_kitchen.02",
+        "text": "Кухня! Угостишь меня чем-нибудь блестящим?",
+        "emotion": "excited",
+        "face": "excited"
+      }
+    ],
+    "home_bedroom": [
+      {
+        "id": "glitter.home_bedroom.01",
+        "text": "Тут я сплю. Под гирляндой из звёздочек.",
+        "emotion": "sleepy",
+        "face": "sleepy"
+      },
+      {
+        "id": "glitter.home_bedroom.02",
+        "text": "Моя спальня! Лежанка цвета лаванды.",
+        "emotion": "happy",
+        "face": "happy"
+      }
+    ],
+    "home_back": [
+      {
+        "id": "glitter.home_back.01",
+        "text": "Вернёмся к карте? Летим!",
+        "emotion": "excited",
+        "face": "excited"
+      },
+      {
+        "id": "glitter.home_back.02",
+        "text": "Пора обратно в карту. Наведи на неё камеру.",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "glitter.home_back.03",
+        "text": "Прыгаем в карту! Я первая!",
+        "emotion": "excited",
+        "face": "excited"
+      }
+    ],
+    "home_cocoa": [
+      {
+        "id": "glitter.home_cocoa.01",
+        "text": "Какао с блёстками! Шучу, с зефиром.",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "glitter.home_cocoa.02",
+        "text": "Мм, какао! Сладкое, как я.",
+        "emotion": "excited",
+        "face": "excited"
+      }
+    ],
+    "home_ball": [
+      {
+        "id": "glitter.home_ball.01",
+        "text": "Лови мячик! Хоп-хоп!",
+        "emotion": "excited",
+        "face": "excited"
+      },
+      {
+        "id": "glitter.home_ball.02",
+        "text": "Мячик скачет, как я на каблучках!",
+        "emotion": "happy",
+        "face": "happy"
       }
     ]
   },
