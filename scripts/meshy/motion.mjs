@@ -538,7 +538,16 @@ async function main() {
   log(`готово: в манифесте ${man.clips.length}; на сайт — со следующей сборкой (push в main или перезапуск ar-update)`);
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+// /var/lib/vershov-commander на swe — симлинк (systemd DynamicUser → /var/lib/private/…): сравниваем реальные пути,
+// иначе main() молча не запускался (план и --go завершались с кодом 0 без вывода)
+const isMain = (() => {
+  try {
+    return !!process.argv[1] && fs.realpathSync(process.argv[1]) === fs.realpathSync(new URL(import.meta.url));
+  } catch {
+    return false;
+  }
+})();
+if (isMain) {
   main().catch((e) => {
     log(`✗ ${e instanceof Stop ? 'стоп' : 'ошибка'}: ${e.message}`);
     process.exit(e instanceof Stop ? 2 : 1);
