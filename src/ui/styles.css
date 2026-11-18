@@ -796,3 +796,172 @@ canvas.gl.shifted, canvas.gl.unshifting { transform-origin: 0 0; transition: tra
 .ui.sheet-open .dock .paw-l { color: var(--green-text); text-shadow: none; }
 /* дом и открытый лист: пузырь — ниже «На карту» и названия комнаты */
 .ui.sheet-open:has(> .home-hud:not(.hidden)) .bubble { top: calc(var(--safe-t) + 92px); }
+
+/* ═════════════════════ меню «как у Говорящего Тома» (feature 'ui.tomLayout', ui/tomMenu.ts, docs/ui/TOM_LAYOUT.md) ═════════════════════
+   Колонки круглых кнопок у краёв (слева «Ласка», справа «Трюки/Образ»), кот — в центре; снизу док: звук · «Мой дом» ·
+   микрофон · «Игры» · «Ещё»; дома над доком — ряд комнаты. Позиции колонок считает tomLayout.ts (мимо кота, safe-area). */
+.tom { position: absolute; inset: 0; z-index: 3; pointer-events: none; font-family: var(--font); }
+.tom.hidden { display: none; }
+.tom-safe { position: absolute; left: 0; top: 0; width: 0; height: 0; visibility: hidden; pointer-events: none;
+  padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px); }
+.ui:not(.tom-play) .tom-col, .ui:not(.tom-play) .tom-tab, .ui:not(.tom-play) .tom-top, .ui:not(.tom-play) .tom-room { display: none; }
+.ui.tom-on .pawbtn { display: none; }
+
+/* колонка: кнопки стоят по ячейкам раскладки (left/top — из tomLayout) */
+.tom-col { position: absolute; pointer-events: auto; transition: transform .38s var(--ease-back), opacity .22s var(--ease); }
+.tom-col.none { display: none; }
+.tom.cols-out .tom-col.l { transform: translateX(calc(-100% - 28px)); opacity: 0; pointer-events: none; transition: transform .32s var(--ease), opacity .3s; }
+.tom.cols-out .tom-col.r { transform: translateX(calc(100% + 28px)); opacity: 0; pointer-events: none; transition: transform .32s var(--ease), opacity .3s; }
+.tom-col .tom-btn { position: absolute; animation: tomin .42s var(--ease-back) backwards; }
+.tom-col .tom-btn:nth-child(3) { animation-delay: .03s; } .tom-col .tom-btn:nth-child(4) { animation-delay: .06s; }
+.tom-col .tom-btn:nth-child(5) { animation-delay: .09s; } .tom-col .tom-btn:nth-child(6) { animation-delay: .12s; }
+.tom-col .tom-btn:nth-child(7) { animation-delay: .15s; }
+@keyframes tomin { from { opacity: 0; transform: scale(.6); } }
+.tom-head { position: absolute; left: -4px; right: -4px; top: -19px; text-align: center; font: 800 10px/1 var(--font); letter-spacing: .1em; text-transform: uppercase;
+  color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,.7); pointer-events: none; }
+
+/* круглая кнопка с короткой подписью (колонки, ряд комнаты, поповеры) */
+.tom-btn, .tom-dbtn { appearance: none; border: 0; background: none; padding: 0; margin: 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 4px;
+  color: #fff; font: 800 11.5px/1.1 var(--font); letter-spacing: -.005em; cursor: pointer; touch-action: manipulation; -webkit-touch-callout: none; }
+.tb-ico { position: relative; flex: none; width: var(--tom-btn, 56px); height: var(--tom-btn, 56px); border-radius: 50%; display: grid; place-items: center;
+  background: linear-gradient(180deg, #fff 0%, #eef5f1 100%); color: var(--green); box-shadow: 0 4px 0 rgba(0,0,0,.2), 0 8px 18px rgba(0,0,0,.24), inset 0 -2px 0 rgba(0,0,0,.04);
+  transition: transform var(--t-fast) var(--ease), box-shadow var(--t-fast); }
+.tb-ico svg { width: 52%; height: 52%; }
+.tb-l { max-width: calc(100% + 10px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 2px 5px 3px; letter-spacing: -.015em; border-radius: 8px;
+  background: rgba(4, 30, 36, .5); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); text-shadow: 0 1px 2px rgba(0,0,0,.35); }
+.tom-btn:active .tb-ico, .tom-dbtn:active .tb-ico { transform: translateY(3px); box-shadow: 0 1px 0 rgba(0,0,0,.2), 0 3px 8px rgba(0,0,0,.22); }
+.tom-btn.tapped .tb-ico, .tom-dbtn.tapped .tb-ico { animation: tombounce .5s var(--ease-back); }
+@keyframes tombounce { 0% { transform: scale(.8); } 45% { transform: scale(1.16); } 70% { transform: scale(.95); } 100% { transform: none; } }
+.tom-btn.nope .tb-ico, .tom-dbtn.nope .tb-ico { animation: tomnope .42s var(--ease); }
+@keyframes tomnope { 20% { transform: translateX(-5px) rotate(-5deg); } 45% { transform: translateX(5px) rotate(4deg); } 70% { transform: translateX(-3px); } }
+/* точка «новое» */
+.tom-btn.new .tb-ico::after, .tom-dbtn.new .tb-ico::after, .tom-tab.new::after { content: ''; position: absolute; top: 0; right: 0; width: 13px; height: 13px; border-radius: 50%;
+  background: #ff4f43; box-shadow: 0 0 0 2.5px #fff, 0 2px 4px rgba(0,0,0,.25); animation: tomdot 2.4s ease-in-out infinite; }
+@keyframes tomdot { 0%, 70%, 100% { transform: none; } 80% { transform: scale(1.25); } }
+/* неактивная: серая, с замочком */
+.tom-btn.dis .tb-ico, .tom-dbtn.dis .tb-ico { background: linear-gradient(180deg, #f1f4f3, #dfe6e3); color: #9aa8ad; box-shadow: 0 3px 0 rgba(0,0,0,.14), 0 6px 14px rgba(0,0,0,.16); }
+.tom-btn.dis .tb-ico::before, .tom-dbtn.dis .tb-ico::before { content: ''; position: absolute; right: -2px; bottom: -2px; width: 20px; height: 20px; border-radius: 50%;
+  background: #7d8b90 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fff' stroke-width='2.6' stroke-linecap='round'%3E%3Crect x='6' y='11' width='12' height='9' rx='2' fill='%23fff' stroke='none'/%3E%3Cpath d='M8.5 11V8.5a3.5 3.5 0 0 1 7 0V11'/%3E%3C/svg%3E") center / 13px no-repeat;
+  box-shadow: 0 0 0 2px #fff; }
+.tom-btn.dis .tb-l { opacity: .8; }
+
+/* цвета по смыслу: «Ласка» — тёплые, «Трюки» — зелёные, игры — синие, фирменные — золотые, «Образ» — фиолетовые */
+.tom-col.l .tb-ico { color: #e8663a; }
+.tom-btn[data-item="hug"] .tb-ico, .tom-btn[data-item="pet"] .tb-ico { color: #e85a6e; }
+.tom-btn[data-item="treat"] .tb-ico, .tom-btn[data-item="home:treat"] .tb-ico { color: #2f7fd0; }
+.tom-btn[data-item="dance"] .tb-ico, .tom-btn[data-item="home:dance"] .tb-ico, .tom-btn[data-item="echo"] .tb-ico { color: #8a5ad6; }
+.tom-btn[data-item="flip"] .tb-ico { color: var(--green); }
+.tom-btn[data-item="skate"] .tb-ico, .tom-btn[data-item="glass"] .tb-ico, .tom-btn[data-item="cocoa"] .tb-ico, .tom-btn[data-item="home:cocoa"] .tb-ico,
+.tom-btn[data-item="bubbles"] .tb-ico, .tom-btn[data-item="mirror"] .tb-ico { color: #c77800; background: linear-gradient(180deg, #fffaf0, #ffeccb); box-shadow: 0 4px 0 #d9a648, 0 8px 18px rgba(0,0,0,.24); }
+.tom-btn[data-item="ui:paint"] .tb-ico, .tom-btn[data-item="ui:paint_erase"] .tb-ico { color: #d0407a; }
+.tom-btn[data-item="other"] .tb-ico { color: var(--teal); }
+.tom-btn[data-item="riddle"] .tb-ico { color: #2f7fd0; }
+.tom-btn.tom-more .tb-ico { color: var(--ink-2); background: rgba(255,255,255,.86); }
+.tom-btn.dis .tb-ico { color: #9aa8ad !important; background: linear-gradient(180deg, #f1f4f3, #dfe6e3) !important; box-shadow: 0 3px 0 rgba(0,0,0,.14), 0 6px 14px rgba(0,0,0,.16) !important; }
+
+/* язычок у края: колонка уехала — тап возвращает */
+.tom-tab { position: absolute; display: none; width: 22px; border: 0; padding: 0; place-items: center; pointer-events: auto; cursor: pointer;
+  background: rgba(255,255,255,.92); color: var(--green); box-shadow: 0 6px 16px rgba(0,0,0,.25); animation: tomtab .3s var(--ease-back); }
+.tom-tab svg { width: 16px; height: 16px; }
+.tom-tab.l { left: 0; border-radius: 0 16px 16px 0; }
+.tom-tab.r { right: 0; border-radius: 16px 0 0 16px; }
+.tom.cols-out .tom-tab:not(.none), .tom-tab.forced:not(.none) { display: grid; }
+.tom-tab.new::after { top: -5px; right: auto; left: 4px; width: 11px; height: 11px; }
+.tom-tab.r.new::after { left: auto; right: 4px; }
+@keyframes tomtab { from { transform: scaleX(0); } }
+.tom-tab.l { transform-origin: 0 50%; } .tom-tab.r { transform-origin: 100% 50%; }
+
+/* сверху: прогресс «открыто N из M» */
+.tom-top { position: absolute; top: calc(var(--safe-t) + 12px); left: calc(var(--safe-l) + 12px); pointer-events: auto; }
+.tom-prog { appearance: none; border: 0; display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 12px 0 5px; border-radius: 999px; cursor: pointer;
+  background: rgba(255,255,255,.94); color: var(--ink); font: 800 15px/1 var(--font); font-variant-numeric: tabular-nums; box-shadow: 0 3px 0 rgba(0,0,0,.12), 0 6px 16px rgba(0,0,0,.2); }
+.tp-ico { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; color: #fff; background: linear-gradient(180deg, #ffc84a, #f0a000); box-shadow: inset 0 -2px 0 rgba(0,0,0,.12); }
+.tp-ico svg { width: 17px; height: 17px; }
+.tom-prog:active { transform: translateY(2px); }
+
+/* док: звук · «Мой дом» · микрофон · «Игры» · «Ещё» */
+.ui.tom-on .dock { grid-template-columns: 1fr auto var(--mic) auto 1fr; gap: 14px; }
+.ui.tom-on .dock .side-l { justify-self: end; margin: 0; width: 46px; height: 46px; }
+.tom-gear { justify-self: start; width: 46px; height: 46px; }
+.tom-gear svg { width: 24px; height: 24px; }
+.tom-gear.hidden { visibility: hidden; }
+.tom-gear.on { background: linear-gradient(180deg, #34c252, #21a038); color: #fff; }
+.tom-dbtn { min-width: 60px; --tom-btn: 54px; }
+.tom-dbtn .tb-l { background: none; -webkit-backdrop-filter: none; backdrop-filter: none; padding: 0; text-shadow: 0 1px 3px rgba(0,0,0,.75); }
+.tom-games .tb-ico { color: #2f7fd0; }
+.tom-home .tb-ico { color: var(--green); }
+.tom-dbtn.on .tb-ico { background: linear-gradient(180deg, #34c252, #21a038); color: #fff; box-shadow: 0 4px 0 #13742a, 0 8px 18px rgba(0,0,0,.22); }
+.tom-dbtn.attn .tb-ico { animation: actattn 1.2s var(--ease) 3; }
+.dock.no-play .tom-dbtn, .dock.no-play .tom-gear { opacity: .45; filter: grayscale(.7); }
+
+/* дома: «На карту» — в доке (кнопка HomeMode сверху не нужна), стрелки комнат — по краям ряда комнаты */
+.ui.tom-on .home-back { display: none; }
+.tom-room { position: absolute; left: 0; right: 0; bottom: var(--tom-room-b, 120px); height: 76px; display: flex; justify-content: center; align-items: flex-start; gap: 22px; pointer-events: none; }
+.tom-room.hidden { display: none; }
+.tom-room .tom-btn { position: relative; width: 78px; pointer-events: auto; --tom-btn: 56px; animation: pop .4s var(--ease-back) backwards; }
+.tom-room .tom-btn:nth-child(2) { animation-delay: .06s; }
+.tom-room .tom-btn .tb-ico { box-shadow: 0 4px 0 rgba(0,0,0,.2), 0 8px 18px rgba(0,0,0,.24), 0 0 0 4px rgba(255,255,255,.55); }
+.tom-room .tom-btn .tb-l { background: rgba(255,255,255,.94); color: var(--green-text); text-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; box-shadow: 0 2px 6px rgba(0,0,0,.15); }
+.ui.tom-on.tom-room-on .home-arrow { top: auto; bottom: calc(var(--tom-room-b, 120px) + 22px); width: 48px; height: 48px; padding: 0; border-radius: 50%; background: rgba(255,255,255,.94);
+  box-shadow: 0 4px 0 rgba(0,0,0,.16), 0 8px 18px rgba(0,0,0,.22); }
+.ui.tom-on.tom-room-on .home-arrow.l { left: calc(var(--safe-l) + 12px); }
+.ui.tom-on.tom-room-on .home-arrow.r { right: calc(var(--safe-r) + 12px); }
+.ui.tom-on.tom-room-on .home-arrow .ha-ico { display: none; }
+
+/* чипы кота — сразу над доком (дома — над рядом комнаты), между колонками */
+.ui.tom-on .stack { bottom: var(--tom-chips-b, var(--dock-h)); padding-bottom: 0; gap: 8px; }
+.ui.tom-on .stack .mic-hint { position: absolute; bottom: calc(100% + 6px); left: 0; right: 0; margin: 0 auto; width: max-content; }
+.ui.tom-on .chips.suggest .sug { min-height: 50px; }
+.ui.tom-on.tom-room-on .stack { left: var(--tom-free-l, 0px); right: var(--tom-free-r, 0px); padding-left: 0; padding-right: 0; }
+.ui.tom-on .bubble { top: calc(var(--safe-t) + 58px); left: calc(var(--tom-free-l, 16px) + 4px); right: calc(var(--tom-free-r, 16px) + 4px); font-size: var(--fs-m); }
+.ui.tom-on.home-on .bubble { top: calc(var(--safe-t) + 66px); }
+
+/* поповер «Игры» / «Ещё» / хвост колонки */
+.tom-pop { position: absolute; z-index: 6; padding: 10px 10px 6px; border-radius: 24px; background: var(--surface); color: var(--ink); pointer-events: auto;
+  box-shadow: 0 6px 0 rgba(0,0,0,.08), var(--sh-3); animation: pop .3s var(--ease-back); }
+.tom-pop.hidden { display: none; }
+.tom-pop-t { margin: 0 6px 8px; font: 800 12px/1 var(--font); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-2); }
+.tom-pop-g { display: grid; grid-template-columns: repeat(var(--n, 3), 72px); gap: 8px 4px; }
+.tom-pop .tom-btn { width: 72px; color: var(--ink); --tom-btn: 52px; }
+.tom-pop .tb-ico { background: linear-gradient(180deg, #f3f8f5, #e4efe9); box-shadow: 0 3px 0 #cfded5; }
+.tom-pop .tb-l { background: none; -webkit-backdrop-filter: none; backdrop-filter: none; text-shadow: none; padding: 0 2px; white-space: normal; text-align: center; line-height: 1.15; max-height: 2.4em; }
+.tom-pop .tom-btn.new .tb-ico::after { box-shadow: 0 0 0 2.5px var(--surface); }
+
+/* подсказка долгого нажатия */
+.tom-tip { position: absolute; z-index: 7; max-width: 230px; padding: 9px 13px; border-radius: 16px; background: #fff; color: var(--ink); font: 700 14px/1.3 var(--font);
+  box-shadow: 0 4px 0 rgba(0,0,0,.08), 0 10px 26px rgba(0,0,0,.28); pointer-events: none; animation: pop .25s var(--ease-back); }
+.tom-tip.hidden { display: none; }
+
+@media (max-width: 370px) and (orientation: portrait) {
+  .ui.tom-on .dock { gap: 9px; }
+  .tom-dbtn { min-width: 54px; --tom-btn: 50px; font-size: 11px; }
+  .ui.tom-on .dock .side-l, .tom-gear { width: 42px; height: 42px; }
+  .tom-btn { font-size: 11px; }
+}
+@media (max-height: 700px) and (orientation: portrait) {
+  .tom-dbtn { --tom-btn: 50px; }
+}
+/* альбомная: док и чипы — снизу между колонками (а не справа, как без меню) */
+@media (orientation: landscape) and (max-height: 520px) {
+  .ui.tom-on .dock { left: var(--tom-free-l, 160px); right: var(--tom-free-r, 160px); top: auto; bottom: 0; width: auto; gap: 12px;
+    padding: 6px 4px calc(8px + var(--safe-b)); grid-template-columns: 1fr auto var(--mic) auto 1fr; grid-template-rows: none; justify-items: initial;
+    background: none; }
+  .ui.tom-on .dock .side-l { justify-self: end; align-self: center; margin: 0; }
+  .ui.tom-on .dock .tom-gear { justify-self: start; align-self: center; }
+  .tom-dbtn { --tom-btn: 48px; }
+  .ui.tom-on .stack { left: var(--tom-free-l, 160px); right: var(--tom-free-r, 160px); width: auto; max-height: none; align-items: center; padding: 0; }
+  .ui.tom-on .stack .mic-hint { align-self: center; }
+  .tom-head { display: none; }
+  .tom-room { left: var(--tom-free-l, 160px); right: var(--tom-free-r, 160px); height: 76px; gap: 28px; }
+  .tom-room .tom-btn { --tom-btn: 50px; width: 70px; }
+  .ui.tom-chips-on .tom.land .tom-room { visibility: hidden; }
+  .tom-btn { font-size: 11px; }
+  .tb-l { padding: 2px 4px 3px; }
+  .ui.tom-on.tom-room-on .home-arrow.l { left: calc(var(--tom-free-l, 160px) + 4px); }
+  .ui.tom-on.tom-room-on .home-arrow.r { right: calc(var(--tom-free-r, 160px) + 4px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tom-col, .tom-col .tom-btn, .tom-btn.new .tb-ico::after { animation: none; transition: none; }
+}
+.tom-col.sm .tom-btn { font-size: 10.5px; }
+.tom-col.sm .tb-l { padding: 2px 4px 3px; }

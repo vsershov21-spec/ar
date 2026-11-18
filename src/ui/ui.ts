@@ -13,6 +13,7 @@ import { CAT_ICON } from './catalogIcons';
 import { collection as stickerCollection } from '../fx/stickerPack';
 import { feature } from '../config/edition';
 import { GROUP_META, RecentStore, groupCatalog, oftenGroup, type CatalogGroup } from './catalogGroups';
+import { TomMenu, type TomUiCtx } from './tomMenu';
 
 export interface UiHandlers {
   onWake(): void;
@@ -42,6 +43,8 @@ export interface UiHandlers {
   onCatalogLayout?(free: { top: number; bottom: number; left: number; right: number } | null): void;
   /** пункты сверх каталога (комнаты дома, «Сдёрнуть наклейки» на десктопе): раздел — для группы по умолчанию */
   extraItems?(): { item: CatalogItem; section: string }[];
+  /** меню «как у Тома» (feature 'ui.tomLayout'): где кот (дом, комната) и чем он занят (сцена, раскраска, сон) */
+  uiContext?(): TomUiCtx;
 }
 
 /** вариант в листе выбора характера */
@@ -345,6 +348,37 @@ export class UI {
     this.watchKeyboard();
     this.obSwipe();
     this.catalogGestures();
+    // меню «как у Говорящего Тома» (feature 'ui.tomLayout'): колонки у краёв вместо листа «Что умею» (ui/tomMenu.ts)
+    if (feature('ui.tomLayout') && h.onCatalogPick && h.catalog) {
+      this.tom = new TomMenu({
+        root, dock: this.dock, micSlot: this.micSlot,
+        groups: () => this.catalogGroups(),
+        ctx: () => h.uiContext?.() ?? { home: null, busy: null },
+        catRect: () => this.catRect(),
+        tried: this.tried, recent: this.recent,
+        icon: (id) => this.catIcon(id),
+        pick: (it) => {
+          this.nudge(null);
+          h.onCatalogPick?.(it);
+        },
+        hint: (t) => this.micHintText(t),
+        playing: () => this.playSeen,
+        scenarioQuiet: () => !this.chipsByScenario,
+      });
+      this.syncTom();
+    }
+  }
+
+  /** меню «как у Тома»; null — выключено (MVP) */
+  tom: TomMenu | null = null;
+  /** меню «как у Тома» сейчас на экране (десктоп-панель забирает его место — там всё как было) */
+  get tomOn() {
+    return !!this.tom?.active;
+  }
+  private syncTom() {
+    if (!this.tom) return;
+    this.tom.setOn(!this.deskToggle);
+    if (this.tom.active && this.catalogOpen) this.closeCatalog();
   }
 
   /** клавиатура: лист имени поднимается к ней (iOS не сжимает layout viewport) */
@@ -516,12 +550,14 @@ export class UI {
     this.syncChips();
   }
   private syncChips() {
+    this.syncTom();
     const on = this.chipsByScenario;
     if (!on) {
       this.closeCatalog();
       this.nudge(null);
     }
     this.chips.classList.toggle('hidden', !on || this.catalogOpen || !this.sugCount);
+    this.root.classList.toggle('tom-chips-on', !this.chips.classList.contains('hidden'));
     if (on) this.playSeen = true;
     this.dock.classList.toggle('no-play', !this.playSeen);
     if (on) this.syncMoreDot();
@@ -530,6 +566,7 @@ export class UI {
   // ───────────── чипы-предложения кота ─────────────
   /** до двух чипов от кота (scenario/suggest.ts); перерисовка — только когда набор сменился */
   setSuggestions(chips: Chip[]) {
+    if (this.tom) chips = this.tom.filterChips(chips);
     const key = chips.map((c) => `${c.id}:${c.label}`).join('|');
     if (key === this.sugKey) return;
     this.sugKey = key;
@@ -590,14 +627,15 @@ export class UI {
     void this.chips.offsetWidth;
     this.chips.classList.add('attn');
     if (mode === 'soft') {
-      this.pawBtn.classList.remove('attn');
-      void this.pawBtn.offsetWidth;
-      this.pawBtn.classList.add('attn');
+      const pb = this.tomOn ? this.tom!.gamesBtn : this.pawBtn;
+      pb.classList.remove('attn');
+      void pb.offsetWidth;
+      pb.classList.add('attn');
       el.classList.add('hidden');
       return;
     }
     const first = this.chips.querySelector('.sug') as HTMLElement | null;
-    const target = first && !this.chips.classList.contains('hidden') ? first : this.pawBtn;
+    const target = first && !this.chips.classList.contains('hidden') ? first : this.tomOn ? this.tom!.gamesBtn : this.pawBtn;
     const r = target.getBoundingClientRect(), root = this.root.getBoundingClientRect();
     el.style.left = `${Math.round(r.left - root.left + Math.min(r.width * 0.5, 44))}px`;
     el.style.top = `${Math.round(r.top - root.top + r.height * 0.55)}px`;
@@ -631,7 +669,7 @@ export class UI {
     this.pawBtn.classList.toggle('new', n.tried < n.total);
   }
   get isCatalogOpen() {
-    return this.catalogOpen;
+    return this.catalogOpen || !!this.tom?.popOpen;
   }
 
   // ───────────── лист каталога (телефон, feature 'catalog.sheet') и общие группы с десктоп-панелью ─────────────
@@ -822,6 +860,8 @@ export class UI {
   /** каталог на месте чипов: крупные вкладки-разделы и один ряд иконок; кот и пузырь остаются видны. В конце — «Ещё» */
   openCatalog(tab?: SectionId) {
     if (this.deskToggle) return this.deskToggle();
+    // меню «как у Тома»: листа нет — колонки выезжают из-за края
+    if (this.tomOn) return this.tom!.reveal();
     if (this.sheetMode) return this.openSheet();
     const c = this.h.catalog?.();
     if (!c || !c.sections.length) return;
@@ -854,6 +894,7 @@ export class UI {
     this.layoutBubble();
   }
   closeCatalog() {
+    this.tom?.closePop();
     if (!this.catalogOpen) return;
     this.catalogOpen = false;
     clearTimeout(this.sheetIdle);
@@ -1126,8 +1167,11 @@ export class UI {
       return;
     }
     const pad = 16;
-    const spaceL = cat.cx - cat.half - pad - gap;
-    const spaceR = W - (cat.cx + cat.half) - pad - gap;
+    // меню «как у Тома»: сбоку от кота — только между колонками
+    const fr = this.tomOn ? this.tom!.layout?.free : null;
+    const x0 = fr ? fr.left - pad + 4 : 0, x1 = fr ? fr.right + pad - 4 : W;
+    const spaceL = cat.cx - cat.half - pad - gap - x0;
+    const spaceR = x1 - (cat.cx + cat.half) - pad - gap;
     const side = spaceR >= spaceL ? 'r' : 'l';
     const space = Math.min(300, Math.max(spaceL, spaceR));
     if (space < 150) return; // некуда — остаётся сверху (кот крупно, пузырь короткий)
@@ -1166,6 +1210,8 @@ export class UI {
   }
   /** подсказка над микрофоном; tone 'warn' — ошибка (нет доступа и т. п.) */
   micHintText(t: string, tone: 'info' | 'warn' = 'info') {
+    // меню «как у Тома»: лапки «Что умею» нет — кнопки по краям экрана
+    if (this.tomOn) t = t.replace(/жми лапку/g, 'жми кнопки по краям');
     this.micHint.textContent = t;
     this.micHint.classList.toggle('show', !!t);
     this.micHint.classList.toggle('warn', tone === 'warn');

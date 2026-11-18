@@ -43,4 +43,11 @@ export const CAT_ICON: Record<string, string> = {
   paint: S('<path d="M14.5 4.5l5 5-7.6 7.6a2.4 2.4 0 0 1-1.7.7H7.5v-2.7c0-.6.3-1.2.7-1.7z" fill="currentColor" fill-opacity=".2"/><path d="M12 7l5 5"/><path d="M7.5 17.8c-.4 1.6-1.6 2.7-3.5 2.7.3-1.9.9-3.2 2.4-3.9" fill="currentColor"/>'),
   eraser: S('<path d="M4.5 15.5l9-9a2 2 0 0 1 2.8 0l3.2 3.2a2 2 0 0 1 0 2.8l-7.5 7.5H8.5z" fill="currentColor" fill-opacity=".2"/><path d="M9 11l5.5 5.5M8.5 20h11"/>'),
   gear: S('<circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v2.6M12 18.6v2.6M2.8 12h2.6M18.6 12h2.6M5.5 5.5l1.9 1.9M16.6 16.6l1.9 1.9M5.5 18.5l1.9-1.9M16.6 7.4l1.9-1.9"/>'),
+  // меню «как у Тома» (ui/tomMenu.ts): игры (джойстик), «ещё» (три точки), солнышко «разбудить», язычки колонок, звезда прогресса
+  games: S('<path d="M7.5 7.5h9a4.5 4.5 0 0 1 4.4 5.4l-.8 3.9a2.3 2.3 0 0 1-4 1L14.5 16h-5L7.9 17.8a2.3 2.3 0 0 1-4-1l-.8-3.9A4.5 4.5 0 0 1 7.5 7.5z" fill="currentColor" fill-opacity=".2"/><path d="M8 10.5v3M6.5 12h3"/><path d="M15.5 11h.01M17.5 13h.01" stroke-width="3"/>'),
+  dots: F('<circle cx="5.5" cy="12" r="2.3"/><circle cx="12" cy="12" r="2.3"/><circle cx="18.5" cy="12" r="2.3"/>'),
+  sun: S('<circle cx="12" cy="12" r="4" fill="currentColor" fill-opacity=".25"/><path d="M12 2.8v2.4M12 18.8v2.4M2.8 12h2.4M18.8 12h2.4M5.5 5.5l1.7 1.7M16.8 16.8l1.7 1.7M5.5 18.5l1.7-1.7M16.8 7.2l1.7-1.7"/>'),
+  chev_l: S('<path d="M14.5 5.5 8 12l6.5 6.5"/>', 2.8),
+  chev_r: S('<path d="M9.5 5.5 16 12l-6.5 6.5"/>', 2.8),
+  trophy: F('<path d="M12 2.8l2.7 5.6 6.1.8-4.5 4.2 1.1 6.1L12 16.6l-5.4 2.9 1.1-6.1-4.5-4.2 6.1-.8z"/>'),
 };

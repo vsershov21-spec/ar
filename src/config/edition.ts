@@ -59,6 +59,7 @@ export const FEATURES = {
   'pilot.switchCooldown': { mvp: false, lab: false, pilot: true, note: 'смена кота не чаще раза в 3 мин, иначе «Чуть позже!» (config/pilot.ts SwitchCooldown, director.switchGate)' },
   'glass.gestures': { mvp: false, lab: true, pilot: true, note: 'стекло пальцем у всех котов: свайп — царапины (claws + claws_glass), долгое нажатие мимо кота — стекло запотевает, рисуем пальцем (steam_draw) — app.ts bindInput' },
   analytics: { mvp: false, lab: true, pilot: true, note: 'воронка: события sendBeacon → POST /api/progress/event (src/analytics, docs/ANALYTICS.md); ?noanalytics — выкл.' },
+  'ui.tomLayout': { mvp: false, lab: true, pilot: true, note: 'меню «как у Говорящего Тома»: колонки кнопок у краёв (Ласка слева, Трюки/Образ справа), кот в центре, снизу микрофон, «Мой дом», «Игры», дома — действия комнаты; колонки прячутся к краю (ui/tomMenu.ts, ui/tomLayout.ts, docs/ui/TOM_LAYOUT.md). В MVP — прежний лист' },
   'card.paint': { mvp: false, lab: true, pilot: true, note: 'раскраска карты котом: предложение, лист цветов, рисунок на плоскости карты, память (src/card/paint.ts; app.ts applyEdition — точка входа)' },
   // ── только lab ──
   'games.new': { mvp: false, lab: true, pilot: false, note: 'мини-игры «Угадай рожицу», «Камень-ножницы», «Делай как я» (emo/rps/simon): persona/content.ts убирает их диалоги' },

@@ -40,6 +40,8 @@ import { feature } from './config/edition';
 import { SWITCH_LATER_TEXT, SwitchCooldown, cutRedirect, fxAllowed } from './config/pilot';
 import { track } from './analytics';
 import { startCardPaint, type CardPaint } from './card/paint';
+import { paintBlocked } from './card/paintPlan';
+import type { TomUiCtx } from './ui/tomMenu';
 import { NO_SHIFT, fitShift, shiftCss, shiftPoint, unshiftPoint, type ViewShift } from './ui/catalogGroups';
 import { ZONES } from './home/zones';
 import { OrbitPointers, OrbitView, bindOrbitKeys, bindOrbitWheel, isDesktopView, isTouchDevice, noCardCameraOff, showOrbitHint, type ViewPose } from './input/orbit';
@@ -219,6 +221,8 @@ export class App {
       // лист каталога открыт — кот уезжает в область над ним (ui/catalogGroups.ts fitShift), закрыт — обратно
       onCatalogLayout: (free) => this.setShiftArea(free),
       extraItems: () => this.extraItems(),
+      // меню «как у Тома» (ui/tomMenu.ts): комната дома, сон, раскраска, сцены — колонки прячутся на время сцен
+      uiContext: () => this.uiContext(),
       onSkipName: () => this.director.dispatch({ type: 'skip_name' }),
       onShakeButton: () => this.input.simulateShake(),
       onKids: () => {
@@ -674,6 +678,15 @@ export class App {
     // «Раскрасить карту» / «Стереть рисунок» — вкладка «Образ» (вне карты кот попросит её показать)
     if (this.paint) for (const it of this.paint.catalogItems()) out.push({ item: it, section: 'magic' });
     return out;
+  }
+  /** для меню «как у Тома» (feature ui.tomLayout): где кот и чем занят */
+  uiContext(): TomUiCtx {
+    const home = this.home, d = this.director;
+    const zone = home?.phase === 'home' ? home.zone : null;
+    const sleeping = !!d?.dozing || home?.bed?.state === 'asleep';
+    const busy: TomUiCtx['busy'] = this.awake?.active ? 'awake' : this.paint?.painting || this.paint?.sheetOpen ? 'paint'
+      : home && (home.phase === 'to_home' || home.phase === 'to_ar' || home.moving) ? 'cutscene' : sleeping ? 'sleep' : null;
+    return { home: zone, sleeping, paintBlocked: this.paint ? paintBlocked(this.paint.where()) !== null : true, busy };
   }
   runCatalogItem(item: CatalogItem) {
     this.input.activity();
