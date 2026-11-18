@@ -4,7 +4,7 @@
  * и голеней выталкиваются из «объёмов» (прокси) тела.
  *
  * Прокси (в системе своей кости, едут вместе с ней), docs/animations/COLLISION.md:
- *  1. public/models/<кот>_colliders.json (экспорт модельщика) — если есть, главнее всего;
+ *  1. public/models/v2/<кот>_colliders.json (экспорт модельщика) — если есть, главнее всего;
  *  2. из меша в позе покоя: вершины, у которых главная кость — таз/спина/шея/голова, дают эллипсоиды торса, шеи и головы;
  *     меши одежды по имени (Cap_*, Headphones_*, Scarf_*, Bow_*, Skirt_*) — свой эллипсоид каждый; бёдра и голени —
  *     капсулы по вершинам ног; уши — капсулы по костям Ear;
@@ -45,7 +45,7 @@ export interface Pocket {
   r: number;
 }
 
-/** формат public/models/<кот>_colliders.json — координаты в пространстве модели (рост 1, поза покоя) */
+/** формат public/models/v2/<кот>_colliders.json — координаты в пространстве модели (рост 1, поза покоя) */
 export interface CollidersJson {
   version?: number;
   volumes?: { name: string; bone: string; type: 'ellipsoid' | 'capsule' | 'hull'; center?: number[]; radii?: number[]; a?: number[]; b?: number[]; r?: number; points?: number[][]; mesh?: string }[];
@@ -186,7 +186,7 @@ export class BodyCollider {
     private legMargin = 0.03,
   ) {}
 
-  /** вызвать один раз после загрузки, модель в позе покоя; json — public/models/<кот>_colliders.json, если есть */
+  /** вызвать один раз после загрузки, модель в позе покоя; json — public/models/v2/<кот>_colliders.json, если есть */
   build(model: THREE.Object3D, json?: CollidersJson | null): string[] {
     model.updateMatrixWorld(true);
     this.proxies = [];

@@ -6,7 +6,7 @@ import path from 'node:path';
 import { optimizeModels } from './model-opt.mjs';
 
 /** какие модели сжимаем: персонажи и реквизит (библиотека движений anims_v1.glb уже meshopt — без изменений) */
-const PICK = (rel) => /^models\/(props\/)?[\w.-]+\.glb$/.test(rel) && !/^models\/(anims_|character\.glb)/.test(rel);
+const PICK = (rel) => /^models\/(props\/|v2\/)?[\w.-]+\.glb$/.test(rel) && !/^models\/(anims_|character\.glb)/.test(rel);
 
 /** emit: false — только карта путей (сборка lab, docs/EDITIONS.md: сжатые модели уже лежат в dist/models/opt от mvp) */
 export function modelOpt({ emit = true } = {}) {

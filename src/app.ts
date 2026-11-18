@@ -29,6 +29,7 @@ import { personaMeta } from './character/personaMeta';
 import { CardMonitor, LumaSampler, cardScreenFrac, type CardEvent } from './tracker/cardMonitor';
 import { perf, AdaptiveQuality, type QualityLevel } from './core/perf';
 import { prefetchModel, warmModel } from './core/modelUrl';
+import { variantGlb } from './character/modelVariant';
 import { loadMemory } from './scenario/memory';
 import { progressReady } from './progress';
 import { PERSONA_IDS } from './persona/types';
@@ -85,7 +86,7 @@ export async function makeCharacter(mode: CharacterMode, personaId = ''): Promis
   if (mode === 'glb') {
     const { GlbCharacter } = await import('./character/glbCharacter');
     const custom = new URLSearchParams(location.search).get('glb');
-    const own = (ASSETS.glbByPersona as Record<string, string>)[personaId] ?? ASSETS.glb;
+    const own = variantGlb((ASSETS.glbByPersona as Record<string, string>)[personaId] ?? ASSETS.glb);
     return new GlbCharacter(custom && /^[\w./-]+\.glb$/.test(custom) ? custom : own, ASSETS.glbAnims);
   }
   return new SpriteCharacter(ASSETS.spriteManifest);
@@ -241,7 +242,7 @@ export class App {
     if (p.character === 'glb' && !new URLSearchParams(location.search).get('glb')) {
       const sp = new URLSearchParams(location.search), qc = sp.get('cat') ?? sp.get('char');
       const own = (ASSETS.glbByPersona as Record<string, string>)[(isPersonaId(qc) ? qc : loadMemory().persona) ?? PERSONA_IDS[0]];
-      if (own) prefetchModel(own, 'high');
+      if (own) prefetchModel(variantGlb(own), 'high');
       prefetchModel(ASSETS.glbAnims, 'high');
       void import('./character/glbCharacter').catch(() => undefined);
     }
@@ -894,7 +895,7 @@ export class App {
     this.warmed = true;
     const cur = this.director.persona.id;
     const run = () => {
-      for (const [id, url] of Object.entries(ASSETS.glbByPersona as Record<string, string>)) if (id !== cur) warmModel(url);
+      for (const [id, url] of Object.entries(ASSETS.glbByPersona as Record<string, string>)) if (id !== cur) warmModel(variantGlb(url));
     };
     const ric = (window as any).requestIdleCallback as ((cb: () => void, o?: { timeout: number }) => void) | undefined;
     setTimeout(() => (ric ? ric(run, { timeout: 5000 }) : run()), 20000);

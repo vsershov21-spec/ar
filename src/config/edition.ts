@@ -72,6 +72,7 @@ export const FEATURES = {
   'card.anycard': { mvp: false, lab: true, pilot: false, note: '?anycard — кот садится на любой прямоугольник (без проверки «это карта Сбера»)' },
   'card.grabExperimental': { mvp: false, lab: true, pilot: false, note: '?grab=bitmap|frame — экспериментальная подача кадра в воркер (cardTracker); ?grab=main остаётся' },
   'model.custom': { mvp: false, lab: true, pilot: false, note: '?glb=путь — своя модель вместо кота' },
+  'model.v2': { mvp: false, lab: true, pilot: false, note: '?models=v2 — коты v2 (public/models/v2: голова по рефам, наушники, фатин, коллайдеры) вместо v1; по умолчанию везде v1 (character/modelVariant.ts)' },
 } as const satisfies Record<string, FeatureSpec>;
 
 export type FeatureId = keyof typeof FEATURES;
@@ -104,6 +105,7 @@ export const PARAMS: Record<string, { feature: FeatureId; test?: boolean; keep?:
   anycard: { feature: 'card.anycard' },
   grab: { feature: 'card.grabExperimental', keep: ['main'] },
   glb: { feature: 'model.custom' },
+  models: { feature: 'model.v2', test: true }, // ?models=v2 — коты v2 (lab и /test), character/modelVariant.ts
   meshy: { feature: 'anims.meshy' }, // ?meshy=0 — lab без клипов Meshy (сравнить с опорами)
   meshyreport: { feature: 'anims.meshy', test: true }, // ?meshyreport — таблица клипов Meshy во вкладке «Тест» (ui/deskPanel.ts)
 };

@@ -1,5 +1,13 @@
 # Модели котов v2 (19.11): форма головы, мягкий мех, одежда — отдельные детали, без проникновений
 
+> **19.11, откат:** в приложении v2 выглядел хуже v1 (темнее, грязный мех, мелкие «сонные» глаза, тонкое кольцо наушников,
+> серый шум вместо фатина). По умолчанию во всех редакциях снова v1 — модели bb768e9 и мех/тон/лицо как на 841b373.
+> v2 лежит рядом: `public/models/v2/<кот>_v2.glb` + `public/models/v2/<кот>_colliders.json` (прокси связаны с геометрией;
+> у v1 файла нет — прокси из меша в рантайме) и включается только `?models=v2` (lab и /test; `character/modelVariant.ts`,
+> функция `model.v2`). Значения меха/тона/лица v2 — там же по параметру (`FUR_V2` в furShell.ts, нос в furTone.ts,
+> румянец в faceWrinkles.ts, `PERSONA_FACE_V2`). Сравнение в приложении: `node tools/model-ab-shot.mjs <out>` →
+> `v2b_app_<кот>.png` (слева v1, справа v2).
+
 Сборка из GLB после `body_detail.py` (для текущих моделей — `git show bb768e9^:public/models/<cat>_v1.glb` → `<base>/<cat>.glb`):
 
     sh scripts/models/build_v2.sh <base> <out> [hooligan kind glitter]     # POSES=rest — проверка только в покое
@@ -28,7 +36,7 @@
 8. `penetration.py` — проверка (сетка против сетки, Möller–Trumbore, cKDTree): покой и крайние позы anims_v1 →
    `docs/models/penetration_<cat>.md` (+ png худшего места); `--pose-json` — позы клипов после рантайм-коррекции
    (`tools/collide-probe.html`, BodyCollider с нашими прокси) → `docs/models/hands_<cat>.md`.
-9. `colliders.py` — `public/models/<cat>_colliders.json` в формате docs/animations/COLLISION.md: голова, уши, кепка (hull),
+9. `colliders.py` — `public/models/v2/<cat>_colliders.json` в формате docs/animations/COLLISION.md: голова, уши, кепка (hull),
    шея, туловище, капюшон, наушники (чашки — капсулы по оси, дуга — цепочка капсул, +8 мм), шарф (кольцо + хвост),
    бант (hull), юбка-фатин (hull), бёдра/голени, карманы (входы «кенгуру»).
 

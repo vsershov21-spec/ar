@@ -3,6 +3,8 @@
 # тон одежды → мех → одежда отдельными мешами → проверка проникновений → коллайдеры.
 #   sh scripts/models/build_v2.sh <base_dir> <out_dir> [cat…]
 # base_dir/<cat>.glb — GLB после body_detail.py (для текущих моделей: git show bb768e9^:public/models/<cat>_v1.glb).
+# Результат — out_dir/<cat>_v2.glb + <cat>_colliders.json → public/models/v2/ (только ?models=v2, lab и /test;
+# по умолчанию приложение грузит v1 — public/models/<cat>_v1.glb).
 set -e
 cd "$(dirname "$0")"
 BASE=$1; OUT=$2; shift 2
@@ -17,7 +19,7 @@ for c in $CATS; do
   if [ $c = glitter ]; then python3 tulle.py $c "$OUT/${c}_2un.glb" "$OUT/${c}_2un.glb" --fit; fi
   python3 outfit_tone.py $c "$OUT/${c}_2un.glb" "$OUT/${c}_2un.glb"
   python3 fur_volume.py $c "$OUT/${c}_2un.glb" "$OUT/${c}_3fur.glb" --anims "$OUT/anims_raw.glb"
-  python3 split_parts.py $c "$OUT/${c}_3fur.glb" "$OUT/${c}_v1.glb"
-  python3 penetration.py $c "$OUT/${c}_v1.glb" "$OUT/anims_raw.glb" "$OUT/penetration_$c.md" --img "$OUT" ${POSES:+--poses $POSES}
-  python3 colliders.py $c "$OUT/${c}_v1.glb" "$OUT/${c}_colliders.json" || true
+  python3 split_parts.py $c "$OUT/${c}_3fur.glb" "$OUT/${c}_v2.glb"
+  python3 penetration.py $c "$OUT/${c}_v2.glb" "$OUT/anims_raw.glb" "$OUT/penetration_$c.md" --img "$OUT" ${POSES:+--poses $POSES}
+  python3 colliders.py $c "$OUT/${c}_v2.glb" "$OUT/${c}_colliders.json" || true
 done

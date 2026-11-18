@@ -30,6 +30,7 @@ import { FaceMixer, EMOTE_FACE, MORPH_TARGETS, facePreset, type FacePreset } fro
 import { EyeRig } from './eyeRig';
 import { FaceWrinkles } from './faceWrinkles';
 import { FurTone } from './furTone';
+import { collidersUrl, modelsV2 } from './modelVariant';
 import { MouthRig } from './mouthRig';
 import { personaMeta } from './personaMeta';
 import type { AnchorName } from '../fx/core';
@@ -122,6 +123,10 @@ export const TRIPO_ALIAS: Record<string, string[]> = {
 
 /** постоянный минимум весов лица по характеру (поверх пресета; хмурость его гасит) */
 const PERSONA_FACE: Record<string, Record<string, number>> = {
+  glitter: { blush: 0.32, smile: 0.12 },
+};
+/** то же для моделей v2 (?models=v2): румянец Блёстки слабее — под персиковый тон faceWrinkles v2 */
+const PERSONA_FACE_V2: Record<string, Record<string, number>> = {
   glitter: { blush: 0.14, smile: 0.12 },
 };
 
@@ -351,7 +356,7 @@ export class GlbCharacter implements Character {
     this.collider.legacy = cm === 'legacy';
     this.collider.enabled = cm !== '0';
     console.info('[glb] объёмы тела', this.collider.build(model));
-    // прокси одежды от модельщика (public/models/<кот>_colliders.json, docs/animations/COLLISION.md): есть — главнее
+    // прокси одежды от модельщика (public/models/v2/<кот>_colliders.json, docs/animations/COLLISION.md): есть — главнее
     const restSnap: [THREE.Object3D, THREE.Quaternion, THREE.Vector3][] = [];
     model.traverse((o) => restSnap.push([o, o.quaternion.clone(), o.position.clone()]));
     void this.loadColliders(model, restSnap);
@@ -550,9 +555,11 @@ export class GlbCharacter implements Character {
     return { mm: worst.depth * CAT_MM, pair: worst.pair };
   }
 
-  /** public/models/<кот>_colliders.json рядом с моделью (models/hooligan_v1.glb → models/hooligan_colliders.json) */
+  /** коллайдеры модельщика рядом с моделью v2 (models/v2/hooligan_v2.glb → models/v2/hooligan_colliders.json); у v1 их нет */
   private async loadColliders(model: THREE.Object3D, restSnap: [THREE.Object3D, THREE.Quaternion, THREE.Vector3][]) {
-    const u = this.url.replace(/[^/]*$/, '') + (this.url.match(/([a-z]+)(?:_v\d+)?\.glb$/i)?.[1] ?? 'character') + '_colliders.json';
+    // только у моделей v2 (геометрия и прокси связаны); v1 — прокси из меша (как на 841b373), без запроса
+    const u = collidersUrl(this.url);
+    if (!u) return;
     try {
       const r = await fetch(asset(u));
       if (!r.ok) return;
@@ -821,7 +828,7 @@ export class GlbCharacter implements Character {
       W.blink_R = Math.max(W.blink_R ?? 0, f.blink);
     }
     // характер в покое (референс): у Блёстки всегда чуть розовые щёчки и мягкая полуулыбка
-    const base = PERSONA_FACE[this.personaId];
+    const base = (modelsV2() ? PERSONA_FACE_V2 : PERSONA_FACE)[this.personaId];
     if (base) for (const k in base) W[k] = Math.max(W[k] ?? 0, base[k] * (1 - (W.frown ?? 0)));
     // складки и мягкость: щёки поднимаются при улыбке, морщинка у носа при хмурых бровях
     W.cheek_up = Math.max(W.cheek_up ?? 0, 0.5 * (W.smile ?? 0), 0.3 * (W.smirk ?? 0));

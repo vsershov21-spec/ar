@@ -11,6 +11,7 @@
  * Brows, стадия face_detail) — светлая морда/щёки/подбородок/вокруг глаз, тёмная макушка. Стоимость — десяток ALU.
  */
 import * as THREE from 'three';
+import { modelsV2 } from './modelVariant';
 
 export interface FurToneParams {
   /** средний цвет меха в альбедо (sRGB 0..1) */
@@ -96,8 +97,9 @@ export class FurTone {
   }
 
   /** чьи материалы тонировать: тело и всё «меховое»; не глаза, рот, нос-накладки, румянец, усы, подушечки */
-  static isFur(name: string) {
-    return !/^(EyeBall|Mouth|Blush|Whiskers|BD_Pads|BD_Metal|BD_Cloth|Emblem|Tear|Headphones|Skirt)/.test(name);
+  static isFur(name: string, v2 = modelsV2()) {
+    // у моделей v2 наушники и фатин — свои меши со своим цветом (не мех)
+    return !(v2 ? /^(EyeBall|Mouth|Blush|Whiskers|BD_Pads|BD_Metal|BD_Cloth|Emblem|Tear|Headphones|Skirt)/ : /^(EyeBall|Mouth|Blush|Whiskers|BD_Pads|BD_Metal|BD_Cloth|Emblem|Tear)/).test(name);
   }
 
   /** маска лица — только у сеток в координатах покоя тела: само тело (скин, морфы), оболочки, карточки */
@@ -109,6 +111,9 @@ export class FurTone {
     if (!m || this.done.has(m) || !(m as THREE.MeshStandardMaterial).isMeshStandardMaterial) return;
     this.done.add(m);
     const U = this.uniforms;
+    const v2 = modelsV2();
+    // нос ниже макушки: v1 — лососевый (841b373), v2 — приглушённее
+    const nose = v2 ? 'vec3(0.64, 0.44, 0.45) + (ftS - vec3(0.6, 0.38, 0.45)) * 0.25' : 'vec3(0.8, 0.54, 0.52) + (ftS - vec3(0.6, 0.38, 0.45)) * 0.35';
     const prev = m.onBeforeCompile;
     m.onBeforeCompile = (sh, r) => {
       prev?.call(m, sh, r);
@@ -162,7 +167,7 @@ export class FurTone {
       ftC = mix(ftC, vec3(0.36, 0.37, 0.44) + (ftS - uFtSrc) * 0.3, brow * uFtBrow);
       // уши выше макушки — розовые, ниже — нос лососевый
       float ear = smoothstep(0.35, 0.6, (p.y - uFtEyeL.y) / D);
-      ftP = mix(vec3(0.64, 0.44, 0.45) + (ftS - vec3(0.6, 0.38, 0.45)) * 0.25, vec3(0.92, 0.55, 0.63) + (ftS - vec3(0.6, 0.38, 0.45)) * 0.6, ear);
+      ftP = mix(${nose}, vec3(0.92, 0.55, 0.63) + (ftS - vec3(0.6, 0.38, 0.45)) * 0.6, ear);
     }
 #endif
     ftC = mix(ftC, ftP, ftN);
@@ -171,7 +176,7 @@ export class FurTone {
         );
     };
     const prevKey = m.customProgramCacheKey?.bind(m);
-    m.customProgramCacheKey = () => (prevKey ? prevKey() : '') + (spatial ? '|fur-tone-v2s' : '|fur-tone-v2');
+    m.customProgramCacheKey = () => (prevKey ? prevKey() : '') + (spatial ? '|fur-tone-v2s' : '|fur-tone-v2') + (v2 ? '|m2' : '');
     m.needsUpdate = true;
   }
 }

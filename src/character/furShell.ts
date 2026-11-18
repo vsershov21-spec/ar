@@ -15,12 +15,16 @@
  * процедурная альфа-текстура (без файлов), мягкие кончики — смешивание без записи глубины, кончики светлее, у карточек «в лоб» к зрителю
  * альфа слабее (не наклейка).
  *
- * Качество: ?fur=0 — без меха, 1 — 4 оболочки, 2 — 8, 3 — 12 (по умолчанию: телефон 6 оболочек, ПК 12); ?fur=N≥4 — N оболочек.
+ * Качество: ?fur=0 — без меха, 1 — 4 оболочки, 2 — 8, 3 — 12 (по умолчанию: телефон 8 оболочек, ПК 12; модели v2 — телефон
+ * PHONE_SHELLS_V2); ?fur=N≥4 — N оболочек.
+ *
+ * Вид прядей — по поколению моделей (character/modelVariant.ts): v1 (по умолчанию) — как на 841b373, v2 (?models=v2) — FUR_V2.
  * LOD (furLod): видимая доля оболочек = качество (src/core/perf.ts, setFurQuality) × энергия (setFurEnergy:
  * calm 0.75, doze 0.5 и без колыхания) × размер кота на экране (мелкий — меньше слоёв); оставшиеся оболочки
  * перераспределяются по той же длине шерсти, силуэт тот же. Карточки при качестве 0 скрыты.
  */
 import * as THREE from 'three';
+import { modelsV2 } from './modelVariant';
 
 export interface FurParams {
   layers: number;
@@ -31,8 +35,8 @@ export interface FurParams {
 const DEF: FurParams = { layers: 4, density: 150, tip: [1.06, 1.06, 1.08] };
 /** оболочек на уровень ?fur=0..3 */
 export const FUR_LEVELS = [0, 4, 8, 12];
-/** телефон по умолчанию: 6 оболочек + пряди ≈ 1.4× кадра без меха (SwiftShader, 585×1266; 8 — уже 1.5×) */
-export const PHONE_SHELLS = 6;
+/** телефон, модели v2: 6 оболочек + пряди ≈ 1.4× кадра без меха (SwiftShader, 585×1266; 8 — уже 1.5×) */
+export const PHONE_SHELLS_V2 = 6;
 
 function isMobile() {
   const nav = typeof navigator !== 'undefined' ? navigator : undefined;
@@ -43,7 +47,7 @@ function isMobile() {
   return mobile || cores <= 4 || mem <= 3;
 }
 
-/** ?fur=… (0..3 — уровень, ≥4 — число оболочек); без параметра: телефон/слабое — PHONE_SHELLS, ПК — уровень 3 */
+/** ?fur=… (0..3 — уровень, ≥4 — число оболочек); без параметра: телефон/слабое — уровень 2 (v2 — PHONE_SHELLS_V2), ПК — уровень 3 */
 export function furLevelParam(search = typeof location !== 'undefined' ? location.search : ''): number | null {
   const s = new URLSearchParams(search).get('fur');
   if (s === null || s === '') return null;
@@ -55,7 +59,7 @@ export function furLevelParam(search = typeof location !== 'undefined' ? locatio
 export function furLayersFor(_n?: number, search?: string, mobile = isMobile()) {
   const q = furLevelParam(search);
   if (q !== null) return q < 4 ? FUR_LEVELS[Math.round(q)] : Math.min(16, Math.round(q));
-  return mobile ? PHONE_SHELLS : FUR_LEVELS[3];
+  return mobile ? (modelsV2(search) ? PHONE_SHELLS_V2 : FUR_LEVELS[2]) : FUR_LEVELS[3];
 }
 
 /** общие для всех котов: время колыхания, энергия, видимая доля по качеству */
@@ -149,11 +153,42 @@ export function tuftTexture() {
   return tex;
 }
 
-/** нижняя граница цвета пряди (линейный): тёмные тексели (обводка глаза, складки) не дают тёмных точек в меху */
-const FUR_FLOOR_GLSL = 'vec3(0.15, 0.165, 0.22)';
+/**
+ * Вид прядей по поколению моделей. v1 — ровно как на 841b373 (модели bb768e9). v2 — под модели v2 (fur_volume v2):
+ * нижняя граница цвета (тёмные тексели обводки и складок не дают тёмных точек), мягкие кончики карточек.
+ */
+interface FurLook {
+  key: string;
+  /** нижняя граница цвета пряди (линейный), null — нет */
+  floor: string | null;
+  /** радиусы прядей (GLSL, h — доля длины) */
+  rad1: string;
+  rad2: string;
+  /** карточки: альфа тает к кончику (1 − k·t²) */
+  cardTip: number;
+  /** карточки: альфа «в лоб» и на силуэте, начало перехода */
+  cardFacing: [number, number, number];
+}
+const FUR_V1: FurLook = {
+  key: '2',
+  floor: null,
+  rad1: '0.48 * (1.0 - 0.75 * h) * (0.85 + 0.3 * r1.z) * step(h, 0.55 + 0.5 * r1.x)',
+  rad2: '0.42 * (1.0 - 0.8 * h) * step(h, 0.35 + 0.45 * r2.x)',
+  cardTip: 0,
+  cardFacing: [1.0, 0.45, 0.55],
+};
+export const FUR_V2: FurLook = {
+  key: 'v2a',
+  floor: 'vec3(0.15, 0.165, 0.22)',
+  rad1: '0.52 * (1.0 - 0.7 * h) * (0.85 + 0.3 * r1.z) * step(h, 0.55 + 0.5 * r1.x)',
+  rad2: '0.46 * (1.0 - 0.75 * h) * step(h, 0.4 + 0.45 * r2.x)',
+  cardTip: 0.7,
+  cardFacing: [0.95, 0.4, 0.5],
+};
+const furLook = () => (modelsV2() ? FUR_V2 : FUR_V1);
+const glf = (x: number) => (Number.isInteger(x) ? x.toFixed(1) : String(x));
 
 const SHELL_COMMON = `
-#define FUR_FLOOR ${FUR_FLOOR_GLSL}
 uniform float uShell;
 uniform float uDensity;
 uniform vec3 uTip;
@@ -196,6 +231,7 @@ export function buildFurShells(model: THREE.Object3D, body?: THREE.MeshStandardM
   sm.raycast = () => {};
   const p: FurParams = { ...DEF, ...((sm.userData?.fur as Partial<FurParams>) ?? {}) };
   const tip = new THREE.Vector3(...p.tip);
+  const look = furLook();
   for (let k = 1; k <= n; k++) {
     const uShell = { value: k / n };
     lod.h.push(uShell);
@@ -232,8 +268,7 @@ export function buildFurShells(model: THREE.Object3D, body?: THREE.MeshStandardM
         .replace('#include <common>', '#include <common>' + SHELL_COMMON)
         .replace(
           '#include <map_fragment>',
-          `#include <map_fragment>
-  diffuseColor.rgb = max(diffuseColor.rgb, FUR_FLOOR);
+          `#include <map_fragment>${look.floor ? `\n  diffuseColor.rgb = max(diffuseColor.rgb, ${look.floor});` : ''}
   {
     vec3 nn = normalize(vRestN);
     vec3 r1, r2;
@@ -242,8 +277,8 @@ export function buildFurShells(model: THREE.Object3D, body?: THREE.MeshStandardM
     float d2 = furStrand(vRest * uDensity * 2.3 + 17.0, nn, r2);
     float h = uShell;
     // у каждой пряди своя длина; тоньше к кончику
-    float rad1 = 0.52 * (1.0 - 0.7 * h) * (0.85 + 0.3 * r1.z) * step(h, 0.55 + 0.5 * r1.x);
-    float rad2 = 0.46 * (1.0 - 0.75 * h) * step(h, 0.4 + 0.45 * r2.x);
+    float rad1 = ${look.rad1};
+    float rad2 = ${look.rad2};
     float facing = abs(dot(normalize(vNormal), normalize(vViewPosition)));
     // в лоб к зрителю — реже (шерсть видна по контуру), на силуэте — гуще
     float edge = mix(1.0, 0.72, smoothstep(0.5, 0.98, facing));
@@ -258,7 +293,7 @@ export function buildFurShells(model: THREE.Object3D, body?: THREE.MeshStandardM
         );
     };
     // слой задаётся униформой uShell — шейдер у всех оболочек один: компилируется один раз, а не по разу на слой
-    mat.customProgramCacheKey = () => 'bdfur3';
+    mat.customProgramCacheKey = () => 'bdfur' + look.key;
     const m = new THREE.SkinnedMesh(sm.geometry, mat);
     m.name = `BD_FurShell_${k}`;
     m.position.copy(sm.position);
@@ -310,28 +345,27 @@ function setupCards(cards: THREE.SkinnedMesh, bodyMat: THREE.MeshStandardMateria
     depthWrite: false,
   });
   mat.name = 'BD_FurCards_rt';
+  const look = furLook();
+  const [fa, fb, fc] = look.cardFacing.map(glf);
   mat.onBeforeCompile = (sh) => {
     sh.fragmentShader = sh.fragmentShader.replace(
       '#include <map_fragment>',
-      `#include <map_fragment>
-  diffuseColor.rgb = max(diffuseColor.rgb, ${FUR_FLOOR_GLSL});`,
+      `#include <map_fragment>${look.floor ? `\n  diffuseColor.rgb = max(diffuseColor.rgb, ${look.floor});` : ''}`,
     ).replace(
       '#include <alphamap_fragment>',
       `#include <alphamap_fragment>
   {
-    float t = vAlphaMapUv.y;
-    // мягкий кончик: альфа тает к концу пряди (облако, а не щётка)
-    diffuseColor.a *= 1.0 - 0.7 * t * t;
+    float t = vAlphaMapUv.y;${look.cardTip ? `\n    // мягкий кончик: альфа тает к концу пряди (облако, а не щётка)\n    diffuseColor.a *= 1.0 - ${glf(look.cardTip)} * t * t;` : ''}
     float facing = abs(dot(normalize(vNormal), normalize(vViewPosition)));
     // пучок на поверхности «в лоб» к зрителю — прозрачнее (не наклейка), на силуэте — целиком
-    diffuseColor.a *= mix(0.95, 0.4, smoothstep(0.5, 0.95, facing));
+    diffuseColor.a *= mix(${fa}, ${fb}, smoothstep(${fc}, 0.95, facing));
     if (diffuseColor.a < 0.03) discard;
     diffuseColor.rgb *= mix(0.78, 1.04, t);
     diffuseColor.rgb += diffuseColor.rgb * 0.22 * t * pow(1.0 - facing, 2.0);
   }`,
     );
   };
-  mat.customProgramCacheKey = () => 'bdcards2';
+  mat.customProgramCacheKey = () => 'bdcards' + look.key;
   cards.material = mat;
   cards.frustumCulled = false;
   cards.raycast = () => {};

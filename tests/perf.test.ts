@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 import { AdaptiveQuality, QUALITY_LEVELS } from '../src/core/perf';
-import { FUR_LEVELS, PHONE_SHELLS, buildFurShells, furLayersFor, furVisibleCount, setFurEnergy, setFurQuality } from '../src/character/furShell';
+import { FUR_LEVELS, PHONE_SHELLS_V2, buildFurShells, furLayersFor, furVisibleCount, setFurEnergy, setFurQuality } from '../src/character/furShell';
 import { modelUrl } from '../src/core/modelUrl';
 
 /** n секунд кадров с частотой fps */
@@ -54,7 +54,8 @@ describe('мех: уровни, LOD и доля оболочек', () => {
     expect(furLayersFor(undefined, '?fur=3')).toBe(12);
     expect(furLayersFor(undefined, '?fur=6')).toBe(6);
     expect(furLayersFor(undefined, '?fur=40')).toBe(16);
-    expect(furLayersFor(undefined, '', true)).toBe(PHONE_SHELLS);
+    expect(furLayersFor(undefined, '', true)).toBe(FUR_LEVELS[2]);
+    expect(furLayersFor(undefined, '?models=v2', true)).toBe(PHONE_SHELLS_V2);
     expect(furLayersFor(undefined, '', false)).toBe(FUR_LEVELS[3]);
   });
 
