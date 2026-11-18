@@ -1,0 +1,18 @@
+<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Предметы Tripo</title>
+<script type="module" src="https://unpkg.com/@google/model-viewer@3.5.0/dist/model-viewer.min.js"></script>
+<style>body{font:15px system-ui;margin:12px;background:#f1f8f4;color:#1f2a2e}h1{font-size:18px}
+.g{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px}
+.c{background:#fff;border-radius:14px;padding:8px;box-shadow:0 2px 6px #0001}
+.c img,.c model-viewer{width:100%;aspect-ratio:1;border-radius:10px;background:#e6f4ec;display:block}
+.c b{display:block;margin-top:6px}.c a{font-size:12px;color:#21a038}</style></head><body>
+<h1>Предметы из Tripo. Тап по картинке — покрутить в 3D</h1><div class="g" id="g"></div>
+<script>
+const names=['skateboard','bed','bowl','ball','pillow','treat_snack','microphone','toothbrush','wardrobe'];
+const g=document.getElementById('g');
+for(const n of names){const d=document.createElement('div');d.className='c';
+d.innerHTML=`<img src="/models/props/${n}.png" alt="${n}"><b>${n}</b><a href="/models/props/${n}.glb">glb</a>`;
+const img=d.querySelector('img');
+img.onclick=()=>{const m=document.createElement('model-viewer');m.setAttribute('src',`/models/props/${n}.glb`);m.setAttribute('camera-controls','');m.setAttribute('auto-rotate','');img.replaceWith(m)};
+g.append(d)}
+</script></body></html>
