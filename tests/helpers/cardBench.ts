@@ -26,6 +26,7 @@ export interface SessionRequest {
   hintRadius?: number;
   reset?: boolean;
   rot?: number[] | null;
+  lostMs?: number;
   detectEvery?: number;
   /** прежний воркер: без ключевого кадра и гироскопа */
   legacy?: boolean;
@@ -92,10 +93,10 @@ export function downsample(src: Uint8ClampedArray, w: number, h: number, k: numb
 }
 
 /** фрагмент кадра вокруг прошлой карты (копия логики CardTracker.cropRect: до 280 px на карту, ≤ 420 px по стороне) */
-export function benchCrop(hi: Uint8ClampedArray, k: number, dw: number, dh: number, q: Pt[]): CropIn | null {
+export function benchCrop(hi: Uint8ClampedArray, k: number, dw: number, dh: number, q: Pt[], full = 0): CropIn | null {
   let x0 = Math.min(...q.map((p) => p.x)), x1 = Math.max(...q.map((p) => p.x));
   let y0 = Math.min(...q.map((p) => p.y)), y1 = Math.max(...q.map((p) => p.y));
-  const mx = (x1 - x0) * 0.25 + 4, my = (y1 - y0) * 0.25 + 4;
+  const mx = full ? 0 : (x1 - x0) * 0.25 + 4, my = full ? 0 : (y1 - y0) * 0.25 + 4;
   x0 = Math.max(0, Math.floor(x0 - mx));
   y0 = Math.max(0, Math.floor(y0 - my));
   x1 = Math.min(dw, Math.ceil(x1 + mx));
@@ -104,8 +105,8 @@ export function benchCrop(hi: Uint8ClampedArray, k: number, dw: number, dh: numb
   if (w < 8 || h < 8) return null;
   const side = (i: number) => Math.hypot(q[i].x - q[(i + 1) % 4].x, q[i].y - q[(i + 1) % 4].y);
   const long = Math.max(side(0), side(1));
-  let s = Math.min(k, Math.max(1, 280 / Math.max(1, long)));
-  s = Math.min(s, 420 / Math.max(w, h));
+  let s = full ? Math.min(k, full / Math.max(w, h)) : Math.min(k, Math.max(1, 280 / Math.max(1, long)));
+  if (!full) s = Math.min(s, 420 / Math.max(w, h));
   if (s < 1.3) return null;
   const cw = Math.round(w * s), ch = Math.round(h * s);
   // ресэмплинг из кадра ×k (билинейно)
@@ -283,6 +284,7 @@ export async function runBench(sc: Scenario, mk: () => BenchSession, o: BenchOpt
   let lastCamDisp = -1;
   let prevQuad: Pt[] | null = null;
   let cropAt = -1e9;
+  let nextDetect = true;
   let lastDesign = -1;
   const wms: number[] = [];
   let visTicks = 0, hiddenTicks = 0, farTicks = 0;
@@ -311,7 +313,15 @@ export async function runBench(sc: Scenario, mk: () => BenchSession, o: BenchOpt
         const hi = await sc.hi(tc, ci);
         rgba = downsample(hi, sc.w * k, sc.h * k, k);
         // фрагмент под проверку — как в CardTracker: по прошлой карте, до посадки не чаще 80 мс, после — раз в секунду
-        if (sc.verify && prevQuad && t * 1000 - cropAt >= (s.tracking ? 1000 : 80)) {
+        const anch = s.state === 'locked' || s.state === 'hold' || s.state === 'relocalize';
+        const lostA = s.state === 'hold' || s.state === 'relocalize';
+        const cropDue = lostA ? t * 1000 - cropAt >= 200 : anch ? t * 1000 - cropAt >= 1000 : t * 1000 - cropAt >= (nextDetect ? 40 : 300);
+        if (sc.verify && lostA && cropDue) {
+          // как CardTracker.cropRect при потере: весь кадр крупнее (до 600 px по длинной стороне)
+          const full = [{ x: 0, y: 0 }, { x: sc.w, y: 0 }, { x: sc.w, y: sc.h }, { x: 0, y: sc.h }];
+          crop = benchCrop(hi, k, sc.w, sc.h, full, 600);
+          if (crop) cropAt = t * 1000;
+        } else if (sc.verify && prevQuad && cropDue) {
           crop = benchCrop(hi, k, sc.w, sc.h, prevQuad);
           if (crop) cropAt = t * 1000;
         }
@@ -319,7 +329,7 @@ export async function runBench(sc: Scenario, mk: () => BenchSession, o: BenchOpt
       lastSent = ci;
       if (rgba) {
         const req = s.request(t, qNow);
-        const out = pipe.process({ rgba, w: sc.w, h: sc.h, focal: K.f, lock: req.lock, hint: req.hint, hintRadius: req.hintRadius, reset: req.reset, rot: req.rot ?? null, verify: sc.verify, detectEvery: req.detectEvery, legacy: req.legacy, crop });
+        const out = pipe.process({ rgba, w: sc.w, h: sc.h, focal: K.f, lock: req.lock, hint: req.hint, hintRadius: req.hintRadius, reset: req.reset, rot: req.rot ?? null, lostMs: req.lostMs, verify: sc.verify, detectEvery: req.detectEvery, legacy: req.legacy, crop });
         if (out) {
           wms.push(out.ms);
           if (out.stages) {
@@ -332,6 +342,7 @@ export async function runBench(sc: Scenario, mk: () => BenchSession, o: BenchOpt
             b.ms.push(out.ms);
           }
           if (o.prof) o.prof.frames++;
+          nextDetect = out.detNext ?? true;
           prevQuad = out.quad ?? (s.state === 'locked' || s.state === 'hold' || s.state === 'relocalize' ? prevQuad : null);
           if (out.ver?.checked) lastDesign = out.ver.design ?? -1;
           if (firstLock < 0 && out.ver?.checked) verN++;

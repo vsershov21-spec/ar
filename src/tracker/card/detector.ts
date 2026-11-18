@@ -223,6 +223,28 @@ export class CardDetector {
     this.planeFrames = 0;
     this.sinceDetect = 0;
   }
+  /**
+   * Кот посажен, карта потеряна (HOLD/RELOCALIZE), а в кадре по содержимому узнана карта Сбера (знак или дизайн —
+   * CardPipeline, 2 проверки подряд) — ведём её отсюда, где бы она ни была: телефон сдвинули, прогноз по гироскопу
+   * сдвига не знает, а ключевой кадр при другом масштабе не сходится. Ключевой кадр снимется заново с этой позы.
+   */
+  relocate(q: Quad): Quad {
+    const ref = this.keyQuad ?? this.hint;
+    const a = ref ? alignQuad(q, ref) : q;
+    this.key.reset();
+    this.keyH = this.keyVel = this.keyQuad = null;
+    this.keyFails = 0;
+    this.prevQuad = a;
+    this.lastH = null;
+    this.anchored = true;
+    this.planeFrames = 0;
+    this.sinceDetect = 0;
+    return a;
+  }
+  /** следующий кадр — с полным поиском (главный поток прикладывает к нему фрагмент под проверку «Сбер») */
+  get detectDueNext(): boolean {
+    return !this.prevQuad || this.sinceDetect + 1 >= this.params.detectEvery;
+  }
   /** забыть текущую «дорожку» (ведём не карту) — следующий кадр начнётся с полного поиска */
   drop() {
     if (this.locked) return;

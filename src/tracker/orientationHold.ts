@@ -35,12 +35,15 @@ export class OrientationHold {
       const prev = this.current ? this.current.clone() : null;
       this.current = deviceQuaternion(e.alpha, e.beta, e.gamma, so, this.current ?? new THREE.Quaternion());
       const now = performance.now();
+      // время отсчёта — по метке события, а не по моменту обработки: при занятом главном потоке (iOS) события
+      // приходят пачкой, и dt «по часам обработчика» ≈ 0 давал ложные всплески скорости → «Держи телефон ровно…»
+      const ts = e.timeStamp > 0 && Math.abs(e.timeStamp - now) < 1000 ? e.timeStamp : now;
       if (prev && this.lastT) {
-        const dt = Math.max(0.005, (now - this.lastT) / 1000);
+        const dt = Math.max(0.012, (ts - this.lastT) / 1000);
         const w = prev.angleTo(this.current) / dt;
         this.speed += (w - this.speed) * 0.3;
       }
-      this.lastT = now;
+      this.lastT = ts;
       this.onSample?.(now, this.current);
     });
   }

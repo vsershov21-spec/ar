@@ -97,7 +97,10 @@ export function analyze({ s, rec, err, long, draws = [] }) {
   facts.lines = `${speaks.length} реплик, без записи: ${unvoiced.length}`;
   if (unvoiced.length) E(`реплики без записи ElevenLabs прозвучали: ${[...new Set(unvoiced.map((u) => u.id))].join(', ')}`);
   const speakTexts = new Set(rec.filter((r) => r.kind === 'speak' || r.kind === 'echo').map((r) => r.text));
-  const mute = rec.filter((r) => r.kind === 'bubble' && r.on && r.txt && !r.hint && !speakTexts.has(r.txt));
+  // вступление к подсказке загадки показывается вместе с текстом подсказки («Подумай ещё. Подсказка: …», director.bubbleText) —
+  // пузырь начинается с озвученного текста
+  const voicedBubble = (t) => speakTexts.has(t) || [...speakTexts].some((s) => s && t.startsWith(s + ' '));
+  const mute = rec.filter((r) => r.kind === 'bubble' && r.on && r.txt && !r.hint && !voicedBubble(r.txt));
   if (mute.length) E(`немой пузырь (текст без голоса): ${[...new Set(mute.map((x) => `«${x.txt.slice(0, 50)}»`))].join(', ')}`);
   const hints = [...new Set(rec.filter((r) => r.kind === 'bubble' && r.on && r.hint).map((x) => `«${x.txt.slice(0, 50)}»`))];
   if (hints.length) facts.hints = `${hints.length}: ${hints.join(', ')}`;
@@ -110,7 +113,7 @@ export function analyze({ s, rec, err, long, draws = [] }) {
     if (r.kind === 'speak') textOf.set(r.id, r.text);
     if (r.kind !== 'speak_end') continue;
     const txt = textOf.get(r.id);
-    const hide = rec.slice(i + 1, i + 40).find((x) => x.kind === 'hide' && x.rt - r.rt < 300 && (x.text === null || x.text === txt));
+    const hide = rec.slice(i + 1, i + 40).find((x) => x.kind === 'hide' && x.rt - r.rt < 300 && (x.text === null || x.text === txt || (!!txt && !!x.text && x.text.startsWith(txt + ' '))));
     if (!hide && rec.some((x) => x.kind === 'hide')) {
       noHide++;
       E(`реплика ${r.id} кончилась, а пузырь не попросили скрыть`);

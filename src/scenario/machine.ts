@@ -91,7 +91,9 @@ export type ScenarioEvent =
   | { type: 'switch_request' }
   | { type: 'covered' }
   | { type: 'shake' }
-  | { type: 'outro_request' };
+  | { type: 'outro_request' }
+  /** сменилась обстановка (вход в «Мой дом», выход на карту): мини-игра заканчивается молча, её чипы («Сдаюсь») — тоже */
+  | { type: 'context_change' };
 
 export type UiPart = 'scan_hint' | 'name_prompt' | 'chips' | 'sberkids' | 'shake_button' | 'mic';
 
@@ -469,6 +471,10 @@ export function step(s: ScenarioState, e: ScenarioEvent, cfg: ScenarioConfig): S
   const a: Action[] = [];
   const done = (state: ScenarioState): StepResult => ({ state, actions: a });
 
+  if (e.type === 'context_change') {
+    if (!s.dialog || s.dialog.id === 'intro') return done(s);
+    return done(stopDialog(s, a));
+  }
   // карта: общая обработка для всех фаз после пробуждения
   if (e.type === 'card_lost') {
     if (!s.cardVisible) return done(s);

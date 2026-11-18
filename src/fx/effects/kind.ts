@@ -65,11 +65,12 @@ class SteamHeart extends Timed {
     super('steam_heart', def);
     this.z = 0;
     this.drawMs = num(def.params, 'drawMs', 1200);
-    const c = args.x !== undefined ? at(args, env) : { x: env.w / 2, y: env.h * 0.42 };
-    const s = Math.min(env.w, env.h) * 0.26;
+    const s = Math.min(env.w, env.h) * 0.2;
+    // сбоку от головы кота, а не по центру экрана: туман на полэкрана делал кота полупрозрачным на 3–4 с (запись 18.11)
+    const c = args.x !== undefined ? at(args, env) : besideHead(env, s);
     // изнутри: сердце наклонено «от себя» и обведено справа налево — снаружи видно зеркальным
     this.pts = heartPoints(c.x, c.y, s, 70, 0.18, true);
-    for (let i = 0; i < 7; i++) breathFog(env.fog, c.x + rand(-s, s), c.y + rand(-s, s * 0.8), s * rand(0.7, 1.1), 0.3);
+    for (let i = 0; i < 7; i++) breathFog(env.fog, c.x + rand(-s, s) * 0.6, c.y + rand(-s, s * 0.8) * 0.6, s * rand(0.55, 0.8), 0.3);
     env.fog.keep(def.durationMs, 2200, 500);
   }
   tick(_dt: number, env: FxEnv) {
@@ -326,3 +327,12 @@ export const KIND: Record<string, FxFactory> = {
   paw_print: (d, a, e) => new PawPrint(d, a, e),
 };
 void pickColor;
+
+/** точка сбоку от головы кота (с той стороны, где больше места), чтобы эффект на «стекле» не закрывал кота */
+function besideHead(env: FxEnv, s: number): Pt {
+  const h = env.anchor('head');
+  const off = Math.max(s * 1.15, h.s * 0.32 + s * 0.8);
+  const right = h.x < env.w / 2;
+  const x = clamp(h.x + (right ? off : -off), s * 1.05, env.w - s * 1.05);
+  return { x, y: clamp(h.y, env.h * 0.18 + s, env.h * 0.6) };
+}

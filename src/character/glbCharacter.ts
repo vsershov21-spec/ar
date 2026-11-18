@@ -49,6 +49,10 @@ const CAPSULE_R: [RegExp, number][] = [
   [/Head/, 0.17], [/Neck/, 0.1], [/Spine|Hips/, 0.16], [/Shoulder/, 0.07], [/ForeArm|Hand/, 0.06], [/Arm/, 0.065],
   [/UpLeg/, 0.08], [/Leg/, 0.07], [/Foot|Toe/, 0.06], [/Tail/, 0.05], [/Ear/, 0.06],
 ];
+/** клипы «через голову»: держим голову и лапы над полом (groundClamp) */
+const ACRO = /flip|tumble|cartwheel|somersault/;
+/** кости и их «радиус» (рост модели ≈ 1) */
+const GROUND_BONES: [string, number][] = [['Head', 0.15], ['Neck', 0.08], ['LeftHand', 0.04], ['RightHand', 0.04], ['Spine2', 0.12]];
 const FINGER = /Thumb|Index|Middle|Ring|Pinky|_End$|Eye|Jaw|Tongue/;
 const HIT_MESH = typeof location !== 'undefined' && /[?&]hit=mesh\b/.test(location.search);
 const HP_A = new THREE.Vector3();
@@ -521,7 +525,9 @@ export class GlbCharacter implements Character {
     if (this.mixer && this.actions.has(cs.cur.id)) {
       this.mixer.update(dt);
       this.anim?.post(dt, cs, this.model ?? this.object);
+      this.groundClamp(dt, cs.cur.id);
     } else {
+      this.lift = 0;
       this.mixer?.update(dt);
       this.rest.forEach((q, n) => this.bones.get(n)!.quaternion.copy(q));
       const root = new THREE.Vector3();
@@ -629,6 +635,30 @@ export class GlbCharacter implements Character {
       const gz = (emo && ee > 0.4 ? emo.p.gaze : facePreset(this.faceMix.preset)?.gaze) ?? null;
       this.eyes.update(dt, { weights: W, pupils, target: tgt, idle: cs.idleMode && this.life.talk < 0.1, bias: gz });
     }
+  }
+
+  /**
+   * Акробатика (сальто, кувырок) из GLB: корень клипа поднимается мало — вверх ногами голова уходила под пол
+   * (дома пол виден, запись 18.11). Пока идёт такой клип, поднимаем кота так, чтобы голова и лапы были не ниже пола
+   * (центр кости минус её радиус), опускаем плавно.
+   */
+  private lift = 0;
+  private groundClamp(dt: number, id: string) {
+    let want = 0;
+    if (ACRO.test(id)) {
+      let minY = Infinity;
+      for (const [n, r] of GROUND_BONES) {
+        const b = this.bones.get(n);
+        if (!b) continue;
+        const y = this.object.worldToLocal(b.getWorldPosition(this.tLocal)).y - this.lift - r;
+        if (y < minY) minY = y;
+      }
+      if (Number.isFinite(minY) && minY < 0) want = Math.min(0.6, -minY);
+    }
+    // вверх — сразу (иначе голова успевает «нырнуть»), вниз — за ~0,15 с
+    this.lift = want > this.lift ? want : this.lift + (want - this.lift) * Math.min(1, dt / 0.15);
+    if (this.lift < 1e-4) this.lift = 0;
+    this.inner.position.y = this.lift;
   }
 
   /** хвост и уши: сброс к покою и вторичная анимация TailRig поверх тела */

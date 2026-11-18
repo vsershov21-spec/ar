@@ -4,6 +4,8 @@
  */
 import { CardDetector } from './detector';
 import { CardVerifier, type CropIn, type VerifyReport } from './verifier';
+import { HIT } from './verify';
+import { alignQuad, quadDiag, quadDistance, type Quad } from './geometry';
 
 export interface PipelineIn {
   /** номер кадра (главный поток сопоставляет ответ с ориентацией телефона в момент съёмки) */
@@ -24,6 +26,8 @@ export interface PipelineIn {
   detectEvery?: number;
   verify?: boolean;
   crop?: CropIn | null;
+  /** кот посажен, а позу трекер не принимает столько мс (HOLD/RELOCALIZE) — пора искать карту по содержимому */
+  lostMs?: number;
   /** стенд «до»: без ключевого кадра и гироскопа — как до переработки */
   legacy?: boolean;
 }
@@ -43,6 +47,10 @@ export interface PipelineOut {
   why?: string;
   /** средняя яркость кадра 0..255 (подсказка «темно» без отдельного чтения кадра) */
   luma?: number;
+  /** следующий кадр будет с полным поиском (до посадки к нему нужен фрагмент под проверку «Сбер») */
+  detNext?: boolean;
+  /** карту нашли заново по содержимому (знак/дизайн), когда кот сидел, а карта была потеряна */
+  relocated?: boolean;
   /** время этапов, мс: подготовка кадра, ключевой кадр, поток/поверхность, полный поиск, проверка «Сбер», прочее */
   stages?: { pre: number; key: number; flow: number; detect: number; verify: number; other: number };
 }
@@ -51,6 +59,9 @@ export class CardPipeline {
   readonly det = new CardDetector();
   readonly ver = new CardVerifier();
   private detectEvery = this.det.params.detectEvery;
+  /** узнавание той же карты Сбера после потери: кандидат и сколько проверок подряд он «Сбер» (at — номер проверки) */
+  private reloc: { quad: Quad; hits: number; at: number } | null = null;
+  private relocTick = 0;
 
   process(m: PipelineIn): PipelineOut | null {
     const det = this.det;
@@ -77,8 +88,26 @@ export class CardPipeline {
       tv = now() - t0;
       out.ms += tv;
     }
+    // кот сидит, карта потеряна (рука ушла, телефон сдвинули/приблизили): ищем её по содержимому среди кандидатов
+    // полного поиска — не только у прогноза. Раньше карта, ушедшая дальше 0,6 диагонали от прогноза при другом
+    // масштабе, не находилась вовсе: кот 6 с висел, потом «Где карта?» при карте в кадре (запись 18.11).
+    // (воркер может и «вести» что-то по ключевому кадру/поверхности, а поза не принимается главным потоком — тоже ищем)
+    if (m.verify !== false && det.locked && (!r.quad || (m.lostMs ?? 0) > 400) && det.ranDetect) {
+      const t0 = now();
+      const q = this.relocalize({ rgba: m.rgba, w: m.w, h: m.h }, { f: m.focal, cx: m.w / 2, cy: m.h / 2 }, m.crop ?? null);
+      if (q) {
+        out.quad = q.quad;
+        out.score = Math.max(0.6, q.score);
+        out.mode = 'detect';
+        out.relocated = true;
+      }
+      tv += now() - t0;
+      out.ms += now() - t0;
+    } else if (!det.locked || !(m.lostMs ?? 0)) this.reloc = null;
+    out.detNext = !det.locked && det.detectDueNext;
     const t1 = now();
-    if (r.quad) out.glare = glareOn(m.rgba, m.w, m.h, r.quad);
+    const oq = out.quad;
+    if (oq) out.glare = glareOn(m.rgba, m.w, m.h, oq);
     let ls = 0, ln = 0;
     for (let i = 0; i < m.rgba.length; i += 4 * 37) (ls += 0.299 * m.rgba[i] + 0.587 * m.rgba[i + 1] + 0.114 * m.rgba[i + 2]), ln++;
     out.luma = ln ? ls / ln : undefined;
@@ -87,6 +116,32 @@ export class CardPipeline {
     const st = det.stages;
     out.stages = { pre: st.pre, key: st.key, flow: st.flow, detect: st.detect, verify: tv, other: Math.max(0, st.total - st.pre - st.key - st.flow - st.detect) + to };
     return out;
+  }
+
+  /**
+   * Кандидат полного поиска — та же карта Сбера? Проверка через кадр (≈ 7 мс на кандидата, на телефоне ×2–3 — только
+   * пока карта потеряна), до двух лучших кандидатов; «да» — знак или известный дизайн в 2 проверках подряд в одном месте.
+   */
+  private relocalize(lo: { rgba: Uint8ClampedArray; w: number; h: number }, K: { f: number; cx: number; cy: number }, crop: CropIn | null): { quad: Quad; score: number } | null {
+    if (this.relocTick++ & 1) return null;
+    const n = this.relocTick;
+    const cands = this.det.lastCandidates.filter((c) => c.score >= 0.45).slice(0, 2);
+    for (const c of cands) {
+      const v = this.ver.classify(c.quad, lo, K, crop);
+      if (!v || !(v.f.logo >= HIT.logo || v.f.designHit)) continue;
+      const r = this.reloc;
+      if (r && n - r.at <= 8 && quadDistance(alignQuad(c.quad, r.quad), r.quad) < 0.15 * quadDiag(r.quad)) r.hits++;
+      else this.reloc = { quad: c.quad, hits: 1, at: n };
+      const cur = this.reloc!;
+      cur.at = n;
+      cur.quad = c.quad;
+      if (cur.hits >= 2) {
+        this.reloc = null;
+        return { quad: this.det.relocate(c.quad), score: c.score };
+      }
+      return null;
+    }
+    return null;
   }
 }
 

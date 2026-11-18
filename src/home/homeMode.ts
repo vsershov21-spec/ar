@@ -52,7 +52,7 @@ export interface HomeHost {
     dozing: boolean;
     ladder: { quietFor(now: number): number; reset(now: number): void };
     queue: { busy: boolean };
-    dispatch(e: { type: 'card_found' } | { type: 'card_lost' }): void;
+    dispatch(e: { type: 'card_found' } | { type: 'card_lost' } | { type: 'context_change' }): void;
     speakEvent(event: string, o?: { background?: boolean; force?: boolean }): boolean;
     hasVoiced(event: string): boolean;
     action(id: string): void;
@@ -180,6 +180,8 @@ export class HomeMode {
     this.offer = null;
     this.stats.enter++;
     h.director.log(`дом: вход (${why})`);
+    // другая обстановка — мини-игра (загадка и т. п.) заканчивается, её чипы («Сдаюсь») не едут в дом
+    h.director.dispatch({ type: 'context_change' });
     h.ui.closeCatalog();
     h.ui.hidePressMenu();
     h.ui.nudge(null);
@@ -256,6 +258,7 @@ export class HomeMode {
     this.phase = 'to_ar';
     this.stats.exit++;
     h.director.log('дом: выход на карту');
+    h.director.dispatch({ type: 'context_change' });
     h.energy.activity(performance.now());
     h.ui.closeCatalog();
     this.move = null;

@@ -17,7 +17,7 @@
 
 export type TrackState = 'search' | 'candidate' | 'locked' | 'hold' | 'relocalize' | 'lost';
 /** что сказать ребёнку (текст — overlay.ts) */
-export type Hint = 'aim' | 'closer' | 'farther' | 'glare' | 'steady' | 'checking' | 'other' | 'back' | 'notcard' | null;
+export type Hint = 'aim' | 'closer' | 'farther' | 'glare' | 'steady' | 'checking' | 'found' | 'other' | 'back' | 'notcard' | null;
 /** что воркер думает о содержимом кандидата */
 export type Kind = 'sber' | 'checking' | 'other' | 'back' | 'notcard';
 
@@ -66,6 +66,17 @@ export const HOLD_AFTER_MS = 300;
 export const HOLD_MS = 1500;
 /** → LOST (кот спрашивает, где карта) */
 export const LOST_MS = 6000;
+/**
+ * Карта Сбера узнана (знак/дизайн в 2+ проверках) — сажаем не дольше чем через столько, даже если «ровно» ещё не
+ * накопилось: на iPhone рукой ровно не удержать, а оценки углов из полного поиска и потока расходятся на 3–6 % диагонали
+ * у мелкой карты — кольцо «Держи телефон ровно…» крутилось 10–15 с (запись продакта 18.11). Ложных посадок это не
+ * добавляет: «чья карта» решает проверка, а не стабильность; после посадки позу уточняет ключевой кадр.
+ */
+export const SBER_LAND_MS = 600;
+/** кот уже сидел на этой карте (вернули после потери) — снова сажаем почти сразу */
+export const RELAND_MS = 150;
+/** «ровно»: смещение углов к прошлому ответу воркера, доли диагонали (было 0,04 — меньше шума оценок у карты 60 px) */
+const JITTER_OK = 0.07;
 const HINT_DWELL_MS = 350;
 const HINT_MIN_MS = 1200;
 
@@ -84,6 +95,8 @@ export class CardFsm {
   seenAt = -1e9;
   private stableMs = 0;
   private checkingSince = 0;
+  /** с какого момента кандидат подряд узнаётся как карта Сбера (0 — нет) */
+  private sberSince = 0;
   private lastObsT = -1;
   /** наблюдений подряд без карты (медленный телефон: 0,45 с — это 1–2 кадра, мало) */
   private missRun = 0;
@@ -104,6 +117,7 @@ export class CardFsm {
     if (to === 'search' || to === 'lost') {
       this.stableMs = 0;
       this.checkingSince = 0;
+      this.sberSince = 0;
     }
     if (to === 'locked') this.everLocked = true;
   }
@@ -115,6 +129,8 @@ export class CardFsm {
     this.verified = false;
     this.stableMs = 0;
     this.checkingSince = 0;
+    this.sberSince = 0;
+    this.everLocked = false;
   }
 
   /** наблюдение по кадру воркера */
@@ -147,18 +163,26 @@ export class CardFsm {
       return this.state;
     }
     if (s !== 'candidate') this.go('candidate', o.t, `карта в кадре (${o.mode})`);
-    const good = (o.err ?? 0) < 3.5 && (o.jitter ?? 0) < 0.04 && o.still !== false && (o.inFrame ?? 1) > 0.97;
-    // гистерезис: хороший кадр копит время, плохой — отнимает вдвое (не обнуляет)
-    this.stableMs = good ? Math.min(STABLE_MS, this.stableMs + dt) : Math.max(0, this.stableMs - 2 * dt);
+    const inFrame = (o.inFrame ?? 1) > 0.97;
+    const good = (o.err ?? 0) < 3.5 && (o.jitter ?? 0) < JITTER_OK && o.still !== false && inFrame;
+    // гистерезис: хороший кадр копит время, плохой — отнимает столько же (не обнуляет)
+    this.stableMs = good ? Math.min(STABLE_MS, this.stableMs + dt) : Math.max(0, this.stableMs - dt);
     const kind = this.verify ? o.kind ?? 'checking' : 'sber';
+    if (kind === 'sber') this.sberSince ||= o.t;
+    else this.sberSince = 0;
     if (kind === 'checking' && this.stableMs >= STABLE_MS * 0.5) this.checkingSince ||= o.t;
     else if (kind !== 'checking') this.checkingSince = 0;
     const patient = kind === 'checking' && o.maybeSber !== false && this.checkingSince > 0 && o.t - this.checkingSince >= CHECK_PATIENCE_MS;
     this.updateProgress(o, o.t, kind);
-    if (this.stableMs >= STABLE_MS && (kind === 'sber' || patient)) {
+    // карта Сбера узнана: не ждём идеального «ровно» дольше SBER_LAND_MS (поза правдоподобна, карта целиком в кадре,
+    // углы не скачут). Кот уже сидел на этой карте — RELAND_MS.
+    const sberFor = kind === 'sber' && this.sberSince ? o.t - this.sberSince : 0;
+    const poseOk = (o.err ?? 0) < 4 && inFrame && (o.jitter ?? 0) < 0.25;
+    const sberReady = kind === 'sber' && poseOk && sberFor >= (this.everLocked ? RELAND_MS : SBER_LAND_MS);
+    if ((this.stableMs >= STABLE_MS && (kind === 'sber' || patient)) || sberReady) {
       this.verified = kind === 'sber';
       this.progress = 1;
-      this.go('locked', o.t, kind === 'sber' ? 'карта Сбера, стабильно' : `знак не пойман за ${CHECK_PATIENCE_MS / 1000} с — по форме карты`);
+      this.go('locked', o.t, kind === 'sber' ? (this.stableMs >= STABLE_MS ? 'карта Сбера, стабильно' : `карта Сбера ${(sberFor / 1000).toFixed(1)} с`) : `знак не пойман за ${CHECK_PATIENCE_MS / 1000} с — по форме карты`);
     }
     return this.state;
   }
@@ -190,15 +214,18 @@ export class CardFsm {
     if (this.state === 'candidate' && o.found && kind) {
       // карта в кадре 0,15 → проверка «Сбер» до 0,6 → стабильность до 1
       const ver = kind === 'sber' ? 1 : kind === 'checking' ? (this.checkingSince ? Math.min(1, (t - this.checkingSince) / CHECK_PATIENCE_MS) * 0.9 : 0) : 0;
-      const stab = this.stableMs / STABLE_MS;
+      // у карты Сбера шкала «ровно» досчитывается и по времени узнавания (сядем не позже SBER_LAND_MS)
+      const sberT = kind === 'sber' && this.sberSince ? (t - this.sberSince) / (this.everLocked ? RELAND_MS : SBER_LAND_MS) : 0;
+      const stab = Math.min(1, Math.max(this.stableMs / STABLE_MS, sberT));
       p = kind === 'other' || kind === 'back' || kind === 'notcard' ? 0.1 : 0.15 + 0.45 * ver + 0.4 * stab * (kind === 'sber' ? 1 : 0.75);
       const size = o.size ?? 0.5;
       if (kind === 'other' || kind === 'back' || kind === 'notcard') want = kind;
       else if ((o.inFrame ?? 1) < 0.97 || size > 0.97) want = 'farther';
       else if (size < 0.33) want = 'closer';
       else if ((o.glare ?? 0) > 0.06) want = 'glare';
-      else if (o.still === false || (o.jitter ?? 0) > 0.04) want = 'steady';
-      else want = kind === 'checking' ? 'checking' : 'steady';
+      else if (kind === 'sber') want = 'found';
+      else if (o.still === false || (o.jitter ?? 0) > JITTER_OK) want = 'steady';
+      else want = 'checking';
     } else if (this.state === 'candidate') {
       p = this.progress; // короткий пропуск — прогресс держим
       want = this.hint;

@@ -35,7 +35,7 @@ export class BenchCardSession implements BenchSession {
     const r = this.s.request(t * 1000, this.capQ);
     const reset = this.pendingReset;
     this.pendingReset = false;
-    return { lock: r.lock, hint: r.hint, hintRadius: r.hintRadius, rot: r.rot, reset };
+    return { lock: r.lock, hint: r.hint, hintRadius: r.hintRadius, rot: r.rot, lostMs: r.lostMs, reset };
   }
   onResult(r: PipelineOut, _cap: { t: number }, K: Intrinsics, ctx: { angSpeed: number; now: number }) {
     this.s.K = K;

@@ -81,6 +81,13 @@ export class CardTracker extends TrackerBase implements Tracker {
   private sentCap: { id: number; q: THREE.Quaternion | null } | null = null;
   /** пересадка без новой карты дольше 6 с — «карта потеряна» (как раньше) */
   private reanchorAt = -1;
+  /** воркер сказал: следующий кадр — с полным поиском (к нему — фрагмент под проверку) */
+  private nextDetect = true;
+  /**
+   * Кот уже стоит на экране (была посадка, не «Пересадить»): никакого поискового интерфейса поверх кота — ни кольца,
+   * ни пунктира, ни «Держи телефон ровно…», ни повторного «Нашёл карту!»; повторная посадка — тихо.
+   */
+  private catPlaced = false;
 
   constructor(private container: HTMLElement) {
     super();
@@ -333,7 +340,7 @@ export class CardTracker extends TrackerBase implements Tracker {
       const frame = this.frameGrab ? grabFrame(v) : null;
       const crop = this.cropRect(v);
       const base = (rgba: ArrayBuffer): CardWorkerIn => {
-        const msg: CardWorkerIn = { id, rgba, w: this.dw, h: this.dh, focal: this.K.f, lock: req.lock, hint: req.hint, hintRadius: req.hintRadius, rot: req.rot, verify: this.verify };
+        const msg: CardWorkerIn = { id, rgba, w: this.dw, h: this.dh, focal: this.K.f, lock: req.lock, hint: req.hint, hintRadius: req.hintRadius, rot: req.rot, verify: this.verify, lostMs: req.lostMs };
         if (this.detectEvery > 0) msg.detectEvery = this.detectEvery;
         return msg;
       };
@@ -401,9 +408,26 @@ export class CardTracker extends TrackerBase implements Tracker {
    * после — раз в секунду (переверификация). Без карты в прошлом кадре — не нужен.
    */
   private cropRect(v: HTMLVideoElement): CardWorkerIn['crop'] {
-    if (!this.verify || !this.prevQuad) return null;
+    if (!this.verify) return null;
     const now = performance.now();
-    if (now - this.cropAt < (this.isLocked ? 1000 : 80)) return null;
+    const st = this.session.state;
+    if (st === 'hold' || st === 'relocalize') {
+      // кот сидит, карта потеряна: где она теперь — неизвестно (телефон сдвинули) — весь кадр в 1,9 раза крупнее
+      // кадра детектора, раз в 200 мс (только пока карта потеряна): воркер узнаёт карту Сбера по знаку среди
+      // кандидатов полного поиска (pipeline.ts relocalize)
+      if (now - this.cropAt < 200) return null;
+      const k = (v.videoWidth || this.dw) / this.dw;
+      const s = Math.min(k, FULL_CROP_PX / Math.max(this.dw, this.dh));
+      if (s < 1.3) return null;
+      this.cropAt = now;
+      return { x0: 0, y0: 0, w: this.dw, h: this.dh, cw: Math.round(this.dw * s), ch: Math.round(this.dh * s) };
+    }
+    if (!this.prevQuad) return null;
+    // до посадки знак проверяется только на кадрах полного поиска (через кадр) — фрагмент нужен именно им: раньше
+    // фрагмент шёл раз в 80 мс «как получится» и при 20–25 Гц воркера часто доставался кадру потока, а проверка
+    // полного поиска шла по 320-px кадру (карта 60 px — знак почти не виден)
+    if (!this.isLocked && !this.nextDetect && now - this.cropAt < 300) return null;
+    if (now - this.cropAt < (this.isLocked ? 1000 : 40)) return null;
     const vw = v.videoWidth || this.dw;
     const k = vw / this.dw; // px видео на px детектора
     if (k < 1.3) return null; // камера не больше кадра детектора — фрагмент ничего не даст
@@ -485,18 +509,21 @@ export class CardTracker extends TrackerBase implements Tracker {
       // посадили «по форме», а под котом не карта — ищем заново (детектор и проверку — с нуля)
       this.worker?.postMessage({ rgba: new ArrayBuffer(4), w: 1, h: 1, focal: 1, reset: true, lock: false });
       this.overlay.forgetRecent();
+      this.catPlaced = false;
     }
     this.prevQuad = st.quad ?? (this.session.fsm.anchored ? this.prevQuad : null);
+    this.nextDetect = r.detNext ?? true;
     const state = this.session.state;
     if (st.quad && st.pose) {
       const pose = st.pose;
       const view: CardView = { quad: st.quad.map((p) => this.toScreen(p)) as Quad, pose, project: (x, y) => this.projectModel(pose, x, y) };
-      if (state === 'candidate') this.overlay.candidate(view.quad, st.kind ?? 'checking');
+      if (state === 'candidate' && !this.catPlaced) this.overlay.candidate(view.quad, st.kind ?? 'checking');
       if (state === 'locked') {
         this.view = view;
-        this.overlay.track(view);
+        this.overlay.track(view, this.catPlaced);
       }
     } else if (state !== 'locked') this.view = null;
+    this.overlay.catPlaced = this.catPlaced;
     this.applyEvents(st, now);
     if (this.verDebug && this.session.log.length !== logN) for (const l of this.session.log.slice(logN)) console.info('[card]', l);
   }
@@ -510,6 +537,7 @@ export class CardTracker extends TrackerBase implements Tracker {
     }
     if (st.found) {
       this.reanchorAt = -1;
+      this.catPlaced = true;
       this.emitFound();
     }
     if (st.lost) {
@@ -534,6 +562,7 @@ export class CardTracker extends TrackerBase implements Tracker {
     this.session.reanchor(now);
     this.prevQuad = null;
     this.reanchorAt = now;
+    this.catPlaced = false;
     if (this.isTracking) this.isTracking = false;
     this.overlay.lost();
     this.overlay.forgetRecent();
@@ -661,6 +690,8 @@ function grabFrame(v: HTMLVideoElement): VideoFrame | null {
 }
 
 const FOCAL_KEY = 'ar.focal.v1';
+/** фрагмент «весь кадр» при потере карты: длинная сторона, px */
+const FULL_CROP_PX = 600;
 
 /** поза (R — столбцы осей карты в системе камеры, t — центр, единица = ширина карты) → матрица якоря */
 export function poseMatrix(p: Pose): THREE.Matrix4 {

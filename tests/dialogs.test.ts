@@ -143,6 +143,18 @@ describe('«хочешь к брату?»', () => {
 });
 
 describe('загадка', () => {
+  it('сменилась обстановка (вход в «Мой дом») — загадка заканчивается молча, слушать перестаём (чип «Сдаюсь» не едет в дом)', () => {
+    let { s } = run(inPlay(), [heard('riddle')]);
+    expect(s.dialog?.id).toBe('riddle');
+    const r = step(s, { type: 'context_change' });
+    s = r.state;
+    expect(s.dialog).toBeNull();
+    expect(r.actions.some((a) => a.type === 'stop_listen')).toBe(true);
+    expect(says(r.actions)).toEqual([]);
+    // знакомство обстановкой не прерывается
+    const intro = run(initialState(), toChoose).s;
+    expect(step(intro, { type: 'context_change' }).state.dialog).toEqual(intro.dialog);
+  });
   it('загадывает → верно → хвалит → ещё? → да → новая загадка', () => {
     let { s, all } = run(inPlay(), [heard('riddle')]);
     expect(says(all)).toEqual(['riddle', '$riddle.q']);

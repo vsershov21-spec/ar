@@ -805,7 +805,8 @@ export class Director extends Emitter<DirectorEvents> {
     if (visuals) this.playVisual({ clip: pk.clip, fx: pk.fx ? [pk.fx] : [], sound: pk.sound, face: pk.face });
     else this.face(pk.face);
     // пузырь живёт ровно столько, сколько звучит реплика (скрывается в конце, а не по таймеру длины текста)
-    this.d.ui.say(pk.text, p.name, p.id, 60_000);
+    const shown = this.bubbleText(pk);
+    this.d.ui.say(shown, p.name, p.id, 60_000);
     this.emit('log', `🗨 ${lineId}: ${pk.text}`);
     if (pk.event === 'meet_skills') this.startCoach();
     const prevClip = this.character.currentClip;
@@ -821,9 +822,21 @@ export class Director extends Emitter<DirectorEvents> {
       await this.d.voice.speak(req);
     } finally {
       this.lastCatEnd = performance.now();
-      this.d.ui.hideBubble?.(pk.text);
+      this.d.ui.hideBubble?.(shown);
       if (talk && this.character.currentClip === 'talk') this.character.play('idle');
     }
+  }
+
+  /**
+   * Текст пузыря. Вступление к подсказке загадки («Подумай ещё. Подсказка:») — отдельная запись, а сама подсказка
+   * звучит следующей репликой (или пропускается, если не озвучена): в пузыре вступление с пустым хвостом «Подсказка:»
+   * висело 1,5–2 с (запись продакта 18.11). Показываем его сразу с текстом подсказки.
+   */
+  private bubbleText(pk: PickedLine): string {
+    const t = pk.text;
+    if (pk.event !== 'riddle_hint' || !/[:—–-]\s*$/.test(t)) return t;
+    const hint = this.currentRiddle()?.hint?.trim();
+    return hint ? `${t} ${hint}` : t.replace(/\s*[:—–-]\s*$/, '.');
   }
 
   /** повторялка: фраза ребёнка голосом характера (выше тоном) */

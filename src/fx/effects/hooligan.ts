@@ -89,7 +89,10 @@ class GumBubble extends Timed {
     this.x = m.x;
     this.y = m.y;
     this.color = (def.params.color as string) ?? env.palette.accent;
-    this.R = num(def.params, 'maxScale', 1.4) * Math.min(env.w, env.h) * 0.5;
+    // размер — от роста кота на экране, а не от экрана: пузырь на полэкрана закрывал всего кота (запись 18.11);
+    // не больше четверти короткой стороны экрана
+    const catH = env.anchor('head').s;
+    this.R = Math.max(26, Math.min(num(def.params, 'maxScale', 1.4) * 0.24 * catH, 0.25 * Math.min(env.w, env.h)));
     this.popAt = num(def.params, 'popAt', 0.8) * this.life;
   }
   update(dt: number, env: FxEnv) {
@@ -97,11 +100,10 @@ class GumBubble extends Timed {
     if (this.popped) return false;
     const grow = clamp(this.t / (this.popAt * 0.85), 0, 1);
     this.r = 4 + (this.R - 4) * grow * grow * (3 - 2 * grow);
-    // пока маленький — держится у рта, потом центр уходит к центру экрана
+    // держится у рта и растёт вниз-вбок: глаза и макушка кота остаются видны
     const m = env.anchor('mouth');
-    const follow = clamp(1 - grow * 2, 0, 1);
-    this.x += ((follow ? m.x : env.w / 2) - this.x) * Math.min(1, dt * (follow ? 20 : 1.6));
-    this.y += ((follow ? m.y + this.r * 0.8 : env.h / 2) - this.y) * Math.min(1, dt * (follow ? 20 : 1.6));
+    this.x += (m.x + this.r * 0.3 - this.x) * Math.min(1, dt * 20);
+    this.y += (m.y + this.r * 0.75 - this.y) * Math.min(1, dt * 20);
     if (this.t >= this.popAt || this.stopped) {
       this.popped = true;
       env.sound('gum_pop');

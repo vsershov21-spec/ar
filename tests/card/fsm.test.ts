@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CardFsm, CHECK_PATIENCE_MS, HOLD_AFTER_MS, HOLD_MS, LOST_MS, type Obs } from '../../src/tracker/card/fsm';
+import { CardFsm, CHECK_PATIENCE_MS, HOLD_AFTER_MS, HOLD_MS, LOST_MS, RELAND_MS, SBER_LAND_MS, type Obs } from '../../src/tracker/card/fsm';
 
 const good = (t: number, o: Partial<Obs> = {}): Obs => ({ t, found: true, mode: 'detect', err: 1, jitter: 0.01, size: 0.5, inFrame: 1, glare: 0, still: true, kind: 'sber', ...o });
 const miss = (t: number): Obs => ({ t, found: false, mode: 'none' });
@@ -138,5 +138,47 @@ describe('машина состояний трекера карты', () => {
     run(b, 0, CHECK_PATIENCE_MS + 1500, (t) => good(t, { kind: 'checking', maybeSber: true }));
     expect(b.state).toBe('locked');
     expect(b.verified).toBe(false);
+  });
+
+  it('карта Сбера узнана, а «ровно» не копится (рука, шум углов 5–8 % диагонали) — сели не позже ≈ 0,6–0,7 с', () => {
+    // запись продакта 18.11: кольцо «Держи телефон ровно…» крутилось 12–15 с на хорошо видной карте
+    const f = new CardFsm(true);
+    let k = 0;
+    run(f, 0, 3000, (t) => good(t, { jitter: k++ % 2 ? 0.08 : 0.05, still: k % 3 !== 0 }));
+    expect(f.state).toBe('locked');
+    expect(f.verified).toBe(true);
+    const at = f.log.find((e) => e.to === 'locked')!.t;
+    expect(at).toBeLessThanOrEqual(SBER_LAND_MS + 140);
+  });
+
+  it('без узнавания «Сбер» нестабильная карта не садится раньше терпения (ложных посадок не прибавилось)', () => {
+    const f = new CardFsm(true);
+    run(f, 0, CHECK_PATIENCE_MS - 200, (t) => good(t, { kind: 'checking', jitter: 0.08 }));
+    expect(f.state).toBe('candidate');
+    const g = new CardFsm(true);
+    run(g, 0, 4000, (t) => good(t, { kind: 'other', jitter: 0.01 }));
+    expect(g.state).toBe('candidate');
+    // поза неправдоподобна (угол за краем кадра) — не садимся и по узнаванию
+    const h = new CardFsm(true);
+    run(h, 0, 3000, (t) => good(t, { inFrame: 0.75 }));
+    expect(h.state).toBe('candidate');
+  });
+
+  it('карту вернули после потери — та же карта Сбера, посадка почти сразу (RELAND_MS)', () => {
+    const f = new CardFsm(true);
+    run(f, 0, 600, good);
+    f.tick(f.seenAt + LOST_MS + 100);
+    expect(f.state).toBe('lost');
+    const t1 = f.seenAt + LOST_MS + 1000;
+    run(f, t1, t1 + 400, (t) => good(t, { jitter: 0.1 }));
+    expect(f.state).toBe('locked');
+    expect(f.log.at(-1)!.t - t1).toBeLessThanOrEqual(RELAND_MS + 70);
+  });
+
+  it('пока карта Сбера узнана и кот вот-вот сядет — подсказка «нашёл», не «держи ровно»', () => {
+    const f = new CardFsm(true);
+    f.observe(good(0, { kind: 'checking' }));
+    run(f, 66, 2000, (t) => good(t, { kind: t < 1500 ? 'checking' : 'sber', jitter: 0.2, err: 4.5 }));
+    expect(f.hint).not.toBe('steady');
   });
 });

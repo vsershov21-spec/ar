@@ -90,7 +90,7 @@ export class CardSession {
   }
 
   /** что послать воркеру с кадром, снятым при ориентации capQ */
-  request(now: number, capQ: THREE.Quaternion | null): { lock: boolean; hint: Pt[] | null; hintRadius: number; rot: number[] | null } {
+  request(now: number, capQ: THREE.Quaternion | null): { lock: boolean; hint: Pt[] | null; hintRadius: number; rot: number[] | null; lostMs: number } {
     const f = this.fsm;
     let rot: number[] | null = null;
     if (capQ && this.lastCapQ && this.gyroOk) {
@@ -101,7 +101,7 @@ export class CardSession {
     }
     this.lastCapQ = capQ ? capQ.clone() : null;
     const anchoredLost = f.anchored && f.state !== 'locked';
-    return { lock: f.anchored, hint: anchoredLost ? this.hintQuad(capQ) : null, hintRadius: f.hintRadius(now), rot };
+    return { lock: f.anchored, hint: anchoredLost ? this.hintQuad(capQ) : null, hintRadius: f.hintRadius(now), rot, lostMs: anchoredLost ? Math.max(0, now - f.seenAt) : 0 };
   }
 
   /** где карта сейчас по удерживаемой позе (в px кадра детектора) — подсказка воркеру */
@@ -157,6 +157,9 @@ export class CardSession {
     if (r.quad && r.score >= 0.5) {
       quad = labelCard(r.quad, this.K, this.prevQuad ?? (now - this.orientAt < 8000 ? this.orientRef : null));
       pose = poseFromQuad(quad, this.K, CARD_ASPECT);
+      // фокус по уже ведомой карте — и когда поза отброшена: при фокусе «по умолчанию», далёком от настоящего,
+      // ошибка наклонной карты всегда > 2 px, и самокалибровка (раньше — только при err < 2) не начиналась никогда
+      if (pose && f.anchored && pose.err < 8 && r.mode !== 'plane') this.calibrate(quad);
       if (pose && (pose.err > 4 || pose.t[2] > -0.5)) {
         this.note(now, `поза отброшена: err ${pose.err.toFixed(1)} z ${pose.t[2].toFixed(2)}`);
         pose = null;
@@ -175,7 +178,6 @@ export class CardSession {
       this.prevQuad = quad;
       this.orientRef = quad;
       this.orientAt = now;
-      if (pose.err < 2 && f.state === 'locked') this.calibrate(quad);
     } else {
       this.quadSpeed *= 0.7;
       // карта пропала надолго — нумерацию забываем (через 8 с — orientRef)
@@ -210,7 +212,9 @@ export class CardSession {
     }
     // поза в мир и фильтр
     if (found && pose && f.anchored) {
-      if (f.state === 'locked' && before !== 'locked' && (before === 'candidate' || !this.hasW)) this.hasW = false; // новая посадка — с нуля
+      // новая посадка — с нуля; карту нашли заново после долгой потери (RELOCALIZE: телефон сдвинули, карта в другом
+      // месте кадра) — тоже сразу на карту, без «подлёта» фильтром через весь экран
+      if (f.state === 'locked' && before !== 'locked' && (before === 'candidate' || before === 'relocalize' || !this.hasW)) this.hasW = false;
       this.measure(pose, capQ, now);
     }
     if (f.state === 'locked' && (before === 'candidate' || before === 'search' || before === 'lost')) {

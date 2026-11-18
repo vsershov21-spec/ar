@@ -371,7 +371,9 @@ export class App {
       if (k === lastState) return;
       lastState = k;
       this.ui.setListening(s.asrState === 'listening');
-      if (s.asrState === 'loading') this.ui.micHintText(`Загружаю распознавание… ${Math.round(s.modelProgress * 100)}%`);
+      // 99 % — архив скачан, дальше Vosk распаковывает его в своём воркере (на iPhone — десятки секунд): «99 %» висело
+      // всё это время поверх поиска карты (запись 18.11). Процент — только пока качаем, распаковка — молча
+      if (s.asrState === 'loading') this.ui.micHintText(s.modelProgress < 0.99 ? `Загружаю распознавание… ${Math.round(s.modelProgress * 100)}%` : '');
       else if (s.asrState === 'listening') this.ui.micHintText(s.echo !== 'off' ? 'Говори — повторю!' : 'Слушаю…');
       else if (s.asrState === 'error')
         this.ui.micHintText(s.micError === 'not-allowed' ? 'Нет доступа к микрофону — жми лапку' : /no-model/.test(s.lastEvent) ? 'Офлайн-модель не найдена — жми лапку' : 'Не расслышал, попробуй ещё', s.micError === 'not-allowed' || /no-model/.test(s.lastEvent) ? 'warn' : 'info');
@@ -850,7 +852,19 @@ export class App {
     };
     // офлайн-распознавание (~45 МБ + 2.4 МБ движок) — заранее, чтобы первое «нажми и скажи» не ждало;
     // не на «экономии трафика»
-    if (!(navigator as any).connection?.saveData) setTimeout(() => void this.engine.asr.preload?.(), 3000);
+    // Не во время поиска карты: распаковка модели (воркер Vosk, WASM) на iPhone забирала процессор у трекера —
+    // посадка шла медленнее. Начинаем через 1,5 с после посадки кота (или через 25 с, если карты так и нет).
+    if (!(navigator as any).connection?.saveData) {
+      let started = false;
+      const go = () => {
+        if (started) return;
+        started = true;
+        off();
+        void this.engine.asr.preload?.();
+      };
+      const off = this.tracker.onFound(() => setTimeout(go, 1500));
+      setTimeout(go, 25_000);
+    }
     if (this.audio.maybeSilentSwitch) setTimeout(() => this.ui.toast('Не слышно кота? Проверь переключатель «Без звука» сбоку iPhone и громкость.', 5000), 2500);
     // десктоп-просмотр: датчиков нет — не спрашиваем; микрофон — только по кнопке
     const desk = this.desktopView;

@@ -29,6 +29,7 @@ export const HINT_TEXT: Record<Exclude<Hint, null>, string> = {
   glare: 'Блик! Наклони карту чуть-чуть',
   steady: 'Держи телефон ровно…',
   checking: 'Смотрю на карту…',
+  found: 'Вот она! Секунду…',
   other: 'Это карта другого банка',
   back: 'Переверни карту',
   notcard: 'Это не карта',
@@ -79,11 +80,17 @@ export class CardOverlay {
     this.wasEmpty = false;
   }
 
-  /** детектор видит карту (уже подтверждённую трекером) */
-  track(v: CardView) {
+  /**
+   * Кот уже стоит на экране (cardTracker): кандидат, кольцо, «Держи ровно», «Это не карта» и анимация «нашёл»
+   * поверх кота не рисуются — повторная посадка тихая.
+   */
+  catPlaced = false;
+
+  /** детектор видит карту (уже подтверждённую трекером); silent — кот уже стоял: без анимации «нашёл» */
+  track(v: CardView, silent = false) {
     this.view = v;
-    // карта вернулась через пару секунд — без повторной анимации «нашёл» и искр, кот просто стоит дальше
-    if (this.state === 'search' && performance.now() - this.lostAt < 5000) {
+    // карта вернулась (или кот и так на экране) — без повторной анимации «нашёл» и искр, кот просто стоит дальше
+    if (this.state === 'search' && (silent || performance.now() - this.lostAt < 5000)) {
       this.state = 'locked';
       this.t = FADE_S;
       return;
@@ -210,7 +217,7 @@ export class CardOverlay {
   private trackState: TrackState = 'search';
   private scanEl: HTMLElement | null = null;
   candidate(pts: Pt[], kind: CandidateKind = 'sber') {
-    if (this.state !== 'search') return;
+    if (this.state !== 'search' || this.catPlaced) return;
     const now = performance.now();
     if (kind === 'notcard') {
       this.cand = null;
@@ -225,6 +232,7 @@ export class CardOverlay {
     this.hint = hint;
     // нижняя подсказка «Наведи камеру…» не спорит с кольцом над картой: пока кандидат на экране — прячем
     this.scanEl ??= document.querySelector('.scan');
+    if (this.catPlaced) this.cand = this.notCard = null;
     const showCand = state === 'candidate' && !!this.cand && performance.now() - this.cand.at < 600;
     const vis = showCand ? 'hidden' : '';
     if (this.scanEl && this.scanEl.style.visibility !== vis) this.scanEl.style.visibility = vis;
