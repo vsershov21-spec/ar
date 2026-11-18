@@ -40,10 +40,11 @@ export const LIMITS = {
 };
 
 /** события воронки и их свойства (тот же список — src/analytics/index.ts EVENTS/PROPS); всё прочее — 400 */
-export const FUNNEL = ['open', 'onboarding_done', 'camera_granted', 'card_landed', 'awake_done', 'named', 'action', 'game_start', 'game_end', 'cat_switch', 'home_enter', 'sleep', 'wake', 'card_lost', 'sberkids_click', 'session_end'];
+export const FUNNEL = ['open', 'onboarding_done', 'camera_granted', 'card_landed', 'awake_done', 'named', 'action', 'game_start', 'game_end', 'cat_switch', 'home_enter', 'sleep', 'wake', 'card_lost', 'sberkids_click', 'session_end', 'paint_offer', 'paint_start', 'paint_done', 'paint_erase'];
 const EVENT_PROPS = {
   card_landed: { ms: 'num' }, action: { id: 'id' }, game_start: { id: 'id' }, game_end: { id: 'id' }, cat_switch: { to: 'id' },
   home_enter: { reason: 'id' }, card_lost: { count: 'num' }, sberkids_click: { kind: 'id' }, session_end: { sec: 'num' },
+  paint_start: { color: 'id' },
 };
 const PROP_ID_RE = /^[a-z0-9_:.-]{1,32}$/i;
 /** свойства события: только известные ключи, числа 0…10⁷, строки-id; остальное (имена, тексты, данные карты) — выбрасывается */

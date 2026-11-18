@@ -12,6 +12,8 @@ import { getDeviceId, safeStorage } from '../progress/device';
 export const EVENTS = [
   'open', 'onboarding_done', 'camera_granted', 'card_landed', 'awake_done', 'named', 'action', 'game_start', 'game_end',
   'cat_switch', 'home_enter', 'sleep', 'wake', 'card_lost', 'sberkids_click', 'session_end',
+  // раскраска карты (src/card/paint.ts)
+  'paint_offer', 'paint_start', 'paint_done', 'paint_erase',
 ] as const;
 export type EventName = (typeof EVENTS)[number];
 
@@ -27,6 +29,7 @@ export const PROPS: Partial<Record<EventName, Record<string, Kind>>> = {
   card_lost: { count: 'num' },
   sberkids_click: { kind: 'id' },
   session_end: { sec: 'num' },
+  paint_start: { color: 'id' },
 };
 const ID_RE = /^[a-z0-9_:.-]{1,32}$/i;
 

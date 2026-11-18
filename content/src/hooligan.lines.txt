@@ -777,3 +777,35 @@ whisper: Спокойной ночи... Ночник пусть горит... х
 ## skate | clip=idle_hooligan_skate fx=skate_sparks sound=skate_grind
 ## cocoa
 ## mirror
+
+## paint_offer | clip=point_button
+cheeky: Слушай, хочешь, раскрашу твою карту? Будет граффити!
+excited: Йо! Давай я разрисую твою карту? Будет круто!
+cheeky: А давай твою карту раскрасим? У меня баллончик есть!
+
+## paint_choose | clip=none
+cheeky: Выбирай цвет! Какой круче?
+excited: Какой баллончик берём? Жми на цвет!
+cheeky: Так, выбирай краску. Любая подойдёт!
+
+## paint_start | clip=none
+excited: Погнали! Сейчас будет красота!
+cheeky: Пш-ш-ш! Не моргай, я художник!
+excited: Поехали! Смотри, как я умею!
+
+## paint_done | clip=celebrate
+excited: Та-да! Вот это граффити!
+proud: Та-да! Самая крутая карта во дворе!
+excited: Та-да! Огонь, правда?
+
+## paint_need_card | clip=none
+neutral: Сначала покажи мне карту. Наведи на неё камеру!
+cheeky: Сначала покажи мне карту! Мне нужна стена... то есть карта.
+cheeky: Где карта? Покажи её, и я раскрашу!
+
+## paint_again | clip=none
+cheeky: Перекрасим? Сделаю по-новому!
+excited: Ещё раз? Давай новое граффити!
+cheeky: Новый цвет? Без проблем, перекрашу!
+
+## paint_card

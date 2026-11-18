@@ -94,7 +94,9 @@
   "turn_over_sleep": "Sleeping cat lying on its left side stirs, mumbles, rolls halfway onto its back with a lazy wave of one paw, then rolls back onto its side and settles asleep again, eyes closed. Stays in place.",
   "wake_stretch_in_bed": "Cat lying on its left side in bed opens its eyes, stretches the arms over the head and the legs out long, yawns widely with a paw over the mouth, then sits up and swings round to sit on the edge of the bed facing forward with the legs dangling. Stays in place.",
   "hop_out_of_bed": "Cat sitting on the side edge of a bed with the legs dangling, facing the viewer, pushes off with both paws and hops down to the floor beside the bed, lands softly with bent knees and stands up facing forward. Ends in a neutral standing pose, in place.",
-  "walk_to_bedside": "Sleepy cat walks slowly in place with small shuffling steps, head slightly lowered, rubbing one eye with a paw once, arms relaxed. Seamless loop, does not move forward."
+  "walk_to_bedside": "Sleepy cat walks slowly in place with small shuffling steps, head slightly lowered, rubbing one eye with a paw once, arms relaxed. Seamless loop, does not move forward.",
+  "paint_brush": "Happy cat leans forward over the floor holding a big paintbrush in the right paw and paints wide strokes left and right on the ground in front of its feet, the left arm out to the side for balance, head follows the brush. Seamless loop, stays in place.",
+  "paint_spray": "Cool cat shakes a spray can in the right paw twice, leans forward and sprays the ground in front of its feet in wide arcs left and right, bobbing the head to the beat. Seamless loop, stays in place."
  },
  "specs": {
   "poke_head": {
@@ -1293,6 +1295,36 @@
     "duration": 2.0,
     "mode": "prime"
    }
+  },
+  "paint_brush": {
+   "priority": "P1",
+   "group": "Раскраска карты",
+   "durationS": 2.0,
+   "loop": true,
+   "start": "стойка idle (наклон)",
+   "end": "= старт (петля)",
+   "replaces": "опора `breath_draw` (рисует на стекле перед собой, а не на карте под ногами)",
+   "trigger": "code:card.paint — Добряк и Блёстка на концах рядов раскраски (src/card/paint.ts)",
+   "meshy": {
+    "prompt": "Leans forward from the hips over the floor holding a paintbrush in the right hand, painting wide smooth strokes left and right on the ground just in front of the feet; left arm out to the side for balance, head follows the brush. Feet stay planted. Seamless loop, in place, no turning.",
+    "duration": 2.0,
+    "mode": "prime"
+   }
+  },
+  "paint_spray": {
+   "priority": "P1",
+   "group": "Раскраска карты",
+   "durationS": 2.0,
+   "loop": true,
+   "start": "стойка idle (наклон)",
+   "end": "= старт (петля)",
+   "replaces": "опора `scratch_glass` (царапает стекло перед собой)",
+   "trigger": "code:card.paint — Хулиган на концах рядов раскраски (src/card/paint.ts)",
+   "meshy": {
+    "prompt": "Shakes a spray can in the right hand twice at chest height, then leans forward and sprays the ground just in front of the feet in wide arcs left and right, bobbing the head to a beat; left hand on the hip. Feet stay planted. Seamless loop, in place, no turning.",
+    "duration": 2.0,
+    "mode": "prime"
+   }
   }
  },
  "props": {
@@ -1455,6 +1487,26 @@
    "bone": "RightHand",
    "size": 0.17,
    "prompt": null
+  },
+  "paint_brush": {
+   "status": "процедурная есть (src/card/paintProps.ts makeBrush)",
+   "priority": "P2",
+   "for": [
+    "paint_brush"
+   ],
+   "bone": "RightHand",
+   "size": 0.3,
+   "prompt": "A chunky cartoon paintbrush, short rounded wooden handle with a white end cap, silver ferrule, fat soft bristles with a pointed tip (bristles as a separate material to be tinted), game asset, low detail, clean topology"
+  },
+  "spray_can": {
+   "status": "процедурная есть (src/card/paintProps.ts makeSpray)",
+   "priority": "P2",
+   "for": [
+    "paint_spray"
+   ],
+   "bone": "RightHand",
+   "size": 0.17,
+   "prompt": "A chunky cartoon spray paint can, rounded body (separate tintable material) with a white stripe, silver shoulders, white nozzle cap, no text and no logo, game asset, low detail, clean topology"
   }
  },
  "meshy": "Meshy Text-to-Motion (scripts/meshy/motion-run.sh, docs/animations/MESHY.md): specs[id].meshy = {prompt ≤400, duration 2–10 шаг 0,5 = durationS ТЗ вверх до 0,5 и не меньше 2, mode}. Промпты — только движение тела одного персонажа, на месте, без хвоста/ушей/лица; старт/финиш — стойка, кроме цепочек сна и сидения."

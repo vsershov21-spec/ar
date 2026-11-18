@@ -59,7 +59,7 @@ export const FEATURES = {
   'pilot.switchCooldown': { mvp: false, lab: false, pilot: true, note: 'смена кота не чаще раза в 3 мин, иначе «Чуть позже!» (config/pilot.ts SwitchCooldown, director.switchGate)' },
   'glass.gestures': { mvp: false, lab: true, pilot: true, note: 'стекло пальцем у всех котов: свайп — царапины (claws + claws_glass), долгое нажатие мимо кота — стекло запотевает, рисуем пальцем (steam_draw) — app.ts bindInput' },
   analytics: { mvp: false, lab: true, pilot: true, note: 'воронка: события sendBeacon → POST /api/progress/event (src/analytics, docs/ANALYTICS.md); ?noanalytics — выкл.' },
-  'card.paint': { mvp: false, lab: true, pilot: true, note: 'раскраска карты — следующий этап; пока только флаг и пустая точка входа (src/card/paint.ts)' },
+  'card.paint': { mvp: false, lab: true, pilot: true, note: 'раскраска карты котом: предложение, лист цветов, рисунок на плоскости карты, память (src/card/paint.ts; app.ts applyEdition — точка входа)' },
   // ── только lab ──
   'games.new': { mvp: false, lab: true, pilot: false, note: 'мини-игры «Угадай рожицу», «Камень-ножницы», «Делай как я» (emo/rps/simon): persona/content.ts убирает их диалоги' },
   'stickers.pack': { mvp: false, lab: true, pilot: false, note: 'новый пак наклеек СберКота и коллекция (fx/stickerPack, fxLayer)' },
@@ -95,6 +95,7 @@ export const PARAMS: Record<string, { feature: FeatureId; test?: boolean; keep?:
   dur: { feature: 'debug.flows', test: true },
   rate: { feature: 'debug.flows', test: true },
   zone: { feature: 'debug.flows', test: true }, // ?flow=home&zone=kitchen (src/home)
+  swatch: { feature: 'card.paint' }, // ?flow=paint&swatch=0..2 — сразу раскраска цветом (src/card/paint.ts)
   bed: { feature: 'home.bed' }, // ?flow=home&zone=bedroom&bed=sleep|wake|night|morning (src/home/bedFlow.ts) — кровать в lab и пилоте
   hour: { feature: 'home.bed' }, // &hour=21 — местный час для кровати (утро, тихий час, вечер)
   nocard: { feature: 'tracker.nocard', test: true },
@@ -140,7 +141,9 @@ export function filterSearch(search: string, edition: Edition = EDITION, referre
     const rule = PARAMS[k];
     // новые мини-игры выключены — их флоу тоже (даже со страницы /test)
     const offGame = k === 'flow' && !featureIn(edition, 'games.new') && (NEW_GAMES as readonly string[]).includes(v);
-    const ok = !offGame && (!rule || featureIn(edition, rule.feature) || !!rule.keep?.includes(v) || (!!rule.test && test));
+    // раскраски карты нет в редакции — и её флоу тоже
+    const offPaint = k === 'flow' && v === 'paint' && !featureIn(edition, 'card.paint');
+    const ok = !offGame && !offPaint && (!rule || featureIn(edition, rule.feature) || !!rule.keep?.includes(v) || (!!rule.test && test));
     if (!ok) removed.push(part);
     return ok;
   });

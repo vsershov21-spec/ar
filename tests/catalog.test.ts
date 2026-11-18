@@ -20,7 +20,7 @@ describe('каталоги content/', () => {
   });
 
   it('для каждого клипа каталога есть процедурная заглушка рига', () => {
-    expect(CLIP_IDS.length).toBe(78);
+    expect(CLIP_IDS.length).toBe(80); // + paint_brush, paint_spray (раскраска карты)
     const missing = CLIP_IDS.filter((id) => !RIG_CLIPS[id]);
     expect(missing).toEqual([]);
     for (const id of CLIP_IDS) {

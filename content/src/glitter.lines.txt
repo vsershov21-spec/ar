@@ -771,3 +771,35 @@ whisper: Спокойной ночи... Звёздочки, светите ти�
 ## mirror | clip=idle_glitter_mirror sound=sparkle_swipe
 ## skate
 ## cocoa
+
+## paint_offer | clip=point_button
+excited: Хочешь, раскрашу твою карту? Будет сиять!
+happy: А давай я украшу твою карту звёздочками?
+excited: Можно, я сделаю твою карту блестящей?
+
+## paint_choose | clip=none
+happy: Выбирай цвет! Какой сияет ярче?
+excited: Какой цвет берём? Выбирай!
+happy: Выбери краску, а я добавлю блёсток.
+
+## paint_start | clip=none
+excited: Начинаю! Звёздочки, блёстки, сияние!
+happy: Смотри внимательно, сейчас будет волшебство!
+excited: Рисую! Чуть-чуть блеска сюда...
+
+## paint_done | clip=celebrate
+excited: Та-да! Карта сияет!
+proud: Та-да! Самая блестящая карта на свете!
+excited: Та-да! Правда красиво?
+
+## paint_need_card | clip=none
+happy: Сначала покажи мне карту. Наведи на неё камеру!
+happy: Сначала покажи мне карту! Без неё не нарисую.
+excited: А где карта? Покажи, и я сделаю её блестящей!
+
+## paint_again | clip=none
+excited: Перекрасим? Сделаю ещё красивее!
+happy: По-новому? Обожаю перекрашивать!
+excited: Ещё раз? Новые звёздочки!
+
+## paint_card

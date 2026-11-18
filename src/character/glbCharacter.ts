@@ -563,6 +563,10 @@ export class GlbCharacter implements Character {
   }
 
   /** «стук в стекло»: в 3D лапа не тянется, но глаза быстро глядят на точку тапа */
+  holdProp(id: string | null, tint: string | null = null) {
+    this.props?.hold(id, tint);
+  }
+
   reach(target: { dx: number; dy: number } | null) {
     if (target) this.eyes?.glanceAt(target.dx, target.dy);
   }

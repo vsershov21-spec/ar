@@ -1,12 +1,18 @@
 /**
- * Реквизит в лапе на время клипа: мыльные пузыри, какао, зеркальце, снежный шар.
- * Модели — public/models/props/*.glb (Tripo), грузятся лениво при первом клипе.
+ * Реквизит в лапе на время клипа: мыльные пузыри, какао, зеркальце, снежный шар; кисть и баллончик раскраски карты.
+ * Модели — public/models/props/*.glb (Tripo), грузятся лениво при первом клипе; кисть и баллончик — процедурные
+ * (make, src/card/paintProps.ts). hold(id) — держать реквизит, пока его не отпустят, при любом клипе (кот идёт по
+ * карте с кистью в лапе).
  * Крепление к кости кисти Mixamo: начало кости — запястье, ось +Y кости идёт к пальцам.
  */
 import * as THREE from 'three';
+import { makeBrush, makeSpray } from '../card/paintProps';
 
 export interface PropDef {
-  url: string;
+  /** GLB-модель (или make — процедурная) */
+  url?: string;
+  /** процедурный реквизит: части с материалом по имени 'paint' перекрашиваются в hold(id, tint) */
+  make?: () => THREE.Object3D;
   /** кость кисти без префикса mixamorig: */
   bone: 'RightHand' | 'LeftHand';
   /** держит двумя лапами — точка хвата посередине между кистями */
@@ -24,6 +30,9 @@ export const PROPS: Record<string, PropDef> = {
   idle_kind_cocoa: { url: 'models/props/cocoa_mug.glb', bone: 'RightHand', size: 0.08, offset: [0.02, -0.03, 0.08], rot: [0, -30, 0] },
   idle_glitter_mirror: { url: 'models/props/hand_mirror.glb', bone: 'LeftHand', size: 0.16, offset: [0, -0.02, 0.07], rot: [-20, 160, 0] },
   snowglobe_shake: { url: 'models/props/snow_globe.glb', bone: 'RightHand', both: true, size: 0.13, offset: [0, -0.04, 0.05], rot: [0, 0, 0] },
+  // раскраска карты (src/card/paint.ts): кисть Добряка и Блёстки, баллончик Хулигана — процедурные
+  paint_brush: { make: makeBrush, bone: 'RightHand', size: 0.3, offset: [0, 0.02, 0.08], rot: [140, 0, -15] },
+  paint_spray: { make: makeSpray, bone: 'RightHand', size: 0.17, offset: [0, -0.06, 0.08], rot: [35, 0, -10] },
 };
 
 type Loader = (url: string) => Promise<THREE.Object3D>;
@@ -33,6 +42,28 @@ export class PropRig {
   private active: { clip: string; obj: THREE.Object3D; def: PropDef; hand: THREE.Object3D } | null = null;
   private want = '';
   private v = new THREE.Vector3();
+  /** реквизит «в руках» поверх клипа (hold) и его цвет */
+  private held: string | null = null;
+  private tint: string | null = null;
+  private lastClip = '';
+
+  /** держать реквизит id при любом клипе (null — отпустить, дальше — по клипу); tint — цвет частей 'paint' */
+  hold(id: string | null, tint: string | null = null) {
+    this.held = id && PROPS[id] ? id : null;
+    this.tint = tint;
+    if (this.active) this.paint(this.active.obj);
+    this.update(this.lastClip);
+  }
+  get holding() {
+    return this.held;
+  }
+  private paint(obj: THREE.Object3D) {
+    if (!this.tint) return;
+    obj.traverse((o) => {
+      const m = (o as THREE.Mesh).material as THREE.MeshStandardMaterial | undefined;
+      if (m && m.name === 'paint') m.color.set(this.tint!);
+    });
+  }
 
   constructor(
     private load: Loader,
@@ -42,7 +73,9 @@ export class PropRig {
   ) {}
 
   /** каждый кадр после позы: текущий клип → показать/убрать реквизит и держать его у кисти */
-  update(clip: string) {
+  update(clipNow: string) {
+    this.lastClip = clipNow;
+    const clip = this.held ?? clipNow;
     if (clip !== this.want) {
       this.want = clip;
       if (this.active && this.active.clip !== clip) {
@@ -51,11 +84,12 @@ export class PropRig {
       }
       const def = PROPS[clip];
       if (def)
-        this.get(def).then((proto) => {
+        this.get(def, clip).then((proto) => {
           if (!proto || this.want !== clip || this.active) return;
           const hand = this.bone(def.bone);
           if (!hand) return;
           this.active = { clip, obj: this.make(proto, def), def, hand };
+          this.paint(this.active.obj);
           this.root.add(this.active.obj);
         });
     }
@@ -97,14 +131,17 @@ export class PropRig {
     return pivot;
   }
 
-  private get(d: PropDef) {
-    let p = this.cache.get(d.url);
+  private get(d: PropDef, id: string) {
+    const key = d.url ?? `make:${id}`;
+    let p = this.cache.get(key);
     if (!p) {
-      p = this.load(d.url).catch((e) => {
-        console.warn('[props] не загрузился', d.url, e);
-        return null;
-      });
-      this.cache.set(d.url, p);
+      p = d.make
+        ? Promise.resolve(d.make())
+        : this.load(d.url!).catch((e) => {
+            console.warn('[props] не загрузился', d.url, e);
+            return null;
+          });
+      this.cache.set(key, p);
     }
     return p;
   }

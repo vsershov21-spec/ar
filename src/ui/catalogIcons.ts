@@ -39,5 +39,8 @@ export const CAT_ICON: Record<string, string> = {
   /** фирменные действия пилота: скейт Хулигана, зеркальце Блёстки (какао — home_mug из home/icons.ts) */
   skate: S('<path d="M3 13.5h18" stroke-width="2.6"/><path d="M4.5 13.5c0-1.2.8-2 2-2h11c1.2 0 2 .8 2 2" fill="currentColor" fill-opacity=".18"/><circle cx="7.5" cy="17.5" r="1.8" fill="currentColor"/><circle cx="16.5" cy="17.5" r="1.8" fill="currentColor"/>'),
   mirror: S('<ellipse cx="12" cy="9" rx="5.5" ry="6.2" fill="currentColor" fill-opacity=".18"/><path d="M12 15.2V21M9.5 21h5"/><path d="M9.6 6.8c.6-1 1.5-1.5 2.4-1.5" stroke-width="1.6"/>'),
+  /** раскраска карты: кисть с каплей; ластик */
+  paint: S('<path d="M14.5 4.5l5 5-7.6 7.6a2.4 2.4 0 0 1-1.7.7H7.5v-2.7c0-.6.3-1.2.7-1.7z" fill="currentColor" fill-opacity=".2"/><path d="M12 7l5 5"/><path d="M7.5 17.8c-.4 1.6-1.6 2.7-3.5 2.7.3-1.9.9-3.2 2.4-3.9" fill="currentColor"/>'),
+  eraser: S('<path d="M4.5 15.5l9-9a2 2 0 0 1 2.8 0l3.2 3.2a2 2 0 0 1 0 2.8l-7.5 7.5H8.5z" fill="currentColor" fill-opacity=".2"/><path d="M9 11l5.5 5.5M8.5 20h11"/>'),
   gear: S('<circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v2.6M12 18.6v2.6M2.8 12h2.6M18.6 12h2.6M5.5 5.5l1.9 1.9M16.6 16.6l1.9 1.9M5.5 18.5l1.9-1.9M16.6 7.4l1.9-1.9"/>'),
 };

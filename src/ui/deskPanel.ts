@@ -373,6 +373,16 @@ export class DeskPanel {
     btn(row, 'Outro', () => d.flow('outro'), "flow('outro')");
     for (const f of ['riddle', 'echo', 'emo', 'rps', 'simon']) if (feature('games.new') || f === 'riddle' || f === 'echo') btn(row, f, () => d.flow(f), `flow('${f}')`);
 
+    // раскраска карты (src/card/paint.ts): лист цветов, сразу цвет, стереть
+    const paint = app.paint;
+    if (paint) {
+      row = sec('Раскраска');
+      btn(row, 'Раскрасить', () => paint.request('test'), 'лист цветов (как пункт «Раскрасить карту»)');
+      for (const i of [0, 1, 2]) btn(row, `Цвет ${i + 1}`, () => paint.start(i), `start(${i}) — сразу цветом палитры кота`);
+      btn(row, 'Стереть', () => paint.erase(), 'erase() — «Стереть рисунок»');
+      btn(row, 'Предложить', () => paint.offer.rewind(performance.now()), 'кот предложит раскрасить, как после 90 с игры (когда свободен)');
+    }
+
     if (feature('home')) {
       row = sec('Дом');
       const home = app.home;

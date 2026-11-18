@@ -39,6 +39,9 @@ const ITEM_GROUP: Record<string, GroupId> = {
   other: 'look',
   sticker: 'look',
   'ui:unstick': 'look',
+  // раскраска карты (src/card/paint.ts)
+  'ui:paint': 'look',
+  'ui:paint_erase': 'look',
   'ui:reanchor': 'world',
   'ui:micmode': 'service',
 };

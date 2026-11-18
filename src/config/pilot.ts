@@ -5,6 +5,7 @@
  *                          голосовые команды вырезанных действий (director.intentGate → cutRedirect: «Давай лучше …» + чипы);
  *   pilot.fx             — белый список эффектов (director.runFx → fxAllowed);
  *   pilot.switchCooldown — смена кота не чаще раза в SWITCH_COOLDOWN_MS (director.switchGate → SwitchCooldown).
+ *   card.paint           — «Раскрасить карту» / «Стереть рисунок» в каталоге пилота (PILOT_PAINT, src/card/paint.ts).
  * Чистая логика без DOM — тесты tests/pilot.test.ts.
  */
 import type { PersonaId } from '../persona/types';
@@ -31,6 +32,9 @@ export const PILOT_GAMES: readonly ActionId[] = ['riddle', 'echo', 'other'];
 
 /** все действия кота в пилоте: 8 общих + 2 фирменных (без игр и «Другого кота») */
 export const pilotActions = (p: PersonaId): ActionId[] => [...PILOT_COMMON, ...PILOT_SIGNATURE[p]];
+/** раскраска карты (card.paint, src/card/paint.ts): «Раскрасить карту» и «Стереть рисунок» — во вкладке «Образ» у всех котов */
+export const PILOT_PAINT: readonly string[] = ['ui:paint', 'ui:paint_erase'];
+
 /** что можно нажать в каталоге (действия): 10 + загадка, повторялка, «Другой кот» */
 export const pilotAllowed = (p: PersonaId): Set<string> => new Set<string>([...pilotActions(p), ...PILOT_GAMES]);
 
@@ -38,6 +42,7 @@ export const pilotAllowed = (p: PersonaId): Set<string> => new Set<string>([...p
 export function pilotItemAllowed(p: PersonaId, id: string): boolean {
   if (/^(home:|zone:)/.test(id)) return true;
   if (id === 'ui:micmode' || id === 'ui:reanchor' || id === 'ui:unstick') return true;
+  if (PILOT_PAINT.includes(id)) return true;
   return pilotAllowed(p).has(id);
 }
 

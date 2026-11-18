@@ -517,6 +517,36 @@
       "notes": "Сидя на краю кровати, спрыгивает вбок на пол у кровати и встаёт лицом к зрителю. Root motion — путь сцены. Нет в GLB — опора `jump` + дуга корня с матраса на пол."
     },
     {
+      "id": "paint_brush",
+      "durationS": 2.0,
+      "loop": true,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 250,
+      "persona": "all",
+      "priority": "P1",
+      "usedBy": [
+        "code:card.paint"
+      ],
+      "fallback": "breath_draw",
+      "notes": "Раскраска карты (Добряк, Блёстка): наклоняется к карте под ногами и широко мажет кистью в правой лапе влево-вправо, левая лапа в стороне для равновесия. Кисть — процедурный реквизит PropRig (paint_brush). Нет в GLB — опора `breath_draw`."
+    },
+    {
+      "id": "paint_spray",
+      "durationS": 2.0,
+      "loop": true,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 250,
+      "persona": "hooligan",
+      "priority": "P1",
+      "usedBy": [
+        "code:card.paint"
+      ],
+      "fallback": "scratch_glass",
+      "notes": "Раскраска карты (Хулиган): трясёт баллончик в правой лапе, наклоняется и брызгает по карте под ногами дугами, качает головой в такт. Баллончик — процедурный реквизит PropRig (paint_spray). Нет в GLB — опора `scratch_glass`."
+    },
+    {
       "id": "wave",
       "durationS": 1.2,
       "loop": false,

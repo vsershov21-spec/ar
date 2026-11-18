@@ -39,7 +39,7 @@ import { prepareFlowMemory, runFlow } from './debug/flows';
 import { feature } from './config/edition';
 import { SWITCH_LATER_TEXT, SwitchCooldown, cutRedirect, fxAllowed } from './config/pilot';
 import { track } from './analytics';
-import { startCardPaint } from './card/paint';
+import { startCardPaint, type CardPaint } from './card/paint';
 import { NO_SHIFT, fitShift, shiftCss, shiftPoint, unshiftPoint, type ViewShift } from './ui/catalogGroups';
 import { ZONES } from './home/zones';
 import { OrbitPointers, OrbitView, bindOrbitKeys, bindOrbitWheel, isDesktopView, isTouchDevice, noCardCameraOff, showOrbitHint, type ViewPose } from './input/orbit';
@@ -113,6 +113,8 @@ export class App {
   character!: Character;
   /** сцена пробуждения кота из карты (src/awake); feature('awake') выкл. или ?awake=0 — старое появление */
   awake: AwakeController | null = null;
+  /** раскраска карты (src/card/paint.ts); feature('card.paint') выкл. — null */
+  paint: CardPaint | null = null;
   private clock = new THREE.Clock();
   private elapsed = 0;
   fps = 0;
@@ -300,7 +302,8 @@ export class App {
       energy: this.energy, suggest: () => this.kickSuggest(), fx: this.fx,
     });
     // кот спит в кровати (src/home/bedFlow.ts): касания — к кровати (бормочет, ворочается), а не «А? Я не спал!»
-    this.director.touchGate = (k, c) => this.home.onTouch(k, c);
+    // раскраска карты: касания по коту, пока он рисует, — съедены (кисть не бросает)
+    this.director.touchGate = (k, c) => !!this.paint?.onTouch() || this.home.onTouch(k, c);
     this.home.runFlow(new URLSearchParams(location.search));
     // чипы кота и подсказка (scenario/suggest.ts): по событиям режиссёра (фаза, лог = любое событие сценария),
     // пока идёт игра — ещё и шагом 330 мс (пороги тишины). В дрёме, вне игры и в скрытой вкладке опрос стоит
@@ -493,7 +496,9 @@ export class App {
       quietMs: d.ladder.quietFor(now), visits: st.visits, available: this.available(), tried: (id) => this.ui.tried.has(id),
       voiced: (ev) => this.voiced(ev),
     });
-    this.ui.setSuggestions(this.home ? this.home.chips(r.chips) : r.chips);
+    const chips = this.home ? this.home.chips(r.chips) : r.chips;
+    // раскраска карты: чипы предложения «Раскрась! / Не сейчас»; пока кот рисует или открыт лист цветов — без чипов
+    this.ui.setSuggestions(this.paint ? this.paint.chips(chips) : chips);
     // подсказка — один раз на тишину и без немого пузыря: в первые визиты кот говорит её озвученной репликой
     // («Погладь меня пальцем или нажми кнопку внизу», событие help) — чипы подпрыгивают; голоса нет
     // (или визит не первый, кот и так предлагает занятия лестницей тишины) — палец стучит по чипу
@@ -512,6 +517,7 @@ export class App {
   runChip(c: Chip) {
     this.input.activity();
     if (c.id.startsWith('home:')) return void this.home.act(c.id);
+    if (c.id.startsWith('paint:')) return void this.paint?.act(c.id);
     if ('action' in c.run) {
       this.suggest.note(c.run.action);
       this.director.action(c.run.action);
@@ -565,7 +571,13 @@ export class App {
     let lost = 0;
     this.tracker.onFound(() => track('card_landed', { ms: performance.now() }, true));
     this.tracker.onLost(() => track('card_lost', { count: ++lost }));
-    if (feature('card.paint')) startCardPaint({ log: (s) => d.log(s) });
+    // раскраска карты (src/card/paint.ts): предложение кота, лист цветов, рисунок на карте, память
+    if (feature('card.paint'))
+      this.paint = startCardPaint({
+        root: this.root, tracker: this.tracker, stage: this.stage, director: d, ui: this.ui, audio: this.audio,
+        character: () => this.character ?? null, home: () => this.home ?? null, awakeActive: () => !!this.awake?.active,
+        kickSuggest: () => this.kickSuggest(), log: (s) => d.log(s),
+      });
   }
 
   /** «Мой дом» (на карте) / «На карту» (дома) — первым пунктом раздела «Игры» */
@@ -659,6 +671,8 @@ export class App {
     if (this.home?.phase === 'home')
       for (const z of ZONES) if (z.id !== this.home.zone) out.push({ item: { id: `zone:${z.id}`, label: z.title, icon: z.icon, run: { ui: 'zone' } }, section: 'world' });
     if (this.desktopView) out.push({ item: { id: 'ui:unstick', label: 'Сдёрнуть наклейки', icon: 'sticker', run: { ui: 'unstick' } }, section: 'magic' });
+    // «Раскрасить карту» / «Стереть рисунок» — вкладка «Образ» (вне карты кот попросит её показать)
+    if (this.paint) for (const it of this.paint.catalogItems()) out.push({ item: it, section: 'magic' });
     return out;
   }
   runCatalogItem(item: CatalogItem) {
@@ -673,6 +687,8 @@ export class App {
         else if (id === 'home') void this.home.act(item.id);
         else if (id === 'unstick') this.input.simulateShake();
         else if (id === 'zone') this.home.go(item.id.slice(5) as (typeof ZONES)[number]['id']);
+        else if (id === 'paint') this.paint?.request('catalog');
+        else if (id === 'paint_erase') this.paint?.erase();
         else {
           const m = this.engine.mode === 'auto' ? 'ptt' : 'auto';
           this.engine.setMode(m);
@@ -832,7 +848,7 @@ export class App {
     // реакция (не idle-вариант и не сон) — первые 4 с клипа; длинные петли (танец, сон) дальше идут на обычной частоте
     const reacting = !/^idle|sleep/.test(clip) && now - this.clipSince < 4000;
     const fxLive = this.fx.parts.list.length > 0 || this.fx.hasLive(fxNeedsBoost);
-    const action = reacting || this.stage.walking || fxLive || this.fx.isPeeling || !!this.input?.touch.isStroking || !!this.awake?.active;
+    const action = reacting || this.stage.walking || fxLive || this.fx.isPeeling || !!this.input?.touch.isStroking || !!this.awake?.active || !!this.paint?.busy;
     const out = this.energy.update({
       now,
       catVisible: this.stage.root.visible,
@@ -1095,6 +1111,7 @@ export class App {
     this.tracker.resize(w, h);
     this.fx.resize(w, h);
     this.awake?.resize(w, h);
+    this.paint?.resize(w, h);
   }
 
   private lvlT = 0;
@@ -1160,6 +1177,7 @@ export class App {
     perf.section('stage');
     this.awake?.update(dt); // поза Stage.intro — до stage.update
     this.stage.update(dt);
+    this.paint?.update(dt); // раскраска: мазок за котом, рисунок на карте, предложение кота
     this.syncPersona();
     perf.section('director');
     this.director.update(dt);

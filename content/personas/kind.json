@@ -674,7 +674,26 @@
     },
     "goodnight": {
       "clip": "none"
-    }
+    },
+    "paint_offer": {
+      "clip": "point_button"
+    },
+    "paint_choose": {
+      "clip": "none"
+    },
+    "paint_start": {
+      "clip": "none"
+    },
+    "paint_done": {
+      "clip": "celebrate"
+    },
+    "paint_need_card": {
+      "clip": "none"
+    },
+    "paint_again": {
+      "clip": "none"
+    },
+    "paint_card": {}
   },
   "lines": {
     "point_camera": [
@@ -3567,7 +3586,128 @@
         "emotion": "whisper",
         "face": "listen"
       }
-    ]
+    ],
+    "paint_offer": [
+      {
+        "id": "kind.paint_offer.01",
+        "text": "Хочешь, я раскрашу твою карту? Нарисую сердечки!",
+        "emotion": "caring",
+        "face": "caring"
+      },
+      {
+        "id": "kind.paint_offer.02",
+        "text": "А давай я украшу твою карту? Будет очень мило!",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "kind.paint_offer.03",
+        "text": "Можно, я раскрашу твою карту? Я аккуратно, кисточкой.",
+        "emotion": "happy",
+        "face": "happy"
+      }
+    ],
+    "paint_choose": [
+      {
+        "id": "kind.paint_choose.01",
+        "text": "Выбери цвет, какой тебе нравится!",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "kind.paint_choose.02",
+        "text": "Какой цвет возьмём? Выбирай!",
+        "emotion": "caring",
+        "face": "caring"
+      },
+      {
+        "id": "kind.paint_choose.03",
+        "text": "Выбирай краску, а я возьму кисточку.",
+        "emotion": "happy",
+        "face": "happy"
+      }
+    ],
+    "paint_start": [
+      {
+        "id": "kind.paint_start.01",
+        "text": "Начинаю! Сердечко сюда, пузырик туда...",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "kind.paint_start.02",
+        "text": "Аккуратненько, кисточкой... Смотри!",
+        "emotion": "caring",
+        "face": "caring"
+      },
+      {
+        "id": "kind.paint_start.03",
+        "text": "Рисую! Это будет самая добрая карта.",
+        "emotion": "happy",
+        "face": "happy"
+      }
+    ],
+    "paint_done": [
+      {
+        "id": "kind.paint_done.01",
+        "text": "Та-да! Карта в сердечках!",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "kind.paint_done.02",
+        "text": "Та-да! Нравится? Я старался!",
+        "emotion": "proud",
+        "face": "proud"
+      },
+      {
+        "id": "kind.paint_done.03",
+        "text": "Та-да! Получилось очень мило!",
+        "emotion": "happy",
+        "face": "happy"
+      }
+    ],
+    "paint_need_card": [
+      {
+        "id": "kind.paint_need_card.01",
+        "text": "Сначала покажи мне карту. Я подожду!",
+        "emotion": "caring",
+        "face": "caring"
+      },
+      {
+        "id": "kind.paint_need_card.02",
+        "text": "Сначала покажи мне карту, хорошо? Наведи на неё камеру.",
+        "emotion": "caring",
+        "face": "caring"
+      },
+      {
+        "id": "kind.paint_need_card.03",
+        "text": "Ой, а где карта? Покажи её, и я раскрашу.",
+        "emotion": "happy",
+        "face": "happy"
+      }
+    ],
+    "paint_again": [
+      {
+        "id": "kind.paint_again.01",
+        "text": "Перекрасить? С радостью нарисую заново!",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "kind.paint_again.02",
+        "text": "Хочешь по-новому? Давай перекрашу.",
+        "emotion": "caring",
+        "face": "caring"
+      },
+      {
+        "id": "kind.paint_again.03",
+        "text": "Ещё раз? Нарисую новые сердечки!",
+        "emotion": "happy",
+        "face": "happy"
+      }
+    ],
+    "paint_card": []
   },
   "riddles": [
     {

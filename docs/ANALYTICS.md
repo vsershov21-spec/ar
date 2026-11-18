@@ -43,6 +43,10 @@
 | `sleep` / `wake` | — | кота уложили в кровать / разбудили (`home/bedFlow.ts`) |
 | `card_lost` | `count` — какая по счёту потеря | карта пропала из кадра (`tracker.onLost`) |
 | `sberkids_click` | `kind`: `open` (кнопка «В СберKids»), `go` («Открыть СберKids»), `close` («Потом») | `app.ts onKids`, `ui.ts` |
+| `paint_offer` | — | кот сам предложил раскрасить карту (`src/card/paint.ts offerTick`, раз за сессию) |
+| `paint_start` | `color` — id цвета палитры (`lime`, `pink`, `purple`, `mint`, `peach`, `sky`, `lilac`, `gold`, `turquoise`) | выбран цвет, кот начал рисовать (`CardPaint.start`) |
+| `paint_done` | — | рисунок готов (или дорисован сразу, если карта ушла посреди) |
+| `paint_erase` | — | «Стереть рисунок» в каталоге |
 | `session_end` | `sec` — длина сессии | вкладка скрыта / закрыта (`visibilitychange` / `pagehide`); после возврата — снова при следующем уходе, `sec` растёт |
 
 Воронка по порядку: `open → onboarding_done → camera_granted → card_landed → awake_done → named → action / game_start →

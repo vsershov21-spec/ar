@@ -20,7 +20,7 @@ export interface CatalogItem {
   run: { action: ActionId } | { say: string } | { ui: UiRun };
 }
 /** служебные пункты: пересадить, микрофон, дом; unstick — «Сдёрнуть наклейки», zone — комната дома (десктоп-панель, лист) */
-export type UiRun = 'reanchor' | 'micmode' | 'home' | 'unstick' | 'zone';
+export type UiRun = 'reanchor' | 'micmode' | 'home' | 'unstick' | 'zone' | 'paint' | 'paint_erase';
 export interface CatalogSection { id: SectionId; title: string; icon: string; items: CatalogItem[] }
 
 interface ActionSpec { id: ActionId; label: string; icon: string; /** подпись и иконка по эффекту реакции характера */ byFx?: { event: string; map: Record<string, [string, string]> } }

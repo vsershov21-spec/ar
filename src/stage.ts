@@ -143,6 +143,13 @@ export class Stage {
     return !!this.walkTarget;
   }
 
+  /** остановиться там, где стоит (раскраска карты: карта ушла посреди ряда) */
+  cancelWalk() {
+    this.walkTarget = null;
+    this.walkYaw = null;
+    this.onArrive = null;
+  }
+
   setCharacter(ch: Character) {
     if (this.character) this.root.remove(this.character.object);
     this.character = ch;

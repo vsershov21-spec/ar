@@ -68,6 +68,8 @@ export interface Character {
    * на экране в долях роста кота (dx > 0 — правее на экране, dy > 0 — ниже). null — сбросить.
    */
   reach?(target: { dx: number; dy: number } | null): void;
+  /** держать реквизит при любом клипе (кисть, баллончик раскраски карты: character/props.ts hold); null — отпустить */
+  holdProp?(id: string | null, tint?: string | null): void;
   /** зона касания: head | cheek | belly | paw | tail | body; null — мимо */
   hitZone?(ray: THREE.Raycaster): TouchZone | null;
   /** точка части кота в локальных координатах object (ноги в 0, рост 1) — для эффектов; null — по умолчанию */

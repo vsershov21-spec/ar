@@ -684,7 +684,26 @@
     },
     "goodnight": {
       "clip": "none"
-    }
+    },
+    "paint_offer": {
+      "clip": "point_button"
+    },
+    "paint_choose": {
+      "clip": "none"
+    },
+    "paint_start": {
+      "clip": "none"
+    },
+    "paint_done": {
+      "clip": "celebrate"
+    },
+    "paint_need_card": {
+      "clip": "none"
+    },
+    "paint_again": {
+      "clip": "none"
+    },
+    "paint_card": {}
   },
   "lines": {
     "point_camera": [
@@ -3643,7 +3662,128 @@
         "emotion": "whisper",
         "face": "listen"
       }
-    ]
+    ],
+    "paint_offer": [
+      {
+        "id": "glitter.paint_offer.01",
+        "text": "Хочешь, раскрашу твою карту? Будет сиять!",
+        "emotion": "excited",
+        "face": "excited"
+      },
+      {
+        "id": "glitter.paint_offer.02",
+        "text": "А давай я украшу твою карту звёздочками?",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "glitter.paint_offer.03",
+        "text": "Можно, я сделаю твою карту блестящей?",
+        "emotion": "excited",
+        "face": "excited"
+      }
+    ],
+    "paint_choose": [
+      {
+        "id": "glitter.paint_choose.01",
+        "text": "Выбирай цвет! Какой сияет ярче?",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "glitter.paint_choose.02",
+        "text": "Какой цвет берём? Выбирай!",
+        "emotion": "excited",
+        "face": "excited"
+      },
+      {
+        "id": "glitter.paint_choose.03",
+        "text": "Выбери краску, а я добавлю блёсток.",
+        "emotion": "happy",
+        "face": "happy"
+      }
+    ],
+    "paint_start": [
+      {
+        "id": "glitter.paint_start.01",
+        "text": "Начинаю! Звёздочки, блёстки, сияние!",
+        "emotion": "excited",
+        "face": "excited"
+      },
+      {
+        "id": "glitter.paint_start.02",
+        "text": "Смотри внимательно, сейчас будет волшебство!",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "glitter.paint_start.03",
+        "text": "Рисую! Чуть-чуть блеска сюда...",
+        "emotion": "excited",
+        "face": "excited"
+      }
+    ],
+    "paint_done": [
+      {
+        "id": "glitter.paint_done.01",
+        "text": "Та-да! Карта сияет!",
+        "emotion": "excited",
+        "face": "excited"
+      },
+      {
+        "id": "glitter.paint_done.02",
+        "text": "Та-да! Самая блестящая карта на свете!",
+        "emotion": "proud",
+        "face": "proud"
+      },
+      {
+        "id": "glitter.paint_done.03",
+        "text": "Та-да! Правда красиво?",
+        "emotion": "excited",
+        "face": "excited"
+      }
+    ],
+    "paint_need_card": [
+      {
+        "id": "glitter.paint_need_card.01",
+        "text": "Сначала покажи мне карту. Наведи на неё камеру!",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "glitter.paint_need_card.02",
+        "text": "Сначала покажи мне карту! Без неё не нарисую.",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "glitter.paint_need_card.03",
+        "text": "А где карта? Покажи, и я сделаю её блестящей!",
+        "emotion": "excited",
+        "face": "excited"
+      }
+    ],
+    "paint_again": [
+      {
+        "id": "glitter.paint_again.01",
+        "text": "Перекрасим? Сделаю ещё красивее!",
+        "emotion": "excited",
+        "face": "excited"
+      },
+      {
+        "id": "glitter.paint_again.02",
+        "text": "По-новому? Обожаю перекрашивать!",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "glitter.paint_again.03",
+        "text": "Ещё раз? Новые звёздочки!",
+        "emotion": "excited",
+        "face": "excited"
+      }
+    ],
+    "paint_card": []
   },
   "riddles": [
     {

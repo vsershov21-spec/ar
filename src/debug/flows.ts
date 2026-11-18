@@ -8,6 +8,7 @@
  *   ?flow=switch                       — «давай другого»: экран заклеен, ждём встряску
  *   ?flow=sad                          — «мне грустно»: бережный ответ и пауза
  *   ?flow=outro                        — зов в СберKids (конец сессии)
+ *   ?flow=paint[&swatch=0..2]          — раскраска карты (card.paint): лист цветов или сразу цвет swatch (src/card/paint.ts)
  *   ?flow=chaos[&rate=5..15][&dur=60]  — автотапер: хаотичные тапы ребёнка по коту и мимо, глажка, долгое нажатие,
  *                                        кнопки и фразы; счётчик кадров и время обработки касания — табличка сверху
  * Знакомство (?fresh) флоу не нужен. Флоу, кроме fresh, пропускают знакомство: память «знакомы» ставится до режиссёра.
@@ -16,7 +17,7 @@ import type { App } from '../app';
 import { loadMemory, saveMemory } from '../scenario/memory';
 import { ACTIONS } from '../scenario/actions';
 
-export const FLOWS = ['return', 'riddle', 'echo', 'emo', 'rps', 'simon', 'doze', 'switch', 'sad', 'outro', 'chaos'] as const;
+export const FLOWS = ['return', 'riddle', 'echo', 'emo', 'rps', 'simon', 'doze', 'switch', 'sad', 'outro', 'chaos', 'paint'] as const;
 export type FlowId = (typeof FLOWS)[number];
 
 const q = () => new URLSearchParams(typeof location !== 'undefined' ? location.search : '');
@@ -49,6 +50,7 @@ export function runFlow(app: App) {
     setTimeout(() => {
       d.log(`флоу ?flow=${f}`);
       if (f === 'chaos') startChaos(app);
+      else if (f === 'paint') app.paint?.flow();
       else d.flow(f);
     }, 700);
   };
