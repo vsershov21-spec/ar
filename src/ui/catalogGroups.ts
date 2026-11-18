@@ -73,6 +73,12 @@ export function oftenGroup(groups: CatalogGroup[], recent: readonly string[], su
     const it = all.get(id);
     if (it && !out.includes(it) && out.length < max) out.push(it);
   }
+  // мало истории (первый раз, дома) — добираем по первому умению из разделов, чтобы «Часто» было всегда
+  for (let k = 0; out.length < Math.min(4, max) && k < 4; k++)
+    for (const g of groups) {
+      const it = g.items.filter((i) => !('ui' in i.run))[k];
+      if (it && !out.includes(it) && out.length < Math.min(4, max)) out.push(it);
+    }
   return out.length ? { id: 'often', ...GROUP_META.often, items: out } : null;
 }
 

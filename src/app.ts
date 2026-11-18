@@ -531,8 +531,46 @@ export class App {
     this.shiftArea = free;
     this.applyShift();
   }
+  private catBox = new THREE.Box3();
+  private catCorner = new THREE.Vector3();
+  /**
+   * Экранная рамка кота без сдвига (px): проекция габаритов модели — для листа каталога. Кот целиком (уши, лапы),
+   * а не приближение по голове (rawCatRect): при виде сверху кот шире, чем 0,64 высоты.
+   */
+  catScreenBox(): { top: number; bottom: number; cx: number; half: number } | null {
+    const obj = this.character?.object;
+    if (!obj || !this.stage?.root.visible) return this.rawCatRect();
+    obj.updateMatrixWorld(true);
+    const w = this.root.clientWidth, h = this.root.clientHeight;
+    let l = Infinity, r = -Infinity, t = Infinity, btm = -Infinity, n = 0;
+    const add = (v: THREE.Vector3) => {
+      const c = v.project(this.stage.camera);
+      const x = ((c.x + 1) / 2) * w, y = ((1 - c.y) / 2) * h;
+      if (!Number.isFinite(x + y)) return;
+      l = Math.min(l, x);
+      r = Math.max(r, x);
+      t = Math.min(t, y);
+      btm = Math.max(btm, y);
+      n++;
+    };
+    // кости скелета (поза сейчас, дёшево); без скелета — габариты модели
+    obj.traverse((o) => {
+      if ((o as THREE.Bone).isBone) add(o.getWorldPosition(this.catCorner));
+    });
+    if (n < 4) {
+      const b = this.catBox.setFromObject(obj);
+      if (b.isEmpty()) return this.rawCatRect();
+      for (let i = 0; i < 8; i++) add(this.catCorner.set(i & 1 ? b.max.x : b.min.x, i & 2 ? b.max.y : b.min.y, i & 4 ? b.max.z : b.min.z));
+    }
+    if (!n) return this.rawCatRect();
+    // кости — внутри тела: запас на мех, уши и кепку (голова — сверху)
+    const bh = Math.max(1, btm - t), bw = Math.max(1, r - l);
+    const padX = Math.max(bw * 0.18, bh * 0.12);
+    return { top: t - bh * 0.22, bottom: btm + bh * 0.04, cx: (l + r) / 2, half: bw / 2 + padX };
+  }
   private applyShift() {
-    const v = this.shiftArea ? fitShift(this.rawCatRect(), this.shiftArea, 10, !this.home?.inRoom) : NO_SHIFT;
+    // кот — не крупнее, чем был (никакого приближения), целиком в области над листом; дома — только сдвиг
+    const v = this.shiftArea ? fitShift(this.catScreenBox(), this.shiftArea, 8, !this.home?.inRoom) : NO_SHIFT;
     const same = (a: ViewShift, b: ViewShift) => Math.abs(a.dx - b.dx) < 2 && Math.abs(a.dy - b.dy) < 2 && Math.abs(a.s - b.s) < 0.01;
     if (same(v, this.shift) && (v === NO_SHIFT) === (this.shift === NO_SHIFT)) return;
     const prev = this.shift;

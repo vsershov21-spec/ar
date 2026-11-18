@@ -53,8 +53,11 @@ describe('группы каталога (лист телефона и дескт
   it('«Часто»: предложения кота, потом последние; только пункты каталога', () => {
     const groups = groupCatalog(buildCatalog(content.personas.get('kind')!, env));
     const o = oftenGroup(groups, ['flip', 'nope', 'pet'], ['riddle', 'giveup'])!;
-    expect(o.items.map((i) => i.id)).toEqual(['riddle', 'flip', 'pet']);
-    expect(oftenGroup(groups, [], [])).toBeNull();
+    expect(o.items.map((i) => i.id).slice(0, 3)).toEqual(['riddle', 'flip', 'pet']);
+    // истории нет — «Часто» всё равно есть: первые умения разделов
+    const empty = oftenGroup(groups, [], [])!;
+    expect(empty.items.length).toBe(4);
+    expect(empty.items[0].id).toBe(groups[0].items[0].id);
     const mem = new Map<string, string>();
     const st = { getItem: (k: string) => mem.get(k) ?? null, setItem: (k: string, v: string) => void mem.set(k, v) };
     const r = new RecentStore(st, 'k', 3);

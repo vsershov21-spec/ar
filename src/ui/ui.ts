@@ -694,7 +694,8 @@ export class UI {
     if (!this.catalogOpen || !this.sheetMode) return null;
     const root = this.root.getBoundingClientRect(), box = this.catalogEl.getBoundingClientRect();
     const land = this.root.clientWidth > this.root.clientHeight && this.root.clientHeight <= 520;
-    const topPad = 24;
+    // дома сверху — «На карту» и название комнаты: кот (и пузырь, styles.css) — ниже них
+    const topPad = this.root.querySelector('.home-hud:not(.hidden)') ? 92 : 24;
     if (land) return { top: topPad, bottom: root.height - 8, left: box.right - root.left, right: root.width };
     return { top: topPad, bottom: box.top - root.top, left: 0, right: root.width };
   }
@@ -737,6 +738,9 @@ export class UI {
     row.className = 'cat-row cs-grid';
     row.dataset.sec = g.id;
     for (const it of g.items) row.appendChild(this.gridItem(it, () => this.pickSheet(it)));
+    // активная вкладка всегда видна (узкий экран: ряд вкладок листается)
+    const on = tabs.querySelector('.cs-tab.on') as HTMLElement | null;
+    if (on && (on.offsetLeft < tabs.scrollLeft || on.offsetLeft + on.offsetWidth > tabs.scrollLeft + tabs.clientWidth)) tabs.scrollLeft = on.offsetLeft - 8;
   }
   /** кнопка сетки (лист и десктоп-панель): иконка, подпись до двух строк, точка «новое», долгое нажатие — подсказка */
   gridItem(it: CatalogItem, pick: () => void, extra = ''): HTMLButtonElement {
