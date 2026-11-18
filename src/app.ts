@@ -246,8 +246,15 @@ export class App {
       isChoiceSticker: (x, y) => !!this.fx.stickerAt(x, y)?.choice,
     });
     this.bindInput();
-    // чипы кота и подсказка в пузыре: 3 раза в секунду по состоянию режиссёра (scenario/suggest.ts)
-    setInterval(() => this.suggestTick(), 330);
+    // чипы кота и подсказка (scenario/suggest.ts): по событиям режиссёра (фаза, лог = любое событие сценария),
+    // пока идёт игра — ещё и шагом 330 мс (пороги тишины). В дрёме, вне игры и в скрытой вкладке опрос стоит
+    this.director.on('log', () => this.kickSuggest());
+    this.director.on('phase', (ph) => {
+      if (ph === 'play' || ph === 'free') this.ui.setPlaying();
+      this.kickSuggest();
+    });
+    document.addEventListener('visibilitychange', () => this.kickSuggest());
+    this.kickSuggest();
     window.addEventListener('resize', () => this.resize());
     this.resize();
     this.renderer.setAnimationLoop(() => this.frame());
@@ -379,6 +386,30 @@ export class App {
       .map((s) => ({ ...s, items: s.items.filter((it) => !('action' in it.run) || !VOICE_GATED[it.run.action] || this.voiced(VOICE_GATED[it.run.action])) }))
       .filter((s) => s.items.length);
   }
+  private sugTimer = 0;
+  private sugKick = false;
+  /** пересчитать чипы как можно скорее (события режиссёра идут пачками — один пересчёт на пачку) */
+  private kickSuggest() {
+    if (this.sugKick) return;
+    this.sugKick = true;
+    clearTimeout(this.sugTimer);
+    this.sugTimer = window.setTimeout(() => this.suggestLoop(), 0);
+  }
+  private suggestLoop() {
+    this.sugKick = false;
+    clearTimeout(this.sugTimer);
+    this.sugTimer = 0;
+    if (document.hidden) return; // вкладку вернули — visibilitychange
+    const d = this.director;
+    this.suggestTick();
+    const playing = d.state.phase === 'play' || d.state.phase === 'free';
+    // дрёма: чип «Разбуди меня» не меняется, пока кот не проснётся (пробуждение — событие режиссёра);
+    // вне игры чипов нет (вход в игру — событие phase)
+    if (d.dozing || !playing) return;
+    this.sugTimer = window.setTimeout(() => this.suggestLoop(), 330);
+  }
+  /** подсказка этой тишины уже показана (голосом или пальцем) */
+  private hintOn = false;
   private suggestTick() {
     const d = this.director;
     if (!d || !this.ui) return;
@@ -395,8 +426,19 @@ export class App {
       voiced: (ev) => this.voiced(ev),
     });
     this.ui.setSuggestions(r.chips);
-    if (r.hint && !this.ui.isCatalogOpen) this.ui.hint(r.hint, d.persona.name, d.persona.id);
-    else this.ui.hint(null);
+    // подсказка — один раз на тишину и без немого пузыря: в первые визиты кот говорит её озвученной репликой
+    // («Погладь меня пальцем или нажми кнопку внизу», событие help) — чипы подпрыгивают; голоса нет
+    // (или визит не первый, кот и так предлагает занятия лестницей тишины) — палец стучит по чипу
+    const want = !!r.hint && !this.ui.isCatalogOpen;
+    if (want && !this.hintOn) {
+      this.hintOn = true;
+      const voiced = r.hintFirst && d.sayHint();
+      this.ui.nudge(voiced ? 'soft' : 'finger', r.hint!);
+      d.log(`подсказка: ${voiced ? 'голосом (help)' : 'палец на чипе'} — ${r.hint}`);
+    } else if (!want && this.hintOn) {
+      this.hintOn = false;
+      this.ui.nudge(null);
+    }
   }
   /** чип кота: действие — как кнопка каталога, фраза — как сказанная голосом */
   private runChip(c: Chip) {

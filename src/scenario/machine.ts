@@ -223,6 +223,24 @@ function gameAnswer(s: ScenarioState, value: string | null, text: string, cfg: S
   return r ? runDialog({ ...s, unknownStreak: 0 }, r, cfg, a, text) : s;
 }
 
+/** «мне грустно» — кот бережно ответил и 10 с не предлагает игр; но действие ребёнка (фраза, кнопка, касание) — как везде:
+ *  пауза кончается, кот отвечает (QA-стенд, docs/qa/BUGS.md № 9: раньше 10 с кот не реагировал ни на что) */
+function endPause(s: ScenarioState, a: Action[]): ScenarioState {
+  if (!s.paused) return s;
+  a.push({ type: 'pause', on: false }, { type: 'cancel_timer', id: 'pause_end' });
+  return { ...s, paused: false };
+}
+
+/** экран заклеен, а встряски всё нет — кот сдёргивает наклейки сам (не «висит» без выхода) */
+export const SWITCH_AUTO_MS = 15_000;
+
+/** смена образа отменена («нет», «не надо», «мне грустно»): наклейки улетают, кот прежний, игра продолжается */
+function cancelSwitch(s: ScenarioState, cfg: ScenarioConfig, a: Action[]): ScenarioState {
+  a.push({ type: 'ui', ui: 'shake_button', show: false }, { type: 'cancel_timer', id: 'switch_auto' }, { type: 'blow_stickers' });
+  const back = s.resumePhase && isPlay(s.resumePhase) ? s.resumePhase : 'play';
+  return enterPlay({ ...s, switchTo: null, resumePhase: null, phase: back }, cfg, a);
+}
+
 function startSwitch(s: ScenarioState, a: Action[], to: PersonaId = nextPersona(s.persona)): ScenarioState {
   s = stopDialog(s, a);
   a.push({ type: 'say', key: 'switch_start', force: true }, { type: 'cover_stickers', persona: to }, { type: 'ui', ui: 'chips', show: false });
@@ -311,6 +329,9 @@ function doAction(s: ScenarioState, action: string, arg: string | undefined, hea
     case 'react':
       if (arg) a.push({ type: 'react', event: arg });
       return s;
+    case 'switch':
+      // «Другой кот?» — «давай»: смена образа (наклейки, встряска)
+      return startSwitch(s, a);
   }
   return s;
 }
@@ -364,6 +385,8 @@ function expects(cfg: ScenarioConfig, d: DialogState, key: string) {
 function onHeard(s: ScenarioState, h: Heard, cfg: ScenarioConfig, a: Action[]): ScenarioState {
   // безопасность — всегда первой, прерывает любой диалог
   if (cfg.dialogs.interrupts.includes(h.type)) return triggerDialog({ ...s, unknownStreak: 0 }, h.type, cfg, a) ?? s;
+  // кот переспросил «Другой кот?», а ребёнок нажал «Другой кот» ещё раз — это «да»
+  if (h.button && h.type === 'change_persona' && s.dialog?.id === 'switch') return startSwitch(stopDialog(s, a), a);
   // «Повтори движение»: кнопка движения («Прыгни», «Сальто»…) — это ответ, а не конец игры
   if (s.dialog?.listening === 'simon' && s.game && gameItemByIntent(cfg, 'simon', h.type)) return gameAnswer(s, gameItemByIntent(cfg, 'simon', h.type)!.id, h.text ?? '', cfg, a);
   // кнопка — явная команда: мини-игра (загадка, повторялка, предложение кота) заканчивается, команда выполняется.
@@ -400,11 +423,14 @@ function onHeard(s: ScenarioState, h: Heard, cfg: ScenarioConfig, a: Action[]): 
   }
   if (s.phase === 'ask_name' || s.phase === 'choose') return s;
   if (!isPlay(s.phase)) return s;
-  if (s.paused) return s; // во время поддержки — без игры
+  // поддержка («мне грустно»): ребёнок сам что-то сказал или нажал — пауза кончается, ответ как обычно
+  s = endPause(s, a);
   const d = triggerDialog(s, h.type, cfg, a);
   if (d) return { ...d, unknownStreak: 0 };
   const t = h.type;
-  if (t === 'change_persona') return startSwitch(s, a);
+  // кнопка / чип «Другой кот» — одно касание могло быть случайным: кот переспрашивает («Давай!» / «Не надо», 8 с).
+  // Голосом («давай другого») ребёнок просит сам — смена сразу
+  if (t === 'change_persona') return h.button && cfg.dialogs.dialogs.switch ? runDialog(s, startDialog(cfg.dialogs, 'switch'), cfg, a) : startSwitch(s, a);
   if (t.startsWith('choose_')) {
     const p = t.slice(7);
     if (!isPersonaId(p)) return s;
@@ -474,6 +500,16 @@ export function step(s: ScenarioState, e: ScenarioEvent, cfg: ScenarioConfig): S
 
   // голос из любой фазы после появления
   if (e.type === 'intent' && s.appeared && s.phase !== 'switching') return done(onHeard(s, e.intent, cfg, a));
+  // смена образа идёт (экран заклеен): «нет», «не надо», «хватит» — отмена; «мне грустно» / «страшно» — отмена и поддержка
+  if (e.type === 'intent' && s.phase === 'switching') {
+    const t = e.intent.type;
+    if (cfg.dialogs.interrupts.includes(t)) return done(onHeard(cancelSwitch(s, cfg, a), e.intent, cfg, a));
+    if (['no', 'skip', 'giveup', 'echo_stop', 'stop'].includes(t)) {
+      a.push({ type: 'react', event: 'no' });
+      return done(cancelSwitch(s, cfg, a));
+    }
+    return done(s);
+  }
 
   switch (s.phase) {
     case 'start':
@@ -530,7 +566,8 @@ export function step(s: ScenarioState, e: ScenarioEvent, cfg: ScenarioConfig): S
     case 'free':
       if (e.type === 'interaction' || e.type === 'shake') {
         const kind = e.type === 'shake' ? 'shake' : e.kind;
-        if (s.paused) return done(s);
+        // поддержка («мне грустно»): касание ребёнка кончает паузу — кот отвечает как обычно
+        s = endPause(s, a);
         // мини-игра (загадка, повторялка, вопрос кота): касание не перебивает её словами — только клип и эмоция
         if (s.dialog) a.push({ type: 'react', event: kind === 'double_tap' ? 'double_tap' : kind, quiet: true });
         else if (kind === 'double_tap') a.push({ type: 'signature' });
@@ -567,10 +604,11 @@ export function step(s: ScenarioState, e: ScenarioEvent, cfg: ScenarioConfig): S
 
     case 'switching':
       if (e.type === 'covered') {
-        a.push({ type: 'say', key: 'shake_prompt', force: true }, { type: 'ui', ui: 'shake_button', show: true });
+        a.push({ type: 'say', key: 'shake_prompt', force: true }, { type: 'ui', ui: 'shake_button', show: true }, { type: 'timer', id: 'switch_auto', ms: SWITCH_AUTO_MS });
         return done(s);
       }
-      if (e.type === 'shake' || (e.type === 'interaction' && e.kind === 'shake')) {
+      if (e.type === 'shake' || (e.type === 'interaction' && e.kind === 'shake') || (e.type === 'timer' && e.id === 'switch_auto')) {
+        a.push({ type: 'cancel_timer', id: 'switch_auto' });
         const p = s.switchTo ?? nextPersona(s.persona);
         a.push(
           { type: 'ui', ui: 'shake_button', show: false },

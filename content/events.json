@@ -14,6 +14,7 @@
     { "id": "mic_hint", "group": "scenario", "priority": 2, "cooldownMs": 30000, "interruptible": true, "trigger": "Первый раз нужен голос, а микрофон не разрешён или ребёнок молчит: кот показывает на кнопку-микрофон." },
     { "id": "choose", "group": "scenario", "priority": 2, "cooldownMs": 0, "interruptible": true, "trigger": "Кот предлагает выбрать характер. На экране три стикера: Хулиган, Добряк, Блёстка. Окно ответа 5 с (голосом), потом — характер по умолчанию." },
     { "id": "invite", "group": "scenario", "priority": 2, "cooldownMs": 20000, "interruptible": true, "trigger": "Характер выбран: кот показывает, что можно делать (тыкать, гладить, трясти, говорить, «повторяй»)." },
+    { "id": "switch_ask", "group": "scenario", "priority": 2, "cooldownMs": 0, "interruptible": true, "trigger": "Кнопка/чип «Другой кот»: кот переспрашивает (одно касание могло быть случайным). Чипы «Давай!» / «Не надо», тишина 8 с — отмена." },
     { "id": "switch_start", "group": "scenario", "priority": 2, "cooldownMs": 0, "interruptible": false, "trigger": "Смена характера: кот заклеивает экран наклейками изнутри." },
     { "id": "shake_prompt", "group": "scenario", "priority": 2, "cooldownMs": 6000, "interruptible": true, "trigger": "Экран заклеен: подсказка «встряхни»." },
     { "id": "hello_new", "group": "scenario", "priority": 2, "cooldownMs": 0, "interruptible": true, "trigger": "После встряски наклейки разлетаются, кот в новом образе." },

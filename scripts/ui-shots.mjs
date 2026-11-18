@@ -196,14 +196,15 @@ const STATES = {
     await wait(600);
     await shot(page, 'land', vp);
   },
-  /** первая минута: ребёнок молчит 8 с — подсказка от кота в пузыре */
+  /** первая минута: ребёнок молчит 8 с — подсказка: кот говорит её голосом (help) или палец стучит по чипу (без немого пузыря) */
   async s_hint(page, vp) {
     await window_fast(page);
     // фейковый микрофон Chrome пищит — кот слышит «хлопки» и отвечает; в снимке — только тишина
     await page.evaluate(() => window.__voice?.mode?.('ptt'));
     // визиты копятся в localStorage общего профиля браузера — для снимка «первый визит»
     await page.evaluate(() => { const d = window.__app.director; d.state = { ...d.state, visits: 1 }; });
-    await until(page, () => document.querySelector('.bubble.hint.show'), 25000);
+    await until(page, () => !!window.__app.ui.nudgeOn, 25000);
+    await wait(600);
     await shot(page, 'first_hint', vp);
   },
   /** после действия: погладили чипом — чипы сменились */
@@ -224,6 +225,17 @@ const STATES = {
     await shot(page, 'catalog', vp);
     await page.evaluate(() => document.querySelector('.cat-tab[data-tab="more"]')?.click());
     await shot(page, 'catalog_more', vp);
+  },
+  /** «Наклейки» из каталога: наклейка сбоку от головы, не на морде; «Другой кот» — кот переспрашивает («Давай!» / «Не надо») */
+  async s_sticker(page, vp) {
+    await window_fast(page);
+    await page.evaluate(() => window.__app.director.action('sticker'));
+    await wait(1500);
+    await shot(page, 'sticker', vp);
+    await page.evaluate(() => window.__app.director.action('other'));
+    await until(page, () => !!document.querySelector('.sug[data-chip="yes"]'), 12000);
+    await wait(600);
+    await shot(page, 'switch_ask', vp);
   },
   /** долгое нажатие на кота: меню «Пересадить на другую карту» */
   async s_press(page, vp) {

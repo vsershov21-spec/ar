@@ -86,7 +86,7 @@
       "shakePx": 2
     },
     "glitter_burst": {
-      "count": 110
+      "count": 55
     },
     "glitter_trail": {
       "perPx": 0.7
@@ -184,6 +184,9 @@
     },
     "invite": {
       "clip": "talk_excited"
+    },
+    "switch_ask": {
+      "clip": "none"
     },
     "switch_start": {
       "clip": "sticker_slap",
@@ -886,6 +889,20 @@
         "text": "Подержи палец на экране — я поцелую стекло. Чмок!",
         "emotion": "neutral",
         "face": "neutral"
+      }
+    ],
+    "switch_ask": [
+      {
+        "id": "glitter.switch_ask.01",
+        "text": "Переодеться в новый образ? Скажи «давай»!",
+        "emotion": "excited",
+        "face": "excited"
+      },
+      {
+        "id": "glitter.switch_ask.02",
+        "text": "Хочешь другую меня? Скажи «давай» или «не надо».",
+        "emotion": "happy",
+        "face": "happy"
       }
     ],
     "switch_start": [

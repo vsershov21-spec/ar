@@ -202,22 +202,39 @@ describe('повторялка', () => {
 });
 
 describe('грустно / страшно', () => {
-  it('поддержка прерывает любой диалог, подсказка взрослого, 10 с без игры', () => {
+  it('поддержка прерывает любой диалог, подсказка взрослого, 10 с кот сам ничего не предлагает', () => {
     let { s, all } = run(inPlay(), [heard('riddle'), heard('sad')]);
     expect(says(all).at(-1)).toBe('sad');
     expect(all.some((a) => a.type === 'adult_hint')).toBe(true);
     expect(all.some((a) => a.type === 'timer' && a.id === 'pause_end' && a.ms === 10_000)).toBe(true);
     expect(s.paused).toBe(true);
     expect(s.dialog).toBeNull();
-    // во время паузы — без игры и без вопросов
-    ({ s, all } = run(s, [{ type: 'interaction', kind: 'tap_cat' }, heard('joke'), heard('riddle'), { type: 'silence' }]));
+    // во время паузы кот сам не зовёт играть (тишина, предложения)
+    ({ s, all } = run(s, [{ type: 'silence' }, { type: 'offer', what: 'riddle' }]));
     expect(all.filter((a) => a.type === 'react' || a.type === 'say')).toEqual([]);
+    expect(s.paused).toBe(true);
     // страшно — снова поддержка даже на паузе
     ({ s, all } = run(s, [heard('scared')]));
     expect(says(all)).toEqual(['scared']);
     ({ s, all } = run(s, [{ type: 'timer', id: 'pause_end' }, { type: 'interaction', kind: 'tap_cat' }]));
     expect(s.paused).toBe(false);
     expect(all.some((a) => a.type === 'react' && a.event === 'tap_cat')).toBe(true);
+  });
+  it('действие ребёнка кончает паузу поддержки: касание, фраза, кнопка — кот отвечает (QA № 9)', () => {
+    let { s, all } = run(inPlay(), [heard('sad')]);
+    expect(s.paused).toBe(true);
+    ({ s, all } = run(s, [{ type: 'interaction', kind: 'tap_cat' }]));
+    expect(s.paused).toBe(false);
+    expect(all.some((a) => a.type === 'pause' && !a.on)).toBe(true);
+    expect(all.some((a) => a.type === 'cancel_timer' && a.id === 'pause_end')).toBe(true);
+    expect(all.some((a) => a.type === 'react' && a.event === 'tap_cat')).toBe(true);
+    ({ s } = run(s, [heard('sad')]));
+    ({ s, all } = run(s, [heard('joke')]));
+    expect(s.paused).toBe(false);
+    expect(all.some((a) => a.type === 'react' && a.event === 'joke')).toBe(true);
+    ({ s } = run(s, [heard('sad')]));
+    ({ s, all } = run(s, [heard('riddle')]));
+    expect(s.dialog?.id).toBe('riddle');
   });
   it('на знакомстве тоже', () => {
     const { all } = run(initialState(), [...toChoose, heard('scared')]);

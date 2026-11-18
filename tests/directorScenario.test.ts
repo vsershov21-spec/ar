@@ -278,11 +278,55 @@ describe('карта и смена кота', () => {
     await h.until(() => !h!.d.queue.busy);
     const t = h.T();
     h.d.action('other');
+    await h.tick(3000);
+    // одно касание «Другой кот» могло быть случайным — кот переспрашивает
+    expect(h.d.state.dialog?.id).toBe('switch');
+    expect(h.d.state.phase).not.toBe('switching');
+    h.d.text('давай');
     await h.tick(5000);
     h.d.interaction('shake');
     await h.tick(6000);
-    expect(ev(h, t)).toEqual(['switch_start', 'shake_prompt', 'hello_new']);
+    expect(ev(h, t)).toEqual(['switch_ask', 'switch_start', 'shake_prompt', 'hello_new']);
     expect(h.d.persona.id).toBe('kind');
     expect(h.spoken.at(-1)!.id.startsWith('kind.')).toBe(true);
+  });
+
+  it('другой кот: «не надо» или 8 с тишины — смены нет; голосом «давай другого» — сразу', async () => {
+    h = await makeDirector({ memory: { met: true, name: 'Маша', persona: 'hooligan', visits: 3 } });
+    await h.boot();
+    await h.until(() => !h!.d.queue.busy);
+    h.d.action('other');
+    await h.tick(3000);
+    h.d.text('не надо');
+    await h.tick(3000);
+    expect(h.d.state.dialog).toBeNull();
+    expect(h.d.state.phase).toBe('play');
+    h.d.action('other');
+    await h.tick(14000);
+    expect(h.d.state.dialog).toBeNull();
+    expect(h.d.state.phase).toBe('play');
+    expect(h.d.persona.id).toBe('hooligan');
+    h.d.text('давай другого');
+    await h.tick(1000);
+    expect(h.d.state.phase).toBe('switching');
+  });
+
+  it('экран заклеен: «нет» — отмена, кот прежний; без встряски — наклейки сдёргиваются сами', async () => {
+    h = await makeDirector({ memory: { met: true, name: 'Маша', persona: 'hooligan', visits: 3 } });
+    await h.boot();
+    await h.until(() => !h!.d.queue.busy);
+    h.d.text('давай другого');
+    await h.tick(5000);
+    expect(h.d.state.phase).toBe('switching');
+    h.d.text('нет');
+    await h.tick(2000);
+    expect(h.d.state.phase).toBe('play');
+    expect(h.d.persona.id).toBe('hooligan');
+    h.d.text('давай другого');
+    await h.tick(5000);
+    expect(h.d.state.phase).toBe('switching');
+    await h.tick(17000);
+    expect(h.d.state.phase).toBe('play');
+    expect(h.d.persona.id).toBe('kind');
   });
 });

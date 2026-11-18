@@ -14,7 +14,7 @@ export function glitterBurst(def: FxDef, args: FxArgs, env: FxEnv) {
   const shapes = list(def.params, 'shapes', ['star', 'dot', 'heart']).map((s) => SHAPES[s] ?? 'spark');
   const life = def.durationMs / 1000;
   for (let i = 0; i < n; i++) {
-    const a = rand(0, Math.PI * 2), sp = rand(80, 560);
+    const a = rand(0, Math.PI * 2), sp = rand(60, 320); // меньше разлёт: блёстки у точки, а не по всему коту
     const sh = i % 4 === 0 ? 'spark' : shapes[i % shapes.length];
     env.parts.spawn({
       x: p.x, y: p.y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 140, g, drag: 0.93,

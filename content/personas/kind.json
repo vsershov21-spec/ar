@@ -184,6 +184,9 @@
     "invite": {
       "clip": "talk_casual"
     },
+    "switch_ask": {
+      "clip": "none"
+    },
     "switch_start": {
       "clip": "sticker_slap",
       "fx": "stickers_cover"
@@ -873,6 +876,20 @@
         "text": "А ещё можно сказать «повторяй за мной». Я буду говорить твоими словами.",
         "emotion": "caring",
         "face": "caring"
+      }
+    ],
+    "switch_ask": [
+      {
+        "id": "kind.switch_ask.01",
+        "text": "Хочешь, я стану другим котом? Скажи «давай» или «не надо».",
+        "emotion": "caring",
+        "face": "caring"
+      },
+      {
+        "id": "kind.switch_ask.02",
+        "text": "Переодеться в другой образ? Скажи «давай».",
+        "emotion": "happy",
+        "face": "happy"
       }
     ],
     "switch_start": [

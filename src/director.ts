@@ -68,6 +68,8 @@ const EXTRA_EMOTION: Record<string, [string, number, number]> = {
  * Эффекты, которые закрывают экран (туман, снежный шар, жвачка на стекле, наклейки, конфетти…): только сразу после
  * действия ребёнка и не чаще раза в COVER_GAP_MS. Сами по себе (мысли вслух, приветствие, тишина) — нет.
  */
+/** взрывы блёсток/конфетти по кнопке — у лап кота, а не у морды */
+const BURST_FX = new Set(['glitter_burst', 'confetti', 'skate_sparks']);
 const COVER_FX = new Set(['snow_globe', 'steam', 'steam_draw', 'steam_heart', 'kiss_print', 'glass_cat', 'gum_splat', 'glitch', 'confetti', 'tag_spray', 'stickers_cover', 'holo_shine']);
 const COVER_GAP_MS = 10_000;
 const USER_ACT_MS = 2500;
@@ -191,7 +193,8 @@ export class Director extends Emitter<DirectorEvents> {
     const listening: ListenMode | null = st.dialog?.listening ?? null;
     const expectName = listening === 'name' || (st.phase === 'ask_name' && !listening);
     const expect = st.dialog ? Object.keys(this.cfg.dialogs.dialogs[st.dialog.id]?.nodes[st.dialog.node]?.on ?? {}) : [];
-    const m = matchIntent(t, { question: !!listening, expectName, expect });
+    // экран заклеен для смены образа — «нет» / «не надо» понимаем как ответ (отмена смены), хотя вопроса не было
+    const m = matchIntent(t, { question: !!listening || st.phase === 'switching', expectName, expect });
     const type = m.intent === 'switch' ? 'change_persona' : m.intent;
     const h: Heard = m.intent === 'name' ? { type: 'name', name: m.name, known: !!m.known, text: t } : { type, text: t };
     this.log(`«${t}» → ${h.type}${h.name ? ` ${h.name}${h.known ? '' : ' (нет в словаре)'}` : ''} ${m.confidence.toFixed(2)}${listening ? ` (ждём: ${listening})` : ''}`);
@@ -391,7 +394,7 @@ export class Director extends Emitter<DirectorEvents> {
           break;
         }
         d.ui.show(a.ui, a.show);
-        if (a.ui === 'chips') d.ui.show('mic', a.show);
+        // микрофон сценарий не прячет: три нижние кнопки видны всегда (ui.show('mic') — только «показать»)
         if (a.ui === 'name_prompt' && a.show) d.ui.show('mic', true);
         break;
       case 'timer':
@@ -535,8 +538,8 @@ export class Director extends Emitter<DirectorEvents> {
     d.audio.play('pop_appear');
     if (first) (d.audio as Audio & { fanfare?: () => void }).fanfare?.();
     await wait(80);
-    const p = d.stage.headScreen(w, h, 0.4);
-    d.fx.burst(p.x, p.y, this.persona.palette.fx, first ? 48 : 30);
+    const p = d.stage.headScreen(w, h, 0.2); // у лап: блёстки не закрывают морду
+    d.fx.burst(p.x, p.y, this.persona.palette.fx, first ? 26 : 18);
     if (first) {
       this.lastCoverAt = performance.now();
       (d.fx as FxLayer & { play?: (id: string, o?: Record<string, unknown>) => unknown }).play?.('confetti', { palette: this.persona.palette });
@@ -626,7 +629,7 @@ export class Director extends Emitter<DirectorEvents> {
   }
 
   /** реплика сценария/диалога: визуал вместе с речью */
-  speakEvent(event: string, o: { force?: boolean; visuals?: boolean; node?: string; scenario?: boolean } = {}): boolean {
+  speakEvent(event: string, o: { force?: boolean; visuals?: boolean; node?: string; scenario?: boolean; background?: boolean } = {}): boolean {
     this.emotion(event);
     const r = this.currentRiddle();
     const pk = this.personas.line(event, { name: this.state.name, vars: r ? { answer: r.answer } : {}, force: o.force, prefer: this.prefer, strict: this.strictVoice });
@@ -635,8 +638,19 @@ export class Director extends Emitter<DirectorEvents> {
       return false;
     }
     // реплика сценария/диалога встаёт в очередь (не ниже 2), даже если событие само по себе — реакция («нет» в «Хочешь загадку?»)
-    const priority = (o.scenario ? Math.max(pk.priority, 2) : pk.priority) as PickedLine['priority'];
+    // фон (подсказка кота по своей инициативе) — любое действие ребёнка её перебивает
+    const priority = (o.background ? 0 : o.scenario ? Math.max(pk.priority, 2) : pk.priority) as PickedLine['priority'];
     return this.enqueue({ ...pk, priority }, o.visuals !== false, o.node, r?.id);
+  }
+
+  /**
+   * Подсказка «что делать» (чипы кота, app.ts): озвученной репликой help («Погладь меня пальцем или нажми кнопку внизу»),
+   * если кот молчит и ни о чём не спрашивает. false — не сказал (нет записи, остывает, кот занят): UI покажет пальцем.
+   */
+  sayHint(): boolean {
+    if (this.queue.busy || this.d.voice.speaking || this.state.dialog || this.paused || this.state.paused || this.dozing) return false;
+    if (!this.hasVoiced('help')) return false;
+    return this.speakEvent('help', { background: true });
   }
 
   /** есть ли у события хоть одна реплика, которая прозвучит живым голосом */
@@ -797,6 +811,27 @@ export class Director extends Emitter<DirectorEvents> {
     this.face(v.face);
   }
 
+  /**
+   * Точка для наклейки вне морды кота: сбоку от головы (с той стороны, где больше места), иначе над макушкой или у лап.
+   * Морда — как в QA-стенде: центр головы ± 0,7 полуширины, от макушки до подбородка (ui.catRect).
+   */
+  private besideFace(p: { x: number; y: number }, w: number, h: number): { x: number; y: number } {
+    const r = this.d.ui.catRect?.();
+    if (!r) return p;
+    const size = Math.min(w, h) * 0.3; // наклейка ≈ 0,22–0,3 × короткая сторона × масштаб до 1,2 (stickerSheet)
+    const half = size / 2 + 10;
+    const face = { l: r.cx - r.half * 0.7, r: r.cx + r.half * 0.7, t: r.top, b: r.headY + (r.bottom - r.headY) * 0.15 };
+    const clear = (x: number, y: number) => x + half <= face.l || x - half >= face.r || y + half <= face.t || y - half >= face.b;
+    if (clear(p.x, p.y)) return p;
+    const y = Math.max(half + 70, Math.min(h * 0.62, r.headY + rand(-0.15, 0.25) * size));
+    const left = face.l - half, right = face.r + half;
+    const sides = (r.cx > w / 2 ? [left, right] : [right, left]).filter((x) => x - size * 0.4 >= 0 && x + size * 0.4 <= w);
+    if (sides.length) return { x: sides[0], y };
+    // кот на весь экран: над макушкой, иначе у лап — с краю
+    if (face.t - size >= 70) return { x: r.cx + rand(-0.3, 0.3) * size, y: face.t - half };
+    return { x: r.cx > w / 2 ? half : w - half, y: Math.min(h - half - 160, Math.max(face.b + half, r.bottom - half)) };
+  }
+
   /** контентный эффект: сначала родной API FxLayer (если научится), иначе запасной из runtimeMap */
   async runFx(id: string) {
     const d = this.d;
@@ -825,7 +860,9 @@ export class Director extends Emitter<DirectorEvents> {
     const { w, h } = d.size();
     const pal = this.persona.palette;
     const tune = this.personas.fxTuning(id);
-    const at = this.ctx.x !== undefined ? { x: this.ctx.x, y: this.ctx.y! } : d.stage.headScreen(w, h, 0.6);
+    let at = this.ctx.x !== undefined ? { x: this.ctx.x, y: this.ctx.y! } : d.stage.headScreen(w, h, BURST_FX.has(id) ? 0.22 : 0.6);
+    // наклейка — на стекло сбоку от головы, не на морду (QA, docs/qa/BUGS.md № 11): закрывала кота и перехватывала тап по нему
+    if (id === 'sticker' || id === 'tag_spray') at = this.besideFace(at, w, h);
     const generic = (d.fx as FxLayer & { play?: (id: string, o: Record<string, unknown>) => boolean | void }).play;
     if (generic && generic.call(d.fx, id, { at, palette: pal, tuning: tune, from: this.ctx.from ?? this.lastSwipe, path: this.ctx.path }) !== false) return;
     const f: FxName | null = runtimeFx(id);

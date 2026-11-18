@@ -137,7 +137,7 @@ describe('чипы кота (scenario/suggest.ts)', () => {
   });
 });
 
-describe('подсказка от кота в пузыре', () => {
+describe('подсказка от кота (голосом или пальцем, не пузырём)', () => {
   it('первый визит: после короткой тишины, один раз за тишину, ненадолго', () => {
     const s = new Suggester();
     expect(s.update(snap({ now: 0, visits: 1, quietMs: 0 })).hint).toBeNull();
@@ -156,6 +156,22 @@ describe('подсказка от кота в пузыре', () => {
     expect(s.update(snap({ now: 100, visits: 6, quietMs: HINT_LONG_MS + 1, speaking: true })).hint).toBeNull();
     expect(s.update(snap({ now: 200, visits: 6, quietMs: HINT_LONG_MS + 2, dozing: true })).hint).toBeNull();
     expect(s.update(snap({ now: 300, visits: 6, quietMs: HINT_LONG_MS + 3 })).hint).toMatch(/^Погладь меня|^Скажи мне/);
+  });
+
+  it('подсказка первых визитов помечена hintFirst (её кот говорит голосом), в долгой тишине — нет (палец на чипе)', () => {
+    const s1 = new Suggester();
+    const r1 = s1.update(snap({ now: HINT_FIRST_MS + 100, visits: 1, quietMs: HINT_FIRST_MS + 100 }));
+    expect(r1.hint).not.toBeNull();
+    expect(r1.hintFirst).toBe(true);
+    const r2 = new Suggester().update(snap({ now: 300, visits: 6, quietMs: HINT_LONG_MS + 3 }));
+    expect(r2.hint).not.toBeNull();
+    expect(r2.hintFirst).toBe(false);
+  });
+
+  it('«Другой кот?» — чипы «Давай!» / «Не надо»', () => {
+    const r = new Suggester().update(snap({ now: 1, dialog: { id: 'switch', node: 'ask', listening: true, expect: ['yes', 'change_persona', 'no', 'timeout', '*'] } }));
+    expect(r.chips.map((c) => c.label)).toEqual(['Давай!', 'Не надо']);
+    expect(r.chips.map((c) => ('say' in c.run ? c.run.say : ''))).toEqual(['давай', 'не надо']);
   });
 
   it('текст подсказки: что сказать голосом', () => {

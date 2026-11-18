@@ -650,7 +650,13 @@ async function sessionFirst(browser, ctx) {
       await sleep(1500);
     }
     s.note(res.join('; '));
-    await sleep(11000); // «мне грустно» — 10 с поддержки без игры (content/dialogs.json, pause_play)
+    // «мне грустно» — кот бережно ответил; действие ребёнка всё равно работает (пауза кончается), QA № 9
+    await s.waitQuiet(12000);
+    const pt = await s.now();
+    await s.catalogPick('pet', 'care');
+    const pr = await s.waitReaction(pt, 4500);
+    s.check(pr, 'после «мне грустно» кот не отреагировал на «Погладить» за 4,5 с');
+    s.note(`после «мне грустно» → «Погладить»: ${pr ? pr.speak ?? pr.clip : '—'}`);
   });
   await s.step('riddle', 'Мини-игра «загадка»: неверно → сдаюсь → «ещё?» → нет', async () => {
     await s.endGames();
@@ -821,6 +827,17 @@ async function sessionFirst(browser, ctx) {
     if (!ui) {
       s.note('кнопки «Другой кот» на экране нет — фразой «давай другого»');
       await s.say('давай другого кота');
+    }
+    // кнопка «Другой кот» — кот переспрашивает (чипы «Давай!» / «Не надо», 8 с): одно касание могло быть случайным
+    if (ui) {
+      const ask = await s.until(() => window.__app.director.state.dialog?.id === 'switch', 6000);
+      s.check(ask, 'кнопка «Другой кот»: кот не переспросил (диалог switch)', 'warn');
+      if (ask) {
+        await s.until(() => !!document.querySelector('.sug[data-chip="yes"]'), 8000);
+        const chips = await s.visible('.sug, [data-chip]', 'data-chip');
+        s.note(`подтверждение: ${chips.map((c) => c.label).join(' / ') || 'чипов нет'}`);
+        if (!(await s.tapEl('.sug[data-chip="yes"]'))) await s.say('давай');
+      }
     }
     const sw = await s.until(() => window.__app.director.state.phase === 'switching', 10000);
     s.check(sw, 'смена кота не началась (фаза switching)');

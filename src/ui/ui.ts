@@ -203,6 +203,7 @@ export class UI {
       <div class="scan hidden"><span>${ICON.paw}<em>Наведи камеру на карту</em></span></div>
       <div class="press-menu hidden" role="menu" aria-label="Кот"><button type="button" role="menuitem" data-a="press-reanchor">${ICON.repin}<span>Пересадить на другую карту</span></button></div>
       <div class="bubble" role="status" aria-live="polite"><span class="who"></span><span class="txt"></span></div>
+      <div class="nudge hidden" aria-hidden="true"><div class="nudge-hand">${ICON.finger}</div></div>
       <div class="coach hidden" aria-hidden="true"><div class="coach-hand">${ICON.finger}</div><div class="coach-label">Погладь меня</div></div>
       <div class="stack">
         <div class="sheet name-sheet namebox hidden">
@@ -232,9 +233,9 @@ export class UI {
         </div>
         <div class="mic-hint" aria-live="polite"></div>
       </div>
-      <div class="dock no-mic no-play">
+      <div class="dock no-play">
         <button class="iconbtn side-l" data-a="mute" aria-label="Выключить звук">${ICON.sound}</button>
-        <div class="mic-slot">${EARS}<button class="mic hidden" aria-label="Скажи коту">${ICON.mic}</button></div>
+        <div class="mic-slot">${EARS}<button class="mic" aria-label="Скажи коту">${ICON.mic}</button></div>
         <button class="pawbtn side-r" data-a="paw" type="button" aria-label="Что умеет кот" aria-haspopup="dialog" aria-expanded="false"><span class="paw-ico">${ICON.paw}</span><span class="paw-l">Что умею</span></button>
       </div>`;
     parent.appendChild(root);
@@ -272,7 +273,9 @@ export class UI {
         h.onReanchor?.();
       }
       if (a === 'paw') {
-        if (this.catalogOpen) this.closeCatalog();
+        // до конца знакомства каталога нет: кнопка видна (приглушена), а кот объясняет, что сначала познакомимся
+        if (this.dock.classList.contains('no-play')) this.micHintText('Сначала познакомимся — потом покажу, что умею');
+        else if (this.catalogOpen) this.closeCatalog();
         else this.openCatalog();
       }
       if (a === 'ob-next') this.obGo(this.obStep + 1);
@@ -317,7 +320,11 @@ export class UI {
     this.mic.addEventListener('pointercancel', up);
     this.mic.addEventListener('pointerleave', up);
     this.mic.addEventListener('contextmenu', (e) => e.preventDefault());
-    if (!opts.micSupported) this.mic.dataset.unsupported = '1';
+    if (!opts.micSupported) {
+      this.mic.dataset.unsupported = '1';
+      this.mic.classList.add('hidden');
+      this.dock.classList.add('no-mic');
+    }
     this.watchKeyboard();
     this.obSwipe();
     this.catalogGestures();
@@ -468,22 +475,32 @@ export class UI {
       this.syncChips();
       return;
     }
-    const el = { scan_hint: this.scan, name_prompt: this.namebox, sberkids: this.kids, shake_button: this.shakeBtn, mic: this.mic }[what];
-    if (what === 'mic' && this.mic.dataset.unsupported) v = false;
+    // три нижние кнопки (звук, микрофон, лапка) видны всегда после онбординга: сценарий микрофон не прячет.
+    // Нет микрофона в браузере — кнопки нет (dock.no-mic)
+    if (what === 'mic') return;
+    const el = { scan_hint: this.scan, name_prompt: this.namebox, sberkids: this.kids, shake_button: this.shakeBtn }[what];
     el.classList.toggle('hidden', !v);
-    if (what === 'mic') this.dock.classList.toggle('no-mic', !v);
     if (what === 'name_prompt' && !v) this.root.classList.remove('kb');
     this.layoutBubble();
   }
-  /** игра идёт: видны лапка и чипы кота (если кот что-то предлагает и каталог закрыт) */
+  /** игра идёт: видны чипы кота (если кот что-то предлагает и каталог закрыт). Лапка видна всегда; до первой игры
+   *  (знакомство) — приглушена (dock.no-play), после — активна до конца сессии, даже когда сценарий прячет чипы */
+  private playSeen = false;
+  /** игра началась (фаза play): лапка активна, даже если чипы ещё ждут обучалку «погладь меня» */
+  setPlaying() {
+    if (this.playSeen) return;
+    this.playSeen = true;
+    this.syncChips();
+  }
   private syncChips() {
     const on = this.chipsByScenario;
     if (!on) {
       this.closeCatalog();
-      this.hint(null);
+      this.nudge(null);
     }
     this.chips.classList.toggle('hidden', !on || this.catalogOpen || !this.sugCount);
-    this.dock.classList.toggle('no-play', !on);
+    if (on) this.playSeen = true;
+    this.dock.classList.toggle('no-play', !this.playSeen);
     if (on) this.syncMoreDot();
   }
 
@@ -509,7 +526,7 @@ export class UI {
         void b.offsetWidth;
         b.classList.add('tapped');
         if ('action' in c.run && this.tried.mark(c.run.action)) this.syncMoreDot();
-        this.hint(null);
+        this.nudge(null);
         this.h.onSuggest?.(c);
       };
       box.appendChild(b);
@@ -526,26 +543,46 @@ export class UI {
     return [...this.chips.querySelectorAll<HTMLElement>('.sug')].map((b) => b.dataset.chip ?? '');
   }
 
-  // ───────────── подсказка от кота в пузыре ─────────────
-  /** короткая подсказка («Погладь меня или скажи «танцуй»») в пузыре; null — убрать. Реплику кота не перебивает. */
-  hint(text: string | null, who = '', personaId = '') {
-    const b = this.bubble;
-    const mine = b.classList.contains('hint');
-    if (!text) {
-      if (mine) {
-        b.classList.remove('show', 'hint');
+  // ───────────── подсказка кота без пузыря ─────────────
+  /**
+   * Подсказка «что делать» без немого пузыря (решение продакта: немых пузырей нет — docs/scenario/LOGIC.md).
+   * 'soft' — кот сам сказал подсказку голосом: чипы и лапка подпрыгивают; 'finger' — голоса нет: палец стучит по первому
+   * чипу. null — убрать. Текст подсказки — только для экранного диктора (aria-label), на экране не пишется.
+   */
+  private nudgeMode: 'soft' | 'finger' | null = null;
+  nudge(mode: 'soft' | 'finger' | null, label = '') {
+    const el = this.root.querySelector('.nudge') as HTMLElement;
+    if (!mode || this.catalogOpen) {
+      if (this.nudgeMode) {
+        this.nudgeMode = null;
+        this.chips.classList.remove('attn');
+        el.classList.add('hidden');
       }
       return;
     }
-    if (this.catalogOpen) return;
-    if (b.classList.contains('show') && !mine) return; // кот говорит — его реплика важнее
-    if (mine && b.classList.contains('show') && (b.querySelector('.txt') as HTMLElement).textContent === text) return;
-    (b.querySelector('.who') as HTMLElement).textContent = who;
-    (b.querySelector('.txt') as HTMLElement).textContent = text;
-    clearTimeout(this.bubbleTimer);
-    b.className = `bubble show hint ${personaId}`;
-    this.layoutBubble();
-    this.followCat();
+    if (this.nudgeMode === mode) return;
+    this.nudgeMode = mode;
+    this.chips.classList.remove('attn');
+    void this.chips.offsetWidth;
+    this.chips.classList.add('attn');
+    if (mode === 'soft') {
+      this.pawBtn.classList.remove('attn');
+      void this.pawBtn.offsetWidth;
+      this.pawBtn.classList.add('attn');
+      el.classList.add('hidden');
+      return;
+    }
+    const first = this.chips.querySelector('.sug') as HTMLElement | null;
+    const target = first && !this.chips.classList.contains('hidden') ? first : this.pawBtn;
+    const r = target.getBoundingClientRect(), root = this.root.getBoundingClientRect();
+    el.style.left = `${Math.round(r.left - root.left + Math.min(r.width * 0.5, 44))}px`;
+    el.style.top = `${Math.round(r.top - root.top + r.height * 0.55)}px`;
+    el.setAttribute('aria-label', label);
+    el.classList.remove('hidden');
+  }
+  /** подсказка сейчас на экране (снимки, тесты) */
+  get nudgeOn() {
+    return this.nudgeMode;
   }
 
   // ───────────── каталог «Что умеет кот» ─────────────
@@ -579,7 +616,7 @@ export class UI {
     const more = moreSection({ reanchor: this.canReanchor && !!this.h.onReanchor, mic: this.mic.dataset.unsupported ? null : this.micModeNow });
     this.catSections = more ? [...c.sections, more] : c.sections;
     this.hidePressMenu();
-    this.hint(null);
+    this.nudge(null);
     if (tab && c.sections.some((s) => s.id === tab)) this.catTab = tab;
     if (!c.sections.some((s) => s.id === this.catTab)) this.catTab = c.sections[0].id;
     const el = this.catalogEl;

@@ -90,8 +90,9 @@ class Confetti extends Timed {
     for (let i = 0; i < n; i++) {
       const fromLeft = i % 2 === 0;
       env.parts.spawn({
-        x: fromLeft ? rand(-10, env.w * 0.15) : rand(env.w * 0.85, env.w + 10), y: rand(env.h * 0.55, env.h * 0.85),
-        vx: (fromLeft ? 1 : -1) * rand(120, 420), vy: -rand(700, 1150), g: 900, drag: 0.955,
+        // с краёв экрана и не к центру: кот посередине, конфетти не закрывает морду (QA: было 80 штук через весь экран)
+        x: fromLeft ? rand(-10, env.w * 0.1) : rand(env.w * 0.9, env.w + 10), y: rand(env.h * 0.6, env.h * 0.88),
+        vx: (fromLeft ? 1 : -1) * rand(50, 200), vy: -rand(600, 950), g: 900, drag: 0.955,
         life: def.durationMs / 1000 * rand(0.8, 1.15), size: rand(8, 14), color: cols[i % cols.length], shape: 'rect', vr: rand(-8, 8), flutter: 160,
       });
     }

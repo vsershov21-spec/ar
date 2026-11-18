@@ -188,6 +188,9 @@
     "invite": {
       "clip": "talk_excited"
     },
+    "switch_ask": {
+      "clip": "none"
+    },
     "switch_start": {
       "clip": "sticker_slap",
       "fx": "stickers_cover"
@@ -894,6 +897,20 @@
         "text": "Тапни по карте — я туда пойду. Тапни мимо — постучу в стекло.",
         "emotion": "neutral",
         "face": "neutral"
+      }
+    ],
+    "switch_ask": [
+      {
+        "id": "hooligan.switch_ask.01",
+        "text": "Сменить прикид? Скажи «давай» или «не надо».",
+        "emotion": "cheeky",
+        "face": "smirk"
+      },
+      {
+        "id": "hooligan.switch_ask.02",
+        "text": "Другого меня позвать? Скажи «давай».",
+        "emotion": "cheeky",
+        "face": "smirk"
       }
     ],
     "switch_start": [

@@ -18,7 +18,7 @@
     { "id": "hearts_float", "layer": "world", "durationMs": 2500, "persona": "kind|glitter", "sound": "pop_soft", "params": { "count": 6 }, "notes": "Сердечки поднимаются над котом при глажке и комплиментах." },
     { "id": "paw_print", "layer": "glass", "durationMs": 3000, "persona": "kind", "sound": "paw_glass", "params": { "fadeMs": 2500 }, "notes": "Отпечаток лапки на стекле изнутри." },
 
-    { "id": "glitter_burst", "layer": "glass", "durationMs": 1600, "persona": "glitter", "sound": "sparkle_burst", "params": { "count": 90, "gravity": 0.4, "shapes": ["star", "dot", "heart"] }, "notes": "Взрыв блёсток в точке тапа." },
+    { "id": "glitter_burst", "layer": "glass", "durationMs": 1200, "persona": "glitter", "sound": "sparkle_burst", "params": { "count": 45, "gravity": 0.4, "shapes": ["star", "dot", "heart"] }, "notes": "Взрыв блёсток в точке тапа." },
     { "id": "glitter_trail", "layer": "glass", "durationMs": 1500, "persona": "glitter", "sound": "sparkle_swipe", "params": { "perPx": 0.5, "fadeMs": 1200 }, "notes": "Блестящий след за пальцем." },
     { "id": "snow_globe", "layer": "glass", "durationMs": 4000, "persona": "glitter", "sound": "snowglobe", "params": { "count": 160, "settleMs": 3500 }, "notes": "При встряске блёстки кружат по всему экрану и медленно оседают." },
     { "id": "holo_shine", "layer": "glass", "durationMs": 1200, "persona": "glitter", "sound": "shimmer", "params": { "angleFromGyro": true }, "notes": "Голографический перелив по наклейкам и по коту, зависит от наклона телефона." },
@@ -29,7 +29,7 @@
     { "id": "sticker_peel", "layer": "glass", "durationMs": 600, "persona": "all", "sound": "sticker_peel", "params": { "fromCorner": true }, "notes": "Отклеивание с угла за палец." },
     { "id": "stickers_cover", "layer": "glass", "durationMs": 2800, "persona": "all", "sound": "sticker_slap", "params": { "count": 14, "intervalMs": 180 }, "notes": "Серия наклеек заклеивает экран перед сменой характера." },
     { "id": "stickers_blow", "layer": "glass", "durationMs": 1000, "persona": "all", "sound": "whoosh_big", "params": { "spin": true }, "notes": "Наклейки разлетаются при встряске." },
-    { "id": "confetti", "layer": "glass", "durationMs": 2000, "persona": "all", "sound": "confetti", "params": { "count": 80 }, "notes": "Праздник: выбор характера, имя, все наклейки отклеены." },
+    { "id": "confetti", "layer": "glass", "durationMs": 1600, "persona": "all", "sound": "confetti", "params": { "count": 36 }, "notes": "Праздник: выбор характера, имя, все наклейки отклеены." },
     { "id": "zzz", "layer": "world", "durationMs": 3000, "persona": "all", "sound": "snore", "params": { "loop": true }, "notes": "Буквы Zzz над спящим котом." },
     { "id": "dizzy_stars", "layer": "world", "durationMs": 2000, "persona": "all", "sound": "dizzy", "params": { "count": 4 }, "notes": "Звёздочки кружат над головой." },
     { "id": "ear_ring", "layer": "world", "durationMs": 1000, "persona": "all", "sound": "none", "params": {}, "notes": "Волны у ушей при крике (кот закрывает уши)." },

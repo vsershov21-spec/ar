@@ -195,7 +195,8 @@ canvas.gl.glitch { --gshift: 8px; animation: glitch .68s steps(1) infinite;
 .dock .side-l { justify-self: end; margin-right: var(--s-3); }
 .dock .side-r { justify-self: start; margin-left: var(--s-3); }
 .dock .mic-slot { width: var(--mic); height: var(--mic); position: relative; }
-.dock.no-play .side-r { visibility: hidden; }
+/* до первой игры (знакомство) лапка видна, но приглушена: каталог откроется после знакомства */
+.dock.no-play .side-r { opacity: .45; filter: grayscale(.7); }
 
 /* микрофон: держи и говори */
 .mic { appearance: none; position: absolute; inset: 0; width: var(--mic); height: var(--mic); border-radius: 50%; border: 0; display: grid; place-items: center;
@@ -417,6 +418,8 @@ body > .toast { position: fixed; }
 
 /* ссылка «Условия» и лист условий */
 .linkbtn { appearance: none; border: 0; background: none; padding: 0; color: #fff; font: inherit; font-weight: 700; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+/* «Условия» в мелком тексте: вид — ссылка, зона нажатия ≥ 44×44 (Apple HIG) за счёт полей, строка не раздвигается */
+.fine .linkbtn { display: inline-block; min-width: 44px; min-height: 44px; padding: 13px 10px; margin: -13px -10px; line-height: 18px; vertical-align: baseline; box-sizing: border-box; }
 .terms { position: absolute; inset: 0; z-index: 5; display: flex; align-items: flex-end; justify-content: center; background: rgba(3, 25, 28, .55);
   padding: var(--safe-t) var(--s-3) calc(var(--s-3) + var(--safe-b)); animation: rise var(--t-med) var(--ease); }
 .terms-card { width: min(100%, 460px); max-height: 86%; display: flex; flex-direction: column; gap: var(--s-3); padding: var(--s-5) var(--s-4) var(--s-4);
@@ -650,3 +653,10 @@ body > .toast { position: fixed; }
 .chips.suggest.game .sug { min-height: 48px; font-size: 14.5px; padding: 0 14px 0 5px; gap: 6px; }
 .chips.suggest.game .sug-ico { width: 36px; height: 36px; }
 .chips.suggest.game .sug-ico svg { width: 21px; height: 21px; }
+
+/* подсказка без пузыря (кот не сказал её голосом): палец стучит по первому чипу */
+.nudge { position: absolute; z-index: 4; width: 0; height: 0; pointer-events: none; }
+.nudge-hand { position: absolute; left: -8px; top: -4px; width: 48px; height: 48px; filter: drop-shadow(0 6px 10px rgba(0,0,0,.35)); animation: nudgetap 1.1s var(--ease) infinite; }
+.nudge-hand svg { width: 100%; height: 100%; }
+@keyframes nudgetap { 0%, 100% { transform: translate(6px, 14px) scale(1); } 45% { transform: translate(0, 0) scale(.92); } 60% { transform: translate(0, 0) scale(.86); } }
+@media (prefers-reduced-motion: reduce) { .nudge-hand { animation: none; } }

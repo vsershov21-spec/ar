@@ -2,7 +2,8 @@
  * Чипы-предложения ОТ КОТА над нижними кнопками (вариант А «Кот подсказывает», docs/UI_AUDIT.md, «Упрощённый экран»).
  * Не больше двух, контекстные и меняющиеся: что кот предлагает прямо сейчас — по состоянию режиссёра
  * (мини-игра, эмоция, дрёма, лестница тишины) и по тому, что ребёнок ещё не пробовал из каталога.
- * Плюс короткая подсказка в пузыре («Погладь меня или скажи «танцуй»») — только в первые визиты или после долгой тишины.
+ * Плюс подсказка «что делать» — только в первые визиты или после долгой тишины. Не пузырём (немых пузырей нет):
+ * app.ts говорит её озвученной репликой кота (событие help) или показывает пальцем на чип.
  * Чистая логика без DOM: снимок состояния → { chips, hint }. Рисует ui.ts, снимок собирает app.ts.
  */
 import type { ActionId } from './actions';
@@ -44,7 +45,10 @@ export interface SuggestSnapshot {
 
 export interface Suggestion {
   chips: Chip[];
+  /** подсказка «что делать» (текст — для лога и диктора; на экран — голосом кота или пальцем, не пузырём) */
   hint: string | null;
+  /** подсказка первых визитов (короткая пауза): её кот говорит голосом */
+  hintFirst?: boolean;
 }
 
 export const MAX_CHIPS = 2;
@@ -124,7 +128,8 @@ export class Suggester {
     }
     const chips = this.chips(s);
     this.last = chips;
-    return { chips, hint: this.hint(s, chips) };
+    const hint = this.hint(s, chips);
+    return { chips, hint, hintFirst: !!hint && this.firstVisit(s) };
   }
 
   private chip(s: SuggestSnapshot, id: string, label?: string): Chip | null {
@@ -153,7 +158,11 @@ export class Suggester {
       if (dlg.id === 'riddle') return this.pick([say('more_riddle', 'Ещё загадку', 'quest', 'ещё загадку'), this.chip(s, 'echo')]);
       if (dlg.id === 'echo') return [say('echo_stop', 'Хватит', 'stop', 'хватит')];
       if (ex.has('yes') && ex.has('no'))
-        return dlg.id === 'offer' ? [say('yes', 'Давай!', 'yes', 'давай'), say('no', 'Не хочу', 'no', 'не хочу')] : [say('yes', 'Да', 'yes', 'да'), say('no', 'Нет', 'no', 'нет')];
+        return dlg.id === 'offer'
+          ? [say('yes', 'Давай!', 'yes', 'давай'), say('no', 'Не хочу', 'no', 'не хочу')]
+          : dlg.id === 'switch'
+            ? [say('yes', 'Давай!', 'swap', 'давай'), say('no', 'Не надо', 'no', 'не надо')]
+            : [say('yes', 'Да', 'yes', 'да'), say('no', 'Нет', 'no', 'нет')];
       return this.last;
     }
     // кот дремлет — разбудить
@@ -187,12 +196,15 @@ export class Suggester {
     return this.pick([games[0] ?? fresh[0] ?? null, second ?? null, ...fresh, ...rest]);
   }
 
+  private firstVisit(s: SuggestSnapshot) {
+    return s.visits <= FIRST_VISITS && s.now - this.playStartedAt < FIRST_VISIT_PLAY_MS;
+  }
   private hint(s: SuggestSnapshot, chips: Chip[]): string | null {
     // тишина оборвалась (ребёнок что-то сделал) — подсказку можно показать снова в следующей тишине
     if (s.quietMs < this.prevQuiet) this.hintAt = -1;
     this.prevQuiet = s.quietMs;
     if (s.dialog || s.speaking || s.paused || s.dozing || !chips.length) return null;
-    const first = s.visits <= FIRST_VISITS && s.now - this.playStartedAt < FIRST_VISIT_PLAY_MS;
+    const first = this.firstVisit(s);
     if (s.quietMs < (first ? HINT_FIRST_MS : HINT_LONG_MS)) return null;
     if (this.hintAt < 0) this.hintAt = s.now;
     if (s.now - this.hintAt > HINT_SHOW_MS) return null;

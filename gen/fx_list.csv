@@ -13,7 +13,7 @@ soap_bubbles,world,kind,3500,bubbles,"{""count"": 12, ""minPx"": 20, ""maxPx"": 
 warm_lights,world,kind,5000,chime_soft,"{""count"": 20, ""color"": ""#FFC86B"", ""drift"": 0.3}",Тёплые светлячки вокруг кота (успокаивающая реакция).
 hearts_float,world,kind|glitter,2500,pop_soft,"{""count"": 6}",Сердечки поднимаются над котом при глажке и комплиментах.
 paw_print,glass,kind,3000,paw_glass,"{""fadeMs"": 2500}",Отпечаток лапки на стекле изнутри.
-glitter_burst,glass,glitter,1600,sparkle_burst,"{""count"": 90, ""gravity"": 0.4, ""shapes"": [""star"", ""dot"", ""heart""]}",Взрыв блёсток в точке тапа.
+glitter_burst,glass,glitter,1200,sparkle_burst,"{""count"": 45, ""gravity"": 0.4, ""shapes"": [""star"", ""dot"", ""heart""]}",Взрыв блёсток в точке тапа.
 glitter_trail,glass,glitter,1500,sparkle_swipe,"{""perPx"": 0.5, ""fadeMs"": 1200}",Блестящий след за пальцем.
 snow_globe,glass,glitter,4000,snowglobe,"{""count"": 160, ""settleMs"": 3500}",При встряске блёстки кружат по всему экрану и медленно оседают.
 holo_shine,glass,glitter,1200,shimmer,"{""angleFromGyro"": true}","Голографический перелив по наклейкам и по коту, зависит от наклона телефона."
@@ -23,7 +23,7 @@ sticker,glass,all,400,sticker_slap,"{""mirrored"": true, ""rotateDeg"": [-18, 18
 sticker_peel,glass,all,600,sticker_peel,"{""fromCorner"": true}",Отклеивание с угла за палец.
 stickers_cover,glass,all,2800,sticker_slap,"{""count"": 14, ""intervalMs"": 180}",Серия наклеек заклеивает экран перед сменой характера.
 stickers_blow,glass,all,1000,whoosh_big,"{""spin"": true}",Наклейки разлетаются при встряске.
-confetti,glass,all,2000,confetti,"{""count"": 80}","Праздник: выбор характера, имя, все наклейки отклеены."
+confetti,glass,all,1600,confetti,"{""count"": 36}","Праздник: выбор характера, имя, все наклейки отклеены."
 zzz,world,all,3000,snore,"{""loop"": true}",Буквы Zzz над спящим котом.
 dizzy_stars,world,all,2000,dizzy,"{""count"": 4}",Звёздочки кружат над головой.
 ear_ring,world,all,1000,none,{},Волны у ушей при крике (кот закрывает уши).
