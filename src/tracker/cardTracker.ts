@@ -22,6 +22,7 @@ import { CardSession, OrientationHistory } from './card/session';
 import type { TrackState } from './card/fsm';
 import { perf } from '../core/perf';
 import { trackerLuma } from './cardMonitor';
+import { CardRecorder, recRequested } from './cardRecorder';
 
 export interface CardView {
   /** углы карты (TL, TR, BR, BL) в px экрана */
@@ -51,10 +52,13 @@ export class CardTracker extends TrackerBase implements Tracker {
   /** ориентация телефона по времени — чтобы знать её в момент съёмки кадра */
   private orient = new OrientationHistory();
   /**
-   * Задержка камеры: кадр, который мы берём из <video>, снят примерно на столько раньше, мс (?camlat=N).
-   * Ориентацию телефона для кадра берём на этот момент.
+   * Задержка камеры: кадр, показанный в <video> (requestVideoFrameCallback), снят примерно на столько раньше, мс.
+   * Источник правды — session.camLatMs: начинается с сохранённой оценки этого телефона (или 33 мс), уточняется по
+   * самой карте (session.ts LatencyEstimator); ?camlat=N — задать и не уточнять.
    */
-  camLatMs = numParam('camlat', 33);
+  get camLatMs() {
+    return this.session.camLatMs;
+  }
 
   private worker: Worker | null = null;
   private busy = false;
@@ -78,7 +82,9 @@ export class CardTracker extends TrackerBase implements Tracker {
   private fpsT = 0;
   /** номер отправленного кадра и ориентация телефона при его съёмке */
   private sendId = 0;
-  private sentCap: { id: number; q: THREE.Quaternion | null } | null = null;
+  private sentCap: { id: number; q: THREE.Quaternion | null; shownAt: number } | null = null;
+  /** когда на экране появился последний кадр камеры (rVFC; без него — время отправки) */
+  private shownAt = 0;
   /** пересадка без новой карты дольше 6 с — «карта потеряна» (как раньше) */
   private reanchorAt = -1;
   /** воркер сказал: следующий кадр — с полным поиском (к нему — фрагмент под проверку) */
@@ -92,6 +98,23 @@ export class CardTracker extends TrackerBase implements Tracker {
   constructor(private container: HTMLElement) {
     super();
     this.overlay = new CardOverlay(container);
+    const fixed = numParam('camlat', NaN);
+    let savedLat = NaN;
+    try {
+      savedLat = parseFloat(localStorage.getItem(LAT_KEY) ?? '');
+    } catch {
+      /* приватный режим */
+    }
+    this.session.camLatMs = Number.isFinite(fixed) ? fixed : savedLat > 0 && savedLat < 200 ? savedLat : 33;
+    this.session.latFixed = Number.isFinite(fixed);
+    this.session.history = this.orient;
+    this.session.onLatency = (ms) => {
+      try {
+        localStorage.setItem(LAT_KEY, ms.toFixed(1));
+      } catch {
+        /* приватный режим */
+      }
+    };
     this.session.onFocal = (f) => {
       this.resize(this.w, this.h);
       try {
@@ -221,10 +244,40 @@ export class CardTracker extends TrackerBase implements Tracker {
     }
   }
 
+  /** ?rec — запись камеры для стенда (src/tracker/cardRecorder.ts) */
+  private recorder: CardRecorder | null = null;
+  /** когда в последний раз были углы карты (для размытия номера на записи) */
+  private quadAt = 0;
+
   async start(): Promise<void> {
+    const self = this;
     if (!this.video) await this.startVideo();
     this.hold.start();
-    this.hold.onSample = (t, q) => this.orient.push(t, q);
+    this.hold.onSample = (t, q) => {
+      this.orient.push(t, q);
+      this.recorder?.sample(t, q);
+    };
+    // ?rec (lab и /test): запись чистой камеры + гироскопа для стенда card:eval, номер карты размыт
+    const recName = recRequested();
+    if (recName && this.video && !this.recorder) {
+      this.recorder = new CardRecorder(
+        {
+          video: this.video,
+          container: this.container,
+          get dw() {
+            return self.dw;
+          },
+          get dh() {
+            return self.dh;
+          },
+          quad: () => (this.prevQuad ? { q: this.prevQuad, at: this.quadAt } : null),
+          focal: () => this.K.f,
+          camLatMs: () => this.camLatMs,
+          state: () => this.session.state,
+        },
+        recName,
+      );
+    }
     this.worker = new Worker(new URL('./card/worker.ts', import.meta.url), { type: 'module' });
     this.worker.onmessage = (e: MessageEvent<CardWorkerOut>) => this.onResult(e.data);
     this.worker.onerror = (e) => console.warn('[card] worker', e.message);
@@ -277,7 +330,9 @@ export class CardTracker extends TrackerBase implements Tracker {
     } catch {
       /* приватный режим */
     }
-    const fDef = focalFromFov(this.dw, this.dh);
+    // iPhone: основная камера 24–26 мм (экв.) — угол обзора по длинной стороне ≈ 67–73°, а не 63° (по записи 18.11:
+    // фокус по набору углов карты ≈ 73°, прежняя самокалибровка — 70°; с 63° позы вблизи отбрасывались, кот терял карту)
+    const fDef = focalFromFov(this.dw, this.dh, isIOS() ? IOS_HFOV : undefined);
     this.session.K = { f: saved > 0 ? saved * Math.max(this.dw, this.dh) : fDef, cx: this.dw / 2, cy: this.dh / 2 };
     this.session.w = this.dw;
     this.session.h = this.dh;
@@ -309,14 +364,16 @@ export class CardTracker extends TrackerBase implements Tracker {
   private bitmapGrab = useBitmapGrab();
 
   private watchFrames(v: HTMLVideoElement) {
-    const vv = v as HTMLVideoElement & { requestVideoFrameCallback?: (cb: () => void) => number };
+    const vv = v as HTMLVideoElement & { requestVideoFrameCallback?: (cb: (now?: number) => void) => number };
     if (typeof vv.requestVideoFrameCallback !== 'function') return;
     this.rvfc = true;
     const gen = ++this.rvfcGen;
-    const cb = () => {
+    const cb = (now?: number) => {
       if (gen !== this.rvfcGen) return; // цепочка заменена (после переоткрытия камеры)
       this.frameSeq++;
       this.rvfcAt = performance.now();
+      // момент показа кадра: время rVFC (≈ композиция кадра); съёмка — на camLat раньше
+      this.shownAt = typeof now === 'number' && Math.abs(now - this.rvfcAt) < 200 ? now : this.rvfcAt;
       if (this.video === v) vv.requestVideoFrameCallback!(cb);
     };
     vv.requestVideoFrameCallback(cb);
@@ -332,10 +389,12 @@ export class CardTracker extends TrackerBase implements Tracker {
       const t0 = performance.now();
       this.sentAt = t0;
       this.busy = true;
-      // ориентация телефона в момент съёмки этого кадра (кадр старше «сейчас» на задержку камеры)
-      const capQ = this.orient.at(t0 - this.camLatMs);
+      // ориентация телефона в момент съёмки этого кадра: он на экране с shownAt (rVFC), снят на camLat раньше
+      // (раньше — «время отправки − 33 мс»: кадр мог висеть до отправки ещё до 33 мс, поворот на это время терялся)
+      const shownAt = this.rvfc && t0 - this.shownAt < 100 ? this.shownAt : t0;
+      const capQ = this.orient.at(shownAt - this.camLatMs);
       const id = ++this.sendId;
-      this.sentCap = { id, q: capQ };
+      this.sentCap = { id, q: capQ, shownAt };
       const req = this.session.request(t0, capQ);
       const frame = this.frameGrab ? grabFrame(v) : null;
       const crop = this.cropRect(v);
@@ -502,9 +561,9 @@ export class CardTracker extends TrackerBase implements Tracker {
       this.frames = 0;
       this.fpsT = now;
     }
-    const capQ = this.sentCap && this.sentCap.id === r.id ? this.sentCap.q : null;
+    const cap = this.sentCap && this.sentCap.id === r.id ? this.sentCap : null;
     const logN = this.session.log.length;
-    const st = this.session.onResult(r, capQ, now, this.hold.angularSpeed);
+    const st = this.session.onResult(r, cap?.q ?? null, now, this.hold.angularSpeed, cap?.shownAt);
     if (st.reset) {
       // посадили «по форме», а под котом не карта — ищем заново (детектор и проверку — с нуля)
       this.worker?.postMessage({ rgba: new ArrayBuffer(4), w: 1, h: 1, focal: 1, reset: true, lock: false });
@@ -512,6 +571,7 @@ export class CardTracker extends TrackerBase implements Tracker {
       this.catPlaced = false;
     }
     this.prevQuad = st.quad ?? (this.session.fsm.anchored ? this.prevQuad : null);
+    if (st.quad) this.quadAt = now;
     this.nextDetect = r.detNext ?? true;
     const state = this.session.state;
     if (st.quad && st.pose) {
@@ -622,7 +682,8 @@ export class CardTracker extends TrackerBase implements Tracker {
       this.reanchorAt = -1;
       this.emitLost();
     }
-    const m = this.session.frame(dt, this.hold.quaternion);
+    // кот — в позе на момент съёмки кадра, который сейчас на экране (session.ts DISPLAY_AT_FRAME)
+    const m = this.session.display(dt, this.rvfc && now - this.shownAt < 100 ? this.shownAt : now, this.hold.quaternion);
     if (m) {
       this.anchor.matrix.copy(m);
       this.anchor.matrixWorldNeedsUpdate = true;
@@ -690,6 +751,14 @@ function grabFrame(v: HTMLVideoElement): VideoFrame | null {
 }
 
 const FOCAL_KEY = 'ar.focal.v1';
+/** угол обзора камеры iPhone по длинной стороне, градусы (без сохранённой калибровки) */
+export const IOS_HFOV = 70;
+function isIOS() {
+  const ua = typeof navigator !== 'undefined' ? navigator.userAgent : '';
+  return /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && typeof navigator !== 'undefined' && navigator.maxTouchPoints > 1);
+}
+/** оценка задержки камеры этого телефона, мс (session.ts LatencyEstimator) */
+const LAT_KEY = 'ar.camlat.v1';
 /** фрагмент «весь кадр» при потере карты: длинная сторона, px */
 const FULL_CROP_PX = 600;
 

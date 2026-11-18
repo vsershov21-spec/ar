@@ -306,6 +306,8 @@ export class CardDetector {
   private keyFrame = -1e9;
   /** кадров подряд без выравнивания по ключевому кадру */
   private keyFails = 0;
+  /** полный поиск подряд лучше углов по шаблону (коррекция ключевого кадра) */
+  private keyFix = 0;
   /** гомография поворота камеры между кадрами по гироскопу (K·R·K⁻¹) в этом кадре */
   private gyroG: Mat3 | null = null;
 
@@ -550,6 +552,34 @@ export class CardDetector {
           this.keyQuad = best.quad;
         }
       } else if (best && mode !== 'plane' && this.keyQuad) this.keyQuad = alignQuad(best.quad, this.keyQuad);
+    }
+    // Коррекция ключевого кадра по краям: шаблон снимается с четырёхугольника на момент посадки, и если тот был
+    // неточным (угол «съехал» на 5–7 px при ведении потоком до посадки), ведение по шаблону хранит ошибку
+    // всю сессию — кот смещён и «кренится», поза с ошибкой > 4 px отбрасывается (стенд card:eval, наклон 25°,
+    // угол обзора 56°). Полный поиск идёт и после посадки (переверификация): если его карта — та же (рядом), но
+    // заметно лучше подтверждена краями, чем углы по шаблону, два раза подряд — новый ключевой кадр с её углов.
+    if (mode === 'key' && keyRes && best && detectOut && this.locked && p.keyframe) {
+      const c = detectOut.candidates[0];
+      const bq = best.quad;
+      const diag = quadDiag(bq);
+      const dq = c ? alignQuad(c.quad, bq) : null;
+      const off = dq ? Math.max(...dq.map((pt, i) => Math.hypot(pt.x - bq[i].x, pt.y - bq[i].y))) : 0;
+      if (c && dq && off > Math.max(1.5, 0.025 * diag) && off < 0.12 * diag) {
+        const ek = this.evaluate(bq);
+        this.keyFix = !ek || c.score > ek.score + 0.08 ? this.keyFix + 1 : 0;
+        if (this.keyFix >= 2 && this.key.capture(this.gray, this.w, this.h, dq, this.frameNo)) {
+          this.keyFix = 0;
+          this.keyFrame = this.frameNo;
+          this.keyH = this.key.homographyFor(dq);
+          this.keyVel = null;
+          this.keyQuad = dq;
+          best = { ...c, quad: dq };
+          mode = 'detect';
+          this.prevQuad = dq;
+          this.stickyQuad = dq;
+          this.why = 'ключевой кадр по краям';
+        }
+      } else if (c && dq && off <= Math.max(1.5, 0.025 * diag)) this.keyFix = 0;
     }
     if (best && mode !== 'plane') {
       this.anchored = true;

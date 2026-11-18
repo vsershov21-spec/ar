@@ -16,11 +16,206 @@
  * Машина состояний (поиск → кандидат → посадка → удержание → поиск рядом → потеря) — ./fsm.ts.
  */
 import * as THREE from 'three';
-import { CARD_ASPECT, focalFromQuad, labelCard, poseFromQuad, quadDiag, type Intrinsics, type Pose, type Pt, type Quad } from './geometry';
+import { CARD_ASPECT, labelCard, poseFromQuad, quadDiag, type Intrinsics, type Pose, type Pt, type Quad } from './geometry';
 import { CardFsm, type Kind, type TrackState } from './fsm';
 import type { PipelineOut } from './pipeline';
-import { OneEuroVec } from '../smoothing';
 import { ACCEPT_OTHER_BANKS } from '../../config';
+
+/**
+ * Кот рисуется в позе на момент съёмки ПОКАЗАННОГО кадра камеры (CardTracker: ориентация телефона и время
+ * «сейчас − camLatMs»), а не на «сейчас»: фон — это кадр, снятый camLat назад, и кот, досчитанный гироскопом до
+ * «сейчас», убегал вперёд фона на каждом повороте (docs/CARD_DETECTION.md, 18.11 вечер). Флаг читает стенд
+ * tests/card/eval/replay.ts, чтобы показывать так же, как приложение этой версии.
+ */
+export const DISPLAY_AT_FRAME = true;
+
+/**
+ * Положение карты в «мире гироскопа» — фильтр Калмана с постоянной скоростью (6 состояний: p, v).
+ * Карта на столе неподвижна, но камера в руке ребёнка СДВИГАЕТСЯ (наклон телефона над картой — это облёт по дуге
+ * 25–30 см, приближение — сдвиг вдоль взгляда): в мире гироскопа положение карты относительно камеры едет со
+ * скоростью сдвига телефона. Прежний OneEuro (0,6 Гц) запаздывал на 150–250 мс, плюс задержка воркера —
+ * кот «плыл» на 2–3 см при наклоне и менял масштаб при приближении. Теперь скорость оценивается, а поза
+ * досчитывается до момента показа. Шум измерения — анизотропный: вдоль луча (глубина по размеру карты) в
+ * z/(ширина карты в px) раз больше, чем поперёк, — глубина сглаживается сильнее, положение на экране — почти нет.
+ */
+export class PosKalman {
+  /** p (3), v (3) */
+  readonly x = new Float64Array(6);
+  /** ковариация 6 × 6 построчно */
+  readonly P = new Float64Array(36);
+  /** время состояния, с */
+  t = 0;
+  ok = false;
+  /** спектральная плотность ускорения (ширин карты² / с³) */
+  constructor(public q = 10) {}
+
+  reset(p: THREE.Vector3, t: number, R: number[]) {
+    this.x.fill(0);
+    this.x[0] = p.x;
+    this.x[1] = p.y;
+    this.x[2] = p.z;
+    this.P.fill(0);
+    for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) this.P[i * 6 + j] = R[i * 3 + j];
+    // скорость неизвестна: до ~0,25 м/с (≈ 3 ширины карты в секунду)
+    for (let i = 3; i < 6; i++) this.P[i * 6 + i] = 4;
+    this.t = t;
+    this.ok = true;
+  }
+
+  /** прогноз до момента t (с) */
+  predict(t: number) {
+    const dt = Math.max(0, Math.min(0.5, t - this.t));
+    this.t = Math.max(this.t, t);
+    if (!dt) return;
+    const x = this.x, P = this.P, q = this.q;
+    for (let i = 0; i < 3; i++) x[i] += x[i + 3] * dt;
+    // P = F P Fᵀ + Q, F = [I dt·I; 0 I]
+    const n = new Float64Array(36);
+    for (let i = 0; i < 6; i++)
+      for (let j = 0; j < 6; j++) {
+        let v = P[i * 6 + j];
+        if (i < 3) v += dt * P[(i + 3) * 6 + j];
+        if (j < 3) v += dt * P[i * 6 + j + 3];
+        if (i < 3 && j < 3) v += dt * dt * P[(i + 3) * 6 + j + 3];
+        n[i * 6 + j] = v;
+      }
+    const d3 = (dt * dt * dt) / 3, d2 = (dt * dt) / 2;
+    for (let k = 0; k < 3; k++) {
+      n[k * 6 + k] += q * d3;
+      n[k * 6 + k + 3] += q * d2;
+      n[(k + 3) * 6 + k] += q * d2;
+      n[(k + 3) * 6 + k + 3] += q * dt;
+    }
+    P.set(n);
+  }
+
+  /** измерение положения z (3) с ковариацией R (3 × 3); возвращает квадрат расстояния Махаланобиса невязки */
+  update(z: THREE.Vector3, R: number[], t: number): number {
+    this.predict(t);
+    const x = this.x, P = this.P;
+    const y = [z.x - x[0], z.y - x[1], z.z - x[2]];
+    const S = [0, 0, 0, 0, 0, 0, 0, 0, 0];
+    for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) S[i * 3 + j] = P[i * 6 + j] + R[i * 3 + j];
+    const Si = inv3(S);
+    if (!Si) return Infinity;
+    let d2 = 0;
+    for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) d2 += y[i] * Si[i * 3 + j] * y[j];
+    // K = P Hᵀ S⁻¹ (6 × 3), H = [I 0]
+    const Kg = new Float64Array(18);
+    for (let i = 0; i < 6; i++) for (let j = 0; j < 3; j++) Kg[i * 3 + j] = P[i * 6] * Si[j] + P[i * 6 + 1] * Si[3 + j] + P[i * 6 + 2] * Si[6 + j];
+    for (let i = 0; i < 6; i++) x[i] += Kg[i * 3] * y[0] + Kg[i * 3 + 1] * y[1] + Kg[i * 3 + 2] * y[2];
+    // P = (I − K H) P
+    const n = new Float64Array(36);
+    for (let i = 0; i < 6; i++) for (let j = 0; j < 6; j++) n[i * 6 + j] = P[i * 6 + j] - (Kg[i * 3] * P[j] + Kg[i * 3 + 1] * P[6 + j] + Kg[i * 3 + 2] * P[12 + j]);
+    P.set(n);
+    return d2;
+  }
+
+  /**
+   * Положение на момент t без изменения состояния. Вперёд от последнего измерения — не дальше horizon (с), с
+   * насыщением: удержание без измерений не «улетает» по скорости.
+   */
+  at(t: number, out: THREE.Vector3, horizon = 0.2): THREE.Vector3 {
+    let dt = t - this.t;
+    if (dt > 0) dt = horizon * (1 - Math.exp(-dt / horizon));
+    else dt = Math.max(dt, -0.1);
+    return out.set(this.x[0] + this.x[3] * dt, this.x[1] + this.x[4] * dt, this.x[2] + this.x[5] * dt);
+  }
+
+  get speed() {
+    return Math.hypot(this.x[3], this.x[4], this.x[5]);
+  }
+}
+
+/**
+ * Задержка камеры по самой карте: карта на столе неподвижна в мире, значит при верной задержке L поворот карты в
+ * мире W = Q(показ − L) · R_карты_в_камере между кадрами минимален. Перебор L = 0…160 мс, сумма квадратов углов
+ * между соседними W по кадрам, где телефон заметно поворачивался (> 1°); минимум — оценка. На записях 18.11 и
+ * синтетике с задержкой 80 мс при «зашитых» 33 мс кот на каждом повороте убегал на 1–2 см (стенд card:eval).
+ */
+export class LatencyEstimator {
+  static readonly STEP = 8;
+  static readonly N = 21;
+  private S = new Float64Array(LatencyEstimator.N);
+  samples = 0;
+  private prev: { R: THREE.Quaternion; T: number } | null = null;
+  estimate: number | null = null;
+
+  /** R — поворот карты в системе камеры (кадр, показанный в момент T, мс), hist — ориентация телефона по времени */
+  add(R: THREE.Quaternion, T: number, hist: OrientationHistory) {
+    const prev = this.prev;
+    this.prev = { R: R.clone(), T };
+    if (!prev || T - prev.T > 250 || T <= prev.T) return;
+    const a = hist.at(T), b = hist.at(prev.T);
+    if (!a || !b || a.angleTo(b) < 0.012) return;
+    const wa = new THREE.Quaternion(), wb = new THREE.Quaternion();
+    for (let k = 0; k < LatencyEstimator.N; k++) {
+      const L = k * LatencyEstimator.STEP;
+      const qa = hist.at(T - L), qb = hist.at(prev.T - L);
+      if (!qa || !qb) return;
+      wa.copy(qa).multiply(R);
+      wb.copy(qb).multiply(prev.R);
+      const e = wa.angleTo(wb);
+      this.S[k] = this.S[k] * 0.98 + Math.min(e, 0.1) ** 2;
+    }
+    this.samples++;
+    if (this.samples < 4) return;
+    let k = 0;
+    for (let i = 1; i < LatencyEstimator.N; i++) if (this.S[i] < this.S[k]) k = i;
+    // уточнение параболой по соседям; минимум на краю перебора — не верим (за пределами 0…160 мс)
+    if (k === 0 || k === LatencyEstimator.N - 1) return;
+    const y0 = this.S[k - 1], y1 = this.S[k], y2 = this.S[k + 1];
+    const den = y0 - 2 * y1 + y2;
+    const dk = den > 1e-12 ? Math.max(-0.5, Math.min(0.5, (0.5 * (y0 - y2)) / den)) : 0;
+    // минимум должен быть выраженным: края заметно хуже
+    // (по 4–14 кадрам движения — только очень выраженный: при встряске неверная задержка срывает ведение раньше)
+    if (Math.min(this.S[0], this.S[LatencyEstimator.N - 1]) < (this.samples < 15 ? 4 : 1.3) * y1) return;
+    this.estimate = (k + dk) * LatencyEstimator.STEP;
+  }
+}
+
+/**
+ * Фокус по набору четырёхугольников карты: при верном фокусе карта (прямоугольник 85,60 × 53,98) ложится в позу
+ * без ошибки, при неверном — ошибка перепроецирования растёт с наклоном. Минимум суммарной ошибки по фокусу
+ * (сетка + парабола) устойчивее, чем фокус по одному кадру (focalFromQuad): у почти фронтальных кадров ошибка
+ * от фокуса не зависит и в минимум не вмешивается.
+ */
+export function focalFromQuads(quads: Quad[], cx: number, cy: number, fMin: number, fMax: number): { f: number; cost: (f: number) => number } | null {
+  if (quads.length < 6) return null;
+  const cost = (f: number) => {
+    let s = 0;
+    for (const q of quads) {
+      const p = poseFromQuad(q, { f, cx, cy }, CARD_ASPECT);
+      const e = p ? p.err / quadDiag(q) : 0.05;
+      s += Math.min(e, 0.05);
+    }
+    return s / quads.length;
+  };
+  const N = 28;
+  const lf = (i: number) => fMin * Math.pow(fMax / fMin, i / (N - 1));
+  const c = Array.from({ length: N }, (_, i) => cost(lf(i)));
+  let k = 0;
+  for (let i = 1; i < N; i++) if (c[i] < c[k]) k = i;
+  if (k === 0 || k === N - 1) return null;
+  // золотое сечение между соседями
+  let a = lf(k - 1), b = lf(k + 1);
+  const g = (Math.sqrt(5) - 1) / 2;
+  let x1 = b - g * (b - a), x2 = a + g * (b - a), f1 = cost(x1), f2 = cost(x2);
+  for (let it = 0; it < 14; it++) {
+    if (f1 < f2) (b = x2), (x2 = x1), (f2 = f1), (x1 = b - g * (b - a)), (f1 = cost(x1));
+    else (a = x1), (x1 = x2), (f1 = f2), (x2 = a + g * (b - a)), (f2 = cost(x2));
+  }
+  return { f: (a + b) / 2, cost };
+}
+
+function inv3(m: number[]): number[] | null {
+  const [a, b, c, d, e, f, g, h, i] = m;
+  const A = e * i - f * h, B = -(d * i - f * g), C = d * h - e * g;
+  const det = a * A + b * B + c * C;
+  if (Math.abs(det) < 1e-30) return null;
+  const k = 1 / det;
+  return [A * k, -(b * i - c * h) * k, (b * f - c * e) * k, B * k, (a * i - c * g) * k, -(a * f - c * d) * k, C * k, -(a * h - b * g) * k, (a * e - b * d) * k];
+}
 
 export interface Orientation {
   /** ориентация камеры в мире (как three DeviceOrientationControls) */
@@ -48,12 +243,14 @@ export class CardSession {
   K: Intrinsics = { f: 300, cx: 160, cy: 90 };
   w = 320;
   h = 180;
-  /** фильтр позы в мире */
+  /** фильтр позы в мире: положение — Калман с постоянной скоростью (PosKalman), поворот — сглаживание */
+  readonly kf = new PosKalman();
   private wPos = new THREE.Vector3();
   private wQuat = new THREE.Quaternion();
   private hasW = false;
-  private posF = new OneEuroVec(3, 0.6, 1.2);
-  /** то, что показываем (догоняет фильтр за ~30 мс — без ступенек 15 Гц) */
+  /** невязок подряд дальше порога (выброс или карта действительно «прыгнула» — тогда фильтр с нуля) */
+  private outliers = 0;
+  /** поворот, который показываем (догоняет фильтр за ~25 мс — без ступенек 15 Гц); положение — прогноз фильтра */
   private shownPos = new THREE.Vector3();
   private shownQuat = new THREE.Quaternion();
   private shownOk = false;
@@ -72,9 +269,22 @@ export class CardSession {
   get gyroOk() {
     return this.gyroSamples < 8 || this.gyroScore > -0.3;
   }
-  /** самокалибровка фокуса */
-  private fSamples: number[] = [];
+  /** самокалибровка фокуса: четырёхугольники карты с заметной перспективой */
+  private fQuads: Quad[] = [];
+  private fNew = 0;
+  private fStable = 0;
   onFocal: ((f: number) => void) | null = null;
+  /**
+   * Задержка камеры, мс: кадр, показанный (requestVideoFrameCallback) в момент T, снят в T − camLatMs. С неё берётся
+   * ориентация телефона для кадра и для показа. Оценивается по самой карте (LatencyEstimator), если не задана
+   * (?camlat=N → latFixed).
+   */
+  camLatMs = 33;
+  latFixed = false;
+  readonly lat = new LatencyEstimator();
+  onLatency: ((ms: number) => void) | null = null;
+  /** история ориентации телефона (CardTracker.orient) — для оценки задержки и показа на момент кадра */
+  history: OrientationHistory | null = null;
   /** скорость карты на экране (доли диагонали в секунду) и телефона (рад/с) */
   quadSpeed = 0;
   private lastQuadT = 0;
@@ -101,13 +311,13 @@ export class CardSession {
     }
     this.lastCapQ = capQ ? capQ.clone() : null;
     const anchoredLost = f.anchored && f.state !== 'locked';
-    return { lock: f.anchored, hint: anchoredLost ? this.hintQuad(capQ) : null, hintRadius: f.hintRadius(now), rot, lostMs: anchoredLost ? Math.max(0, now - f.seenAt) : 0 };
+    return { lock: f.anchored, hint: anchoredLost ? this.hintQuad(capQ, now) : null, hintRadius: f.hintRadius(now), rot, lostMs: anchoredLost ? Math.max(0, now - f.seenAt) : 0 };
   }
 
   /** где карта сейчас по удерживаемой позе (в px кадра детектора) — подсказка воркеру */
-  private hintQuad(q: THREE.Quaternion | null): Pt[] | null {
+  private hintQuad(q: THREE.Quaternion | null, now: number): Pt[] | null {
     if (!this.hasW) return null;
-    const m = this.cameraPose(q, new THREE.Matrix4()).elements;
+    const m = this.cameraPose(q, new THREE.Matrix4(), now).elements;
     const hw = 0.5, hh = 0.5 / CARD_ASPECT;
     const out: Pt[] = [];
     for (const [X, Y] of [[-hw, hh], [hw, hh], [hw, -hh], [-hw, -hh]]) {
@@ -119,8 +329,8 @@ export class CardSession {
   }
 
   /** поза карты в системе камеры при ориентации q (по фильтру в мире) */
-  private cameraPose(q: THREE.Quaternion | null, out: THREE.Matrix4): THREE.Matrix4 {
-    out.compose(this.wPos, this.wQuat, new THREE.Vector3(1, 1, 1));
+  private cameraPose(q: THREE.Quaternion | null, out: THREE.Matrix4, t?: number): THREE.Matrix4 {
+    out.compose(t !== undefined && this.kf.ok ? this.kf.at(t / 1000, new THREE.Vector3()) : this.wPos, this.wQuat, new THREE.Vector3(1, 1, 1));
     if (q && this.gyroOk) out.premultiply(tmpM.makeRotationFromQuaternion(tmpQ.copy(q).invert()));
     return out;
   }
@@ -144,9 +354,11 @@ export class CardSession {
 
   /**
    * Ответ воркера. capQ — ориентация телефона в момент съёмки кадра (null — гироскопа нет),
-   * angSpeed — угловая скорость телефона, рад/с (NaN — неизвестно).
+   * angSpeed — угловая скорость телефона, рад/с (NaN — неизвестно), shownAt — когда кадр появился (rVFC), мс:
+   * момент съёмки = shownAt − camLatMs (без него — now, как раньше).
    */
-  onResult(r: PipelineOut, capQ: THREE.Quaternion | null, now: number, angSpeed: number): SessionStep {
+  onResult(r: PipelineOut, capQ: THREE.Quaternion | null, now: number, angSpeed: number, shownAt?: number): SessionStep {
+    const capT = shownAt !== undefined ? shownAt - this.camLatMs : now;
     const f = this.fsm;
     const before = f.state;
     const wasEver = f.everLocked;
@@ -159,8 +371,12 @@ export class CardSession {
       pose = poseFromQuad(quad, this.K, CARD_ASPECT);
       // фокус по уже ведомой карте — и когда поза отброшена: при фокусе «по умолчанию», далёком от настоящего,
       // ошибка наклонной карты всегда > 2 px, и самокалибровка (раньше — только при err < 2) не начиналась никогда
-      if (pose && f.anchored && pose.err < 8 && r.mode !== 'plane') this.calibrate(quad);
-      if (pose && (pose.err > 4 || pose.t[2] > -0.5)) {
+      // (и до посадки: кандидат — тоже прямоугольник ID-1; при неверном фокусе ошибка позы > 4 px и кот не садился)
+      if (r.mode !== 'plane' && r.mode !== 'flow' && (f.anchored || (f.state === 'candidate' && kind === 'sber'))) this.calibrate(quad, pose, now);
+      // у посаженного кота порог — от размера карты: вблизи (карта 150–250 px) при фокусе, ещё не уточнённом
+      // самокалибровкой, ошибка 4–8 px, и кот терял карту именно при приближении
+      const errMax = f.anchored ? Math.max(4, 0.035 * quadDiag(quad)) : 4;
+      if (pose && (pose.err > errMax || pose.t[2] > -0.5)) {
         this.note(now, `поза отброшена: err ${pose.err.toFixed(1)} z ${pose.t[2].toFixed(2)}`);
         pose = null;
       }
@@ -215,7 +431,7 @@ export class CardSession {
       // новая посадка — с нуля; карту нашли заново после долгой потери (RELOCALIZE: телефон сдвинули, карта в другом
       // месте кадра) — тоже сразу на карту, без «подлёта» фильтром через весь экран
       if (f.state === 'locked' && before !== 'locked' && (before === 'candidate' || before === 'relocalize' || !this.hasW)) this.hasW = false;
-      this.measure(pose, capQ, now);
+      this.measure(pose, capQ, capT, r.mode, shownAt);
     }
     if (f.state === 'locked' && (before === 'candidate' || before === 'search' || before === 'lost')) {
       step.found = true;
@@ -241,10 +457,25 @@ export class CardSession {
     return step;
   }
 
-  private measure(pose: Pose, capQ: THREE.Quaternion | null, now: number) {
+  private measure(pose: Pose, capQ: THREE.Quaternion | null, now: number, mode = 'key', shownAt?: number) {
     const R = pose.R, t = pose.t;
     const M = new THREE.Matrix4().set(R[0], R[1], R[2], t[0], R[3], R[4], R[5], t[1], R[6], R[7], R[8], t[2], 0, 0, 0, 1);
     const mq = new THREE.Quaternion().setFromRotationMatrix(M);
+    // задержка камеры — по точным кадрам (ключевой кадр / края). И когда самопроверка гироскопа его «выключила»:
+    // при задержке, далёкой от настоящей, предсказанный поворот не сходится с видимым — гироскоп признавался
+    // негодным, и задержка не уточнялась никогда (стенд: встряска при задержке 80 мс против 33)
+    if (this.history && shownAt !== undefined && !this.latFixed && (mode === 'key' || mode === 'detect')) {
+      this.lat.add(mq, shownAt, this.history);
+      const e = this.lat.estimate;
+      if (e !== null && Math.abs(e - this.camLatMs) > 4) {
+        const prev = this.camLatMs;
+        this.camLatMs += 0.5 * (e - this.camLatMs);
+        if (Math.abs(this.camLatMs - prev) > 6 || this.lat.samples % 50 === 0) this.note(now, `задержка камеры ≈ ${this.camLatMs.toFixed(0)} мс`);
+        // самопроверку гироскопа — заново, уже с новой задержкой
+        if (Math.abs(this.camLatMs - prev) > 6 && !this.gyroOk) (this.gyroScore = 0), (this.gyroSamples = 0);
+        this.onLatency?.(this.camLatMs);
+      }
+    }
     // проверка гироскопа: видимый поворот карты между кадрами против предсказанного гироскопом
     if (capQ && this.lastMeasR && this.lastMeasCapQ) {
       const still = this.lastMeasR.angleTo(mq);
@@ -264,38 +495,62 @@ export class CardSession {
     const p = new THREE.Vector3(), q = new THREE.Quaternion(), s = new THREE.Vector3();
     M.decompose(p, q, s);
     const ts = now / 1000;
+    // шум измерения: поперёк луча — σ px углов, вдоль луча (глубина по размеру карты) — в z·(ширина/px) раз больше
+    const z = Math.hypot(t[0], t[1], t[2]);
+    const spx = mode === 'key' ? 0.5 : mode === 'detect' ? 0.8 : 1.2;
+    const sl = (z * spx) / this.K.f, sd = (z * z * spx * 1.4) / this.K.f;
+    const u = p.clone().normalize();
+    const R3 = [0, 0, 0, 0, 0, 0, 0, 0, 0];
+    for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) R3[i * 3 + j] = (i === j ? sl * sl : 0) + (sd * sd - sl * sl) * u.getComponent(i) * u.getComponent(j);
     if (!this.hasW) {
-      this.posF.reset();
-      this.posF.filter([p.x, p.y, p.z], ts);
+      this.kf.reset(p, ts, R3);
+      this.outliers = 0;
       this.wPos.copy(p);
       this.wQuat.copy(q);
       this.hasW = true;
       this.shownOk = false;
       return;
     }
-    const fp = this.posF.filter([p.x, p.y, p.z], ts);
-    this.wPos.set(fp[0], fp[1], fp[2]);
+    // выброс (неверная нумерация, кривой четырёхугольник) — пропускаем; три подряд — карта правда в другом месте
+    const save = this.outliers < 2 ? { x: this.kf.x.slice(), P: this.kf.P.slice(), t: this.kf.t } : null;
+    // без гироскопа «мир» — система камеры: в положении карты и шум позы, и повороты телефона — сглаживаем сильнее
+    this.kf.q = capQ && this.gyroOk ? 10 : 3;
+    const d2 = this.kf.update(p, R3, ts);
+    if (d2 > 60 && save) {
+      this.kf.x.set(save.x);
+      this.kf.P.set(save.P);
+      this.kf.t = save.t;
+      this.outliers++;
+    } else if (d2 > 60) {
+      this.kf.reset(p, ts, R3);
+      this.outliers = 0;
+    } else this.outliers = 0;
+    this.kf.at(ts, this.wPos);
     // поворот: в мире карта неподвижна — сглаживаем сильно; большой поворот (сменилась нумерация, пересадка) — быстро
     const ang = this.wQuat.angleTo(q);
     const k = ang > 0.35 ? 1 : 0.25 + 0.75 * Math.min(1, ang / 0.12);
     this.wQuat.slerp(q, k);
   }
 
-  /** кадр рендера: поза якоря в системе камеры на «сейчас» (null — кота нет) */
-  frame(dt: number, qNow: THREE.Quaternion | null): THREE.Matrix4 | null {
+  /**
+   * Кадр рендера: поза якоря в системе камеры (null — кота нет). qNow — ориентация телефона, tShow — момент (мс), на
+   * который показываем: CardTracker передаёт момент съёмки показанного кадра камеры и ориентацию на него
+   * (DISPLAY_AT_FRAME) — кот совпадает с фоном; без tShow — положение на последнее измерение (без прогноза).
+   */
+  frame(dt: number, qNow: THREE.Quaternion | null, tShow?: number): THREE.Matrix4 | null {
     if (!this.fsm.anchored || !this.hasW) {
       this.shownOk = false;
       return null;
     }
-    // сглаживаем ступеньки между ответами воркера В МИРЕ (догоняем фильтр за ~25 мс): поворот телефона
-    // накладывается после — он без задержки
+    // положение — прогноз фильтра на момент показа (скорость сдвига телефона), поворот — догоняет фильтр за ~25 мс
+    // В МИРЕ; поворот телефона накладывается после — он без задержки
+    if (tShow !== undefined) this.kf.at(tShow / 1000, this.shownPos);
+    else this.shownPos.copy(this.wPos);
     if (!this.shownOk) {
-      this.shownPos.copy(this.wPos);
       this.shownQuat.copy(this.wQuat);
       this.shownOk = true;
     } else {
       const a = 1 - Math.exp(-dt / 0.025);
-      this.shownPos.lerp(this.wPos, a);
       this.shownQuat.slerp(this.wQuat, a);
     }
     this.anchor.compose(this.shownPos, this.shownQuat, new THREE.Vector3(1, 1, 1));
@@ -303,25 +558,59 @@ export class CardSession {
     return this.anchor;
   }
 
-  /** самокалибровка фокуса по карте: медиана оценок с наклонённых устойчивых кадров */
-  private calibrate(quad: Quad) {
-    if (this.fSamples.length >= 60) return;
-    const f = focalFromQuad(quad, this.K.cx, this.K.cy, CARD_ASPECT);
-    if (!f) return;
+  /**
+   * Самокалибровка фокуса: копим четырёхугольники карты (целиком в кадре, ≥ 50 px, наклон ≥ 20°), раз в 8 новых — фокус по всему набору (focalFromQuads). Раньше — медиана focalFromQuad по кадрам,
+   * только у посаженного кота и при ошибке позы < 8 px: на стенде фокус уходил на 5–12 % от истинного, а при фокусе,
+   * далёком от истинного (угол обзора iPhone 56–70° против 63° по умолчанию), позы отбрасывались (> 4 px) и кот
+   * терял карту вблизи и на наклоне. Новый фокус — с нуля и фильтр позы (без «подлёта» в другом масштабе).
+   */
+  private calibrate(quad: Quad, pose: Pose | null, now: number) {
+    if (this.fStable >= 3) return;
+    if (!quad.every((p) => p.x > 1 && p.y > 1 && p.x < this.w - 2 && p.y < this.h - 2) || quadDiag(quad) < 50) return;
     const L = Math.max(this.w, this.h);
     const fMin = L / 2 / Math.tan((85 * Math.PI) / 360), fMax = L / 2 / Math.tan((45 * Math.PI) / 360);
-    if (f < fMin || f > fMax) return;
-    this.fSamples.push(f);
-    if (this.fSamples.length % 10 !== 0) return;
-    const sorted = [...this.fSamples].sort((a, b) => a - b);
-    const med = sorted[sorted.length >> 1];
-    if (Math.abs(med - this.K.f) / this.K.f < 0.02) return;
-    this.K = { ...this.K, f: med };
-    this.onFocal?.(med);
+    // наклон ≥ 20°: без перспективы фокус из кадра не следует (поза — при нынешнем фокусе, для отбора хватает)
+    if (!pose || Math.acos(Math.min(1, Math.abs(pose.R[8]))) < 0.35) return;
+    // новые кадры — только непохожие на последний принятый (иначе набор из одного ракурса)
+    const last = this.fQuads[this.fQuads.length - 1];
+    if (last && Math.max(...quad.map((p, i) => Math.hypot(p.x - last[i].x, p.y - last[i].y))) < 0.02 * quadDiag(quad)) return;
+    this.fQuads.push(quad);
+    if (this.fQuads.length > 48) this.fQuads.shift();
+    if (++this.fNew < 8 || this.fQuads.length < 12) return;
+    this.fNew = 0;
+    const r = focalFromQuads(this.fQuads, this.K.cx, this.K.cy, fMin, fMax);
+    if (!r) return;
+    // меняем фокус, только если с нынешним карта заметно не ложится в позу (> 0,5 % диагонали в среднем) и с новым —
+    // вдвое лучше: на 320-px кадре углы ведения смещены на доли px, и фокус «по углам» гуляет на 5–10 % (стенд) —
+    // мелкие поправки делали только хуже (кот кренился и менял масштаб после каждой)
+    const cur = r.cost(this.K.f), best = r.cost(r.f);
+    if (Math.abs(r.f - this.K.f) / this.K.f < 0.03 || cur < 0.005 || best > 0.5 * cur) {
+      this.fStable++;
+      return;
+    }
+    this.fStable = 0;
+    this.note(now, `фокус ${this.K.f.toFixed(0)} → ${r.f.toFixed(0)} px (ошибка позы ${(cur * 100).toFixed(2)} → ${(best * 100).toFixed(2)} % диагонали)`);
+    this.K = { ...this.K, f: r.f };
+    // поза в новом масштабе — с нуля (иначе фильтр «подлетает» из позы прежнего фокуса)
+    this.hasW = false;
+    this.prevQuad = null;
+    this.onFocal?.(r.f);
   }
 
   resetFocalSamples() {
-    this.fSamples = [];
+    this.fQuads = [];
+    this.fNew = 0;
+    this.fStable = 0;
+  }
+
+  /**
+   * Кадр рендера для приложения: кадр камеры на экране появился в shownAt (мс, rVFC) — кот в позе на момент его
+   * съёмки (shownAt − camLatMs), с ориентацией телефона на тот же момент. Нет истории ориентации — qFallback.
+   */
+  display(dt: number, shownAt: number, qFallback: THREE.Quaternion | null): THREE.Matrix4 | null {
+    const tc = shownAt - this.camLatMs;
+    const q = this.history?.at(tc) ?? qFallback;
+    return this.frame(dt, q, tc);
   }
 
   private note(now: number, s: string) {
