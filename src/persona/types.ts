@@ -47,12 +47,15 @@ export type FxName =
   | 'gum_bubble' | 'claws' | 'glitch' | 'steam_heart'
   | 'glass_cat' | 'sticker' | 'knock' | 'none';
 
-export type StickerKind = 'tag' | 'bolt' | 'text' | 'heart' | 'star' | 'holo' | 'skull_free_smile' | 'image';
+/** image — наклейка пака СберКота (SVG); остальные — процедурные (debug и старые пресеты) */
+export type StickerKind = 'tag' | 'bolt' | 'text' | 'heart' | 'star' | 'holo' | 'image';
 export interface StickerSpec {
   kind: StickerKind;
   text?: string;
-  /** для kind=image — путь к PNG (public/...) */
+  /** для kind=image — путь к картинке (public/..., пак СберКота — stickers/sber/*.svg) */
   src?: string;
+  /** id наклейки пака (public/stickers/sber/manifest.json) — для коллекции «собрал N из M» */
+  id?: string;
   color?: string;
 }
 

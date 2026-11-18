@@ -1,13 +1,29 @@
-/** Процедурная отрисовка наклеек (пока нет арта). PNG-наклейки подставляются через kind=image. */
+/**
+ * Отрисовка наклейки в канвас: пак СберКота — SVG-картинки (kind=image, белая вырубка уже в рисунке),
+ * процедурные формы — для debug и старых пресетов. Текст не зеркалится: ребёнок читает наклейку с лица.
+ */
 import type { StickerSpec } from '../persona/types';
 import { asset } from '../core/util';
 
 const imgCache = new Map<string, HTMLImageElement>();
-export function preloadStickerImage(src: string) {
-  if (imgCache.has(src)) return;
-  const i = new Image();
+export function preloadStickerImage(src: string): HTMLImageElement {
+  let i = imgCache.get(src);
+  if (i) return i;
+  i = new Image();
+  i.decoding = 'async';
   i.src = asset(src);
   imgCache.set(src, i);
+  return i;
+}
+/** картинка наклейки ещё грузится — промис загрузки (нарисовать заново), иначе null */
+export function stickerImagePending(spec: StickerSpec): Promise<void> | null {
+  if (spec.kind !== 'image' || !spec.src) return null;
+  const img = preloadStickerImage(spec.src);
+  if (img.complete) return null;
+  return new Promise((r) => {
+    img.addEventListener('load', () => r(), { once: true });
+    img.addEventListener('error', () => r(), { once: true });
+  });
 }
 
 function heartPath(g: CanvasRenderingContext2D, s: number) {
@@ -33,21 +49,29 @@ function boltPath(g: CanvasRenderingContext2D, s: number) {
   g.closePath();
 }
 
-/** Рисует наклейку в канвас size×size; mirrored — вид «с обратной стороны стекла». */
-export function renderSticker(spec: StickerSpec, size: number, palette: { primary: string; secondary: string; accent: string }, mirrored: boolean): { face: HTMLCanvasElement; back: HTMLCanvasElement } {
+export interface StickerArt {
+  face: HTMLCanvasElement;
+  /** обратная сторона (серо-белый силуэт) — для загнутого уголка */
+  back: HTMLCanvasElement;
+  /** мягкая тень силуэта (поле SHADOW_PAD с каждой стороны) */
+  shadow: HTMLCanvasElement;
+}
+/** поле тени вокруг наклейки, доля размера */
+export const SHADOW_PAD = 0.18;
+
+/** Рисует наклейку в канвас size×size; mirrored — вид «с обратной стороны стекла» (только процедурные без текста). */
+export function renderSticker(spec: StickerSpec, size: number, palette: { primary: string; secondary: string; accent: string }, mirrored = false): StickerArt {
   const face = document.createElement('canvas');
   face.width = face.height = size;
   const g = face.getContext('2d')!;
   const s = size / 2;
   g.translate(s, s);
-  if (mirrored) g.scale(-1, 1);
+  // надписи не зеркалим никогда: «ХОП» с обратной стороны читался как «ПОХ»
+  if (mirrored && spec.kind !== 'text' && spec.kind !== 'tag' && spec.kind !== 'image') g.scale(-1, 1);
   const border = Math.max(4, size * 0.05);
   const outline = (draw: () => void, fill: string | CanvasGradient) => {
-    // белая вырубка вокруг формы + тень
+    // белая вырубка вокруг формы (тень рисует StickerSheet)
     g.save();
-    g.shadowColor = 'rgba(0,0,0,0.35)';
-    g.shadowBlur = size * 0.05;
-    g.shadowOffsetY = size * 0.02;
     draw();
     g.lineJoin = 'round';
     g.lineWidth = border * 2;
@@ -139,12 +163,17 @@ export function renderSticker(spec: StickerSpec, size: number, palette: { primar
       break;
     }
     case 'image': {
-      const img = spec.src ? imgCache.get(spec.src) : null;
+      const img = spec.src ? preloadStickerImage(spec.src) : null;
       if (img?.complete && img.naturalWidth) {
-        const k = Math.min((size * 0.9) / img.naturalWidth, (size * 0.9) / img.naturalHeight);
+        // SVG пака: квадрат 240×240 с вырубкой — во весь размер, растр в нужном разрешении
+        const k = Math.min(size / img.naturalWidth, size / img.naturalHeight);
         g.drawImage(img, (-img.naturalWidth * k) / 2, (-img.naturalHeight * k) / 2, img.naturalWidth * k, img.naturalHeight * k);
       } else {
-        outline(() => starPath(g, s * 0.8), palette.accent);
+        // ещё грузится — круглая зелёная заглушка (StickerSheet перерисует по load)
+        outline(() => {
+          g.beginPath();
+          g.arc(0, 0, s * 0.7, 0, Math.PI * 2);
+        }, '#21A038');
       }
       break;
     }
@@ -158,11 +187,21 @@ export function renderSticker(spec: StickerSpec, size: number, palette: { primar
   b.drawImage(face, 0, 0);
   b.globalCompositeOperation = 'source-in';
   const bg = b.createLinearGradient(0, 0, size, size);
-  bg.addColorStop(0, '#f4f4f4');
-  bg.addColorStop(1, '#cfcfd4');
+  bg.addColorStop(0, '#f2f4f3');
+  bg.addColorStop(1, '#b7c2bc');
   b.fillStyle = bg;
   b.fillRect(0, 0, size, size);
-  return { face, back };
+  // тень: силуэт тёмно-зелёным с размытием (сам рисунок уводим за край — остаётся только тень)
+  const pad = Math.round(size * SHADOW_PAD);
+  const shadow = document.createElement('canvas');
+  shadow.width = shadow.height = size + pad * 2;
+  const sg = shadow.getContext('2d')!;
+  const off = size * 4;
+  sg.shadowColor = 'rgba(6,40,22,0.55)';
+  sg.shadowBlur = size * 0.06;
+  sg.shadowOffsetX = off;
+  sg.drawImage(face, pad - off, pad);
+  return { face, back, shadow };
 }
 
 function shade(hex: string, k: number) {

@@ -1,0 +1,216 @@
+{
+  "pack": "sber",
+  "title": "Наклейки СберКота",
+  "note": "Генерируется scripts/stickers/gen_sber_pack.py. Без логотипов сервисов и знака Сбера: только стилизация и цвета.",
+  "themes": {
+    "cat": "СберКот",
+    "sber": "Детские темы Сбера",
+    "friends": "Друзья кота",
+    "words": "Добрые слова",
+    "hooligan": "Хулиган",
+    "kind": "Добряк",
+    "glitter": "Блёстка"
+  },
+  "stickers": [
+    {
+      "id": "cat_paw",
+      "title": "Лапка СберКота",
+      "theme": "cat",
+      "personas": [],
+      "src": "stickers/sber/cat_paw.svg"
+    },
+    {
+      "id": "cat_face",
+      "title": "Мордочка СберКота",
+      "theme": "cat",
+      "personas": [],
+      "src": "stickers/sber/cat_face.svg"
+    },
+    {
+      "id": "paw_heart",
+      "title": "Сердечко-лапка",
+      "theme": "cat",
+      "personas": [
+        "kind"
+      ],
+      "src": "stickers/sber/paw_heart.svg"
+    },
+    {
+      "id": "piggy",
+      "title": "Копилка",
+      "theme": "sber",
+      "personas": [
+        "kind"
+      ],
+      "src": "stickers/sber/piggy.svg"
+    },
+    {
+      "id": "coin",
+      "title": "Монетка",
+      "theme": "sber",
+      "personas": [],
+      "src": "stickers/sber/coin.svg"
+    },
+    {
+      "id": "card_cat",
+      "title": "Карта-котик",
+      "theme": "sber",
+      "personas": [
+        "glitter"
+      ],
+      "src": "stickers/sber/card_cat.svg"
+    },
+    {
+      "id": "bonus_star",
+      "title": "Звёздочка-бонус",
+      "theme": "sber",
+      "personas": [],
+      "src": "stickers/sber/bonus_star.svg"
+    },
+    {
+      "id": "music",
+      "title": "Музыка в наушниках",
+      "theme": "friends",
+      "personas": [
+        "hooligan"
+      ],
+      "src": "stickers/sber/music.svg"
+    },
+    {
+      "id": "map_pin",
+      "title": "Пин на маршруте",
+      "theme": "friends",
+      "personas": [],
+      "src": "stickers/sber/map_pin.svg"
+    },
+    {
+      "id": "parcel",
+      "title": "Посылка уже мчится",
+      "theme": "friends",
+      "personas": [],
+      "src": "stickers/sber/parcel.svg"
+    },
+    {
+      "id": "tv",
+      "title": "Мультик",
+      "theme": "friends",
+      "personas": [
+        "kind"
+      ],
+      "src": "stickers/sber/tv.svg"
+    },
+    {
+      "id": "rocket",
+      "title": "Ракета знаний",
+      "theme": "friends",
+      "personas": [],
+      "src": "stickers/sber/rocket.svg"
+    },
+    {
+      "id": "gamepad",
+      "title": "Джойстик",
+      "theme": "friends",
+      "personas": [
+        "hooligan"
+      ],
+      "src": "stickers/sber/gamepad.svg"
+    },
+    {
+      "id": "w_kruto",
+      "title": "«Круто!»",
+      "theme": "words",
+      "personas": [
+        "hooligan"
+      ],
+      "src": "stickers/sber/w_kruto.svg"
+    },
+    {
+      "id": "w_vau",
+      "title": "«Вау!»",
+      "theme": "words",
+      "personas": [
+        "glitter"
+      ],
+      "src": "stickers/sber/w_vau.svg"
+    },
+    {
+      "id": "w_mur",
+      "title": "«Мур!»",
+      "theme": "words",
+      "personas": [
+        "kind"
+      ],
+      "src": "stickers/sber/w_mur.svg"
+    },
+    {
+      "id": "w_ura",
+      "title": "«Ура!»",
+      "theme": "words",
+      "personas": [],
+      "src": "stickers/sber/w_ura.svg"
+    },
+    {
+      "id": "h_skate",
+      "title": "Скейт Хулигана",
+      "theme": "hooligan",
+      "personas": [
+        "hooligan"
+      ],
+      "src": "stickers/sber/h_skate.svg"
+    },
+    {
+      "id": "h_graffiti_star",
+      "title": "Граффити-звёздочка",
+      "theme": "hooligan",
+      "personas": [
+        "hooligan"
+      ],
+      "src": "stickers/sber/h_graffiti_star.svg"
+    },
+    {
+      "id": "k_bubbles",
+      "title": "Пузыри Добряка",
+      "theme": "kind",
+      "personas": [
+        "kind"
+      ],
+      "src": "stickers/sber/k_bubbles.svg"
+    },
+    {
+      "id": "k_cocoa",
+      "title": "Какао с зефирками",
+      "theme": "kind",
+      "personas": [
+        "kind"
+      ],
+      "src": "stickers/sber/k_cocoa.svg"
+    },
+    {
+      "id": "g_sparkles",
+      "title": "Блёстки",
+      "theme": "glitter",
+      "personas": [
+        "glitter"
+      ],
+      "src": "stickers/sber/g_sparkles.svg"
+    },
+    {
+      "id": "g_mirror",
+      "title": "Зеркальце Блёстки",
+      "theme": "glitter",
+      "personas": [
+        "glitter"
+      ],
+      "src": "stickers/sber/g_mirror.svg"
+    },
+    {
+      "id": "g_bow",
+      "title": "Бантик",
+      "theme": "glitter",
+      "personas": [
+        "glitter"
+      ],
+      "src": "stickers/sber/g_bow.svg"
+    }
+  ]
+}

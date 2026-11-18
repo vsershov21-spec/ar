@@ -9,6 +9,8 @@ import { asset } from '../core/util';
 import { TriedStore, moreSection, type CatalogItem, type CatalogSection, type SectionId } from './actionCatalog';
 import type { Chip } from '../scenario/suggest';
 import { CAT_ICON } from './catalogIcons';
+import { collection as stickerCollection } from '../fx/stickerPack';
+import { feature } from '../config/edition';
 
 export interface UiHandlers {
   onWake(): void;
@@ -707,6 +709,16 @@ export class UI {
         b.innerHTML = `<span class="act-ico">${this.catIcon(it.icon)}</span><span class="act-l"></span>`;
       }
       (b.querySelector('.act-l') as HTMLElement).textContent = it.label;
+      if (it.id === 'sticker' && feature('stickers.pack')) {
+        // коллекция наклеек пака: «собрал N из M»
+        const c = stickerCollection();
+        const n = document.createElement('span');
+        n.className = 'cat-count';
+        n.textContent = `${c.n}/${c.total}`;
+        n.title = `Собрано наклеек: ${c.n} из ${c.total}`;
+        b.setAttribute('aria-label', `${it.label}: собрано ${c.n} из ${c.total}`);
+        b.querySelector('.act-ico')?.appendChild(n);
+      }
       b.classList.toggle('new', !('ui' in it.run) && !this.tried.has(it.id));
       b.onclick = () => this.pickCatalog(it);
       row.appendChild(b);

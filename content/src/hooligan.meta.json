@@ -103,33 +103,29 @@
   "ambience": "amb_room_hooligan",
   "stickers": [
     {
-      "kind": "tag",
-      "text": "КОТ"
+      "kind": "image",
+      "src": "stickers/sber/h_skate.svg",
+      "id": "h_skate"
     },
     {
-      "kind": "bolt"
+      "kind": "image",
+      "src": "stickers/sber/h_graffiti_star.svg",
+      "id": "h_graffiti_star"
     },
     {
-      "kind": "text",
-      "text": "ТУТ БЫЛ КОТ"
+      "kind": "image",
+      "src": "stickers/sber/gamepad.svg",
+      "id": "gamepad"
     },
     {
-      "kind": "tag",
-      "text": "ЙО!"
+      "kind": "image",
+      "src": "stickers/sber/w_kruto.svg",
+      "id": "w_kruto"
     },
     {
-      "kind": "bolt"
-    },
-    {
-      "kind": "text",
-      "text": "СКЕЙТ"
-    },
-    {
-      "kind": "star"
-    },
-    {
-      "kind": "tag",
-      "text": "ХОП"
+      "kind": "image",
+      "src": "stickers/sber/music.svg",
+      "id": "music"
     }
   ],
   "glb": {

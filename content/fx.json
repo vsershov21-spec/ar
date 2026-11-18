@@ -25,10 +25,10 @@
     { "id": "kiss_print", "layer": "glass", "durationMs": 3000, "persona": "glitter", "sound": "kiss", "params": { "color": "#FF8FCB" }, "notes": "Кот целует стекло — остаётся блестящий отпечаток-сердечко." },
 
     { "id": "glass_cat", "layer": "glass", "durationMs": 2000, "persona": "all", "sound": "glass_squeak", "params": { "squash": 0.3, "fogAroundNose": true }, "notes": "Кот прижат к стеклу: мордочка сплющена, вокруг носа запотевание." },
-    { "id": "sticker", "layer": "glass", "durationMs": 400, "persona": "all", "sound": "sticker_slap", "params": { "mirrored": true, "rotateDeg": [-18, 18], "scale": [0.8, 1.2] }, "notes": "Наклейка шлёпается изнутри (рисунок зеркальный), блик при наклоне." },
+    { "id": "sticker", "layer": "glass", "durationMs": 400, "persona": "all", "sound": "sticker_slap", "params": { "mirrored": false, "rotateDeg": [-18, 18], "scale": [0.8, 1.2] }, "notes": "Наклейка из пака СберКота (public/stickers/sber): шлёпается на стекло с подпрыгиванием, доворотом и прогибом, тень прижимается; блик пробегает раз, дальше — от наклона. Надписи не зеркалятся." },
     { "id": "sticker_peel", "layer": "glass", "durationMs": 600, "persona": "all", "sound": "sticker_peel", "params": { "fromCorner": true }, "notes": "Отклеивание с угла за палец." },
-    { "id": "stickers_cover", "layer": "glass", "durationMs": 2800, "persona": "all", "sound": "sticker_slap", "params": { "count": 14, "intervalMs": 180 }, "notes": "Серия наклеек заклеивает экран перед сменой характера." },
-    { "id": "stickers_blow", "layer": "glass", "durationMs": 1000, "persona": "all", "sound": "whoosh_big", "params": { "spin": true }, "notes": "Наклейки разлетаются при встряске." },
+    { "id": "stickers_cover", "layer": "glass", "durationMs": 2800, "persona": "all", "sound": "sticker_slap", "params": { "count": 8, "intervalMs": 180 }, "notes": "Серия наклеек заклеивает экран перед сменой характера: тематические нового кота + 3 общих, не больше 8 на стекле." },
+    { "id": "stickers_blow", "layer": "glass", "durationMs": 1000, "persona": "all", "sound": "whoosh_big", "params": { "spin": true }, "notes": "Наклейки рассыпаются при встряске волной от центра: у каждой отгибается уголок, и она улетает с вращением." },
     { "id": "confetti", "layer": "glass", "durationMs": 1600, "persona": "all", "sound": "confetti", "params": { "count": 36 }, "notes": "Праздник: выбор характера, имя, все наклейки отклеены." },
     { "id": "zzz", "layer": "world", "durationMs": 3000, "persona": "all", "sound": "snore", "params": { "loop": true }, "notes": "Буквы Zzz над спящим котом." },
     { "id": "dizzy_stars", "layer": "world", "durationMs": 2000, "persona": "all", "sound": "dizzy", "params": { "count": 4 }, "notes": "Звёздочки кружат над головой." },

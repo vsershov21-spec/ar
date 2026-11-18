@@ -101,30 +101,29 @@
   "ambience": "amb_room_glitter",
   "stickers": [
     {
-      "kind": "holo"
+      "kind": "image",
+      "src": "stickers/sber/g_sparkles.svg",
+      "id": "g_sparkles"
     },
     {
-      "kind": "heart"
+      "kind": "image",
+      "src": "stickers/sber/g_mirror.svg",
+      "id": "g_mirror"
     },
     {
-      "kind": "star"
+      "kind": "image",
+      "src": "stickers/sber/g_bow.svg",
+      "id": "g_bow"
     },
     {
-      "kind": "text",
-      "text": "ВАУ"
+      "kind": "image",
+      "src": "stickers/sber/w_vau.svg",
+      "id": "w_vau"
     },
     {
-      "kind": "holo"
-    },
-    {
-      "kind": "skull_free_smile"
-    },
-    {
-      "kind": "text",
-      "text": "БЛЕСК"
-    },
-    {
-      "kind": "heart"
+      "kind": "image",
+      "src": "stickers/sber/card_cat.svg",
+      "id": "card_cat"
     }
   ],
   "glb": {

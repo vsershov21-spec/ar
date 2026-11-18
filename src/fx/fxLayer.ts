@@ -11,6 +11,9 @@ import type { StickerSpec } from '../persona/types';
 import { resolveFx, setFxCatalogLogger, num, range, bool, type FxTuning, type FxParams } from './catalog';
 import { Particles, Surface, breathFog, type AnchorName, type FxArgs, type FxEnv, type FxFactory, type FxInstance, type Palette, type Pt } from './core';
 import { StickerSheet, type AddOpts, type Sticker } from './stickerSheet';
+import { coverSet, nextRandom, editionStickers, LEGACY, PACK, packSpec, MAX_ON_GLASS } from './stickerPack';
+import { feature } from '../config/edition';
+import { preloadStickerImage } from './stickers';
 import { COMMON } from './effects/common';
 import { KIND } from './effects/kind';
 import { GLITTER } from './effects/glitter';
@@ -63,7 +66,8 @@ export class FxLayer {
   lod = 1;
   palette: Palette = { primary: '#111', secondary: '#B6FF3B', accent: '#FF6FB5', fx: ['#fff'] };
   tuning: FxTuning = {};
-  stickerSpecs: StickerSpec[] = [{ kind: 'star' }];
+  /** тематические наклейки текущего кота (meta.json → stickers, пак СберКота) */
+  stickerSpecs: StickerSpec[] = feature('stickers.pack') ? PACK.slice(0, 3).map(packSpec) : LEGACY.kind;
   /** экранная точка части кота (задаёт app по Stage); по умолчанию — центр экрана */
   anchorFn: (name: AnchorName) => Pt & { s: number } = () => ({ x: this.w / 2, y: this.h * 0.45, s: this.h * 0.4 });
   /**
@@ -105,6 +109,8 @@ export class FxLayer {
       active: (id) => this.live.some((l) => l.inst.id === id),
     };
     this.sheet.onAllGone = () => this.onAllStickersGone();
+    // SVG пака — заранее: первая наклейка шлёпается сразу с рисунком
+    if (feature('stickers.pack') && typeof Image !== 'undefined') for (const p of PACK) preloadStickerImage(p.src);
   }
 
   // ───────────── совместимость со старым API ─────────────
@@ -130,7 +136,8 @@ export class FxLayer {
   setPersona(p: { palette?: Palette; fxTuning?: FxTuning; stickers?: StickerSpec[] }) {
     if (p.palette) this.palette = p.palette;
     this.tuning = p.fxTuning ?? {};
-    if (p.stickers?.length) this.stickerSpecs = p.stickers;
+    // MVP: пак выключен — прежние наклейки кота (без грубых надписей)
+    if (p.stickers?.length) this.stickerSpecs = editionStickers(p.stickers, feature('stickers.pack'));
   }
 
   resize(w: number, h: number) {
@@ -221,14 +228,16 @@ export class FxLayer {
         const x = args.x ?? rand(this.w * 0.25, this.w * 0.75), y = args.y ?? rand(this.h * 0.25, this.h * 0.7);
         const [r0, r1] = range(p, 'rotateDeg', [-18, 18]);
         const [s0, s1] = range(p, 'scale', [0.8, 1.2]);
-        this.sheet.add(s[Math.floor(Math.random() * s.length)], x, y, this.palette, { mirrored: bool(p, 'mirrored', true), rot: (rand(r0, r1) * Math.PI) / 180, scale: rand(s0, s1) });
+        // «Чудеса → Наклейки» и реакции кота: случайная из всего пака, не та же, что в прошлый раз
+        this.sheet.add(feature('stickers.pack') ? nextRandom() : s[Math.floor(Math.random() * s.length)], x, y, this.palette, { mirrored: bool(p, 'mirrored', false), rot: (rand(r0, r1) * Math.PI) / 180, scale: rand(s0, s1) });
         return doneHandle(id, 400);
       }
       case 'sticker_peel':
         this.sheet.autoPeel(durMs || 600);
         return doneHandle(id, durMs || 600);
       case 'stickers_cover': {
-        const done = this.sheet.cover(s, this.palette, Math.round(num(p, 'count', 14)), num(p, 'intervalMs', 180), range(p, 'rotateDeg', [-18, 18]), range(p, 'scale', [0.9, 1.15]));
+        const n = Math.round(num(p, 'count', MAX_ON_GLASS));
+        const done = this.sheet.cover(feature('stickers.pack') ? coverSet(s, n) : s, this.palette, n, num(p, 'intervalMs', 180), range(p, 'rotateDeg', [-18, 18]), range(p, 'scale', [0.9, 1.15]));
         return { id, done, stop: () => this.sheet.blow() };
       }
       case 'stickers_blow':
@@ -320,10 +329,15 @@ export class FxLayer {
   addSticker(spec: StickerSpec, x: number, y: number, opts: AddOpts = {}): Sticker {
     return this.sheet.add(spec, x, y, this.palette, opts);
   }
-  /** заклеить экран (параметры — fx.json stickers_cover; ms игнорируется, оставлен для совместимости) */
+  /**
+   * Заклеить экран при смене образа: specs — тематические наклейки нового кота, к ним 2–3 общих из пака
+   * (параметры — fx.json stickers_cover; ms игнорируется, оставлен для совместимости)
+   */
   cover(specs: StickerSpec[], palette: Palette, _ms?: number): Promise<void> {
     const p = resolveFx('stickers_cover', this.tuning).params;
-    return this.sheet.cover(specs, palette, Math.round(num(p, 'count', 14)), num(p, 'intervalMs', 180), range(p, 'rotateDeg', [-18, 18]), range(p, 'scale', [0.9, 1.15]));
+    const n = Math.round(num(p, 'count', MAX_ON_GLASS));
+    const set = feature('stickers.pack') ? coverSet(specs, n) : editionStickers(specs, false);
+    return this.sheet.cover(set, palette, n, num(p, 'intervalMs', 180), range(p, 'rotateDeg', [-18, 18]), range(p, 'scale', [0.9, 1.15]));
   }
   blowStickers() {
     this.sheet.blow(bool(resolveFx('stickers_blow', this.tuning).params, 'spin', true));
@@ -446,13 +460,17 @@ export class FxLayer {
 
   /** прошлый кадр слоя был пуст (холст уже чистый) */
   private wasEmpty = false;
+  /** прошлый кадр — только наклейки в покое (следующий такой же можно не рисовать) */
+  private sheetStill = false;
 
   draw() {
     const t0 = performance.now();
     const g = this.g;
     // нечего рисовать и холст уже чистый — не трогаем его: браузер не перекомпонует полноэкранный слой каждый кадр
-    const empty = !this.live.length && !this.parts.list.length && !this.fog.visible && !this.gum.visible && !this.sheet.list.length;
-    if (empty && this.wasEmpty) {
+    const onlySheet = !this.live.length && !this.parts.list.length && !this.fog.visible && !this.gum.visible;
+    const empty = onlySheet && !this.sheet.list.length;
+    // на стекле только наклейки и они в покое (прилипли, блик пробежал, наклон тот же) — кадр уже нарисован
+    if ((empty && this.wasEmpty) || (onlySheet && !empty && this.sheetStill && this.sheet.still(this.tilt))) {
       this.cost = 0;
       this.frameMs += (0 - this.frameMs) * 0.1;
       if (this.frameMs < 2.5 && this.lod < 1) this.lod = Math.min(1, this.lod + 0.005);
@@ -460,6 +478,7 @@ export class FxLayer {
       return;
     }
     this.wasEmpty = empty;
+    this.sheetStill = onlySheet && !empty && this.sheet.still(this.tilt);
     g.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     g.clearRect(0, 0, this.w, this.h);
     const env = this.env;

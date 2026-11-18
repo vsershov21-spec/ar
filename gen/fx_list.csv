@@ -19,10 +19,10 @@ snow_globe,glass,glitter,4000,snowglobe,"{""count"": 160, ""settleMs"": 3500}",�
 holo_shine,glass,glitter,1200,shimmer,"{""angleFromGyro"": true}","Голографический перелив по наклейкам и по коту, зависит от наклона телефона."
 kiss_print,glass,glitter,3000,kiss,"{""color"": ""#FF8FCB""}",Кот целует стекло — остаётся блестящий отпечаток-сердечко.
 glass_cat,glass,all,2000,glass_squeak,"{""squash"": 0.3, ""fogAroundNose"": true}","Кот прижат к стеклу: мордочка сплющена, вокруг носа запотевание."
-sticker,glass,all,400,sticker_slap,"{""mirrored"": true, ""rotateDeg"": [-18, 18], ""scale"": [0.8, 1.2]}","Наклейка шлёпается изнутри (рисунок зеркальный), блик при наклоне."
+sticker,glass,all,400,sticker_slap,"{""mirrored"": false, ""rotateDeg"": [-18, 18], ""scale"": [0.8, 1.2]}","Наклейка из пака СберКота (public/stickers/sber): шлёпается на стекло с подпрыгиванием, доворотом и прогибом, тень прижимается; блик пробегает раз, дальше — от наклона. Надписи не зеркалятся."
 sticker_peel,glass,all,600,sticker_peel,"{""fromCorner"": true}",Отклеивание с угла за палец.
-stickers_cover,glass,all,2800,sticker_slap,"{""count"": 14, ""intervalMs"": 180}",Серия наклеек заклеивает экран перед сменой характера.
-stickers_blow,glass,all,1000,whoosh_big,"{""spin"": true}",Наклейки разлетаются при встряске.
+stickers_cover,glass,all,2800,sticker_slap,"{""count"": 8, ""intervalMs"": 180}","Серия наклеек заклеивает экран перед сменой характера: тематические нового кота + 3 общих, не больше 8 на стекле."
+stickers_blow,glass,all,1000,whoosh_big,"{""spin"": true}","Наклейки рассыпаются при встряске волной от центра: у каждой отгибается уголок, и она улетает с вращением."
 confetti,glass,all,1600,confetti,"{""count"": 36}","Праздник: выбор характера, имя, все наклейки отклеены."
 zzz,world,all,3000,snore,"{""loop"": true}",Буквы Zzz над спящим котом.
 dizzy_stars,world,all,2000,dizzy,"{""count"": 4}",Звёздочки кружат над головой.

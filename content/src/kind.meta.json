@@ -101,32 +101,34 @@
   "ambience": "amb_room_kind",
   "stickers": [
     {
-      "kind": "heart"
-    },
-    {
-      "kind": "text",
-      "text": "ТЫ СУПЕР"
-    },
-    {
-      "kind": "star"
-    },
-    {
-      "kind": "heart"
-    },
-    {
-      "kind": "text",
-      "text": "МУР"
+      "kind": "image",
+      "src": "stickers/sber/k_bubbles.svg",
+      "id": "k_bubbles"
     },
     {
       "kind": "image",
-      "src": "stickers/kind_paw.png"
+      "src": "stickers/sber/k_cocoa.svg",
+      "id": "k_cocoa"
     },
     {
-      "kind": "text",
-      "text": "ОБНИМУ"
+      "kind": "image",
+      "src": "stickers/sber/paw_heart.svg",
+      "id": "paw_heart"
     },
     {
-      "kind": "star"
+      "kind": "image",
+      "src": "stickers/sber/w_mur.svg",
+      "id": "w_mur"
+    },
+    {
+      "kind": "image",
+      "src": "stickers/sber/piggy.svg",
+      "id": "piggy"
+    },
+    {
+      "kind": "image",
+      "src": "stickers/sber/tv.svg",
+      "id": "tv"
     }
   ],
   "glb": {

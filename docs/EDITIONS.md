@@ -33,7 +33,7 @@
 | `awake` | да | да | нет | пробуждение-катсцена и салют; выключить → `OFF_SWITCH`: `?awake=0` (app.ts не создаёт `AwakeController`) |
 | `progress.server` | да | да | нет | прогресс на сервере (`src/progress/index.ts bootProgress`); выкл. — только localStorage |
 | `games.new` | — | да | нет | «Угадай рожицу», «Камень-ножницы», «Делай как я»: `persona/content.ts editionDialogs` убирает их диалоги, триггеры и предложения → нет в каталоге, чипах, голосом; `scenario/initiative.ts OFFERS`; `?flow=emo/rps/simon` вырезается |
-| `stickers.pack` | — | да | нет | новый пак наклеек СберКота и коллекция (`fx/fxLayer.ts`: `coverSet`/`nextRandom` → в MVP — наклейки кота как раньше) |
+| `stickers.pack` | — | да | нет | новый пак наклеек СберКота (24 SVG, `public/stickers/sber`) и коллекция «собрал N из M» (каталог, `ui.ts`). Влит 18.11: проверки в `fx/fxLayer.ts` (`coverSet`/`nextRandom`/предзагрузка `PACK`) и `ui.ts` (плашка коллекции). В MVP — прежние процедурные наклейки кота (`stickerPack.ts LEGACY`, `editionStickers`), **без грубых надписей в обеих редакциях** («ТУТ БЫЛ КОТ», «ЙО!», «ХОП»/«ПОХ», тег «КОТ» убраны; надписи не зеркалятся). Новая анимация шлепка/отклеивания/рассыпания и «не больше 8 на стекле» — в обеих |
 | `anims.new` | — | да | нет | новые анимации по мере генерации — проверку ставит агент анимаций в точке входа клипа |
 | `debug.flows` | — | да | нет | тестовые флоу и ускорения `?flow=…`, `&dur`, `&rate`; в MVP — только со страницы /test (`?from=test`) |
 | `tracker.nocard` | — | да | нет | `?nocard` — кот на столе без карты; в MVP — только со страницы /test |
@@ -60,12 +60,12 @@ if (feature('stickers.pack')) { /* новое */ } else { /* как в MVP */ }
 
 ### Точки входа кода, который ещё не в main (18.11)
 
-Пробуждение (`src/awake`, `fx/salute.ts`) и новый пак наклеек (`fx/stickerPack.ts`) пока
-не влиты — их проверки ставят авторы при вливании (одна строка, `import { feature } from '../config/edition'`):
+Пробуждение (`src/awake`, `fx/salute.ts`) пока
+не влито (пак наклеек `fx/stickerPack.ts` влит 18.11) — их проверки ставят авторы при вливании (одна строка, `import { feature } from '../config/edition'`):
 
 | Функция | Где | Строка |
 |---|---|---|
-| `stickers.pack` (в MVP — выкл.) | `src/fx/fxLayer.ts`, `stickers_cover` / `cover()` / `sticker` | `feature('stickers.pack') ? coverSet(s, n) : s` и `feature('stickers.pack') ? nextRandom() : s[…]`; `stickerSpecs` по умолчанию и предзагрузка `PACK` — тоже под флагом |
+| `stickers.pack` (в MVP — выкл.) — **влит 18.11** | `src/fx/fxLayer.ts` (`setPersona`, `stickers_cover` / `cover()` / `sticker`, предзагрузка), `src/ui/ui.ts` (плашка «N/M» у «Наклеек») | сделано: `feature('stickers.pack') ? coverSet(s, n) : s`, `? nextRandom() : s[…]`; в MVP `editionStickers()` отдаёт прежние наклейки кота |
 | `home` (влит 18.11) | `src/home/homeMode.ts` — зов домой при потере карты (чипы «Пойдём!») | пункт каталога уже под `feature('home')`; при выключении — и предложение в `HomeMode` |
 | `awake` | `src/app.ts` | уже работает через `?awake=0` (`OFF_SWITCH`); явная проверка не обязательна |
 
