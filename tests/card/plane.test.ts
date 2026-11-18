@@ -11,6 +11,9 @@ function sequence(n: number, f: (i: number) => { ox: number; dist: number; tilt?
     const o = f(i);
     const fr = renderCardScene({ w: 320, h: 240, tilt: o.tilt ?? 35, yaw: 10, dist: o.dist, ox: o.ox, oy: 0, bg: 'wood', tableOnPlane: true, card: { rgb: [33, 160, 56], design: 'doodle' }, noise: 2, blur: 1, seed: 3, noiseSeed: i });
     const r = det.process(fr.rgba, fr.w, fr.h, { focal: fr.focal });
+    // кот посажен на первой найденной карте (как в приложении): до посадки поверхность держит кандидата лишь
+    // несколько кадров (PRE_LOCK_PLANE_FRAMES), после — долго
+    if (r.quad) det.locked = true;
     const inFrame = fr.corners.every((c) => c.x >= 0 && c.x < 320 && c.y >= 0 && c.y < 240);
     let err = Infinity;
     if (r.quad) {

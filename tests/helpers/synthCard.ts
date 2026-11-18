@@ -26,7 +26,19 @@ export interface SynthOptions {
   shape?: { aspect: number; radius: number };
   /** фон — картинка (растягивается на кадр) вместо процедурного стола */
   bgImage?: Tex;
-  bg?: 'wood' | 'plain' | 'dark' | 'clutter' | 'paper' | 'white';
+  bg?: 'wood' | 'plain' | 'dark' | 'clutter' | 'paper' | 'white' | 'check' | 'gloss';
+  /** цвет света (множители R, G, B): тёплый ≈ [1,1; 0,95; 0,75], холодный ≈ [0,8; 0,95; 1,15] */
+  tint?: [number, number, number];
+  /** блики-пятна на карте: число пятен (вместо одного glare) */
+  glareSpots?: number;
+  /** смаз движения: сдвиг за выдержку, px (направление — вектор) */
+  motion?: [number, number];
+  /** подвыборки на пиксель по стороне (по умолчанию 3) */
+  ss?: number;
+  /** вторая карта (другого банка) на том же столе: центр (в ширинах карты, оси карты) и поворот, градусы */
+  card2?: { tex: Tex; x: number; y: number; rot?: number };
+  /** палец — точка в координатах карты (u, v ∈ 0..1 от левого верхнего угла дизайна) */
+  fingerCard?: { u: number; v: number; r?: number };
   finger?: boolean;
   glare?: boolean;
   /** множитель яркости (тусклый свет) */
@@ -166,6 +178,15 @@ export function renderCardScene(o: SynthOptions = {}): SynthFrame {
     if (bg === 'plain') c = [175, 172, 165];
     else if (bg === 'dark') c = [38, 36, 40];
     else if (bg === 'white' || bg === 'paper') c = [236, 235, 230];
+    else if (bg === 'check') {
+      // клетчатая скатерть (красно-белая «виши»)
+      const a = Math.floor(x / 11) & 1, b = Math.floor(y / 11) & 1;
+      c = a && b ? [178, 42, 48] : a || b ? [214, 140, 140] : [242, 236, 230];
+    } else if (bg === 'gloss') {
+      // тёмный глянец с отражением окна (светлая размытая полоса)
+      const k = Math.exp(-(((x - 0.35 * w) * 0.8 + (y - 0.4 * h) * 0.6) ** 2) / (2 * (0.12 * w) ** 2));
+      c = [30 + 170 * k, 32 + 170 * k, 38 + 175 * k];
+    }
     else {
       const u = x * Math.cos(grainAng) + y * Math.sin(grainAng), v = -x * Math.sin(grainAng) + y * Math.cos(grainAng);
       const g = Math.sin(u * grainF + 3 * Math.sin(v * 0.02)) * 0.5 + 0.5;
@@ -234,13 +255,19 @@ export function renderCardScene(o: SynthOptions = {}): SynthFrame {
   let fingerAt = proj(-0.1 + R() * 0.3, -hh);
   let fingerFrom = { x: fingerAt.x + (R() - 0.5) * w * 0.3, y: h + 20 };
   let fingerR = Math.max(w, h) * 0.045;
-  if (o.fingerAt) {
+  if (o.fingerCard) {
+    const fc = o.fingerCard;
+    fingerAt = proj(-0.5 + fc.u, hh - 2 * hh * fc.v);
+    fingerAt = { x: fingerAt.x + 0.5, y: fingerAt.y + 0.5 + Math.max(w, h) * 0.02 };
+    fingerFrom = { x: fingerAt.x + w * 0.15, y: h + 40 };
+    fingerR = Math.max(w, h) * (fc.r ?? 0.035);
+  } else if (o.fingerAt) {
     fingerAt = { x: o.fingerAt.x * w, y: o.fingerAt.y * h };
     fingerFrom = { x: fingerAt.x + w * 0.1, y: h + 40 };
     fingerR = Math.max(w, h) * (o.fingerAt.r ?? 0.06);
   }
   const inFinger = (x: number, y: number) => {
-    if (!o.finger) return 0;
+    if (!o.finger && !o.fingerCard) return 0;
     const ax = fingerFrom.x, ay = fingerFrom.y, bx = fingerAt.x, by = fingerAt.y - fingerR * 0.6;
     const dx = bx - ax, dy = by - ay;
     const tt = Math.max(0, Math.min(1, ((x - ax) * dx + (y - ay) * dy) / (dx * dx + dy * dy)));
@@ -248,9 +275,14 @@ export function renderCardScene(o: SynthOptions = {}): SynthFrame {
     return d < fingerR ? 1 - (d / fingerR) ** 2 : 0;
   };
   const glareC = proj((R() - 0.5) * 0.4, (R() - 0.5) * 0.2);
+  const spots: { x: number; y: number; r: number; k: number }[] = [];
+  for (let i = 0; i < (o.glareSpots ?? 0); i++) {
+    const p = proj((R() - 0.5) * 0.85, (R() - 0.5) * 0.5);
+    spots.push({ x: p.x, y: p.y, r: w * (0.025 + R() * 0.05), k: 0.7 + R() * 0.3 });
+  }
 
   const rgba = new Uint8ClampedArray(w * h * 4);
-  const SS = 3;
+  const SS = o.ss ?? 3;
   for (let y = 0; y < h; y++)
     for (let x = 0; x < w; x++) {
       let ar = 0, ag = 0, ab = 0;
@@ -266,13 +298,28 @@ export function renderCardScene(o: SynthOptions = {}): SynthFrame {
               if (s > 0) {
                 const P: V3 = [d[0] * s - t[0], d[1] * s - t[1], d[2] * s - t[2]];
                 const X = dot(P, r1), Y = dot(P, r2);
-                if (o.tableOnPlane && (o.noCard || !inCard(X, Y))) c = planeTex(X, Y);
+                if (o.tableOnPlane && (o.noCard || !inCard(X, Y))) {
+                  c = planeTex(X, Y);
+                  if (o.card2) {
+                    const a = ((o.card2.rot ?? 0) * Math.PI) / 180;
+                    const dx = X - o.card2.x, dy = Y - o.card2.y;
+                    const u = dx * Math.cos(a) + dy * Math.sin(a), v = -dx * Math.sin(a) + dy * Math.cos(a);
+                    if (inCard(u, v)) c = texAt(o.card2.tex, u + 0.5, (hh - v) / (2 * hh));
+                  }
+                }
                 else if (inCard(X, Y)) {
                   c = cardColor(X, Y);
                   if (o.glare) {
                     const gd = Math.hypot(px - glareC.x, (py - glareC.y) * 1.8) / (w * 0.09);
                     const k = Math.exp(-gd * gd) * 0.85;
                     c = [c[0] + (255 - c[0]) * k, c[1] + (255 - c[1]) * k, c[2] + (255 - c[2]) * k];
+                  }
+                  for (const sp of spots) {
+                    const gd = Math.hypot(px - sp.x, (py - sp.y) * 1.5) / sp.r;
+                    if (gd < 2.5) {
+                      const k = Math.min(1, Math.exp(-gd * gd * gd) * 1.3) * sp.k;
+                      c = [c[0] + (255 - c[0]) * k, c[1] + (255 - c[1]) * k, c[2] + (255 - c[2]) * k];
+                    }
                   }
                 }
               }
@@ -291,8 +338,11 @@ export function renderCardScene(o: SynthOptions = {}): SynthFrame {
       rgba[i + 2] = ab / (SS * SS);
       rgba[i + 3] = 255;
     }
+  if (o.motion) motionBlur(rgba, w, h, o.motion[0], o.motion[1]);
   if (o.blur) boxBlur(rgba, w, h, o.blur);
   const light = o.light ?? 1, noise = o.noise ?? 0;
+  const tint = o.tint ?? [1, 1, 1];
+  if (o.tint) for (let i = 0; i < rgba.length; i += 4) for (let k = 0; k < 3; k++) rgba[i + k] = rgba[i + k] * tint[k];
   if (light !== 1 || noise) {
     const RN = o.noiseSeed != null ? rng(o.noiseSeed * 7919 + 17) : R;
     const g = () => {
@@ -308,7 +358,29 @@ export function renderCardScene(o: SynthOptions = {}): SynthFrame {
   return { w, h, rgba, corners, focal: f };
 }
 
-function boxBlur(d: Uint8ClampedArray, w: number, h: number, r: number) {
+/** смаз движения: среднее вдоль отрезка (dx, dy) */
+export function motionBlur(d: Uint8ClampedArray, w: number, h: number, dx: number, dy: number) {
+  const n = Math.max(2, Math.ceil(Math.hypot(dx, dy)) + 1);
+  const src = d.slice();
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++) {
+      let r = 0, g = 0, b = 0;
+      for (let k = 0; k < n; k++) {
+        const t = k / (n - 1) - 0.5;
+        const xx = Math.min(w - 1, Math.max(0, Math.round(x + dx * t))), yy = Math.min(h - 1, Math.max(0, Math.round(y + dy * t)));
+        const i = (yy * w + xx) * 4;
+        r += src[i];
+        g += src[i + 1];
+        b += src[i + 2];
+      }
+      const i = (y * w + x) * 4;
+      d[i] = r / n;
+      d[i + 1] = g / n;
+      d[i + 2] = b / n;
+    }
+}
+
+export function boxBlur(d: Uint8ClampedArray, w: number, h: number, r: number) {
   const tmp = new Float32Array(w * h * 4);
   const k = 2 * r + 1;
   for (let y = 0; y < h; y++)

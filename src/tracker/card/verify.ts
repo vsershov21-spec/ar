@@ -21,6 +21,7 @@
  * сохраняется и никуда не отправляется: всё считается в памяти воркера (буферы переиспользуются и
  * перезаписываются следующим кадром). См. docs/PRIVACY.md.
  */
+import { matchDesign } from './fingerprint';
 import { type Pt, type Intrinsics, CARD_ASPECT, CARD_RADIUS, homography, applyH, metricShape, orderClockwise, rotateQuad, type Quad } from './geometry';
 
 export const CW = 200;
@@ -39,6 +40,12 @@ export interface CardFeatures {
   logo: number;
   /** фирменный зелёный (градиентный знак или тело карты) */
   green: number;
+  /** похожесть на лучший известный дизайн Сбера по отпечатку 0..1 (fingerprint.ts) */
+  design: number;
+  /** отпечаток совпал с известным дизайном (score ≥ порога записи) */
+  designHit: boolean;
+  /** номер дизайна в каталоге (−1 — нет) */
+  designId: number;
   ps: number;
   corners: number;
   tex: number;
@@ -687,6 +694,7 @@ export function classifyCard(img: Img, quad: Pt[], K?: Intrinsics): CardVerdict 
   const logo = logoScore();
   const t4 = now();
   const green = greenScore();
+  const dm = matchDesign(R, G, B, CW, CH);
   const t5 = now();
   prof.warp += t1 - t0;
   prof.stats += t2 - t1;
@@ -700,20 +708,26 @@ export function classifyCard(img: Img, quad: Pt[], K?: Intrinsics): CardVerdict 
   const flat = clamp01(1 - busyFrac / 0.04) * clamp01(1 - card.sd / 0.08);
   const sharp = clamp01(g90 / 0.1);
   const pxw = Math.hypot(q[1].x - q[0].x, q[1].y - q[0].y);
-  const f: CardFeatures = { chip, back, logo, green, ps, corners, tex, flat, sharp, px: pxw };
+  const f: CardFeatures = { chip, back, logo, green, design: dm.score, designHit: dm.hit, designId: dm.id, ps, corners, tex, flat, sharp, px: pxw };
   const W = CARD_W;
   const z = W.b + W.chip * chip + W.back * back + W.logo * logo + W.ps * ps + W.corners * (corners - 0.5) * 2 + W.tex * tex + W.flat * flat;
   const pCard = sig(z);
   // Сбер: знак по форме; фирменный зелёный — только вместе с чипом (зелёная книга — не карта Сбера)
   // зелёный цвет сам по себе — не Сбер (зелёные карты есть и у других банков): только усиливает найденный знак
-  const sber = clamp01(logo * 1.1 + (logo > 0.3 ? 0.25 * green : 0));
+  // известный дизайн каталога (отпечаток) — тоже Сбер, даже без знака на лицевой стороне
+  const sber = Math.max(clamp01(logo * 1.1 + (logo > 0.3 ? 0.25 * green : 0)), dm.hit ? 0.9 : 0);
   return { card: pCard, sber, side: back > chip && back > 0.4 ? 'back' : 'front', f, ms: now() - t0 };
 }
 
 export function fmtFeatures(v: CardVerdict | null): string {
   if (!v) return 'ver —';
   const f = v.f, p = (x: number) => x.toFixed(2);
-  return `chip ${p(f.chip)} sber ${p(f.logo)}/${p(f.green)} ps ${p(f.ps)} corners ${p(f.corners)} back ${p(f.back)} tex ${p(f.tex)} flat ${p(f.flat)} → card ${p(v.card)} sber ${p(v.sber)} ${v.side}`;
+  return `chip ${p(f.chip)} sber ${p(f.logo)}/${p(f.green)} design ${f.designHit ? '#' + f.designId + ' ' : ''}${p(f.design)} ps ${p(f.ps)} corners ${p(f.corners)} back ${p(f.back)} tex ${p(f.tex)} flat ${p(f.flat)} → card ${p(v.card)} sber ${p(v.sber)} ${v.side}`;
+}
+
+/** буферы последнего выпрямленного изображения (R, G, B 0..1, CW × CH) — для отпечатка дизайна */
+export function canonicalPlanes() {
+  return { R, G, B };
 }
 
 /** последнее выпрямленное изображение карты как RGBA (только для отладки и тестов) */
@@ -746,7 +760,7 @@ export const HIT = { logo: 0.6, chip: 0.75, back: 0.6, miss: 0.3 };
  * Неуверенные кадры (размытые, карта мельче 60 px) пропускаем — они не голосуют ни «за», ни «против».
  */
 export class CardEvidence {
-  readonly win: { logo: number; chip: number; back: number; t: number }[] = [];
+  readonly win: { logo: number; chip: number; back: number; design: number; t: number }[] = [];
   state: CardKind = 'unknown';
   last: CardVerdict | null = null;
   constructor(public size = 12) {}
@@ -762,21 +776,24 @@ export class CardEvidence {
   push(v: CardVerdict, t = 0): CardKind {
     this.last = v;
     if (!CardEvidence.usable(v)) return this.state;
-    this.win.push({ logo: v.side === 'front' ? v.f.logo : 0, chip: v.f.chip, back: v.f.back, t });
+    const front = v.side === 'front';
+    this.win.push({ logo: front ? v.f.logo : 0, chip: v.f.chip, back: v.f.back, design: front && v.f.designHit ? 1 : 0, t });
     if (this.win.length > this.size) this.win.shift();
     this.state = this.decide();
     return this.state;
   }
   counts() {
-    let sber = 0, chip = 0, back = 0, none = 0, maxLogo = 0;
+    let sber = 0, chip = 0, back = 0, none = 0, maxLogo = 0, design = 0;
     for (const w of this.win) {
-      if (w.logo >= HIT.logo) sber++;
+      // знак Сбера ИЛИ известный дизайн каталога
+      if (w.logo >= HIT.logo || w.design >= 1) sber++;
+      if (w.design >= 1) design++;
       if (w.chip >= HIT.chip) chip++;
       if (w.back >= HIT.back) back++;
-      if (w.logo < HIT.miss && w.chip < HIT.miss && w.back < HIT.miss) none++;
+      if (w.logo < HIT.miss && w.chip < HIT.miss && w.back < HIT.miss && w.design < 1) none++;
       if (w.logo > maxLogo) maxLogo = w.logo;
     }
-    return { n: this.win.length, sber, chip, back, none, maxLogo };
+    return { n: this.win.length, sber, chip, back, none, maxLogo, design };
   }
   private decide(): CardKind {
     const c = this.counts();

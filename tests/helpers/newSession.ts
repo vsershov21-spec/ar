@@ -22,6 +22,9 @@ export class BenchCardSession implements BenchSession {
     return this.s.state;
   }
   set state(_v: string) {}
+  get verified() {
+    return this.s.fsm.verified;
+  }
   get tracking() {
     return this.s.state === 'locked';
   }
@@ -41,6 +44,7 @@ export class BenchCardSession implements BenchSession {
     const st = this.s.onResult(r, this.capQ, ctx.now, ctx.angSpeed);
     if (st.found) this.events.push({ t: ctx.now, ev: 'lock' });
     if (st.reset) this.events.push({ t: ctx.now, ev: 'reanchor' });
+    if (st.lost) this.events.push({ t: ctx.now, ev: 'lost' });
     this.pendingReset ||= !!st.reset;
   }
   pendingReset = false;

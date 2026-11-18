@@ -31,6 +31,8 @@ export interface VerifyReport {
   /** проверяли в этом кадре */
   checked: boolean;
   ms: number;
+  /** номер известного дизайна, если отпечаток совпал в этой проверке (−1 — нет) */
+  design?: number;
 }
 
 const PRE_MS = 80;
@@ -112,7 +114,7 @@ export class CardVerifier {
         if (others.length) {
           const c = others[this.alt++ % others.length];
           const va = this.classify(c.quad, lo, K, crop);
-          if (va && (va.f.logo >= HIT.logo || va.f.chip >= HIT.chip || va.f.back >= HIT.back)) {
+          if (va && (va.f.logo >= HIT.logo || va.f.designHit || va.f.chip >= HIT.chip || va.f.back >= HIT.back)) {
             det.adopt(c.quad);
             this.ev.reset();
             this.ev.push(va, now);
@@ -124,6 +126,7 @@ export class CardVerifier {
     const c = (locked ? this.post : this.ev).counts();
     this.line = `${locked ? 'post' : this.ev.state} n${c.n} s${c.sber} c${c.chip} b${c.back} · ${fmtFeatures(v)} · ${crop ? 'crop' : 'lo'} ${v.f.px.toFixed(0)}px ${v.ms.toFixed(1)}мс`;
     rep.state = this.ev.state;
+    rep.design = v.f.designHit ? v.f.designId : -1;
     rep.line = this.line;
     rep.ms = performance.now() - t0;
     return rep;

@@ -43,6 +43,8 @@ export interface PipelineOut {
   why?: string;
   /** средняя яркость кадра 0..255 (подсказка «темно» без отдельного чтения кадра) */
   luma?: number;
+  /** время этапов, мс: подготовка кадра, ключевой кадр, поток/поверхность, полный поиск, проверка «Сбер», прочее */
+  stages?: { pre: number; key: number; flow: number; detect: number; verify: number; other: number };
 }
 
 export class CardPipeline {
@@ -68,15 +70,22 @@ export class CardPipeline {
     det.params.detectEvery = !det.locked && m.verify !== false ? Math.min(2, this.detectEvery) : this.detectEvery;
     const r = det.process(m.rgba, m.w, m.h, { focal: m.focal });
     const out: PipelineOut = { id: m.id, quad: r.quad, score: r.score, mode: r.mode, ms: r.ms, key: det.keyInfo, why: det.why };
+    let tv = 0;
     if (m.verify !== false) {
       const t0 = now();
       out.ver = this.ver.step(det, r, { rgba: m.rgba, w: m.w, h: m.h }, { f: m.focal, cx: m.w / 2, cy: m.h / 2 }, now(), m.crop ?? null);
-      out.ms += now() - t0;
+      tv = now() - t0;
+      out.ms += tv;
     }
+    const t1 = now();
     if (r.quad) out.glare = glareOn(m.rgba, m.w, m.h, r.quad);
     let ls = 0, ln = 0;
     for (let i = 0; i < m.rgba.length; i += 4 * 37) (ls += 0.299 * m.rgba[i] + 0.587 * m.rgba[i + 1] + 0.114 * m.rgba[i + 2]), ln++;
     out.luma = ln ? ls / ln : undefined;
+    const to = now() - t1;
+    out.ms += to;
+    const st = det.stages;
+    out.stages = { pre: st.pre, key: st.key, flow: st.flow, detect: st.detect, verify: tv, other: Math.max(0, st.total - st.pre - st.key - st.flow - st.detect) + to };
     return out;
   }
 }

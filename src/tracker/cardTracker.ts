@@ -294,8 +294,12 @@ export class CardTracker extends TrackerBase implements Tracker {
   private sentAt = 0;
   /** кадр в воркер как VideoFrame (Chrome/Android); Safari и отказ воркера — по-старому, ?grab=main|frame — вручную */
   private frameGrab = useFrameGrab();
-  /** ?grab=bitmap — кадр уменьшает createImageBitmap, читает воркер (на iPhone не проверено — по умолчанию выключено) */
-  private bitmapGrab = !this.frameGrab && typeof createImageBitmap === 'function' && typeof OffscreenCanvas !== 'undefined' && new URLSearchParams(location.search).get('grab') === 'bitmap';
+  /**
+   * Кадр уменьшает createImageBitmap, пиксели читает воркер (главный поток не делает drawImage/getImageData —
+   * docs/qa/BUGS.md № 13). По умолчанию — вне iOS как запасной путь, если не вышел VideoFrame; на iPhone — только
+   * ?grab=bitmap (не проверено на устройстве); ?grab=main — по-старому.
+   */
+  private bitmapGrab = useBitmapGrab();
 
   private watchFrames(v: HTMLVideoElement) {
     const vv = v as HTMLVideoElement & { requestVideoFrameCallback?: (cb: () => void) => number };
@@ -442,13 +446,22 @@ export class CardTracker extends TrackerBase implements Tracker {
   private onResult(r: CardWorkerOut) {
     this.busy = false;
     if (r.mode === 'no-frame') {
-      this.frameGrab = false; // воркер не смог прочитать VideoFrame/ImageBitmap — дальше кадры читаем на главном потоке
-      this.bitmapGrab = false;
-      this.debug('воркер не читает VideoFrame — кадры читаем на главном потоке');
+      // воркер не смог прочитать кадр: VideoFrame → пробуем ImageBitmap, ImageBitmap → главный поток
+      if (this.frameGrab) this.frameGrab = false;
+      else this.bitmapGrab = false;
+      this.debug(`воркер не читает кадр — дальше ${this.bitmapGrab ? 'createImageBitmap' : 'главный поток'}`);
       return;
     }
     const now = performance.now();
     perf.add('tracker.worker', r.ms);
+    if (r.stages) {
+      // этапы воркера: в ?perf видно, что ест бюджет на телефоне
+      perf.add('tracker.pre', r.stages.pre);
+      if (r.stages.key) perf.add('tracker.key', r.stages.key);
+      if (r.stages.flow) perf.add('tracker.flow', r.stages.flow);
+      if (r.stages.detect) perf.add('tracker.detect', r.stages.detect);
+      if (r.stages.verify) perf.add('tracker.verify', r.stages.verify);
+    }
     perf.count('tracker');
     if (r.luma !== undefined) (trackerLuma.value = r.luma), (trackerLuma.at = now);
     this.stats.ms = r.ms;
@@ -627,6 +640,16 @@ function useFrameGrab(): boolean {
   // WebKit (iPhone): поворот кадра камеры в VideoFrame не проверен на устройствах — оставляем проверенный путь
   const ua = typeof navigator !== 'undefined' ? navigator.userAgent : '';
   return !/AppleWebKit/.test(ua) || /Chrome\/|Android/.test(ua);
+}
+
+function useBitmapGrab(): boolean {
+  if (typeof createImageBitmap !== 'function' || typeof OffscreenCanvas === 'undefined') return false;
+  const q = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('grab') : null;
+  if (q === 'bitmap') return true;
+  if (q === 'main' || q === 'frame') return false;
+  const ua = typeof navigator !== 'undefined' ? navigator.userAgent : '';
+  const iosLike = /AppleWebKit/.test(ua) && !/Chrome\/|Android/.test(ua);
+  return !iosLike;
 }
 
 function grabFrame(v: HTMLVideoElement): VideoFrame | null {

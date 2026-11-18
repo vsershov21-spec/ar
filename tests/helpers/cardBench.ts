@@ -16,6 +16,7 @@ import * as THREE from 'three';
 import { spawn } from 'node:child_process';
 import { CARD_ASPECT, type Intrinsics, type Pt } from '../../src/tracker/card/geometry';
 import { CardPipeline, type PipelineOut } from '../../src/tracker/card/pipeline';
+import type { CropIn } from '../../src/tracker/card/verifier';
 import { focalFromFov } from '../../src/tracker/card/detector';
 import { camMatrix, renderCardScene, sceneCorners, type SynthOptions } from './synthCard';
 
@@ -58,6 +59,67 @@ export interface Scenario {
   /** окно покоя для дрожания, с */
   still?: [number, number];
   focal: number;
+  /**
+   * Кадр камеры в большем разрешении (×hiK): тогда кадр детектора — его уменьшение, а к кадрам до посадки
+   * прикладывается фрагмент вокруг карты для проверки «Сбер» — как в CardTracker.cropRect.
+   */
+  hi?(t: number, i: number): Promise<Uint8ClampedArray> | Uint8ClampedArray;
+  hiK?: number;
+}
+
+/** уменьшение кадра в k раз (среднее k × k) */
+export function downsample(src: Uint8ClampedArray, w: number, h: number, k: number): Uint8ClampedArray {
+  const W = Math.floor(w / k), H = Math.floor(h / k);
+  const out = new Uint8ClampedArray(W * H * 4);
+  const n = k * k;
+  for (let y = 0; y < H; y++)
+    for (let x = 0; x < W; x++) {
+      let r = 0, g = 0, b = 0;
+      for (let dy = 0; dy < k; dy++)
+        for (let dx = 0; dx < k; dx++) {
+          const i = ((y * k + dy) * w + x * k + dx) * 4;
+          r += src[i];
+          g += src[i + 1];
+          b += src[i + 2];
+        }
+      const o = (y * W + x) * 4;
+      out[o] = r / n;
+      out[o + 1] = g / n;
+      out[o + 2] = b / n;
+      out[o + 3] = 255;
+    }
+  return out;
+}
+
+/** фрагмент кадра вокруг прошлой карты (копия логики CardTracker.cropRect: до 280 px на карту, ≤ 420 px по стороне) */
+export function benchCrop(hi: Uint8ClampedArray, k: number, dw: number, dh: number, q: Pt[]): CropIn | null {
+  let x0 = Math.min(...q.map((p) => p.x)), x1 = Math.max(...q.map((p) => p.x));
+  let y0 = Math.min(...q.map((p) => p.y)), y1 = Math.max(...q.map((p) => p.y));
+  const mx = (x1 - x0) * 0.25 + 4, my = (y1 - y0) * 0.25 + 4;
+  x0 = Math.max(0, Math.floor(x0 - mx));
+  y0 = Math.max(0, Math.floor(y0 - my));
+  x1 = Math.min(dw, Math.ceil(x1 + mx));
+  y1 = Math.min(dh, Math.ceil(y1 + my));
+  const w = x1 - x0, h = y1 - y0;
+  if (w < 8 || h < 8) return null;
+  const side = (i: number) => Math.hypot(q[i].x - q[(i + 1) % 4].x, q[i].y - q[(i + 1) % 4].y);
+  const long = Math.max(side(0), side(1));
+  let s = Math.min(k, Math.max(1, 280 / Math.max(1, long)));
+  s = Math.min(s, 420 / Math.max(w, h));
+  if (s < 1.3) return null;
+  const cw = Math.round(w * s), ch = Math.round(h * s);
+  // ресэмплинг из кадра ×k (билинейно)
+  const W = dw * k, rgba = new Uint8ClampedArray(cw * ch * 4);
+  for (let y = 0; y < ch; y++)
+    for (let x = 0; x < cw; x++) {
+      const sx = Math.min(W - 1.001, Math.max(0, (x0 + ((x + 0.5) / cw) * w) * k - 0.5)), sy = Math.min(dh * k - 1.001, Math.max(0, (y0 + ((y + 0.5) / ch) * h) * k - 0.5));
+      const xi = sx | 0, yi = sy | 0, fx = sx - xi, fy = sy - yi;
+      const a = (yi * W + xi) * 4, b = a + 4, c = a + W * 4, d = c + 4;
+      const o = (y * cw + x) * 4;
+      for (let ch2 = 0; ch2 < 3; ch2++) rgba[o + ch2] = (hi[a + ch2] * (1 - fx) + hi[b + ch2] * fx) * (1 - fy) + (hi[c + ch2] * (1 - fx) + hi[d + ch2] * fx) * fy;
+      rgba[o + 3] = 255;
+    }
+  return { img: { rgba, w: cw, h: ch }, x0, y0, w, h };
 }
 
 const q3 = (a: [number, number, number]) => new THREE.Quaternion().setFromRotationMatrix(m4(camMatrix(a)));
@@ -119,6 +181,10 @@ export interface BenchOpts {
   workerLat?: number;
   /** шум гироскопа, градусы */
   gyroNoise?: number;
+  /** остановиться через столько секунд после первой посадки */
+  stopAfterLock?: number;
+  /** время воркера по этапам (мс) — копится сюда */
+  prof?: { frames: number; ms: number[] };
 }
 
 export interface BenchResult {
@@ -135,6 +201,23 @@ export interface BenchResult {
   jitterIdx: number;
   frames: number;
   states: Record<string, number>;
+  /** с какой проверкой посадили: по знаку/дизайну (verified) или «по форме» после терпения */
+  verified?: boolean;
+  /** номер дизайна, узнанного по отпечатку (последний кадр проверки), −1 — нет */
+  design?: number;
+  /** доля кадров рендера (карта целиком в кадре, кот показан), где кот дальше 0,3 диагонали от карты — «сидит не там» */
+  farFrac?: number;
+  /** доля кадров рендера, когда карта целиком в кадре, а кота нет (после первой посадки) */
+  hiddenFrac?: number;
+  /** события «карта потеряна» */
+  lostEvents?: number;
+  /** среднее время этапов воркера на кадр, мс */
+  stages?: Record<string, number>;
+  /** время воркера до посадки (search) и после (locked): кадров, среднее, p95 */
+  msBy?: Record<string, { n: number; mean: number; p95: number }>;
+  /** время воркера на кадр, мс: среднее и p95 */
+  workerMs?: number;
+  workerP95?: number;
 }
 
 /** углы модели карты, спроецированные позой якоря (кадр детектора) */
@@ -191,7 +274,16 @@ export async function runBench(sc: Scenario, mk: () => BenchSession, o: BenchOpt
   const camQuads: Pt[][] = [];
   const states: Record<string, number> = {};
   let lastCamDisp = -1;
+  let prevQuad: Pt[] | null = null;
+  let cropAt = -1e9;
+  let lastDesign = -1;
+  const wms: number[] = [];
+  let visTicks = 0, hiddenTicks = 0, farTicks = 0;
+  const stg: Record<string, number> = {};
+  let stgN = 0;
+  const stgBy: Record<string, { n: number; ms: number[] }> = {};
   for (let t = 0; t < sc.duration; t += dt) {
+    if (o.stopAfterLock !== undefined && firstLock >= 0 && t - firstLock > o.stopAfterLock) break;
     const qNow = qAt(t);
     // ответ воркера
     if (pending && t >= pending.due) {
@@ -202,11 +294,37 @@ export async function runBench(sc: Scenario, mk: () => BenchSession, o: BenchOpt
     const ci = Math.floor((t - camLat) * 30);
     if (!pending && t >= busyUntil && ci > lastSent && ci >= 0) {
       const tc = ci / 30;
-      const rgba = await sc.frame(tc, ci);
+      let rgba: Uint8ClampedArray | null;
+      let crop: CropIn | null = null;
+      if (sc.hi) {
+        const k = sc.hiK ?? 2;
+        const hi = await sc.hi(tc, ci);
+        rgba = downsample(hi, sc.w * k, sc.h * k, k);
+        // фрагмент под проверку — как в CardTracker: по прошлой карте, до посадки не чаще 80 мс, после — раз в секунду
+        if (sc.verify && prevQuad && t * 1000 - cropAt >= (s.tracking ? 1000 : 80)) {
+          crop = benchCrop(hi, k, sc.w, sc.h, prevQuad);
+          if (crop) cropAt = t * 1000;
+        }
+      } else rgba = await sc.frame(tc, ci);
       lastSent = ci;
       if (rgba) {
         const req = s.request(t, qNow);
-        const out = pipe.process({ rgba, w: sc.w, h: sc.h, focal: K.f, lock: req.lock, hint: req.hint, hintRadius: req.hintRadius, reset: req.reset, rot: req.rot ?? null, verify: sc.verify, detectEvery: req.detectEvery, legacy: req.legacy });
+        const out = pipe.process({ rgba, w: sc.w, h: sc.h, focal: K.f, lock: req.lock, hint: req.hint, hintRadius: req.hintRadius, reset: req.reset, rot: req.rot ?? null, verify: sc.verify, detectEvery: req.detectEvery, legacy: req.legacy, crop });
+        if (out) {
+          wms.push(out.ms);
+          if (out.stages) {
+            for (const [k, v] of Object.entries(out.stages)) stg[k] = (stg[k] ?? 0) + v;
+            stgN++;
+            // этапы по режиму кадра: до посадки (поиск + проверка) и после (ведение)
+            const tag = s.tracking ? 'locked' : 'search';
+            const b = (stgBy[tag] ??= { n: 0, ms: [] as number[] });
+            b.n++;
+            b.ms.push(out.ms);
+          }
+          if (o.prof) o.prof.frames++;
+          prevQuad = out.quad ?? (s.state === 'locked' || s.state === 'hold' || s.state === 'relocalize' ? prevQuad : null);
+          if (out.ver?.checked) lastDesign = out.ver.design ?? -1;
+        }
         pending = { due: t + workerLat, out, capT: t };
         busyUntil = t + workerLat;
         qPrevSent = qNow;
@@ -227,9 +345,14 @@ export async function runBench(sc: Scenario, mk: () => BenchSession, o: BenchOpt
       }
       const m = s.display();
       const dq = m ? anchorQuad(m, K) : null;
+      if (gt && inFrame) {
+        visTicks++;
+        if (!dq) hiddenTicks++;
+      }
       if (gt && dq && inFrame) {
         const e = quadErr(dq, gt);
         errs.push(e);
+        if (e > 0.3 * Math.hypot(gt[0].x - gt[2].x, gt[0].y - gt[2].y)) farTicks++;
         // дрожание относительно карты: отклонение углов кота от настоящих (без постоянного смещения)
         if (sc.still && t >= sc.still[0] && t <= sc.still[1]) stillPts.push(bestAlign(dq, gt).map((p, k) => ({ x: p.x - gt[k].x, y: p.y - gt[k].y })));
       }
@@ -270,6 +393,15 @@ export async function runBench(sc: Scenario, mk: () => BenchSession, o: BenchOpt
     jitterIdx: d2.length ? Math.sqrt(avg(d2)) : NaN,
     frames: ticks,
     states,
+    verified: (s as { verified?: boolean }).verified,
+    design: lastDesign,
+    farFrac: errs.length ? farTicks / errs.length : NaN,
+    hiddenFrac: visTicks ? hiddenTicks / visTicks : NaN,
+    lostEvents: s.events.filter((e) => e.ev === 'lost').length,
+    stages: stgN ? Object.fromEntries(Object.entries(stg).map(([k, v]) => [k, v / stgN])) : undefined,
+    msBy: Object.fromEntries(Object.entries(stgBy).map(([k, v]) => [k, { n: v.n, mean: avg(v.ms), p95: [...v.ms].sort((a, b) => a - b)[Math.floor(v.ms.length * 0.95)] }])),
+    workerMs: wms.length ? avg(wms) : NaN,
+    workerP95: wms.length ? [...wms].sort((a, b) => a - b)[Math.floor(wms.length * 0.95)] : NaN,
   };
 }
 

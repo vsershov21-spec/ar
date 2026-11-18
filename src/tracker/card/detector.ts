@@ -203,6 +203,8 @@ export class CardDetector {
   lastCandidates: Candidate[] = [];
   /** в этом кадре был полный поиск (lastCandidates — свежие) */
   ranDetect = false;
+  /** время этапов последнего кадра, мс: серый + пирамида, ключевой кадр, поток/поверхность, полный поиск (вкл. края) */
+  stages = { pre: 0, key: 0, flow: 0, detect: 0, total: 0 };
   /**
    * Кот не посажен, а ведём не карту (проверка по содержимому: книга, бутылка) — перейти на другого кандидата.
    * Логику посаженного кота (locked/hint) не трогает.
@@ -328,6 +330,8 @@ export class CardDetector {
     this.edgesReady = false;
     this.grayOnly(rgba);
     this.buildPyramid();
+    const tPre = now();
+    let tKey = 0, tFlow = 0, tDet = 0;
 
     let best: Candidate | null = null;
     let mode: DetectResult['mode'] = 'none';
@@ -354,6 +358,7 @@ export class CardDetector {
         H0 = h && this.gyroG ? mul3(this.gyroG, h) : h;
       } else if (this.hint && this.keyQuad) H0 = this.key.homographyFor(alignQuad(this.hint, this.keyQuad));
       if (H0) keyRes = this.tryKey(H0, this.prevQuad);
+      tKey += now() - tPre;
       if (keyRes) {
         best = this.keyCandidate(keyRes, this.prevQuad ?? this.keyQuad);
         mode = 'key';
@@ -365,12 +370,15 @@ export class CardDetector {
     }
 
     if (!best && p.track && this.prevQuad && !opts.forceDetect) {
+      const tf0 = now();
       const tr = this.trackStep(this.prevQuad, opts.debug);
       flow = tr.flow;
       if (tr.cand) {
         best = tr.cand;
         mode = 'track';
-      } else if (this.anchored && this.planeFrames < MAX_PLANE_FRAMES) {
+      } else if (this.anchored && this.planeFrames < (this.locked ? MAX_PLANE_FRAMES : PRE_LOCK_PLANE_FRAMES)) {
+        // до посадки — только короткие пропуски краёв: иначе ошибочный первый четырёхугольник держался бы
+        // поверхностью вечно (полный поиск его не перебивает, проверка «Сбер» идёт только по кадрам поиска)
         // края карты не видно — ведём её по поверхности: кот остаётся на месте и масштабируется с расстоянием
         const pq = this.planeStep(this.prevQuad);
         if (pq) {
@@ -379,6 +387,7 @@ export class CardDetector {
         }
       }
       this.sinceDetect++;
+      tFlow += now() - tf0;
       // поток/поверхность нашли карту — уточняем по ключевому кадру (снова без дрейфа)
       if (best && useKey && this.keyQuad) {
         const h = this.key.homographyFor(alignQuad(best.quad, this.keyQuad));
@@ -391,7 +400,9 @@ export class CardDetector {
       }
     }
     if (!best || this.sinceDetect >= p.detectEvery) {
+      const td0 = now();
       detectOut = this.detect();
+      tDet += now() - td0;
       this.lastCandidates = detectOut.candidates;
       this.ranDetect = true;
       this.sinceDetect = 0;
@@ -433,7 +444,7 @@ export class CardDetector {
         }
       }
       // карта ведётся по поверхности — чужой прямоугольник (книга, телефон) кота не утащит: только рядом с ожидаемым местом
-      if (d && mode === 'plane' && best && quadDistance(alignQuad(d.quad, best.quad), best.quad) > 0.35 * quadDiag(best.quad)) d = undefined;
+      if (d && mode === 'plane' && this.locked && best && quadDistance(alignQuad(d.quad, best.quad), best.quad) > 0.35 * quadDiag(best.quad)) d = undefined;
       if (d) {
         if (!best) {
           best = d;
@@ -486,7 +497,9 @@ export class CardDetector {
     } else if (mode === 'plane') this.planeFrames++;
     else if (!this.locked) this.anchored = false;
 
-    const res: DetectResult = { quad: best ? best.quad : null, score: best ? best.score : 0, mode: best ? mode : 'none', ms: now() - t0, edgeThreshold: this.thr };
+    const tEnd = now();
+    this.stages = { pre: tPre - t0, key: tKey, flow: tFlow, detect: tDet, total: tEnd - t0 };
+    const res: DetectResult = { quad: best ? best.quad : null, score: best ? best.score : 0, mode: best ? mode : 'none', ms: tEnd - t0, edgeThreshold: this.thr };
     if (opts.debug) {
       this.ensureEdges();
       res.edges = this.edge.slice();
@@ -1144,6 +1157,8 @@ export class CardDetector {
 }
 
 /** сколько кадров подряд можно вести карту только по столу (~15 кадров/с → 40 с), дальше нужен повторный захват */
+/** до посадки поверхность держит кандидата не дольше (кадров) */
+const PRE_LOCK_PLANE_FRAMES = 6;
 const MAX_PLANE_FRAMES = 600;
 
 // ───────────── вспомогательное ─────────────

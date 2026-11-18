@@ -105,7 +105,7 @@ describe('карта Сбера на реальных кадрах', () => {
     expect(sum.hi.negChipHit).toBeLessThanOrEqual(0.03);
     expect(negStates.has('sber')).toBe(false);
     expect(negStates.has('card')).toBe(false);
-  }, 60000);
+  }, 300_000);
 });
 
 /** короткая «съёмка» одного предмета: 3 кадра с дрожанием позы и шумом */
@@ -115,7 +115,7 @@ function shoot(tex: Tex, seed: number, shape?: { aspect: number; radius: number 
   const base = { tilt: 10 + R() * 40, yaw: (R() - 0.5) * 50 + (R() < 0.2 ? 180 : 0), dist: 2 + R() * 0.7, ox: (R() - 0.5) * 0.2, oy: (R() - 0.5) * 0.2, bg: bgs[Math.floor(R() * bgs.length)], light: 0.7 + R() * 0.4 };
   const out: CardVerdict[] = [];
   for (let k = 0; k < n; k++) {
-    const f = renderCardScene({ w: 480, h: 360, ...base, tilt: base.tilt + k * 2, yaw: base.yaw + k, tex, shape, noise: 3, blur: k === 1 ? 1 : 0, seed: seed + 1, noiseSeed: k + 1 });
+    const f = renderCardScene({ w: 480, h: 360, ...base, tilt: base.tilt + k * 2, yaw: base.yaw + k, tex, shape, noise: 3, blur: k === 1 ? 1 : 0, seed: seed + 1, noiseSeed: k + 1, ss: 2 });
     // углы — как у детектора: с ошибкой до ±0,7 px
     const q = f.corners.map((c) => ({ x: c.x + (R() - 0.5) * 1.4, y: c.y + (R() - 0.5) * 1.4 }));
     out.push(classifyCard(f, q, { f: f.focal, cx: f.w / 2, cy: f.h / 2 })!);
@@ -144,7 +144,7 @@ describe('синтетика: дизайны карт и предметы-нег
     expect((res['sber-catalog'].sber ?? 0) / n('sber-catalog')).toBeGreaterThanOrEqual(0.85);
     expect(res.other.sber ?? 0).toBe(0);
     expect(res.back.sber ?? 0).toBe(0);
-  }, 120000);
+  }, 300_000);
 
   it('не карты (лист, книга, телефон, ноутбук, коробка, экран, тетрадь) — ни «Сбер», ни «карта»', () => {
     const res: Record<string, number> = {};
@@ -156,11 +156,11 @@ describe('синтетика: дизайны карт и предметы-нег
     log('synth not-cards', JSON.stringify(res));
     expect(res.sber ?? 0).toBe(0);
     expect(res.card ?? 0).toBe(0);
-  }, 120000);
+  }, 300_000);
 });
 
 describe('накопление уверенности', () => {
-  const v = (logo: number, chip: number, back = 0, sharp = 1): CardVerdict => ({ card: 0, sber: logo, side: back > chip ? 'back' : 'front', ms: 0, f: { chip, back, logo, green: 0, ps: 0, corners: 0.5, tex: 1, flat: 0, sharp, px: 150 } });
+  const v = (logo: number, chip: number, back = 0, sharp = 1): CardVerdict => ({ card: 0, sber: logo, side: back > chip ? 'back' : 'front', ms: 0, f: { chip, back, logo, green: 0, design: 0, designHit: false, designId: -1, ps: 0, corners: 0.5, tex: 1, flat: 0, sharp, px: 150 } });
   it('один удачный кадр — ещё не Сбер; два — Сбер', () => {
     const ev = new CardEvidence();
     expect(ev.push(v(0.9, 0.8))).toBe('unknown');
