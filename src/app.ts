@@ -12,6 +12,7 @@ import { SpriteCharacter } from './character/spriteCharacter';
 import { RigCat } from './character/rigCat';
 import { isClip } from './character/types';
 import { FxLayer } from './fx/fxLayer';
+import { AwakeController } from './awake';
 import { Audio } from './audio/audio';
 import { VoicePlayer } from './voice/voicePlayer';
 import { VoiceEngine } from './voice/engine';
@@ -102,6 +103,8 @@ export class App {
   ui!: UI;
   director!: Director;
   character!: Character;
+  /** сцена пробуждения кота из карты (src/awake); feature('awake') выкл. или ?awake=0 — старое появление */
+  awake: AwakeController | null = null;
   private clock = new THREE.Clock();
   private elapsed = 0;
   fps = 0;
@@ -237,7 +240,18 @@ export class App {
 
     await progressReady(); // память с сервера (≤ 1,5 с от старта страницы; обычно уже готова к этому моменту)
     prepareFlowMemory(); // ?flow=… — без знакомства, сразу игра (src/debug/flows.ts)
+    // редакция (config/edition.ts): пробуждение в MVP; выключатель — feature('awake') / ?awake=0 (OFF_SWITCH)
+    if (feature('awake') && new URLSearchParams(location.search).get('awake') !== '0') {
+      this.awake = new AwakeController({
+        anchor: this.tracker.anchor, aspect: this.tracker.aspect, stage: this.stage, character: () => this.character ?? null, audio: this.audio,
+        root: this.root, camera: this.tracker.camera, renderer: this.renderer, log: (s) => this.director?.log(s), persona: () => this.director.persona.id,
+      });
+      // свечение, искры и «Ого!» при находке карты — теперь в сцене пробуждения
+      const ov = (this.tracker as unknown as { overlay?: { quiet: boolean } }).overlay;
+      if (ov) ov.quiet = true;
+    }
     this.director = new Director({
+      awake: this.awake ?? undefined,
       tracker: this.tracker, stage: this.stage, fx: this.fx, audio: this.audio, voice: this.voice, ui: this.ui,
       content, glCanvas: this.renderer.domElement, size: () => ({ w: this.root.clientWidth, h: this.root.clientHeight }),
       // окно ответа: кот спросил — микрофон слушает сам ms (mode 'echo' — повтор: запись без распознавания)
@@ -245,6 +259,7 @@ export class App {
       stopListen: () => this.engine.stopListen(),
     });
     await this.setCharacterMode(p.character);
+    this.awake?.warm(this.scene); // шейдеры и текстуры сцены пробуждения — заранее (без рывка на «ПУФ»)
     await sfx;
     perf.mark('char');
     this.wireFx();
@@ -647,7 +662,7 @@ export class App {
     // реакция (не idle-вариант и не сон) — первые 4 с клипа; длинные петли (танец, сон) дальше идут на обычной частоте
     const reacting = !/^idle|sleep/.test(clip) && now - this.clipSince < 4000;
     const fxLive = this.fx.parts.list.length > 0 || this.fx.hasLive(fxNeedsBoost);
-    const action = reacting || this.stage.walking || fxLive || this.fx.isPeeling || !!this.input?.touch.isStroking;
+    const action = reacting || this.stage.walking || fxLive || this.fx.isPeeling || !!this.input?.touch.isStroking || !!this.awake?.active;
     const out = this.energy.update({
       now,
       catVisible: this.stage.root.visible,
@@ -842,6 +857,7 @@ export class App {
     this.renderer.setSize(w, h, false);
     this.tracker.resize(w, h);
     this.fx.resize(w, h);
+    this.awake?.resize(w, h);
   }
 
   private lvlT = 0;
@@ -905,6 +921,7 @@ export class App {
       this.audio.play('purr', 0.8);
     }
     perf.section('stage');
+    this.awake?.update(dt); // поза Stage.intro — до stage.update
     this.stage.update(dt);
     this.syncPersona();
     perf.section('director');
@@ -917,7 +934,7 @@ export class App {
     this.onFrame(dt);
     perf.section('render');
     // кота (и его тени) на экране нет: один кадр — очистить холст, дальше GPU не трогаем
-    const empty = !this.stage.root.visible && !this.stage.shadow.visible && this.params.tracker !== 'webxr';
+    const empty = !this.stage.root.visible && !this.stage.shadow.visible && !this.awake?.active && this.params.tracker !== 'webxr';
     if (!empty || !this.blankDrawn) {
       this.renderer.render(this.scene, this.stage.camera);
       perf.count('render');

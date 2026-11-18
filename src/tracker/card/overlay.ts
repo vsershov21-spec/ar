@@ -56,6 +56,11 @@ export class CardOverlay {
   /** «сюрприз»: вспышка и искры из карты в момент, когда она найдена */
   private sparks: { x: number; y: number; vx: number; vy: number; life: number; age: number; size: number; color: string; rot: number; vr: number }[] = [];
   private flash: { x: number; y: number; r: number; age: number } | null = null;
+  /**
+   * Тихий режим: свечение, вспышку, искры и подпись «Ого, вот она!» делает сцена пробуждения кота (src/awake) —
+   * в 3D на самой карте; здесь остаётся только прилипание контура к карте.
+   */
+  quiet = false;
   /** колбэк «карта захвачена» (после анимации прилипания) */
   onLocked: (() => void) | null = null;
 
@@ -346,10 +351,10 @@ export class CardOverlay {
     g.clearRect(0, 0, this.w, this.h);
     if (!busy) return;
     if (this.state === 'snap' && this.t >= SNAP_S) {
-      this.state = 'glow';
+      this.state = this.quiet ? 'locked' : 'glow';
       this.t = 0;
       const o = this.outline();
-      if (o) this.burst(o);
+      if (o && !this.quiet) this.burst(o);
       this.onLocked?.();
     } else if (this.state === 'glow' && this.t >= GLOW_S) {
       this.state = 'locked';
@@ -392,7 +397,7 @@ export class CardOverlay {
     path(g, pts);
     g.fill();
     // подпись над картой
-    if (this.state === 'glow' || (this.state === 'locked' && alpha > 0.05)) {
+    if (!this.quiet && (this.state === 'glow' || (this.state === 'locked' && alpha > 0.05))) {
       const top = pts.reduce((a, p) => (p.y < a.y ? p : a), pts[0]);
       const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
       const y = Math.max(28, top.y - 22);

@@ -30,7 +30,7 @@
 | `silence.doze` | да | да | нет | лестница тишины и дрёма — ядро |
 | `cat.switch` | да | да | нет | смена кота: «Другой кот», встряска — ядро |
 | `home` | да | да | нет | мир кота, базовый: пункт каталога «Мой дом» (`app.ts withHome` → `feature('home')`); `?flow=home` — как отладочный флоу |
-| `awake` | да | да | нет | пробуждение-катсцена и салют; выключить → `OFF_SWITCH`: `?awake=0` (app.ts не создаёт `AwakeController`) |
+| `awake` | да | да | нет | пробуждение-катсцена и салют (влито 18.11: `src/awake`, `fx/salute.ts`, звуки `public/sounds/awake.*`): `app.ts` → `feature('awake')`; выключить → `mvp: false` или `OFF_SWITCH` `?awake=0` (старое появление). `?flow=awake` (кнопки «↻ Пробуждение / ↻ Повтор») — как отладочный флоу: lab или со страницы /test |
 | `progress.server` | да | да | нет | прогресс на сервере (`src/progress/index.ts bootProgress`); выкл. — только localStorage |
 | `games.new` | — | да | нет | «Угадай рожицу», «Камень-ножницы», «Делай как я»: `persona/content.ts editionDialogs` убирает их диалоги, триггеры и предложения → нет в каталоге, чипах, голосом; `scenario/initiative.ts OFFERS`; `?flow=emo/rps/simon` вырезается |
 | `stickers.pack` | — | да | нет | новый пак наклеек СберКота (24 SVG, `public/stickers/sber`) и коллекция «собрал N из M» (каталог, `ui.ts`). Влит 18.11: проверки в `fx/fxLayer.ts` (`coverSet`/`nextRandom`/предзагрузка `PACK`) и `ui.ts` (плашка коллекции). В MVP — прежние процедурные наклейки кота (`stickerPack.ts LEGACY`, `editionStickers`), **без грубых надписей в обеих редакциях** («ТУТ БЫЛ КОТ», «ЙО!», «ХОП»/«ПОХ», тег «КОТ» убраны; надписи не зеркалятся). Новая анимация шлепка/отклеивания/рассыпания и «не больше 8 на стекле» — в обеих |
@@ -60,14 +60,13 @@ if (feature('stickers.pack')) { /* новое */ } else { /* как в MVP */ }
 
 ### Точки входа кода, который ещё не в main (18.11)
 
-Пробуждение (`src/awake`, `fx/salute.ts`) пока
-не влито (пак наклеек `fx/stickerPack.ts` влит 18.11) — их проверки ставят авторы при вливании (одна строка, `import { feature } from '../config/edition'`):
+Пробуждение (`src/awake`, `fx/salute.ts`) и пак наклеек (`fx/stickerPack.ts`) влиты 18.11 — проверки стоят в точках входа (одна строка, `import { feature } from '../config/edition'`):
 
 | Функция | Где | Строка |
 |---|---|---|
 | `stickers.pack` (в MVP — выкл.) — **влит 18.11** | `src/fx/fxLayer.ts` (`setPersona`, `stickers_cover` / `cover()` / `sticker`, предзагрузка), `src/ui/ui.ts` (плашка «N/M» у «Наклеек») | сделано: `feature('stickers.pack') ? coverSet(s, n) : s`, `? nextRandom() : s[…]`; в MVP `editionStickers()` отдаёт прежние наклейки кота |
 | `home` (влит 18.11) | `src/home/homeMode.ts` — зов домой при потере карты (чипы «Пойдём!») | пункт каталога уже под `feature('home')`; при выключении — и предложение в `HomeMode` |
-| `awake` | `src/app.ts` | уже работает через `?awake=0` (`OFF_SWITCH`); явная проверка не обязательна |
+| `awake` (влито 18.11) | `src/app.ts`, создание `AwakeController` | `if (feature('awake') && ?awake ≠ 0) this.awake = new AwakeController(…)`; нет контроллера — `director.appear` по-старому; `?flow=awake` режется `PARAMS.flow` (lab или `?from=test`) |
 
 ## Сборка
 

@@ -52,6 +52,11 @@ export interface DirectorDeps {
   stopListen?: () => void;
   /** заполняется сам: для старых вкладок debug, читающих d.personas */
   personas?: ContentBundle['personas'];
+  /**
+   * Сцена пробуждения кота из карты (src/awake): свечение карты, столб света, кот выпрыгивает, салют и фанфары.
+   * play → через сколько мс сценарий идёт дальше. Нет — старое появление (хлопок, конфетти).
+   */
+  awake?: { play(persona: PersonaId, kind: 'first' | 'short'): number };
 }
 
 /** эмоции новых событий (знакомство, угощение), которых ещё нет в character/emotions.ts */
@@ -449,10 +454,14 @@ export class Director extends Emitter<DirectorEvents> {
         // микрофон сценарий не прячет: три нижние кнопки видны всегда (ui.show('mic') — только «показать»)
         if (a.ui === 'name_prompt' && a.show) d.ui.show('mic', true);
         break;
-      case 'timer':
+      case 'timer': {
         clearTimeout(this.timers.get(a.id));
-        this.timers.set(a.id, window.setTimeout(() => this.dispatch({ type: 'timer', id: a.id }), a.ms));
+        // конец появления — когда кончится сцена пробуждения (первая встреча ~5 с), а не через appearMs автомата
+        const ms = a.id === 'appear_done' && this.appearMs > 0 ? this.appearMs : a.ms;
+        if (a.id === 'appear_done') this.appearMs = 0;
+        this.timers.set(a.id, window.setTimeout(() => this.dispatch({ type: 'timer', id: a.id }), ms));
         break;
+      }
       case 'cancel_timer':
         clearTimeout(this.timers.get(a.id));
         break;
@@ -576,10 +585,19 @@ export class Director extends Emitter<DirectorEvents> {
     }, ms);
   }
 
+  /** длительность сцены пробуждения для таймера appear_done (0 — как в автомате) */
+  private appearMs = 0;
+
   private async appear() {
     const d = this.d;
     // хлопок → кот выскакивает из карты; первая встреча — под фанфары и конфетти
     const first = !this.state.met;
+    // сцена пробуждения (src/awake): свой «видеоряд» у каждого образа — первая встреча полная, повтор короткий
+    if (d.awake && typeof d.awake.play === 'function') {
+      this.appearMs = d.awake.play(this.persona.id, first ? 'first' : 'short');
+      if (first) this.lastCoverAt = performance.now();
+      return;
+    }
     d.stage.resetPosition();
     d.audio.play('gum_chew');
     await wait(300);

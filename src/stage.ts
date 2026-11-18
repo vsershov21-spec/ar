@@ -8,6 +8,7 @@ import type { Character } from './character/types';
 import type { StageConfig } from './config';
 import { clamp, easeInOut } from './core/util';
 import type { AnchorName } from './fx/core';
+import type { IntroPose } from './awake/timeline';
 
 /** точки частей кота в долях роста (ноги в 0, рост 1, лицом в +Z) — если персонаж не дал свои */
 const ANCHOR_FRAC: Record<AnchorName, [number, number, number]> = {
@@ -39,6 +40,15 @@ export class Stage {
   private q2 = new THREE.Quaternion();
   private s2 = new THREE.Vector3();
   shown = false;
+  /**
+   * Сцена пробуждения (src/awake): поза поверх позы на карте — подъём из-под карты, масштаб с перелётом, сальто,
+   * вращение, крен, сквош приземления (в ростах кота, вокруг центра тела). null — обычная поза.
+   */
+  intro: IntroPose | null = null;
+  private mI = new THREE.Matrix4();
+  private mJ = new THREE.Matrix4();
+  private qI = new THREE.Quaternion();
+  private eI = new THREE.Euler();
   /** текущая точка опоры на карте (меняется при ходьбе) */
   pos = new THREE.Vector2();
   private walkTarget: THREE.Vector2 | null = null;
@@ -253,10 +263,19 @@ export class Stage {
       this.q1.slerp(this.q2, k);
       this.s1.lerp(this.s2, k);
     }
-    this.s1.multiplyScalar(Math.max(0.0001, this.visibleK));
+    const it = this.intro;
+    this.s1.multiplyScalar(Math.max(0.0001, it ? 1 : this.visibleK));
     this.root.matrix.compose(this.p1, this.q1, this.s1);
+    if (it) {
+      // T(подъём) · T(центр тела) · R(сальто, вращение, крен) · S(масштаб, сквош) · T(−центр тела)
+      const c = 0.45, k = Math.max(0.0001, it.scale);
+      this.qI.setFromEuler(this.eI.set(it.flip, it.spin, it.roll, 'YXZ'));
+      this.mI.compose(this.tmpB.set(0, it.lift + c * k, 0), this.qI, this.tmpC.set(k * (1 + it.squash * 0.6), k * (1 - it.squash), k * (1 + it.squash * 0.6)));
+      this.mI.multiply(this.mJ.makeTranslation(0, -c, 0));
+      this.root.matrix.multiply(this.mI);
+    }
     this.root.matrixWorldNeedsUpdate = true;
-    this.root.visible = this.visibleK > 0.001;
+    this.root.visible = it ? it.scale > 0.001 : this.visibleK > 0.001;
     if (this.character) {
       this.character.object.userData.tilt = this.cfg.billboardTilt * (1 - this.t);
       // скорость шага в ростах кота в секунду — 3D-кот подгоняет под неё темп клипа ходьбы
@@ -267,8 +286,9 @@ export class Stage {
     const c = this.cfg;
     this.shadow.position.set(this.pos.x, this.pos.y, c.footZ + 0.002);
     this.shadow.scale.set(c.height * 0.55, c.height * 0.32, 1);
-    (this.shadow.material as THREE.MeshBasicMaterial).opacity = (1 - this.t) * this.visibleK * 0.9;
-    this.shadow.visible = this.visibleK > 0.001;
+    const shK = it ? it.shadow : this.visibleK;
+    (this.shadow.material as THREE.MeshBasicMaterial).opacity = (1 - this.t) * shK * 0.9;
+    this.shadow.visible = shK > 0.001;
   }
 
   /**

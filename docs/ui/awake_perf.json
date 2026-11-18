@@ -1,0 +1,89 @@
+{
+ "hooligan": {
+  "playMs": 8.5,
+  "updMaxMs": 13.1,
+  "updMedianMs": 0.7,
+  "frameMaxStartMs": 23.7,
+  "frameMedianStartMs": 23.7,
+  "frameMedianLaterMs": 6.8,
+  "framesStart": 2,
+  "newProgramsAtStart": 0,
+  "longTasksStart": [
+   524
+  ],
+  "saluteMaxParts": 419,
+  "after": {
+   "salute": false,
+   "display": "none",
+   "parts": 0
+  },
+  "replayPlayMs": 0.4,
+  "replayUpdMaxMs": 0.1,
+  "replayFrameMaxMs": 11.9,
+  "replayLongTasks": [
+   732
+  ],
+  "replayFrames": 3,
+  "baselineLongTasks600ms": [
+   756
+  ],
+  "baselineFrameMaxMs": 6.6
+ },
+ "kind": {
+  "playMs": 1.9,
+  "updMaxMs": 5,
+  "updMedianMs": 0.1,
+  "frameMaxStartMs": 4.7,
+  "frameMedianStartMs": 0.6,
+  "frameMedianLaterMs": 1.2,
+  "framesStart": 33,
+  "newProgramsAtStart": 0,
+  "longTasksStart": [],
+  "saluteMaxParts": 417,
+  "after": {
+   "salute": false,
+   "display": "none",
+   "parts": 0
+  },
+  "replayPlayMs": 0.4,
+  "replayUpdMaxMs": 0.2,
+  "replayFrameMaxMs": 4.6,
+  "replayLongTasks": [
+   79,
+   62,
+   59
+  ],
+  "replayFrames": 20,
+  "baselineLongTasks600ms": [],
+  "baselineFrameMaxMs": 7.5
+ },
+ "glitter": {
+  "playMs": 2.1,
+  "updMaxMs": 5,
+  "updMedianMs": 0.1,
+  "frameMaxStartMs": 3.5,
+  "frameMedianStartMs": 0.8,
+  "frameMedianLaterMs": 1.7,
+  "framesStart": 33,
+  "newProgramsAtStart": 0,
+  "longTasksStart": [],
+  "saluteMaxParts": 416,
+  "after": {
+   "salute": false,
+   "display": "none",
+   "parts": 0
+  },
+  "replayPlayMs": 0.4,
+  "replayUpdMaxMs": 0.2,
+  "replayFrameMaxMs": 3.3,
+  "replayLongTasks": [],
+  "replayFrames": 36,
+  "baselineLongTasks600ms": [
+   295,
+   302,
+   304
+  ],
+  "baselineFrameMaxMs": 3.5
+ },
+ "_note": "headless Chrome, SwiftShader (программный рендер), машина под нагрузкой: длинные задачи есть и без сцены (baseline). Цена старта сцены — playMs/replayUpdMaxMs/frameMax*, newProgramsAtStart=0 — шейдеры прогреты."
+}

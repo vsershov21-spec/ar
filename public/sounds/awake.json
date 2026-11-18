@@ -1,0 +1,60 @@
+{
+ "src": [
+  "awake.mp3",
+  "awake.m4a"
+ ],
+ "sprite": {
+  "rise": [
+   0,
+   2000
+  ],
+  "pop_hooligan": [
+   2250,
+   1050
+  ],
+  "pop_kind": [
+   3550,
+   1050
+  ],
+  "pop_glitter": [
+   4850,
+   1050
+  ],
+  "fanfare_hooligan": [
+   6150,
+   3200
+  ],
+  "fanfare_kind": [
+   9600,
+   3300
+  ],
+  "fanfare_glitter": [
+   13150,
+   3300
+  ],
+  "fanfare_short_hooligan": [
+   16700,
+   1650
+  ],
+  "fanfare_short_kind": [
+   18600,
+   1650
+  ],
+  "fanfare_short_glitter": [
+   20500,
+   1650
+  ],
+  "boom_1": [
+   22400,
+   1300
+  ],
+  "boom_2": [
+   23950,
+   1300
+  ],
+  "boom_3": [
+   25500,
+   1300
+  ]
+ }
+}
