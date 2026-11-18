@@ -38,8 +38,8 @@ if (pos.length) {
   const l = pos.filter((r) => r.landed);
   lines.push(`Позитивы: ${pos.length} прогонов (${new Set(pos.map((r) => r.item)).size} дизайнов × ${new Set(pos.map((r) => r.cond)).size} условий), посадок ${pct(l.length, pos.length)}, по знаку/дизайну ${pct(l.filter((r) => r.verified).length, l.length)}, медиана времени ${f(med(l.map((r) => r.tLock)), 2)} с.`);
   lines.push('', posTable('условие', (r) => r.cond), '', posTable('стол', (r) => r.table), '', posTable('дизайн', (r) => r.group));
-  const bad = [...group(pos, (r) => r.item)].map(([k, v]) => [k, v.filter((r) => !r.landed).map((r) => r.cond)]).filter(([, v]) => v.length >= 3);
-  if (bad.length) lines.push('', 'Дизайны с ≥ 3 непосадками: ' + bad.map(([k, v]) => `${k} (${v.length}: ${v.join(', ')})`).join('; '));
+  const bad = [...group(pos, (r) => r.item)].map(([k, v]) => [k, v.filter((r) => !r.landed).map((r) => r.cond)]).filter(([, v]) => v.length >= Math.ceil(0.6 * new Set(pos.map((r) => r.cond)).size));
+  if (bad.length) lines.push('', 'Дизайны, где кот не сел в ≥ 60 % условий: ' + bad.map(([k, v]) => `${k} (${v.length})`).join(', '));
 }
 if (neg.length) {
   lines.push('', '| негатив | прогонов | ложных посадок | из них «по форме» | «Сбер» по знаку/дизайну |', '|---|---|---|---|---|');
@@ -51,5 +51,15 @@ if (neg.length) {
   if (fl.length) lines.push('', 'Ложные посадки: ' + fl.map((r) => `${r.item} / ${r.cond} / ${r.table}${r.verified ? ' (Сбер' + (r.design >= 0 ? ' #' + r.design : '') + ')' : ' (по форме)'}`).join('; '));
 }
 const ms = rows.map((r) => r.workerMs).filter(Number.isFinite);
+const stg = {};
+for (const r of rows) for (const [k, v] of Object.entries(r.stages ?? {})) (stg[k] ??= []).push(v);
+const by = {};
+for (const r of rows) for (const [k, v] of Object.entries(r.msBy ?? {})) (by[k] ??= []).push(v);
+if (Object.keys(stg).length) {
+  lines.push('', '| этап воркера | среднее на кадр, мс (медиана по прогонам) |', '|---|---|');
+  const names = { pre: 'серый кадр + пирамида', key: 'ключевой кадр (после посадки)', flow: 'поток / поверхность', detect: 'полный поиск (края, отрезки, четырёхугольники)', verify: 'проверка «Сбер» (выпрямление, чип, знак, отпечаток)', other: 'прочее (блик, яркость)' };
+  for (const [k, v] of Object.entries(stg)) lines.push(`| ${names[k] ?? k} | ${f(med(v), 2)} |`);
+  for (const [k, v] of Object.entries(by)) lines.push(`| всего, ${k === 'locked' ? 'после посадки' : 'до посадки'} | среднее ${f(med(v.map((x) => x.mean)))}, p95 ${f(med(v.map((x) => x.p95)))} |`);
+}
 lines.push('', `Время воркера на кадр (ноутбук, Node): медиана ${f(med(ms))} мс, p90 ${f(p90(ms))} мс, худший прогон p95 ${f(Math.max(...rows.map((r) => r.workerP95).filter(Number.isFinite)))} мс.`);
 console.log(lines.join('\n'));

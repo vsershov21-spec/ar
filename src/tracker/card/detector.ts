@@ -203,6 +203,9 @@ export class CardDetector {
   lastCandidates: Candidate[] = [];
   /** в этом кадре был полный поиск (lastCandidates — свежие) */
   ranDetect = false;
+  /** последняя карта, найденная краями (до посадки — предпочтение ей среди кандидатов) */
+  private stickyQuad: Quad | null = null;
+  private stickyFrame = -1e9;
   /** время этапов последнего кадра, мс: серый + пирамида, ключевой кадр, поток/поверхность, полный поиск (вкл. края) */
   stages = { pre: 0, key: 0, flow: 0, detect: 0, total: 0 };
   /**
@@ -443,6 +446,17 @@ export class CardDetector {
           }
         }
       }
+      // до посадки: карта, которую только что видели (≤ 0,5 с), важнее другого прямоугольника в кадре (чужая карта
+      // рядом, книга): иначе кандидат прыгал бы между ними, проверка «Сбер» начиналась заново и кот не садился
+      if (d && !this.locked && this.stickyQuad && this.frameNo - this.stickyFrame <= 8) {
+        const ref = this.stickyQuad;
+        if (quadDistance(alignQuad(d.quad, ref), ref) > 0.15 * quadDiag(ref)) {
+          const near = detectOut.candidates.slice(1, 6).find((c) => c.score >= 0.6 * d!.score && quadDistance(alignQuad(c.quad, ref), ref) < 0.08 * quadDiag(ref));
+          if (near) d = { ...near, quad: alignQuad(near.quad, ref) };
+          // слабый «другой» четырёхугольник (часть рисунка, край блика) карту, которую только что видели, не перебивает
+          else if (d.score < 0.5) d = undefined;
+        }
+      }
       // карта ведётся по поверхности — чужой прямоугольник (книга, телефон) кота не утащит: только рядом с ожидаемым местом
       if (d && mode === 'plane' && this.locked && best && quadDistance(alignQuad(d.quad, best.quad), best.quad) > 0.35 * quadDiag(best.quad)) d = undefined;
       if (d) {
@@ -459,6 +473,10 @@ export class CardDetector {
       }
     }
     this.prevQuad = best ? best.quad : null;
+    if (best && mode !== 'plane') {
+      this.stickyQuad = best.quad;
+      this.stickyFrame = this.frameNo;
+    }
     // ключевой кадр: состояние выравнивания; съёмка при посадке; редкое обновление при сильной смене масштаба/вида
     if (mode === 'key' && keyRes) {
       this.keyFails = 0;

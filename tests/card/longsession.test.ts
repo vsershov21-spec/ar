@@ -47,10 +47,10 @@ function plan(T: number): Plan {
 const inAny = (t: number, r: [number, number][]) => r.some(([a, b]) => t >= a && t < b);
 const ease = (x: number) => (x <= 0 ? 0 : x >= 1 ? 1 : 0.5 - 0.5 * Math.cos(Math.PI * x));
 
-export function longScenario(T: number, tex: Tex, other: Tex): Scenario {
+export function longScenario(T: number, tex: Tex, other: Tex, plain = false): Scenario {
   const w = 320, h = 240, K = 2;
   const P = plan(T);
-  const base: SynthOptions = { tilt: 38, yaw: 12, dist: 26 / CARD_CM, bg: 'wood', noise: 2.5, seed: 21, tableOnPlane: true, tex, card2: { tex: other, x: 1.45, y: 0.05, rot: 8 } };
+  const base: SynthOptions = { tilt: 38, yaw: 12, dist: 26 / CARD_CM, bg: plain ? 'white' : 'wood', noise: 2.5, seed: 21, tableOnPlane: !plain, tex, card2: { tex: other, x: 1.45, y: 0.05, rot: 8 } };
   const rot = (t: number): [number, number, number] => {
     let ry = 2.5 * Math.sin(t * 0.13) + 0.2 * Math.sin(t * 53 + 1);
     let rx = 2 * Math.sin(t * 0.09 + 1) + 0.15 * Math.sin(t * 47) + 0.1 * Math.sin(t * 71);
@@ -96,7 +96,7 @@ export function longScenario(T: number, tex: Tex, other: Tex): Scenario {
       }
   };
   return {
-    name: `долгая сессия ${T} с`,
+    name: `долгая сессия ${T} с${plain ? ', гладкий белый стол' : ''}`,
     duration: T,
     verify: true,
     w,
@@ -110,8 +110,8 @@ export function longScenario(T: number, tex: Tex, other: Tex): Scenario {
   };
 }
 
-export async function runLong(T: number): Promise<BenchResult> {
-  const sc = longScenario(T, await fixture('122'), design('other-green', 2));
+export async function runLong(T: number, plain = false): Promise<BenchResult> {
+  const sc = longScenario(T, await fixture('122'), design('other-green', 2), plain);
   return runBench(sc, () => new BenchCardSession(true));
 }
 
@@ -121,7 +121,7 @@ const fmt = (r: BenchResult) =>
 
 describe('долгая сессия: свет, рука, край, уходы и возвраты, чужая карта рядом', () => {
   it('40 с: без ложных пересадок, кот не уходит на чужую карту', async () => {
-    const r = await runLong(40);
+    const r = await runLong(40, true);
     console.log('long40', fmt(r));
     expect(r.tLock).toBeGreaterThanOrEqual(0);
     expect(r.reanchors).toBe(0);
@@ -129,7 +129,7 @@ describe('долгая сессия: свет, рука, край, уходы и
     expect(r.err).toBeLessThan(4);
   }, 600_000);
   it.skipIf(!process.env.LONG)('5 мин', async () => {
-    const r = await runLong(+(process.env.LONG_S ?? 300));
+    const r = await runLong(+(process.env.LONG_S ?? 300), !!process.env.LONG_PLAIN);
     console.log('long', fmt(r), JSON.stringify(r.states));
     expect(r.reanchors).toBe(0);
     expect(r.farFrac ?? 0).toBeLessThan(0.01);

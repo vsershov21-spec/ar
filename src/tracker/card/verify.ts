@@ -760,9 +760,14 @@ export const HIT = { logo: 0.6, chip: 0.75, back: 0.6, miss: 0.3 };
  * Неуверенные кадры (размытые, карта мельче 60 px) пропускаем — они не голосуют ни «за», ни «против».
  */
 export class CardEvidence {
-  readonly win: { logo: number; chip: number; back: number; design: number; t: number }[] = [];
+  readonly win: { logo: number; chip: number; back: number; design: number; id: number; t: number }[] = [];
   state: CardKind = 'unknown';
   last: CardVerdict | null = null;
+  /**
+   * Дизайн карты, на которой кот уже сидел (узнан по отпечатку при решении «Сбер»). Переживает reset(): вернули ту же
+   * карту после «Где карта?» — хватает одного совпадения отпечатка с этим дизайном, а не двух.
+   */
+  known = -1;
   constructor(public size = 12) {}
   reset() {
     this.win.length = 0;
@@ -777,7 +782,7 @@ export class CardEvidence {
     this.last = v;
     if (!CardEvidence.usable(v)) return this.state;
     const front = v.side === 'front';
-    this.win.push({ logo: front ? v.f.logo : 0, chip: v.f.chip, back: v.f.back, design: front && v.f.designHit ? 1 : 0, t });
+    this.win.push({ logo: front ? v.f.logo : 0, chip: v.f.chip, back: v.f.back, design: front && v.f.designHit ? 1 : 0, id: v.f.designHit ? v.f.designId : -1, t });
     if (this.win.length > this.size) this.win.shift();
     this.state = this.decide();
     return this.state;
@@ -797,7 +802,15 @@ export class CardEvidence {
   }
   private decide(): CardKind {
     const c = this.counts();
-    if (c.sber >= 2 && c.sber * 4 >= c.n) return 'sber';
+    if (c.sber >= 2 && c.sber * 4 >= c.n) {
+      for (let i = this.win.length - 1; i >= 0; i--) if (this.win[i].id >= 0) {
+        this.known = this.win[i].id;
+        break;
+      }
+      return 'sber';
+    }
+    // та же карта, что была под котом (тот же дизайн каталога), — достаточно одного совпадения
+    if (this.known >= 0 && this.win.some((w) => w.id === this.known)) return 'sber';
     if (c.back >= 2 && c.back >= c.chip) return 'back';
     if (c.n >= 10 && c.chip >= 4 && c.sber === 0 && c.maxLogo < 0.45) return 'card';
     if (c.n >= 6 && c.chip === 0 && c.back === 0 && c.sber === 0 && c.none * 2 >= c.n) return 'notcard';
