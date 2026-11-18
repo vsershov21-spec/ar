@@ -412,6 +412,96 @@
       "notes": "Вздрагивает, протирает глаза."
     },
     {
+      "id": "get_into_bed",
+      "durationS": 1.3,
+      "loop": false,
+      "rootMotion": true,
+      "layer": "body",
+      "blendInMs": 250,
+      "persona": "all",
+      "priority": "P0",
+      "usedBy": [
+        "code:home.bed"
+      ],
+      "fallback": "jump",
+      "notes": "Забирается в кровать: от изножья — шаг, прыжок-подъём на матрас (высота 0,4 роста), разворот головой к подушке. Root motion — путь сцены (src/home/bedFlow.ts), клип на месте. Нет в GLB — процедурно: клип-опора `jump` + путь корня по дуге."
+    },
+    {
+      "id": "lie_down_side",
+      "durationS": 1.2,
+      "loop": false,
+      "rootMotion": true,
+      "layer": "body",
+      "blendInMs": 500,
+      "persona": "all",
+      "priority": "P0",
+      "usedBy": [
+        "code:home.bed"
+      ],
+      "fallback": "sleep_loop",
+      "notes": "Ложится на бок на матрасе головой к подушке. Нет в GLB — процедурно: `sleep_loop` + плавное опускание корня и крен на бок."
+    },
+    {
+      "id": "sleep_loop_bed",
+      "durationS": 4.0,
+      "loop": true,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 600,
+      "persona": "all",
+      "priority": "P0",
+      "usedBy": [
+        "code:home.bed"
+      ],
+      "fallback": "sleep_loop",
+      "notes": "Спит в кровати под одеялом на боку, бок поднимается от дыхания. Бесшовная петля. Нет в GLB — `sleep_loop` + дыхание корнем."
+    },
+    {
+      "id": "turn_over_sleep",
+      "durationS": 1.4,
+      "loop": false,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 300,
+      "persona": "all",
+      "priority": "P0",
+      "usedBy": [
+        "code:home.bed"
+      ],
+      "fallback": "sleep_loop",
+      "notes": "Во сне переворачивается/ворочается от касания, бормочет, не просыпается; начало и конец — поза sleep_loop_bed. Нет в GLB — `sleep_loop` + приподнять и покачать корень."
+    },
+    {
+      "id": "wake_stretch_in_bed",
+      "durationS": 1.8,
+      "loop": false,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 400,
+      "persona": "all",
+      "priority": "P0",
+      "usedBy": [
+        "code:home.bed"
+      ],
+      "fallback": "wake_startle",
+      "notes": "Просыпается в кровати: зевает, потягивается лёжа, садится, одеяло сползает. Нет в GLB — `wake_startle` (сидя), корень на матрасе, плюс подъём из лёжа."
+    },
+    {
+      "id": "hop_out_of_bed",
+      "durationS": 1.0,
+      "loop": false,
+      "rootMotion": true,
+      "layer": "body",
+      "blendInMs": 200,
+      "persona": "all",
+      "priority": "P0",
+      "usedBy": [
+        "code:home.bed"
+      ],
+      "fallback": "jump",
+      "notes": "Спрыгивает с кровати на пол к зрителю, приземляется в стойку. Root motion — путь сцены. Нет в GLB — `jump` + дуга корня с матраса на пол."
+    },
+    {
       "id": "wave",
       "durationS": 1.2,
       "loop": false,

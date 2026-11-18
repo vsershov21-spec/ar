@@ -10,6 +10,7 @@
  * Выход: кнопка «На карту» — getUserMedia повторно прямо в жесте (iOS: без второго запроса разрешения и без
  *        блокировки autoplay), трекер ищет карту с нуля, кот ждёт «у стекла».
  * Где кот (AR/дом, зона) — в памяти кота (scenario/memory.ts, поле home).
+ * Кровать в спальне (уложить спать, сон, разбудить, время суток) — bedFlow.ts, функция `home.bed` (lab).
  *
  * Энергия: в доме камеры и воркера трекера нет, рендер — по энергобюджету (покой 20 к/с, обычно 30).
  */
@@ -21,6 +22,8 @@ import type { Room } from './room';
 import type { Chip } from '../scenario/suggest';
 import { loadMemory, saveMemory } from '../scenario/memory';
 import { CAT_ICON } from '../ui/catalogIcons';
+import { feature } from '../config/edition';
+import { BedFlow } from './bedFlow';
 
 export type HomePhase = 'ar' | 'to_home' | 'home' | 'to_ar';
 
@@ -50,6 +53,8 @@ export interface HomeHost {
   director: {
     state: { phase: string; appeared: boolean; cardVisible: boolean; dialog: unknown; paused: boolean };
     dozing: boolean;
+    /** реплика без озвучки — только пузырём (кровать: новые реплики до прогона ElevenLabs) */
+    showLine?(event: string): boolean;
     ladder: { quietFor(now: number): number; reset(now: number): void };
     queue: { busy: boolean };
     dispatch(e: { type: 'card_found' } | { type: 'card_lost' } | { type: 'context_change' }): void;
@@ -62,7 +67,9 @@ export interface HomeHost {
   };
   character(): { play(clip: string, o?: { loop?: boolean }): void; currentClip: string; face(p: string, ms?: number): void } | null;
   ui: { root: HTMLElement; toast(t: string, ms?: number): void; closeCatalog(): void; nudge(m: null): void; hidePressMenu(): void; error(t: string, s: string): void; canReanchor: boolean };
-  audio: { play(id: string, v?: number): unknown };
+  audio: { play(id: string, v?: number): unknown; ctx?: AudioContext | null; muted?: boolean };
+  /** эффекты (Zzz над спящим котом в кровати) */
+  fx?: { play(id: string): unknown; stop?(id: string): void };
   energy: { activity(now: number, boost?: boolean): void };
   /** пересчитать чипы кота */
   suggest(): void;
@@ -101,11 +108,16 @@ export class HomeMode {
   private onOrient = (e: DeviceOrientationEvent) => this.orient(e);
   private bowlTimer = 0;
   private savedClear = new THREE.Color(0, 0, 0);
+  /** кровать в спальне (функция home.bed; null — как в MVP: «Уложить спать» = дрёма режиссёра) */
+  readonly bed: BedFlow | null;
+  private bedParam: string | null = null;
+  private cam = { dy: 0, zoom: 1, dx: 0 };
   /** счётчики для тестов и debug: сколько раз открывали/закрывали камеру */
   readonly stats = { enter: 0, exit: 0, cameraStops: 0, cameraStarts: 0 };
 
-  constructor(private h: HomeHost) {
+  constructor(private h: HomeHost, opts: { bed?: boolean } = {}) {
     registerHomeIcons();
+    this.bed = (opts.bed ?? feature('home.bed')) ? new BedFlow(h, this) : null;
     const mem = loadMemory().home;
     if (mem && isZoneId(mem.zone)) this.zone = mem.zone;
     // кот был дома, когда ребёнок закрыл вкладку — позовёт домой в первую паузу
@@ -182,11 +194,13 @@ export class HomeMode {
     h.director.log(`дом: вход (${why})`);
     // другая обстановка — мини-игра (загадка и т. п.) заканчивается, её чипы («Сдаюсь») не едут в дом
     h.director.dispatch({ type: 'context_change' });
+    const bz = this.bed?.beforeEnter(this.bedParam === 'morning' ? 'morning' : undefined);
+    if (bz) this.zone = bz;
     h.ui.closeCatalog();
     h.ui.hidePressMenu();
     h.ui.nudge(null);
     h.energy.activity(performance.now());
-    h.character()?.play('jump');
+    if (!this.bed?.holdsCat) h.character()?.play('jump');
     h.audio.play('whoosh_big', 0.8);
     this.portalIn();
     const room = this.loadRoom();
@@ -199,8 +213,10 @@ export class HomeMode {
           if (this.phase !== 'to_home') return;
           this.phase = 'home';
           this.h.suggest();
-          this.sayZone(!this.visited ? 'home_enter' : this.zoneDef.enterEvent);
+          if (!this.bed?.holdsCat) this.sayZone(!this.visited ? 'home_enter' : this.zoneDef.enterEvent);
           this.visited = true;
+          if (this.bedParam) this.bed?.flow(this.bedParam);
+          this.bedParam = null;
         });
       }, (e) => {
         console.error('[home] комната не построилась', e);
@@ -242,8 +258,11 @@ export class HomeMode {
     window.addEventListener('deviceorientation', this.onOrient);
     this.frame();
     room.setLight(1);
-    h.character()?.play('appear');
-    h.audio.play('boing', 0.6);
+    if (this.bed?.holdsCat) this.bed.afterSwap();
+    else {
+      h.character()?.play('appear');
+      h.audio.play('boing', 0.6);
+    }
     this.remember();
   }
 
@@ -273,10 +292,13 @@ export class HomeMode {
       h.ui.error('Камера не включилась', 'Разреши доступ к камере в настройках браузера и попробуй ещё раз.');
     });
     void started;
-    // спал — просыпается («ой, задремал»), иначе — «вернёмся к карте!»
-    if (h.director.dozing) h.director.interaction('wake_up');
+    // спал — просыпается («ой, задремал»), иначе — «вернёмся к карте!»; спит в кровати — спит дальше (дремлет у карты)
+    const inBed = !!this.bed?.holdsCat;
+    this.bed?.onExit();
+    if (inBed) h.director.log('дом: кот спит в кровати — на карте дремлет дальше');
+    else if (h.director.dozing) h.director.interaction('wake_up');
     else h.director.speakEvent('home_back', { background: true });
-    h.character()?.play('jump');
+    if (!inBed) h.character()?.play('jump');
     h.audio.play('whoosh_big', 0.8);
     this.portalIn();
     this.later(PORTAL_IN_MS, () => {
@@ -310,7 +332,8 @@ export class HomeMode {
       h.stage.setMode('glass');
     }
     this.lostSince = -1;
-    h.character()?.play('appear');
+    if (this.bed?.holdsCat) this.bed.onCard();
+    else h.character()?.play('appear');
     this.remember();
   }
 
@@ -337,11 +360,15 @@ export class HomeMode {
     const to = this.zoneDef.x;
     this.move = { from, to, t: 0, dir: Math.sign(to - from) };
     const h = this.h;
-    if (h.director.dozing) h.director.interaction('wake_up');
+    // кот в кровати остаётся спать: камера уходит одна
+    const held = !!this.bed?.holdsCat;
+    if (!held && h.director.dozing) h.director.interaction('wake_up');
     h.director.activity();
     h.energy.activity(performance.now());
-    h.stage.cfg.yawFollow = false;
-    h.character()?.play('run', { loop: true });
+    if (!held) {
+      h.stage.cfg.yawFollow = false;
+      h.character()?.play('run', { loop: true });
+    }
     h.audio.play('whoosh', 0.5);
     this.room?.showBowl(false);
     this.syncHud(true);
@@ -396,10 +423,18 @@ export class HomeMode {
         this.later(250, () => void h.director.speakEvent('home_ball'));
         return true;
       case 'home:sleep':
-        // «Уложить спать»: как «Усыпи», но без самопробуждения через 6,5 с — спит, пока ребёнок не разбудит
+        // кровать (lab): кот залезает в кровать, одеяло, ночник — bedFlow.ts
+        if (this.bed) return this.bed.act(id);
+        // MVP: как «Усыпи», но без самопробуждения через 6,5 с — спит, пока ребёнок не разбудит
         // (касание или чип «Разбуди меня»); свет в спальне гаснет (update)
         h.director.interaction('sleep');
         return true;
+      case 'home:wake':
+      case 'home:shade':
+      case 'home:to_bed':
+      case 'home:bed_yes':
+      case 'home:bed_no':
+        return this.bed?.act(id) ?? false;
     }
     return false;
   }
@@ -414,7 +449,12 @@ export class HomeMode {
       return offerChips(this.offer.why).map((a) => this.chip(a.id, a.label, a.icon));
     }
     if (this.phase !== 'home') return [];
+    // перебежка между комнатами: чипов нет (иначе висели чипы прошлой комнаты), по прибытии — новые
+    if (this.move) return [];
     const d = this.h.director;
+    // кровать: спит — «Разбудить» / «Открыть шторку», залезает — без чипов, предложение «вздремнём?» — да/нет
+    const bc = this.bed?.chips();
+    if (bc && (this.bed!.holdsCat || !base.some((c) => !('action' in c.run)))) return bc;
     // ответы на вопрос, варианты мини-игры, «разбуди меня», поддержка — как обычно
     if (base.some((c) => !('action' in c.run)) || d.dozing || d.state.paused || d.state.dialog) return base;
     const acts = this.zoneDef.actions.map((a) => this.chip(a.id, a.label, a.icon));
@@ -437,11 +477,13 @@ export class HomeMode {
   update(dt: number, now = performance.now()) {
     this.now = now;
     const h = this.h;
+    this.bed?.update(dt, now);
     if (this.phase === 'ar') {
       this.offerTick(now);
       return;
     }
     if (!this.inRoom || !this.room) return;
+    const held = !!this.bed?.holdsCat;
     // перебежка между зонами
     if (this.move) {
       const m = this.move;
@@ -450,21 +492,25 @@ export class HomeMode {
       const x = m.from + (m.to - m.from) * k;
       // разворот по ходу бега в начале, к зрителю — в конце
       const turn = Math.min(1, m.t / 0.18, (1 - m.t) / 0.22);
-      this.placeCat(x, (m.dir * Math.PI) / 2 * Math.max(0, turn));
+      if (!held) this.placeCat(x, (m.dir * Math.PI) / 2 * Math.max(0, turn));
       this.camX = x;
       if (m.t >= 1) {
         this.move = null;
-        h.stage.cfg.yawFollow = true;
-        this.placeCat(this.zoneDef.x);
-        h.character()?.play('idle');
-        this.sayZone(this.zoneDef.enterEvent);
+        if (!held) {
+          h.stage.cfg.yawFollow = true;
+          this.placeCat(this.zoneDef.x);
+          h.character()?.play('idle');
+          this.sayZone(this.zoneDef.enterEvent);
+        }
+        this.bed?.onArrive(this.zone);
         h.suggest();
       }
     }
-    // свет: спит — ночь (в спальне глубже)
+    // свет: спит — ночь (в спальне глубже); кровать решает сама, пока кот в ней
     const ch = h.character();
     const sleeping = h.director.dozing || /^sleep/.test(ch?.currentClip ?? '');
-    this.room.setLight(sleeping ? (this.zone === 'bedroom' ? 0.15 : 0.55) : 1);
+    const bl = this.bed?.lightTarget();
+    this.room.setLight(bl ?? (sleeping ? (this.zone === 'bedroom' ? 0.15 : 0.55) : 1));
     this.room.update(dt);
     // параллакс по гироскопу (плавно)
     const p = this.par;
@@ -532,12 +578,18 @@ export class HomeMode {
     const catH = this.h.stage.cfg.height;
     const frac = land ? 0.56 : 0.42;
     const feetAt = land ? 0.8 : 0.72;
+    // кот в кровати: камера чуть выше и дальше (плавно)
+    const fb = this.bed?.frameBias() ?? { dy: 0, zoom: 1, dx: 0 };
+    const c = this.cam;
+    c.dy += (fb.dy - c.dy) * 0.08;
+    c.zoom += (fb.zoom - c.zoom) * 0.08;
+    c.dx += (fb.dx - c.dx) * 0.08;
     const halfH = catH / frac / 2;
-    const D = halfH / Math.tan(THREE.MathUtils.degToRad(cam.fov / 2));
-    const yc = (2 * feetAt - 1) * halfH + (this.move ? 0 : this.zoneDef.floorY);
+    const D = (halfH / Math.tan(THREE.MathUtils.degToRad(cam.fov / 2))) * c.zoom;
+    const yc = (2 * feetAt - 1) * halfH + (this.move ? 0 : this.zoneDef.floorY) + c.dy;
     const pitch = THREE.MathUtils.degToRad(7);
     const p = this.par;
-    const tx = this.camX, tz = 0.2;
+    const tx = this.camX + c.dx, tz = 0.2;
     cam.position.set(tx + p.x * 0.22, yc + Math.sin(pitch) * D + p.y * 0.12, tz + Math.cos(pitch) * D);
     cam.lookAt(tx + p.x * 0.05, yc, tz);
     cam.updateProjectionMatrix();
@@ -612,7 +664,8 @@ export class HomeMode {
   }
 
   private remember() {
-    saveMemory({ home: { where: this.phase === 'to_ar' || this.phase === 'ar' ? 'ar' : 'home', zone: this.zone } });
+    const morning = loadMemory().home?.morning;
+    saveMemory({ home: { where: this.phase === 'to_ar' || this.phase === 'ar' ? 'ar' : 'home', zone: this.zone, ...(morning ? { morning } : {}) } });
   }
 
   /** ?flow=home (страница /test): как только кот в игре — домой (&zone=kitchen|living|bedroom — сразу в зону) */
@@ -620,6 +673,8 @@ export class HomeMode {
     if (q.get('flow') !== 'home') return;
     const z = q.get('zone');
     if (isZoneId(z)) this.zone = z;
+    // &bed=sleep|wake|night|morning — кровать (src/home/bedFlow.ts)
+    if (this.bed && q.get('bed')) this.bedParam = q.get('bed');
     const t0 = performance.now();
     const tick = () => {
       if (this.phase !== 'ar') return;
@@ -629,7 +684,21 @@ export class HomeMode {
     tick();
   }
 
+  /** кот дома в кровати (спит, залезает или вылезает) */
+  get catInBed(): boolean {
+    return this.phase === 'home' && !!this.bed?.holdsCat;
+  }
+  /** касание до режиссёра (Director.touchGate): кот спит в кровати — съедаем (бормочет, ворочается) */
+  onTouch(kind: string, ctx: { x?: number; y?: number } = {}): boolean {
+    return this.bed?.onTouch(kind, ctx) ?? false;
+  }
+  /** фраза ребёнка до режиссёра: «спать», «просыпайся», да/нет на «вздремнём?» */
+  onText(text: string, safety = false): boolean {
+    return this.bed?.onText(text, safety) ?? false;
+  }
+
   dispose() {
+    this.bed?.dispose();
     for (const t of this.timers) clearTimeout(t);
     this.timers = [];
     clearTimeout(this.bowlTimer);

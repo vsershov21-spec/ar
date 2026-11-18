@@ -116,7 +116,8 @@ class Zzz extends Timed {
       this.zs.push({ t: 0, dx: rand(-0.05, 0.05), s: rand(0.8, 1.2) });
       this.next = this.t + 0.8;
     }
-    this.zs.forEach((z) => (z.t += dt));
+    // остановили (кот проснулся, ушли из комнаты) — буквы, что уже летят, тают за ~0,4 с, а не висят 2,4 с
+    this.zs.forEach((z) => (z.t += this.stopped ? dt * 6 : dt));
     this.zs = this.zs.filter((z) => z.t < 2.4);
     void env;
     return this.zs.length > 0 || (!this.stopped && (this.loop || this.t < this.life));

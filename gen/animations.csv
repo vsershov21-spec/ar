@@ -7,8 +7,10 @@ ear_twitch,P0,all,0.5,0,0,additive,idle loud,Подёргивание одног
 echo_speak,P0,all,2.0,1,0,body,echo_done code:echo_playback,"Повторяет фразу: смешно гримасничает, лапами изображает собеседника."
 flinch,P0,all,0.7,0,0,body,poke_hard,Резко отшатывается.
 flip,P0,all,1.2,0,1,body,flip double_tap,"Сальто назад, приземление в ту же точку, поза «та-да»."
+get_into_bed,P0,all,1.3,0,1,body,code:home.bed,"Забирается в кровать: от изножья — шаг, прыжок-подъём на матрас (высота 0,4 роста), разворот головой к подушке. Root motion — путь сцены (src/home/bedFlow.ts), клип на месте. Нет в GLB — процедурно: клип-опора `jump` + путь корня по дуге."
 glitter_throw,P0,glitter,1.6,0,0,body,gum double_tap,Достаёт горсть блёсток и сдувает их в камеру.
 gum_blow,P0,hooligan,2.6,0,0,body,gum double_tap,"Надувает пузырь из жвачки (face cheeks_gum), пузырь растёт, лопается, жвачка на мордочке, снимает лапой."
+hop_out_of_bed,P0,all,1.0,0,1,body,code:home.bed,"Спрыгивает с кровати на пол к зрителю, приземляется в стойку. Root motion — путь сцены. Нет в GLB — `jump` + дуга корня с матраса на пол."
 hug_screen,P0,kind,2.5,0,0,body,double_tap stroke_long,"Обнимает экран изнутри, щекой к стеклу."
 idle_breathe,P0,all,4.0,1,0,body,idle,"Дыхание, переминание, хвост покачивается, моргание раз в 3–5 с. Бесшовная петля."
 idle_look_around,P0,all,3.5,0,0,body,idle,"Смотрит влево-вправо, потом в камеру."
@@ -16,6 +18,7 @@ jump,P0,all,1.0,0,1,body,jump clap,"Присед, прыжок, приземле
 kind_bubbles,P0,kind,2.6,0,0,body,gum,"Выдувает мыльные пузыри из колечка, ловит один лапой."
 knock_glass,P0,all,0.9,0,0,body,tap_screen,Подходит вплотную и стучит костяшками в стекло дважды. Лапа попадает в точку тапа (IK).
 laugh,P0,all,1.8,0,0,body,tap_cat joke tap_cat_belly,"Смеётся, держится за живот."
+lie_down_side,P0,all,1.2,0,1,body,code:home.bed,Ложится на бок на матрасе головой к подушке. Нет в GLB — процедурно: `sleep_loop` + плавное опускание корня и крен на бок.
 listen,P0,all,2.0,1,0,body,ask_name unknown echo_start,"Прикладывает ухо к стеклу, уши торчком."
 peek_from_edge,P0,all,2.0,1,0,body,card_lost point_camera,"Выглядывает из-за края экрана, ищет карту."
 point_button,P0,all,1.5,0,0,body,mic_hint outro money sberkids,Показывает лапой вниз на кнопку (микрофон / СберKids). Направление задаёт IK по координате кнопки.
@@ -24,10 +27,13 @@ poke_head,P0,all,0.8,0,0,body,tap_cat_head,"Голова качается от �
 press_glass,P0,all,2.0,1,0,body,longpress,"Прижимается к стеклу носом и лапами, мордочка сплющена."
 purr_stroke,P0,all,2.0,1,0,body,stroke stroke_long,"Тянется под ладонь, глаза прищурены, хвост дрожит."
 scratch_glass,P0,hooligan,1.0,0,0,body,swipe,Проводит когтями по стеклу по траектории свайпа.
+sleep_loop_bed,P0,all,4.0,1,0,body,code:home.bed,"Спит в кровати под одеялом на боку, бок поднимается от дыхания. Бесшовная петля. Нет в GLB — `sleep_loop` + дыхание корнем."
 sticker_slap,P0,all,0.7,0,0,body,switch_start stickers,Хлопает наклейку на стекло изнутри. Повторяется серией.
 surprised,P0,all,1.0,0,0,body,intro clap card_found,"Отшатывается, уши вверх."
 tail_wag,P0,all,1.0,1,0,additive,*happy,Хвост ходит из стороны в сторону.
 talk_casual,P0,all,3.0,1,0,body,*speech,"Жестикулирует при разговоре, спокойно. Лицо и рот — липсинк поверх."
+turn_over_sleep,P0,all,1.4,0,0,body,code:home.bed,"Во сне переворачивается/ворочается от касания, бормочет, не просыпается; начало и конец — поза sleep_loop_bed. Нет в GLB — `sleep_loop` + приподнять и покачать корень."
+wake_stretch_in_bed,P0,all,1.8,0,0,body,code:home.bed,"Просыпается в кровати: зевает, потягивается лёжа, садится, одеяло сползает. Нет в GLB — `wake_startle` (сидя), корень на матрасе, плюс подъём из лёжа."
 walk,P0,all,1.0,1,0,body,walk_to,"Цикл шага на двух лапах, хвост для баланса. Скорость в коде."
 wave,P0,all,1.2,0,0,body,wave hello goodbye,Машет лапой.
 celebrate,P1,all,2.0,0,0,body,yes nice_name stickers_all_gone,Подпрыгивает с поднятыми лапами.

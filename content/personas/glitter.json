@@ -657,6 +657,27 @@
     },
     "home_ball": {
       "clip": "jump"
+    },
+    "tuck_in": {
+      "clip": "none"
+    },
+    "asleep_murmur": {
+      "clip": "none"
+    },
+    "wake_morning": {
+      "clip": "idle_stretch"
+    },
+    "wake_forced": {
+      "clip": "wake_startle"
+    },
+    "nap_offer": {
+      "clip": "idle_yawn"
+    },
+    "evening_yawn": {
+      "clip": "idle_yawn"
+    },
+    "goodnight": {
+      "clip": "none"
     }
   },
   "lines": {
@@ -3427,7 +3448,7 @@
       },
       {
         "id": "glitter.home_bedroom.02",
-        "text": "Моя спальня! Лежанка цвета лаванды.",
+        "text": "Моя спальня! Одеяло в звёздочку.",
         "emotion": "happy",
         "face": "happy"
       }
@@ -3478,6 +3499,140 @@
         "text": "Мячик скачет, как я на каблучках!",
         "emotion": "happy",
         "face": "happy"
+      }
+    ],
+    "tuck_in": [
+      {
+        "id": "glitter.tuck_in.01",
+        "text": "Одеяло в звёздочку! Я сплю, как принцесса.",
+        "emotion": "sleepy",
+        "face": "sleepy"
+      },
+      {
+        "id": "glitter.tuck_in.02",
+        "text": "Укрыли? Ура! Теперь мне приснятся блёстки.",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "glitter.tuck_in.03",
+        "text": "Тсс... Мне пора на бал снов.",
+        "emotion": "sleepy",
+        "face": "sleepy"
+      }
+    ],
+    "asleep_murmur": [
+      {
+        "id": "glitter.asleep_murmur.01",
+        "text": "Мм... ещё блёсток... побольше...",
+        "emotion": "sleepy",
+        "face": "sleepy"
+      },
+      {
+        "id": "glitter.asleep_murmur.02",
+        "text": "Ммм... корона... моя... хр...",
+        "emotion": "sleepy",
+        "face": "sleepy"
+      },
+      {
+        "id": "glitter.asleep_murmur.03",
+        "text": "Ш-ш... я сплю... красиво...",
+        "emotion": "whisper",
+        "face": "listen"
+      },
+      {
+        "id": "glitter.asleep_murmur.04",
+        "text": "Мур... единорог... подожди...",
+        "emotion": "sleepy",
+        "face": "sleepy"
+      }
+    ],
+    "wake_morning": [
+      {
+        "id": "glitter.wake_morning.01",
+        "text": "Доброе утро! Я проснулась ещё красивее!",
+        "emotion": "excited",
+        "face": "excited"
+      },
+      {
+        "id": "glitter.wake_morning.02",
+        "text": "Утро! Мне снились блёстки. Целое море!",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "glitter.wake_morning.03",
+        "text": "Доброе утро! Потягушечки — и сияем!",
+        "emotion": "excited",
+        "face": "excited"
+      }
+    ],
+    "wake_forced": [
+      {
+        "id": "glitter.wake_forced.01",
+        "text": "Ой! Мне снился такой сон! Ну ладно, встаю.",
+        "emotion": "surprised",
+        "face": "surprised"
+      },
+      {
+        "id": "glitter.wake_forced.02",
+        "text": "Эй, мой бал снов только начался! Ладно, играем.",
+        "emotion": "offended",
+        "face": "neutral"
+      },
+      {
+        "id": "glitter.wake_forced.03",
+        "text": "Тук-тук? Я проснулась! Что случилось?",
+        "emotion": "surprised",
+        "face": "surprised"
+      }
+    ],
+    "nap_offer": [
+      {
+        "id": "glitter.nap_offer.01",
+        "text": "Может, вздремнём? Красоте нужен сон.",
+        "emotion": "sleepy",
+        "face": "sleepy"
+      },
+      {
+        "id": "glitter.nap_offer.02",
+        "text": "Тихий час! Уложишь меня под звёздочки?",
+        "emotion": "happy",
+        "face": "happy"
+      }
+    ],
+    "evening_yawn": [
+      {
+        "id": "glitter.evening_yawn.01",
+        "text": "Ах, уже вечер... Пора в кроватку.",
+        "emotion": "sleepy",
+        "face": "sleepy"
+      },
+      {
+        "id": "glitter.evening_yawn.02",
+        "text": "Я так зеваю! Уложишь меня спать?",
+        "emotion": "sleepy",
+        "face": "sleepy"
+      }
+    ],
+    "goodnight": [
+      {
+        "id": "glitter.goodnight.01",
+        "text": "Спокойной ночи! Пусть приснятся блёстки.",
+        "emotion": "caring",
+        "face": "caring"
+      },
+      {
+        "id": "glitter.goodnight.02",
+        "text": "Сладких снов! До завтра, до завтра!",
+        "emotion": "sleepy",
+        "face": "sleepy"
+      },
+      {
+        "id": "glitter.goodnight.03",
+        "text": "Спокойной ночи... Звёздочки, светите тихо...",
+        "emotion": "whisper",
+        "face": "listen"
       }
     ]
   },

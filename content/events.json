@@ -154,6 +154,13 @@
     { "id": "home_bedroom", "group": "scenario", "priority": 1, "cooldownMs": 20000, "interruptible": true, "trigger": "«Мир кота»: кот привёл в спальню." },
     { "id": "home_back", "group": "scenario", "priority": 2, "cooldownMs": 0, "interruptible": true, "trigger": "«Мир кота»: кнопка «На карту» — кот прыгает обратно в карту, камера снова." },
     { "id": "home_cocoa", "group": "scenario", "priority": 1, "cooldownMs": 8000, "interruptible": true, "trigger": "«Мир кота», кухня: чип «Какао» — кот пьёт какао." },
-    { "id": "home_ball", "group": "scenario", "priority": 1, "cooldownMs": 6000, "interruptible": true, "trigger": "«Мир кота», гостиная: чип «Мячик» — мячик прыгает, кот за ним." }
+    { "id": "home_ball", "group": "scenario", "priority": 1, "cooldownMs": 6000, "interruptible": true, "trigger": "«Мир кота», гостиная: чип «Мячик» — мячик прыгает, кот за ним." },
+    { "id": "tuck_in", "group": "scenario", "priority": 2, "cooldownMs": 0, "interruptible": true, "trigger": "«Мир кота», кровать (home.bed): кота уложили днём — одеяло накрывает, кот благодарит и засыпает." },
+    { "id": "asleep_murmur", "group": "scenario", "priority": 1, "cooldownMs": 2500, "interruptible": true, "trigger": "«Мир кота», кровать: тап по спящему коту — бормочет во сне, ворочается, не просыпается (3 тапа подряд — просыпается)." },
+    { "id": "wake_morning", "group": "scenario", "priority": 2, "cooldownMs": 0, "interruptible": true, "trigger": "«Мир кота», кровать: разбудили чипом «Разбудить», голосом («просыпайся», «утро») или шторкой — потянулся, спрыгнул: «доброе утро»." },
+    { "id": "wake_forced", "group": "scenario", "priority": 2, "cooldownMs": 0, "interruptible": true, "trigger": "«Мир кота», кровать: разбудили тремя тапами подряд или сразу после того, как уснул — «я только уснул!», без обиды." },
+    { "id": "nap_offer", "group": "scenario", "priority": 2, "cooldownMs": 60000, "interruptible": true, "trigger": "«Мир кота», днём 13–16 по местным часам, 20 с тишины дома или вход в спальню: «Может, вздремнём?» (чипы «Вздремнём» / «Не хочу»). Раз за сессию." },
+    { "id": "evening_yawn", "group": "scenario", "priority": 2, "cooldownMs": 60000, "interruptible": true, "trigger": "«Мир кота», вечером 20–23: кот зевает и зовёт в кровать (чипы «Уложить спать» / «Ещё поиграем»). Раз за сессию." },
+    { "id": "goodnight", "group": "scenario", "priority": 2, "cooldownMs": 0, "interruptible": true, "trigger": "«Мир кота», кровать: кота уложили вечером или ночью — «спокойной ночи», после неё кот спит и молчит (сессия может закончиться)." }
   ]
 }

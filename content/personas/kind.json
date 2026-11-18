@@ -647,6 +647,27 @@
     },
     "home_ball": {
       "clip": "jump"
+    },
+    "tuck_in": {
+      "clip": "none"
+    },
+    "asleep_murmur": {
+      "clip": "none"
+    },
+    "wake_morning": {
+      "clip": "idle_stretch"
+    },
+    "wake_forced": {
+      "clip": "wake_startle"
+    },
+    "nap_offer": {
+      "clip": "idle_yawn"
+    },
+    "evening_yawn": {
+      "clip": "idle_yawn"
+    },
+    "goodnight": {
+      "clip": "none"
     }
   },
   "lines": {
@@ -3345,7 +3366,7 @@
     "home_bedroom": [
       {
         "id": "kind.home_bedroom.01",
-        "text": "Тут я сплю. Лежанка мягкая-мягкая.",
+        "text": "Тут я сплю. Кровать мягкая-мягкая.",
         "emotion": "sleepy",
         "face": "sleepy"
       },
@@ -3402,6 +3423,140 @@
         "text": "Мячик прыгает, и я прыгаю!",
         "emotion": "happy",
         "face": "happy"
+      }
+    ],
+    "tuck_in": [
+      {
+        "id": "kind.tuck_in.01",
+        "text": "Спасибо за одеяло. Так тепло и уютно.",
+        "emotion": "caring",
+        "face": "caring"
+      },
+      {
+        "id": "kind.tuck_in.02",
+        "text": "Мягкое одеяло... Я чуть-чуть посплю, хорошо?",
+        "emotion": "sleepy",
+        "face": "sleepy"
+      },
+      {
+        "id": "kind.tuck_in.03",
+        "text": "Подушка мягкая-мягкая. Я немножко отдохну.",
+        "emotion": "sleepy",
+        "face": "sleepy"
+      }
+    ],
+    "asleep_murmur": [
+      {
+        "id": "kind.asleep_murmur.01",
+        "text": "Мур-р... какао... с зефиркой...",
+        "emotion": "sleepy",
+        "face": "sleepy"
+      },
+      {
+        "id": "kind.asleep_murmur.02",
+        "text": "Ммм... пузырики... большие-большие...",
+        "emotion": "sleepy",
+        "face": "sleepy"
+      },
+      {
+        "id": "kind.asleep_murmur.03",
+        "text": "Мур... я тут... я сплю...",
+        "emotion": "whisper",
+        "face": "listen"
+      },
+      {
+        "id": "kind.asleep_murmur.04",
+        "text": "Ммм... обнимашки... мур...",
+        "emotion": "sleepy",
+        "face": "sleepy"
+      }
+    ],
+    "wake_morning": [
+      {
+        "id": "kind.wake_morning.01",
+        "text": "Доброе утро! Я так сладко выспался.",
+        "emotion": "happy",
+        "face": "happy"
+      },
+      {
+        "id": "kind.wake_morning.02",
+        "text": "Доброе утро! Как хорошо, что ты рядом.",
+        "emotion": "caring",
+        "face": "caring"
+      },
+      {
+        "id": "kind.wake_morning.03",
+        "text": "Утро! Потянусь — и можно играть.",
+        "emotion": "happy",
+        "face": "happy"
+      }
+    ],
+    "wake_forced": [
+      {
+        "id": "kind.wake_forced.01",
+        "text": "Ой, я проснулся! Ничего, я рад тебя видеть.",
+        "emotion": "surprised",
+        "face": "surprised"
+      },
+      {
+        "id": "kind.wake_forced.02",
+        "text": "Мур? Уже встаём? Хорошо, я тут.",
+        "emotion": "caring",
+        "face": "caring"
+      },
+      {
+        "id": "kind.wake_forced.03",
+        "text": "Ой... Я только задремал. Но с тобой веселее.",
+        "emotion": "sleepy",
+        "face": "sleepy"
+      }
+    ],
+    "nap_offer": [
+      {
+        "id": "kind.nap_offer.01",
+        "text": "Может, вздремнём? Совсем чуть-чуть.",
+        "emotion": "sleepy",
+        "face": "sleepy"
+      },
+      {
+        "id": "kind.nap_offer.02",
+        "text": "Тихий час! Уложишь меня под одеяло?",
+        "emotion": "caring",
+        "face": "caring"
+      }
+    ],
+    "evening_yawn": [
+      {
+        "id": "kind.evening_yawn.01",
+        "text": "Уже вечер... Глазки слипаются. Пойдём спать?",
+        "emotion": "sleepy",
+        "face": "sleepy"
+      },
+      {
+        "id": "kind.evening_yawn.02",
+        "text": "Мур... Пора баиньки. Уложишь меня?",
+        "emotion": "caring",
+        "face": "caring"
+      }
+    ],
+    "goodnight": [
+      {
+        "id": "kind.goodnight.01",
+        "text": "Спокойной ночи! Пусть тебе приснится доброе.",
+        "emotion": "caring",
+        "face": "caring"
+      },
+      {
+        "id": "kind.goodnight.02",
+        "text": "Сладких снов! Завтра поиграем ещё.",
+        "emotion": "sleepy",
+        "face": "sleepy"
+      },
+      {
+        "id": "kind.goodnight.03",
+        "text": "Спокойной ночи... Спасибо, что ты рядом... мур.",
+        "emotion": "whisper",
+        "face": "listen"
       }
     ]
   },

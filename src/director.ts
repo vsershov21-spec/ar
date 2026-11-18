@@ -283,7 +283,14 @@ export class Director extends Emitter<DirectorEvents> {
     return { game: st.game.id, mode, options: this.gameItems(st.game.id).map((i) => ({ id: i.id, label: i.label })) };
   }
 
+  /**
+   * Касание до режиссёра: true — съедено снаружи (кот спит в кровати «Мира кота»: тап — бормочет и ворочается,
+   * не будит; src/home/bedFlow.ts). Ставит app.ts.
+   */
+  touchGate: ((kind: string, ctx: { x?: number; y?: number }) => boolean) | null = null;
+
   interaction(kind: InteractionKind, ctx: { x?: number; y?: number; from?: { x: number; y: number }; path?: { x: number; y: number }[] } = {}) {
+    if (this.touchGate?.(kind, ctx)) return;
     if (kind === 'swipe' && ctx.from) this.lastSwipe = ctx.from;
     this.ctx = ctx;
     this.lastTouch = { kind, at: Date.now() };
@@ -729,6 +736,20 @@ export class Director extends Emitter<DirectorEvents> {
     if (this.queue.busy || this.d.voice.speaking || this.state.dialog || this.paused || this.state.paused || this.dozing) return false;
     if (!this.hasVoiced('help')) return false;
     return this.speakEvent('help', { background: true });
+  }
+
+  /**
+   * Реплика без записи ElevenLabs — только пузырём, без голоса и синтеза (новые события до прогона озвучки:
+   * кровать «Мира кота»). Озвученная — обычным путём (speakEvent). false — у события нет реплик.
+   */
+  showLine(event: string): boolean {
+    if (this.hasVoiced(event)) return this.speakEvent(event);
+    const pk = this.personas.line(event, { name: this.state.name, strict: false });
+    if (!pk) return false;
+    const p = this.persona;
+    this.d.ui.say(pk.text, p.name, p.id);
+    this.emotion(event);
+    return true;
   }
 
   /** есть ли у события хоть одна реплика, которая прозвучит живым голосом */

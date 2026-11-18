@@ -8,7 +8,12 @@ import { isPersonaId } from '../persona/types';
 
 export interface Memory { name: string | null; persona: PersonaId | null; visits: number; lastVisitAt: number | null; met?: boolean; home?: HomePlace }
 /** где кот: на карте (AR) или у себя дома («Мир кота», src/home) и в какой комнате */
-export interface HomePlace { where: 'ar' | 'home'; zone: string }
+export interface HomePlace {
+  where: 'ar' | 'home';
+  zone: string;
+  /** кровать (src/home/bed.ts): день YYYY-MM-DD, когда кота уже будили утром — «утро первого открытия» раз в день */
+  morning?: string;
+}
 const KEY = 'sber-ar-cat:v1';
 
 export function loadMemory(storage: Pick<Storage, 'getItem'> | null = safeStorage()): Memory {
@@ -23,7 +28,9 @@ export function loadMemory(storage: Pick<Storage, 'getItem'> | null = safeStorag
       visits: Number.isFinite(o.visits) ? o.visits : 0,
       lastVisitAt: Number.isFinite(o.lastVisitAt) ? o.lastVisitAt : null,
       ...(o.met === true ? { met: true } : {}),
-      ...(o.home && (o.home.where === 'ar' || o.home.where === 'home') && typeof o.home.zone === 'string' ? { home: { where: o.home.where, zone: o.home.zone.slice(0, 20) } } : {}),
+      ...(o.home && (o.home.where === 'ar' || o.home.where === 'home') && typeof o.home.zone === 'string'
+        ? { home: { where: o.home.where, zone: o.home.zone.slice(0, 20), ...(typeof o.home.morning === 'string' && /^\d{4}-\d\d-\d\d$/.test(o.home.morning) ? { morning: o.home.morning } : {}) } }
+        : {}),
     };
   } catch {
     return def;

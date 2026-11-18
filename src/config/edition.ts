@@ -49,6 +49,7 @@ export const FEATURES = {
   // ── только lab ──
   'games.new': { mvp: false, lab: true, note: 'мини-игры «Угадай рожицу», «Камень-ножницы», «Делай как я» (emo/rps/simon): persona/content.ts убирает их диалоги' },
   'stickers.pack': { mvp: false, lab: true, note: 'новый пак наклеек СберКота и коллекция (fx/stickerPack, fxLayer)' },
+  'home.bed': { mvp: false, lab: true, note: 'кровать в спальне «Мира кота»: уложить спать, сон, разбудить, время суток (src/home/bedFlow.ts; homeMode.ts — точка входа)' },
   'anims.new': { mvp: false, lab: true, note: 'новые анимации по мере генерации (точка входа — у агента анимаций)' },
   'debug.flows': { mvp: false, lab: true, note: 'тестовые флоу и ускорения ?flow=… (src/debug/flows.ts); в MVP — только со страницы /test (?from=test)' },
   'tracker.nocard': { mvp: false, lab: true, note: '?nocard — кот на столе без карты; в MVP — только со страницы /test' },
@@ -79,6 +80,8 @@ export const PARAMS: Record<string, { feature: FeatureId; test?: boolean; keep?:
   dur: { feature: 'debug.flows', test: true },
   rate: { feature: 'debug.flows', test: true },
   zone: { feature: 'debug.flows', test: true }, // ?flow=home&zone=kitchen (src/home)
+  bed: { feature: 'home.bed' }, // ?flow=home&zone=bedroom&bed=sleep|wake|night|morning (src/home/bedFlow.ts) — кровать только в lab
+  hour: { feature: 'home.bed' }, // &hour=21 — местный час для кровати (утро, тихий час, вечер)
   nocard: { feature: 'tracker.nocard', test: true },
   desktop: { feature: 'tracker.nocard', test: true }, // ?desktop = ?nocard=off + вращение мышью (src/input/orbit.ts)
   anycard: { feature: 'card.anycard' },

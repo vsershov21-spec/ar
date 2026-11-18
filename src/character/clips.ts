@@ -16,6 +16,12 @@ export interface ClipDef {
   priority: string;
   usedBy: string[];
   notes: string;
+  /**
+   * Клипа ещё нет в библиотеке (anims_v1.glb) — что играть вместо него: существующий клип-опора, поверх него
+   * сцена добавляет путь корня и мелкие поправки костей (кровать: src/home/bedFlow.ts). Настоящий клип с этим id
+   * в GLB сам займёт место (своё имя важнее опоры).
+   */
+  fallback?: string;
 }
 
 const DEFS = new Map<string, ClipDef>();
@@ -23,6 +29,8 @@ for (const c of (anim as { clips: ClipDef[] }).clips) DEFS.set(c.id, c);
 
 export const CLIP_IDS: readonly string[] = [...DEFS.keys()];
 export const clipDef = (id: string): ClipDef | undefined => DEFS.get(id);
+/** клипы каталога с опорой fallback (их ещё нет в библиотеке движений) */
+export const FALLBACK_CLIPS: readonly ClipDef[] = [...DEFS.values()].filter((d) => !!d.fallback);
 
 /** старые имена клипов (director, спрайт-манифест) → id каталога. 'idle' — особый: выбор по весам характера */
 export const LEGACY_CLIP: Record<string, string> = {

@@ -101,6 +101,8 @@ const tick = async (home: HomeMode, ms: number, step = 50) => {
 
 beforeEach(() => {
   vi.useFakeTimers();
+  // полдень: кровать (src/home/bedFlow.ts) ничего не предлагает и утром кота не укладывает — тесты не зависят от часов
+  vi.setSystemTime(new Date(2026, 10, 18, 12, 0));
   localStorage.clear();
 });
 afterEach(() => {
@@ -232,9 +234,9 @@ describe('переход AR → дом → AR', () => {
 });
 
 describe('дома: свайпы, действия, чипы', () => {
-  async function atHome() {
+  async function atHome(opts: { bed?: boolean } = {}) {
     const env = makeHost();
-    const home = new HomeMode(env.host);
+    const home = new HomeMode(env.host, opts);
     home.enter();
     await tick(home, 1200);
     return { ...env, home };
@@ -267,8 +269,8 @@ describe('дома: свайпы, действия, чипы', () => {
     expect(home.zone).toBe('kitchen');
   });
 
-  it('кухня: «Угостить» — миска и угощение; «Какао» — клип с кружкой; спальня: «Уложить спать» — сон и приглушённый свет', async () => {
-    const { home, rooms, director, character } = await atHome();
+  it('кухня: «Угостить» — миска и угощение; «Какао» — клип с кружкой; спальня (MVP, без кровати): «Уложить спать» — сон и приглушённый свет', async () => {
+    const { home, rooms, director, character } = await atHome({ bed: false });
     home.go('kitchen');
     await tick(home, 1100);
     const chips = home.chips([]);

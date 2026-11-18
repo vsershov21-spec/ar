@@ -103,6 +103,7 @@ export const NEAREST: Record<string, string> = {
   kind_bubbles: 'bubble_gum', glitter_throw: 'glitter_burst', snowglobe_shake: 'dance', purr_stroke: 'listen', poke_head: 'laugh',
   poke_cheek: 'laugh', poke_belly: 'laugh', poke_paw: 'knock_glass', poke_tail: 'glitter_burst', flinch: 'tumble',
   dance_hooligan: 'dance', dance_kind: 'dance', dance_glitter: 'dance', echo_speak: 'talk',
+  get_into_bed: 'glitter_burst', lie_down_side: 'bored', sleep_loop_bed: 'bored', turn_over_sleep: 'bored', wake_stretch_in_bed: 'glitter_burst', hop_out_of_bed: 'glitter_burst',
 };
 
 export function procFor(id: string): (k: number, t: number) => ProcPose {

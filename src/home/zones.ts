@@ -21,7 +21,7 @@ export interface ZoneDef {
   icon: string;
   /** центр зоны по X в комнате (единицы мира: рост кота ≈ 1,1) */
   x: number;
-  /** пол под котом (лежанка в спальне чуть выше пола) */
+  /** пол под котом (кровать спальни — отдельно: src/home/bedFlow.ts кладёт кота на матрас) */
   floorY: number;
   /** реплика кота при входе в зону (озвученная — звучит, иначе только подпись-иконка) */
   enterEvent: string;
@@ -44,7 +44,7 @@ export const ZONES: readonly ZoneDef[] = [
     ],
   },
   {
-    id: 'bedroom', title: 'Спальня', icon: 'home_moon', x: 3.6, floorY: 0.07, enterEvent: 'home_bedroom',
+    id: 'bedroom', title: 'Спальня', icon: 'home_moon', x: 3.6, floorY: 0, enterEvent: 'home_bedroom',
     actions: [{ id: 'home:sleep', label: 'Уложить спать', icon: 'moon' }],
   },
 ];

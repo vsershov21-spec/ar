@@ -16,7 +16,7 @@ import { makeGltfLoader } from './gltfLoad';
 import { type MouthShape, type Viseme } from '../lipsync/visemes';
 import { FaceLife } from './faceLife';
 import { ClipState } from './clipState';
-import { clipDef } from './clips';
+import { clipDef, FALLBACK_CLIPS } from './clips';
 import { prepareClipsAsync, type ClipPrepInfo } from './animPrep';
 import { AnimBlender } from './animBlend';
 import { TailRig, type TailOutput } from './tailRig';
@@ -313,6 +313,7 @@ export class GlbCharacter implements Character {
         });
       }
       for (const clip of anims) this.addClip(clip);
+      this.addFallbacks();
       if (!raw) this.anim = new AnimBlender(model, (a) => this.animInfo.get(a.getClip()));
       // одноразовые клипы играют до конца движения, а не по ориентиру каталога
       this.actions.forEach((a, id) => this.clips.realDuration.set(id, this.anim?.realDuration(a) ?? a.getClip().duration));
@@ -388,6 +389,29 @@ export class GlbCharacter implements Character {
       }
     }
   }
+
+  /**
+   * Клипы каталога, которых ещё нет в библиотеке (поле fallback в content/animations.json: кровать, сон в кровати…):
+   * играет клип-опора, а путь корня и поправки поз добавляет сцена (poseTweak). Своё имя в GLB важнее — пришёл
+   * настоящий клип, опора не нужна.
+   */
+  private addFallbacks() {
+    for (const d of FALLBACK_CLIPS) {
+      if (this.actions.has(d.id) && !this.aliased.has(d.id)) continue;
+      const base = this.actions.get(d.fallback!);
+      if (!base) continue;
+      this.actions.set(d.id, base);
+      this.aliased.add(d.id);
+      this.procedural.add(d.id);
+    }
+  }
+  /** id клипов, которые сейчас играют опорой (настоящего клипа в GLB нет) — для сцены и debug */
+  readonly procedural = new Set<string>();
+  /**
+   * Поправки поверх клипа после миксера (сцена: кот в кровати ворочается, потягивается): rot(кость, ось модели, угол).
+   * Оси — модели (up/side/fwd), а не локальные оси костей: у моделей Tripo они повёрнуты.
+   */
+  poseTweak: ((rot: (bone: string, axis: 'up' | 'side' | 'fwd', a: number) => void, dt: number) => void) | null = null;
 
   /** имя клипа GLB → id каталога (своё имя + TRIPO_ALIAS) */
   static aliasIds(name: string) {
@@ -628,6 +652,14 @@ export class GlbCharacter implements Character {
       this.rotWorld(head, fwd, h.roll);
       const chest = this.bones.get('Spine2');
       if (chest) this.rotWorld(chest, side, h.breath);
+    }
+    // поправки сцены поверх клипа (кровать: кот ворочается, потягивается лёжа) — в осях модели
+    if (this.poseTweak) {
+      const ax = this.modelAxes();
+      this.poseTweak((n, a, ang) => {
+        const b = this.bones.get(n);
+        if (b) this.rotWorld(b, ax[a], ang);
+      }, dt);
     }
     // глаза — после головы: взгляд на зрителя (или на точку lookAt), веки, зрачки
     if (this.eyes) {

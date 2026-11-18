@@ -24,7 +24,7 @@ import { Suggester, VOICE_GATED, type Chip } from './scenario/suggest';
 import { turn } from './voice/turn';
 import { Director, type ActionId } from './director';
 import { HomeMode, prepareHomeFlow, type HomeHost } from './home/homeMode';
-import { NAMES, normalize } from './voice/intents';
+import { NAMES, normalize, matchIntent } from './voice/intents';
 import { personaMeta } from './character/personaMeta';
 import { CardMonitor, LumaSampler, cardScreenFrac, type CardEvent } from './tracker/cardMonitor';
 import { perf, AdaptiveQuality, type QualityLevel } from './core/perf';
@@ -290,8 +290,10 @@ export class App {
     this.home = new HomeMode({
       root: this.root, scene: this.scene, renderer: this.renderer, tracker: this.tracker as unknown as HomeHost['tracker'], stage: this.stage,
       director: this.director as unknown as HomeHost['director'], character: () => this.character, ui: this.ui, audio: this.audio,
-      energy: this.energy, suggest: () => this.kickSuggest(),
+      energy: this.energy, suggest: () => this.kickSuggest(), fx: this.fx,
     });
+    // кот спит в кровати (src/home/bedFlow.ts): касания — к кровати (бормочет, ворочается), а не «А? Я не спал!»
+    this.director.touchGate = (k, c) => this.home.onTouch(k, c);
     this.home.runFlow(new URLSearchParams(location.search));
     // чипы кота и подсказка (scenario/suggest.ts): по событиям режиссёра (фаза, лог = любое событие сценария),
     // пока идёт игра — ещё и шагом 330 мс (пороги тишины). В дрёме, вне игры и в скрытой вкладке опрос стоит
@@ -403,6 +405,9 @@ export class App {
       this.energy.activity(performance.now());
       if (source === 'asr') this.ui.micHintText(`«${text}»`);
       this.input?.activity();
+      // дома: «спать», «просыпайся», да/нет на «вздремнём?» — кровати (src/home/bedFlow.ts); «грустно/страшно» — режиссёру
+      const safety = /^(sad|scared)$/.test(matchIntent(text).intent);
+      if (this.home?.onText(text, safety)) return;
       this.director.text(text);
     });
     e.on('event', ({ id, data }) => {
@@ -838,6 +843,8 @@ export class App {
     const d = this.director;
     const has = !!d.persona.reactions?.[event];
     d.interaction((has ? event : fallback) as InteractionKind, p);
+    // кот спит в кровати: касание уже обработала кровать (бормочет), клип тычка на спящем не нужен
+    if (this.home?.catInBed) return;
     if (!has) {
       if (POKE_CLIP[event] && !this.stage.walking) this.character.play(POKE_CLIP[event], { loop: event === 'stroke' });
       if (POKE_FACE[event]) this.character.face(POKE_FACE[event], event === 'stroke' ? 0 : 2000);
