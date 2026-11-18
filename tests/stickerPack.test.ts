@@ -9,9 +9,9 @@ const meta = (p: string) => JSON.parse(fs.readFileSync(path.join(root, `content/
 const PERSONAS = ['hooligan', 'kind', 'glitter'] as const;
 
 describe('пак наклеек СберКота', () => {
-  it('16–24 наклейки, id уникальны, у каждой есть SVG в public/stickers/sber', () => {
+  it('16–32 наклейки, id уникальны, у каждой есть SVG в public/stickers/sber', () => {
     expect(PACK.length).toBeGreaterThanOrEqual(16);
-    expect(PACK.length).toBeLessThanOrEqual(24);
+    expect(PACK.length).toBeLessThanOrEqual(32);
     expect(new Set(PACK.map((p) => p.id)).size).toBe(PACK.length);
     for (const p of PACK) {
       expect(p.src).toMatch(/^stickers\/sber\/[a-z_]+\.svg$/);
@@ -83,6 +83,34 @@ describe('подбор наклеек', () => {
       seen.add(prev);
     }
     expect(seen.size).toBeGreaterThanOrEqual(PACK.length - 2);
+  });
+});
+
+describe('Хулиган: уличные наклейки', () => {
+  it('у Хулигана больше всех наклеек, смена образа берёт из всего его набора', () => {
+    const themed = meta('hooligan').stickers as { kind: 'image'; src: string; id: string }[];
+    expect(themed.length).toBeGreaterThanOrEqual(12);
+    for (const id of ['h_bam', 'h_ogon', 'h_legend', 'h_bolt', 'h_spray', 'h_sneaker', 'h_cap']) expect(themed.map((s) => s.id)).toContain(id);
+    const seen = new Set<string>();
+    for (let k = 0; k < 60; k++) for (const s of coverSet(themed, 8, 'hooligan', seeded(k))) seen.add(packIdOf(s)!);
+    for (const s of themed) expect(seen.has(s.id), s.id).toBe(true);
+  });
+
+  it('уличные слова проверены (docs/stickers/WORDS_CHECK.md) и не складываются в грубое ни в какую сторону', () => {
+    const doc = fs.readFileSync(path.join(root, 'docs/stickers/WORDS_CHECK.md'), 'utf8');
+    const words = PACK.filter((p) => p.theme === 'hooligan' && /^«/.test(p.title)).map((p) => p.title.replace(/[«»!]/g, '').toUpperCase());
+    expect(words.length).toBeGreaterThanOrEqual(3);
+    const bad = /ПОХ|ХОП|ХУ|ЙО|ЖОП|ЛОХ|БЛЯ|СУК|ПИЗ|ЕБ|ЁБ|ГОВН|СРА|ДУР|ТУП|УБ[ЬИ]|ПУШК|БОМБ/;
+    for (const w of words) {
+      expect(doc, `${w} — нет в таблице проверки`).toContain(w);
+      const forms = [w, [...w].reverse().join(''), w.slice(1), w.slice(0, -1), [...w.slice(1)].reverse().join(''), [...w.slice(0, -1)].reverse().join('')];
+      for (const f of forms) expect(f, w).not.toMatch(bad);
+    }
+  });
+
+  it('надписи-картинки пака не зеркалятся', () => {
+    const src = fs.readFileSync(path.join(root, 'src/fx/stickers.ts'), 'utf8');
+    expect(src).toMatch(/mirrored && spec\.kind !== 'text' && spec\.kind !== 'tag' && spec\.kind !== 'image'/);
   });
 });
 

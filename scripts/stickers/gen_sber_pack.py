@@ -255,17 +255,19 @@ add('gamepad', 'Джойстик', 'friends', ['hooligan'], f'<path d="{pad}"/>'
     + gloss('M40 112 Q46 98 62 98 L110 98 Q60 104 46 134 Z', .4))
 
 # ═════════ 4. Добрые слова ═════════
-def word(id, title, text, fill, back, deco, personas, rot=-6, size=78):
-    d = text_path(text, 120, 124, 184, size)
+def word(id, title, text, fill, back, deco, personas, rot=-6, size=78, theme='words', under='', under_sil='', cy=124):
+    """under — подложка под буквами (взрыв, плашка): входит и в рисунок, и в вырубку (under_sil — её силуэт).
+    Надписи никогда не зеркалятся: картинки пака (kind=image) stickers.ts не отражает."""
+    d = text_path(text, 120, cy, 184, size)
     tr = f'transform="rotate({rot} 120 120)"'
     # буквы — один контур (#w), остальное — <use>: обводка-подложка, тень, заливка
-    sil = f'<use href="#w" {tr} stroke-width="26"/>'
-    art = (f'<defs><path id="w" d="{d}"/></defs>'
+    sil = under_sil + f'<use href="#w" {tr} stroke-width="26"/>'
+    art = (f'<defs><path id="w" d="{d}"/></defs>' + under +
            f'<g {tr}><use href="#w" fill="{back}" stroke="{back}" stroke-width="26" stroke-linejoin="round"/>'
            f'<use href="#w" fill="{GDD}" transform="translate(0 6)" opacity=".35"/>'
            f'<use href="#w" fill="{fill}"/></g>')
     # силуэт вырубки = буквы + толстая обводка (26) → белая кромка снаружи
-    add(id, title, 'words', personas, sil, art, cut=16, deco=deco)
+    add(id, title, theme, personas, sil, art, cut=16, deco=deco)
 
 
 word('w_kruto', '«Круто!»', 'Круто!', '#fff', 'url(#sb)', f'<path d="{sparkle(200, 82, 15)}" fill="{GOLD}"/>', ['hooligan'])
@@ -293,6 +295,87 @@ add('h_graffiti_star', 'Граффити-звёздочка', 'hooligan', ['hool
     f'<path d="{star(116, 108, 40, 0.5, rot=-80)}" fill="#FF6FB5" opacity=".9"/>'
     '<circle cx="104" cy="98" r="7" fill="#111"/><circle cx="132" cy="98" r="7" fill="#111"/><path d="M104 120 Q118 132 132 120" fill="none" stroke="#111" stroke-width="6" stroke-linecap="round"/>'
     , deco=''.join(f'<circle cx="{x}" cy="{y}" r="{r}" fill="#1EE3CF"/>' for x, y, r in [(200, 52, 6), (212, 72, 4), (192, 34, 3.5)]))
+
+# ── уличные слова Хулигана: каждое проверено на чтение задом наперёд, зеркально, вверх ногами,
+#    с закрытой первой/последней буквой и на созвучия — см. docs/stickers/WORDS_CHECK.md ──
+INK = '#111'
+NEON = '#B6FF3B'
+HPINK = '#FF6FB5'
+burst = star(120, 122, 104, 0.74, n=12, rot=-75)
+word('h_bam', '«БАМ!»', 'БАМ!', '#fff', INK, f'<path d="{sparkle(206, 196, 14)}" fill="{NEON}"/>', ['hooligan'],
+     rot=-8, size=96, theme='hooligan',
+     under=f'<path d="{burst}" fill="url(#gold)" stroke="{INK}" stroke-width="7" stroke-linejoin="round"/>'
+           f'<path d="{star(120, 122, 74, 0.8, n=12, rot=-60)}" fill="{HPINK}" opacity=".9"/>',
+     under_sil=f'<path d="{burst}" stroke-width="7"/>')
+word('h_ogon', '«Огонь!»', 'ОГОНЬ!', 'url(#gold)', INK,
+     ''.join(f'<path d="M{x} {y} Q{x + 9} {y - 14} {x} {y - 30} Q{x - 9} {y - 14} {x} {y} Z" fill="{c}"/>'
+             for x, y, c in [(40, 94, GOLD), (52, 98, '#FF9A3D'), (196, 178, GOLD), (208, 172, '#FF9A3D')]),
+     ['hooligan'], rot=-7, size=80, theme='hooligan')
+crown = 'M86 74 L92 40 L108 58 L120 30 L132 58 L148 40 L154 74 Z'
+word('h_legend', '«Легенда»', 'ЛЕГЕНДА', '#fff', 'url(#sb)',
+     # корона сидит на буквах (тот же наклон), чтобы вырубка была одним куском
+     f'<g transform="rotate(-5 120 120) translate(0 30)"><path d="{crown}" fill="url(#gold)" stroke="{GOLD2}" stroke-width="4" stroke-linejoin="round"/>'
+     + ''.join(f'<circle cx="{x}" cy="{y}" r="5" fill="{c}"/>' for x, y, c in [(92, 40, HPINK), (120, 30, NEON), (148, 40, HPINK)]) + '</g>',
+     ['hooligan'], rot=-5, size=70, theme='hooligan', cy=132)
+
+# ── уличные картинки Хулигана ──
+bolt = 'M140 16 L54 134 L108 134 L86 224 L188 96 L132 96 L160 16 Z'
+add('h_bolt', 'Молния', 'hooligan', ['hooligan'], f'<path d="{bolt}" stroke-width="8"/>',
+    f'<path d="{bolt}" fill="{GD}" transform="translate(5 7)"/>'
+    f'<path d="{bolt}" fill="url(#gold)" stroke="{INK}" stroke-width="8" stroke-linejoin="round"/>'
+    f'<path d="M134 34 L84 116 L100 116 L144 44 Z" fill="#fff" opacity=".6"/>'
+    f'<path d="M118 150 L104 196 L150 134 Z" fill="{GOLD2}" opacity=".55"/>',
+    deco=f'<path d="{sparkle(52, 54, 18)}" fill="{NEON}"/><path d="{sparkle(196, 186, 14)}" fill="{T}"/>'
+         f'<circle cx="200" cy="52" r="6" fill="{HPINK}"/>')
+
+spray_star = star(176, 66, 40, 0.5, rot=-70)
+add('h_spray', 'Баллончик со звёздочкой', 'hooligan', ['hooligan'],
+    '<rect x="44" y="96" width="78" height="124" rx="16"/><path d="M48 104 Q50 70 83 66 Q116 70 118 104 Z"/><rect x="70" y="40" width="26" height="30" rx="6"/>'
+    f'<path d="{spray_star}" stroke-width="8"/>',
+    f'<rect x="72" y="42" width="22" height="26" rx="6" fill="{GRAPH}"/><rect x="92" y="48" width="10" height="8" rx="3" fill="{GRAPH}"/>'
+    f'<path d="M48 104 Q50 70 83 66 Q116 70 118 104 Z" fill="#D9E6DF"/>'
+    f'<rect x="44" y="96" width="78" height="124" rx="16" fill="url(#sbv)"/>'
+    f'<rect x="44" y="128" width="78" height="52" fill="{INK}"/>'
+    f'<path d="{star(83, 154, 18, 0.5, rot=-80)}" fill="{NEON}"/>'
+    f'<rect x="54" y="104" width="10" height="106" rx="5" fill="#fff" opacity=".4"/>'
+    + ''.join(f'<circle cx="{x}" cy="{y}" r="{r}" fill="{c}"/>' for x, y, r, c in
+              [(110, 52, 4, NEON), (122, 48, 5, HPINK), (122, 60, 3.5, T), (134, 54, 4, NEON), (134, 42, 3, HPINK), (144, 62, 3, T)])
+    + f'<path d="{spray_star}" fill="{HPINK}" stroke="{INK}" stroke-width="8" stroke-linejoin="round"/>'
+    + f'<path d="{star(176, 68, 17, 0.5, rot=-70)}" fill="{NEON}"/>',
+    deco=f'<path d="{sparkle(206, 128, 12)}" fill="{GOLD}"/>')
+
+upper = 'M34 70 Q34 52 52 52 L98 52 Q112 52 114 68 L120 110 Q160 112 192 128 Q218 142 218 166 L218 178 L30 178 Z'
+add('h_sneaker', 'Кед', 'hooligan', ['hooligan'],
+    f'<path d="{upper}"/><rect x="22" y="166" width="204" height="40" rx="18"/>',
+    f'<path d="{upper}" fill="url(#sb)"/>'
+    f'<path d="M30 66 Q32 56 46 56 L98 56 Q108 56 110 66 L112 82 L32 82 Z" fill="{INK}"/>'
+    f'<path d="M150 116 Q196 126 212 152 L212 170 L156 170 Q150 140 150 116 Z" fill="#fff" opacity=".92"/>'
+    f'<path d="{star(70, 128, 24, 0.5, rot=-80)}" fill="{NEON}" stroke="{INK}" stroke-width="4" stroke-linejoin="round"/>'
+    + ''.join(f'<path d="M{108 + i * 12} {92 + i * 6} L{126 + i * 12} {104 + i * 6} M{126 + i * 12} {92 + i * 6} L{108 + i * 12} {104 + i * 6}" stroke="#fff" stroke-width="5" stroke-linecap="round"/>' for i in range(3))
+    + f'<rect x="22" y="166" width="204" height="40" rx="18" fill="#fff" stroke="{GRAPH}" stroke-width="5"/>'
+    f'<path d="M34 186 H214" stroke="{HPINK}" stroke-width="7" stroke-linecap="round"/>'
+    + ''.join(f'<rect x="{40 + i * 22}" y="198" width="12" height="6" rx="3" fill="{GRAPH}" opacity=".5"/>' for i in range(8))
+    + gloss('M44 92 Q46 76 60 72 L66 72 Q54 90 56 140 L44 140 Z', .35),
+    deco=f'<path d="{sparkle(204, 66, 16)}" fill="{NEON}"/><circle cx="182" cy="44" r="5" fill="{HPINK}"/>')
+
+head = 'M42 150 C42 112 76 92 120 92 C164 92 198 112 198 150 C198 192 164 216 120 216 C76 216 42 192 42 150 Z'
+dome = 'M44 132 C44 74 78 40 120 40 C162 40 196 74 196 132 Q120 112 44 132 Z'
+visor = '<ellipse cx="208" cy="96" rx="38" ry="13" transform="rotate(32 208 96)"/>'
+add('h_cap', 'Кепка задом наперёд', 'hooligan', ['hooligan'],
+    f'<path d="{head}"/><path d="{dome}"/>{visor}',
+    f'<ellipse cx="208" cy="96" rx="38" ry="13" fill="{HPINK}" stroke="{INK}" stroke-width="5" transform="rotate(32 208 96)"/>'
+    f'<path d="{head}" fill="url(#sb)"/>'
+    f'<path d="{dome}" fill="{GRAPH}"/>'
+    f'<path d="M120 42 Q104 80 102 124 M120 42 Q136 80 138 124" fill="none" stroke="{NEON}" stroke-width="4" opacity=".8"/>'
+    f'<circle cx="120" cy="42" r="7" fill="{NEON}"/>'
+    # застёжка сзади смотрит на нас — значит, козырёк назад
+    f'<path d="M98 126 Q98 100 120 100 Q142 100 142 126 Z" fill="{G}"/><rect x="96" y="112" width="48" height="8" rx="4" fill="{HPINK}"/>'
+    f'<path d="M68 156 Q80 146 94 154" fill="none" stroke="{GDD}" stroke-width="6" stroke-linecap="round"/>'
+    f'<ellipse cx="150" cy="154" rx="11" ry="13" fill="{GDD}"/><circle cx="153" cy="149" r="4" fill="#fff"/>'
+    f'<path d="M104 186 Q124 196 146 180" fill="none" stroke="{GDD}" stroke-width="6" stroke-linecap="round"/>'
+    f'<circle cx="70" cy="182" r="11" fill="{PINK}" opacity=".45"/><circle cx="176" cy="180" r="11" fill="{PINK}" opacity=".45"/>'
+    + gloss('M62 98 Q72 62 104 52 Q82 70 76 104 Z', .25),
+    deco=f'<path d="{sparkle(36, 56, 14)}" fill="{NEON}"/>')
 
 # ═════════ 6. Добряк ═════════
 add('k_bubbles', 'Пузыри Добряка', 'kind', ['kind'],

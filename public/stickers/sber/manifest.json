@@ -168,6 +168,69 @@
       "src": "stickers/sber/h_graffiti_star.svg"
     },
     {
+      "id": "h_bam",
+      "title": "«БАМ!»",
+      "theme": "hooligan",
+      "personas": [
+        "hooligan"
+      ],
+      "src": "stickers/sber/h_bam.svg"
+    },
+    {
+      "id": "h_ogon",
+      "title": "«Огонь!»",
+      "theme": "hooligan",
+      "personas": [
+        "hooligan"
+      ],
+      "src": "stickers/sber/h_ogon.svg"
+    },
+    {
+      "id": "h_legend",
+      "title": "«Легенда»",
+      "theme": "hooligan",
+      "personas": [
+        "hooligan"
+      ],
+      "src": "stickers/sber/h_legend.svg"
+    },
+    {
+      "id": "h_bolt",
+      "title": "Молния",
+      "theme": "hooligan",
+      "personas": [
+        "hooligan"
+      ],
+      "src": "stickers/sber/h_bolt.svg"
+    },
+    {
+      "id": "h_spray",
+      "title": "Баллончик со звёздочкой",
+      "theme": "hooligan",
+      "personas": [
+        "hooligan"
+      ],
+      "src": "stickers/sber/h_spray.svg"
+    },
+    {
+      "id": "h_sneaker",
+      "title": "Кед",
+      "theme": "hooligan",
+      "personas": [
+        "hooligan"
+      ],
+      "src": "stickers/sber/h_sneaker.svg"
+    },
+    {
+      "id": "h_cap",
+      "title": "Кепка задом наперёд",
+      "theme": "hooligan",
+      "personas": [
+        "hooligan"
+      ],
+      "src": "stickers/sber/h_cap.svg"
+    },
+    {
       "id": "k_bubbles",
       "title": "Пузыри Добряка",
       "theme": "kind",

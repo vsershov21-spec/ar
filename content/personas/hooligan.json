@@ -126,6 +126,41 @@
       "kind": "image",
       "src": "stickers/sber/music.svg",
       "id": "music"
+    },
+    {
+      "kind": "image",
+      "src": "stickers/sber/h_bam.svg",
+      "id": "h_bam"
+    },
+    {
+      "kind": "image",
+      "src": "stickers/sber/h_ogon.svg",
+      "id": "h_ogon"
+    },
+    {
+      "kind": "image",
+      "src": "stickers/sber/h_legend.svg",
+      "id": "h_legend"
+    },
+    {
+      "kind": "image",
+      "src": "stickers/sber/h_bolt.svg",
+      "id": "h_bolt"
+    },
+    {
+      "kind": "image",
+      "src": "stickers/sber/h_spray.svg",
+      "id": "h_spray"
+    },
+    {
+      "kind": "image",
+      "src": "stickers/sber/h_sneaker.svg",
+      "id": "h_sneaker"
+    },
+    {
+      "kind": "image",
+      "src": "stickers/sber/h_cap.svg",
+      "id": "h_cap"
     }
   ],
   "glb": {
