@@ -780,6 +780,15 @@ export class CardEvidence {
   }
   push(v: CardVerdict, t = 0): CardKind {
     this.last = v;
+    // мелкая карта (40–60 px, 40–45 см, без фрагмента в большем разрешении): знак и чип там не разобрать, а отпечаток
+    // дизайна (сетка 16 × 10) — ещё да: в окно идёт только совпадение отпечатка, «нет признаков» не голосует
+    const small = !CardEvidence.usable(v) && v.f.sharp >= 0.3 && v.f.px >= 40 && v.side === 'front' && v.f.designHit;
+    if (small) {
+      this.win.push({ logo: 0, chip: 0, back: 0, design: 1, id: v.f.designId, t });
+      if (this.win.length > this.size) this.win.shift();
+      this.state = this.decide();
+      return this.state;
+    }
     if (!CardEvidence.usable(v)) return this.state;
     const front = v.side === 'front';
     this.win.push({ logo: front ? v.f.logo : 0, chip: v.f.chip, back: v.f.back, design: front && v.f.designHit ? 1 : 0, id: v.f.designHit ? v.f.designId : -1, t });
@@ -788,7 +797,7 @@ export class CardEvidence {
     return this.state;
   }
   counts() {
-    let sber = 0, chip = 0, back = 0, none = 0, maxLogo = 0, design = 0;
+    let sber = 0, chip = 0, back = 0, none = 0, maxLogo = 0, design = 0, maxChip = 0, nLogo = 0, nChip = 0;
     for (const w of this.win) {
       // знак Сбера ИЛИ известный дизайн каталога
       if (w.logo >= HIT.logo || w.design >= 1) sber++;
@@ -797,8 +806,11 @@ export class CardEvidence {
       if (w.back >= HIT.back) back++;
       if (w.logo < HIT.miss && w.chip < HIT.miss && w.back < HIT.miss && w.design < 1) none++;
       if (w.logo > maxLogo) maxLogo = w.logo;
+      if (w.chip > maxChip) maxChip = w.chip;
+      if (w.logo >= 0.3) nLogo++;
+      if (w.chip >= 0.35) nChip++;
     }
-    return { n: this.win.length, sber, chip, back, none, maxLogo, design };
+    return { n: this.win.length, sber, chip, back, none, maxLogo, design, maxChip, nLogo, nChip };
   }
   private decide(): CardKind {
     const c = this.counts();

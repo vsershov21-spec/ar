@@ -218,6 +218,13 @@ export interface BenchResult {
   /** время воркера на кадр, мс: среднее и p95 */
   workerMs?: number;
   workerP95?: number;
+  /** до посадки: доля ответов воркера с картой рядом с настоящей (≤ 0,06 диагонали); доля кадров полного поиска, где
+   *  карта — первый кандидат / есть среди кандидатов */
+  preHit?: number;
+  verN?: number;
+  sberAt?: number;
+  detTop?: number;
+  detAny?: number;
 }
 
 /** углы модели карты, спроецированные позой якоря (кадр детектора) */
@@ -282,6 +289,9 @@ export async function runBench(sc: Scenario, mk: () => BenchSession, o: BenchOpt
   const stg: Record<string, number> = {};
   let stgN = 0;
   const stgBy: Record<string, { n: number; ms: number[] }> = {};
+  let verN = 0, sberAt = -1;
+  let preN = 0, preHit = 0, detN = 0, detTop = 0, detAny = 0;
+  const near = (q: Pt[] | null | undefined, gt: Pt[] | undefined) => !!q && !!gt && quadErr(q, gt) < 0.06 * Math.hypot(gt[0].x - gt[2].x, gt[0].y - gt[2].y);
   for (let t = 0; t < sc.duration; t += dt) {
     if (o.stopAfterLock !== undefined && firstLock >= 0 && t - firstLock > o.stopAfterLock) break;
     const qNow = qAt(t);
@@ -324,6 +334,19 @@ export async function runBench(sc: Scenario, mk: () => BenchSession, o: BenchOpt
           if (o.prof) o.prof.frames++;
           prevQuad = out.quad ?? (s.state === 'locked' || s.state === 'hold' || s.state === 'relocalize' ? prevQuad : null);
           if (out.ver?.checked) lastDesign = out.ver.design ?? -1;
+          if (firstLock < 0 && out.ver?.checked) verN++;
+          if (sberAt < 0 && out.ver?.state === 'sber') sberAt = t;
+          if (firstLock < 0 && sc.gt) {
+            const gt = sc.gt(tc);
+            preN++;
+            if (near(out.quad, gt)) preHit++;
+            if (pipe.det.ranDetect) {
+              detN++;
+              const cs = pipe.det.lastCandidates;
+              if (near(cs[0]?.quad, gt)) detTop++;
+              if (cs.some((c) => near(c.quad, gt))) detAny++;
+            }
+          }
         }
         pending = { due: t + workerLat, out, capT: t };
         busyUntil = t + workerLat;
@@ -402,6 +425,11 @@ export async function runBench(sc: Scenario, mk: () => BenchSession, o: BenchOpt
     msBy: Object.fromEntries(Object.entries(stgBy).map(([k, v]) => [k, { n: v.n, mean: avg(v.ms), p95: [...v.ms].sort((a, b) => a - b)[Math.floor(v.ms.length * 0.95)] }])),
     workerMs: wms.length ? avg(wms) : NaN,
     workerP95: wms.length ? [...wms].sort((a, b) => a - b)[Math.floor(wms.length * 0.95)] : NaN,
+    verN,
+    sberAt,
+    preHit: preN ? preHit / preN : NaN,
+    detTop: detN ? detTop / detN : NaN,
+    detAny: detN ? detAny / detN : NaN,
   };
 }
 

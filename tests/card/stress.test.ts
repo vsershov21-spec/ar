@@ -135,13 +135,18 @@ export interface StressRow {
   workerP95: number;
   stages?: Record<string, number>;
   msBy?: Record<string, { n: number; mean: number; p95: number }>;
+  preHit?: number;
+  verN?: number;
+  sberAt?: number;
+  detTop?: number;
+  detAny?: number;
 }
 
 function row(kind: 'pos' | 'neg', item: string, group: string, cond: string, table: string, r: BenchResult): StressRow {
   return {
     kind, item, group, cond, table,
     landed: r.tLock >= 0, tLock: r.tLock, verified: !!r.verified, design: r.design ?? -1,
-    locked: r.locked, losses: r.losses, reanchors: r.reanchors, err: r.err, p90: r.p90, workerMs: r.workerMs ?? NaN, workerP95: r.workerP95 ?? NaN, stages: r.stages, msBy: r.msBy,
+    locked: r.locked, losses: r.losses, reanchors: r.reanchors, err: r.err, p90: r.p90, workerMs: r.workerMs ?? NaN, workerP95: r.workerP95 ?? NaN, stages: r.stages, msBy: r.msBy, preHit: r.preHit, verN: r.verN, sberAt: r.sberAt, detTop: r.detTop, detAny: r.detAny,
   };
 }
 
@@ -157,8 +162,10 @@ describe.skipIf(!on)('стресс-набор трекера карты', () => 
     const mine = () => n++ % SN === SH;
     if (part !== 'neg') {
       const designs = QUICK || !catalogAvailable() ? await fixtureDesigns() : await Promise.all(CATALOG_IDS.map(async (id) => ({ id, tex: await catalogDesign(id) })));
+      const step = Number(process.env.DSTEP ?? 1);
       for (const [di, d] of designs.entries())
         for (const [ci, c] of conds.entries()) {
+          if (di % step) continue;
           if (!mine()) continue;
           const table = TABLES[(di + ci) % TABLES.length];
           const sc = stressScenario(`${d.id} ${c.name}`, d.tex, c, table, 100 + di * 37 + ci, 5);

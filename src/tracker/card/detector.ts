@@ -61,6 +61,8 @@ export interface CardDetectorParams {
   track: boolean;
   /** после посадки — ведение по ключевому кадру (keyframe.ts); false — как до ноября 2026 (стенд «до») */
   keyframe: boolean;
+  /** второй масштаб (центр кадра ×2) для мелкой карты, когда в полном кадре карты нет */
+  roi: boolean;
 }
 
 export const defaultDetectorParams: CardDetectorParams = {
@@ -85,6 +87,7 @@ export const defaultDetectorParams: CardDetectorParams = {
   detectEvery: 6,
   track: true,
   keyframe: true,
+  roi: true,
 };
 
 export interface Segment {
@@ -361,6 +364,17 @@ export class CardDetector {
         H0 = h && this.gyroG ? mul3(this.gyroG, h) : h;
       } else if (this.hint && this.keyQuad) H0 = this.key.homographyFor(alignQuad(this.hint, this.keyQuad));
       if (H0) keyRes = this.tryKey(H0, this.prevQuad);
+      // повторная посадка (карты не видно, ищем у hint): прогноз по гироскопу неточен после долгой потери —
+      // сверяем ключевой кадр и со сдвигами вокруг hint (через кадр, 4 сдвига по 0,15 диагонали)
+      if (!keyRes && !this.keyH && !this.prevQuad && this.hint && this.keyQuad && (this.frameNo & 1) === 0) {
+        const hq = alignQuad(this.hint, this.keyQuad);
+        const dd = 0.15 * quadDiag(hq);
+        for (const [ox, oy] of [[dd, 0], [-dd, 0], [0, dd], [0, -dd]]) {
+          const h = this.key.homographyFor(hq.map((pt) => ({ x: pt.x + ox, y: pt.y + oy })));
+          keyRes = h ? this.tryKey(h, null) : null;
+          if (keyRes) break;
+        }
+      }
       tKey += now() - tPre;
       if (keyRes) {
         best = this.keyCandidate(keyRes, this.prevQuad ?? this.keyQuad);
@@ -405,6 +419,12 @@ export class CardDetector {
     if (!best || this.sinceDetect >= p.detectEvery) {
       const td0 = now();
       detectOut = this.detect();
+      // мелкая карта (40–45 см, ≈ 50 px): в полном кадре края карты короче порога отрезка и тонут в текстуре —
+      // второй масштаб: центр кадра (там ребёнок держит карту) ×2, через раз, пока ничего не ведём
+      if (!best && !this.locked && p.roi && (!detectOut.candidates.length || detectOut.candidates[0].score < 0.45) && (this.roiTick++ & 1) === 0) {
+        const rc = this.roiDetect();
+        if (rc.length && (!detectOut.candidates.length || rc[0].score > detectOut.candidates[0].score)) detectOut.candidates = [...rc, ...detectOut.candidates];
+      }
       tDet += now() - td0;
       this.lastCandidates = detectOut.candidates;
       this.ranDetect = true;
@@ -530,6 +550,39 @@ export class CardDetector {
     return res;
   }
 
+  // ───────────── второй масштаб: центр кадра ×2 ─────────────
+  private roiDet: CardDetector | null = null;
+  private roiBuf: Uint8ClampedArray | null = null;
+  private roiTick = 0;
+  /** кандидаты в центральной половине кадра, увеличенной вдвое (координаты — кадра детектора) */
+  private roiDetect(): Candidate[] {
+    const src = this.frameRgba;
+    if (!src) return [];
+    const { w, h } = this;
+    const x0 = w / 4, y0 = h / 4;
+    if (!this.roiBuf || this.roiBuf.length !== w * h * 4) this.roiBuf = new Uint8ClampedArray(w * h * 4);
+    const buf = this.roiBuf;
+    for (let Y = 0; Y < h; Y++) {
+      const sy = y0 + (Y + 0.5) / 2 - 0.5;
+      const iy = Math.floor(sy), fy = sy - iy;
+      const r0 = Math.max(0, Math.min(h - 1, iy)) * w, r1 = Math.max(0, Math.min(h - 1, iy + 1)) * w;
+      for (let X = 0; X < w; X++) {
+        const sx = x0 + (X + 0.5) / 2 - 0.5;
+        const ix = Math.floor(sx), fx = sx - ix;
+        const c0 = Math.max(0, Math.min(w - 1, ix)), c1 = Math.max(0, Math.min(w - 1, ix + 1));
+        const a = (r0 + c0) * 4, b = (r0 + c1) * 4, c = (r1 + c0) * 4, d = (r1 + c1) * 4, o = (Y * w + X) * 4;
+        for (let k = 0; k < 3; k++) buf[o + k] = (src[a + k] * (1 - fx) + src[b + k] * fx) * (1 - fy) + (src[c + k] * (1 - fx) + src[d + k] * fx) * fy;
+        buf[o + 3] = 255;
+      }
+    }
+    // увеличенный кадр мягче: порог края ниже; карта там крупная — мелочь (рисунок внутри карты) отсекаем площадью
+    const sub = (this.roiDet ??= new CardDetector({ ...this.params, track: false, keyframe: false, roi: false, minEdge: 9, minAreaFrac: 0.03 }));
+    sub.process(buf, w, h, { focal: this.K.f * 2, forceDetect: true });
+    const back = (q: Quad): Quad => q.map((pt) => ({ x: x0 + (pt.x + 0.5) / 2 - 0.5, y: y0 + (pt.y + 0.5) / 2 - 0.5 })) as Quad;
+    // в кадре детектора карта ≈ 50 px: оценка — та, что в увеличенном (края там подтверждены), чуть ниже
+    return sub.lastCandidates.slice(0, 6).map((c) => ({ ...c, quad: back(c.quad), score: c.score * 0.95 }));
+  }
+
   // ───────────── края ─────────────
 
   private frameRgba: Uint8ClampedArray | Uint8Array | null = null;
@@ -613,7 +666,12 @@ export class CardDetector {
         break;
       }
     }
-    this.thr = Math.max(this.params.minEdge, this.params.edgeRatio * pct);
+    // тусклый/тёплый свет: контраст краёв падает вместе с яркостью — нижний порог края по средней яркости кадра
+    let gs = 0, gn = 0;
+    for (let i = 0; i < n; i += 61) (gs += this.gray[i]), gn++;
+    const lum = gn ? gs / gn : 128;
+    const minEdge = this.params.minEdge * Math.max(0.55, Math.min(1, lum / 105));
+    this.thr = Math.max(minEdge, this.params.edgeRatio * pct);
     const thr = this.thr;
     for (let i = 0; i < n; i++) {
       if (!edge[i]) continue;
@@ -741,7 +799,12 @@ export class CardDetector {
     // длина выше cap уже не добавляет веса: иначе длинные слабые волокна дерева вытесняют короткие контрастные стороны дальней карты
     const cap = 0.2 * Math.min(w, h);
     const rank = (s: Segment) => Math.min(s.len, cap) * Math.pow(s.mag, 0.8);
-    const all = this.segments().sort((a, b) => rank(b) - rank(a));
+    const segAll = this.segments();
+    // клетка скатерти, строки, доски: семейства параллельных линий с постоянным шагом по ОБЕ стороны отрезка.
+    // У стороны карты соседи такого семейства — только снаружи (внутри — рисунок карты): её не трогаем
+    const periodic = periodicSegments(segAll);
+    const rk = (s: Segment) => rank(s) * (periodic.has(s) ? 0.3 : 1);
+    const all = segAll.sort((a, b) => rk(b) - rk(a));
     if (all.length > 120) all.length = 120;
     const cands: Candidate[] = [];
     const area0 = w * h;
@@ -1180,6 +1243,53 @@ const PRE_LOCK_PLANE_FRAMES = 6;
 const MAX_PLANE_FRAMES = 600;
 
 // ───────────── вспомогательное ─────────────
+
+/**
+ * Отрезки периодической текстуры: у отрезка есть ≥ 2 параллельных соседа с каждой стороны на расстояниях, кратных
+ * одному шагу (4–40 px), перекрывающихся с ним вдоль направления.
+ */
+export function periodicSegments(segs: Segment[]): Set<Segment> {
+  const out = new Set<Segment>();
+  const n = segs.length;
+  if (n < 5) return out;
+  const offs: number[] = [];
+  for (let i = 0; i < n; i++) {
+    const a = segs[i];
+    const dx = Math.cos(a.dir), dy = Math.sin(a.dir);
+    const t0 = a.x1 * dx + a.y1 * dy, t1 = a.x2 * dx + a.y2 * dy;
+    const lo = Math.min(t0, t1), hi = Math.max(t0, t1);
+    offs.length = 0;
+    for (let j = 0; j < n; j++) {
+      if (j === i) continue;
+      const b = segs[j];
+      if (angDiffPi(a.dir, b.dir) > 0.08) continue;
+      const u0 = b.x1 * dx + b.y1 * dy, u1 = b.x2 * dx + b.y2 * dy;
+      if (Math.max(u0, u1) < lo - 2 || Math.min(u0, u1) > hi + 2) continue;
+      const d = a.line.a * b.mx + a.line.b * b.my - a.line.c;
+      if (Math.abs(d) < 3 || Math.abs(d) > 160) continue;
+      offs.push(d);
+    }
+    if (offs.length < 4) continue;
+    // шаг — ближайший сосед с каждой стороны (меньший из двух)
+    let np = Infinity, nn = Infinity;
+    for (const d of offs) if (d > 0) np = Math.min(np, d);
+    else nn = Math.min(nn, -d);
+    if (!Number.isFinite(np) || !Number.isFinite(nn)) continue;
+    const g = Math.min(np, nn);
+    if (g < 4 || g > 40 || Math.max(np, nn) > 1.25 * g) continue;
+    const seen = new Set<number>();
+    let pos = 0, neg = 0;
+    for (const d of offs) {
+      const k = Math.round(d / g);
+      if (k === 0 || Math.abs(k) > 4 || Math.abs(d / g - k) > 0.15 || seen.has(k)) continue;
+      seen.add(k);
+      if (k > 0) pos++;
+      else neg++;
+    }
+    if (pos >= 2 && neg >= 2) out.add(a);
+  }
+  return out;
+}
 
 function dist(a: Pt, b: Pt) {
   return Math.hypot(a.x - b.x, a.y - b.y);

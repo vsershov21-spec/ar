@@ -34,7 +34,7 @@ export interface VerifyReport {
   /** номер известного дизайна, если отпечаток совпал в этой проверке (−1 — нет) */
   design?: number;
   /**
-   * Есть хоть намёк на Сбер (знак ≥ 0,3 хотя бы в одной проверке окна): только тогда машина состояний может
+   * Есть намёк на Сбер и на банковскую карту (знак ≥ 0,3 и чип ≥ 0,35 — каждый хотя бы в 3 проверках окна): только тогда машина состояний может
    * посадить кота «по форме» после терпения. Без намёка (чужая карта без пойманного чипа) — не садим.
    */
   maybeSber?: boolean;
@@ -43,6 +43,8 @@ export interface VerifyReport {
 const PRE_MS = 80;
 /** «намёк на знак Сбера» для посадки по форме */
 const MAYBE_LOGO = 0.3;
+/** «намёк на чип» для посадки по форме */
+const MAYBE_CHIP = 0.35;
 const POST_MS = 1000;
 
 export class CardVerifier {
@@ -55,6 +57,16 @@ export class CardVerifier {
   private wasLocked = false;
   private alt = 0;
   private line = '';
+
+  /**
+   * Посадка «по форме» возможна: намёк на знак И намёк на чип (банковская карта) — каждый хотя бы в 3 проверках окна.
+   * Иначе картинки на карточке сажали кота «по форме»: кольцо, похожее на знак, без чипа (негатив n000, наклон 50°);
+   * знак и «чип» по одному разу на зелёной картинке (n194, клетчатая скатерть).
+   */
+  private maybe(): boolean {
+    const c = this.ev.counts();
+    return c.maxLogo >= MAYBE_LOGO && c.maxChip >= MAYBE_CHIP && c.nLogo >= 3 && c.nChip >= 3;
+  }
 
   reset() {
     this.ev.reset();
@@ -79,7 +91,7 @@ export class CardVerifier {
     const locked = det.locked;
     if (locked && !this.wasLocked) this.post.reset();
     this.wasLocked = locked;
-    const rep: VerifyReport = { state: this.ev.state, postNotCard: false, line: this.line, checked: false, ms: 0, maybeSber: this.ev.counts().maxLogo >= MAYBE_LOGO };
+    const rep: VerifyReport = { state: this.ev.state, postNotCard: false, line: this.line, checked: false, ms: 0, maybeSber: this.maybe() };
     const q = r.quad;
     if (!q) {
       // карта пропала надолго — начинаем заново
@@ -134,7 +146,7 @@ export class CardVerifier {
     this.line = `${locked ? 'post' : this.ev.state} n${c.n} s${c.sber} c${c.chip} b${c.back} · ${fmtFeatures(v)} · ${crop ? 'crop' : 'lo'} ${v.f.px.toFixed(0)}px ${v.ms.toFixed(1)}мс`;
     rep.state = this.ev.state;
     rep.design = v.f.designHit ? v.f.designId : -1;
-    rep.maybeSber = this.ev.counts().maxLogo >= MAYBE_LOGO;
+    rep.maybeSber = this.maybe();
     rep.line = this.line;
     rep.ms = performance.now() - t0;
     return rep;
