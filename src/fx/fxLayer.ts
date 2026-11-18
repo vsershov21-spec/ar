@@ -176,8 +176,15 @@ export class FxLayer {
    * Проиграть эффект по id из content/fx.json. Параметры: fx.json → fxTuning характера → args.params.
    * Неизвестный id — заглушка (handle.done сразу), предупреждение в лог.
    */
+  /**
+   * Фильтр эффектов: false — эффект не играет (кот спит в кровати «Мира кота»: над спящим только Zzz,
+   * без сердечек и пузырей реакций; src/home/bedFlow.ts). null — всё как обычно.
+   */
+  filter: ((id: string) => boolean) | null = null;
+
   play(id: string, args: FxArgs = {}): FxHandle {
     if (!id || id === 'none') return doneHandle(id);
+    if (this.filter && !this.filter(id)) return doneHandle(id);
     if (args.at && args.x === undefined) args = { ...args, x: args.at.x, y: args.at.y };
     const def = resolveFx(id, this.tuning, args.tuning ? { ...args.tuning, ...args.params } : args.params);
     if (args.durationMs !== undefined) def.durationMs = args.durationMs;
@@ -214,6 +221,23 @@ export class FxLayer {
     this.live.push({ inst: live, resolve });
     this.live.sort((a, b) => a.inst.z - b.inst.z);
     return { id, done, stop: () => live.stop?.() };
+  }
+
+  /** убрать эффекты сразу, без затухания (Zzz при пробуждении, сердечки над засыпающим котом); keep — оставить */
+  kill(pred: (id: string) => boolean) {
+    const gone = this.live.filter((l) => pred(l.inst.id));
+    if (!gone.length) return;
+    this.live = this.live.filter((l) => !gone.includes(l));
+    if (this.capture && gone.some((l) => l.inst === this.capture)) this.capture = null;
+    for (const l of gone) {
+      l.inst.stop?.();
+      l.resolve();
+    }
+  }
+
+  /** убрать все частицы (сердечки, искры, пузырьки реакций) — кот засыпает в кровати */
+  clearParticles() {
+    this.parts.clear();
   }
 
   /** остановить все экземпляры эффекта (петли: zzz, echo_wave, listen_ears) */

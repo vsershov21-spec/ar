@@ -47,6 +47,11 @@ export interface BedProp {
   readonly cover: number;
   /** кот под одеялом (горб): 0..1 */
   setHump(k: number): void;
+  /**
+   * Силуэт кота для одеяла: капсулы тела (мир) и X плеч (докуда натягивать). null — без силуэта (мягкий горб).
+   * Зовёт bedFlow, пока кот лежит (раз в 0,25 с).
+   */
+  setBody(caps: { a: THREE.Vector3; b: THREE.Vector3; r: number }[] | null, shoulderX?: number): void;
   /** ночник 0..1 */
   setLamp(k: number): void;
   /** шторка: 0 — открыта, 1 — опущена */
@@ -191,17 +196,18 @@ export function buildBed(batch: BatchLike, cx: number, win: { x: number; y: numb
   S(rbox(0.36, 0.13, W * 0.68, 0.06, 3), PAL.white, { p: [x0 + L / 2 - 0.25, BED.top + 0.07, z0], r: [0, 0, 0.12] });
   S(rbox(0.3, 0.02, W * 0.6, 0.01), PAL.mint, { p: [x0 + L / 2 - 0.25, BED.top + 0.14, z0], r: [0, 0, 0.12] });
 
-  const spot = new THREE.Vector3(x0 + 0.12, BED.top - 0.01, z0 + 0.06);
+  const spot = new THREE.Vector3(x0 + 0.1, BED.top, z0 + 0.04);
   const foot = new THREE.Vector3(stand.x, 0, stand.z);
 
-  // ───────── одеяло: сетка с настоящим сгибом ─────────
-  const NU = 30, NV = 14;
-  const LB = L * 0.78, WB = W + 0.26;
+  // ───────── одеяло: ткань-сетка с настоящим сгибом, ложится по силуэту кота ─────────
+  // u — вдоль одеяла от изножья (−X) к изголовью, v — поперёк. Откинуто: 0,22 длины лежит у изножья в два слоя;
+  // накрыто: до плеч кота (голова и уши на подушке открыты). Высота над матрасом — карта высот тела кота
+  // (капсулы по костям, setBody): максимум → расширение → размытие, чтобы ткань легла мягко, без «зелёного кирпича».
+  const NU = 44, NV = 20;
+  const WB = W + 0.28;
   const geo = new THREE.PlaneGeometry(1, 1, NU, NV);
   const uvAttr = geo.getAttribute('uv') as THREE.BufferAttribute;
-  // u — вдоль одеяла от изножья, v — поперёк; храним исходные u,v (позиции пересчитываются)
   const base = Float32Array.from(uvAttr.array as ArrayLike<number>);
-  // текстура: несколько повторов звёзд
   for (let i = 0; i < uvAttr.count; i++) uvAttr.setXY(i, base[i * 2] * 2.2, base[i * 2 + 1] * 1.6);
   geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(uvAttr.count * 3), 3));
   const blanketMat = new THREE.MeshBasicMaterial({ map: blanketTexture(), vertexColors: true, side: THREE.DoubleSide });
@@ -210,35 +216,64 @@ export function buildBed(batch: BatchLike, cx: number, win: { x: number; y: numb
   blanket.frustumCulled = false;
   proc.add(blanket);
   let cover = 0, coverGoal = 0, hump = 0, humpGoal = 0, dirty = true;
-  const footX = x0 - L / 2 + 0.04;
-  const humpC = () => ({ x: spot.x - 0.22, z: spot.z + 0.04 });
+  const footX = x0 - L / 2 + 0.03;
+  /** длина одеяла «накрыто» (до плеч кота); без тела — 0,7 кровати */
+  let coverLen = L * 0.7;
+  const FOLD = 0.22;
+  // карта высот тела над матрасом (мир): сетка HX × HZ над кроватью
+  const HX = 56, HZ = 24;
+  const hx0 = x0 - L / 2 - 0.05, hx1 = x0 + L / 2 + 0.05, hz0 = z0 - WB / 2, hz1 = z0 + WB / 2;
+  const HF = new Float32Array(HX * HZ);
+  let bodyOn = false;
+  const hfAt = (x: number, z: number) => {
+    const fx = THREE.MathUtils.clamp(((x - hx0) / (hx1 - hx0)) * (HX - 1), 0, HX - 1.001);
+    const fz = THREE.MathUtils.clamp(((z - hz0) / (hz1 - hz0)) * (HZ - 1), 0, HZ - 1.001);
+    const i = Math.floor(fx), j = Math.floor(fz), tx = fx - i, tz = fz - j;
+    const g = (a: number, b: number) => HF[b * HX + a];
+    return (g(i, j) * (1 - tx) + g(i + 1, j) * tx) * (1 - tz) + (g(i, j + 1) * (1 - tx) + g(i + 1, j + 1) * tx) * tz;
+  };
   const shape = () => {
     const pos = geo.getAttribute('position') as THREE.BufferAttribute;
     const col = geo.getAttribute('color') as THREE.BufferAttribute;
-    // откинуто — 0,32 длины лежит у изножья в два слоя, накрыто — во всю длину
-    const c = 0.32 + 0.68 * cover;
-    const hc = humpC();
+    const c = FOLD + (1 - FOLD) * cover;
+    const len = coverLen;
+    const floor = BED.top + 0.022;
     for (let i = 0; i < pos.count; i++) {
       const u = base[i * 2], v = base[i * 2 + 1];
       const folded = u > c;
       const along = folded ? 2 * c - u : u;
-      const x = footX + along * LB;
-      let z = z0 + (v - 0.5) * WB;
-      let y = BED.top + 0.025 + (folded ? 0.035 + (u - c) * 0.02 : 0);
-      // горб: кот под одеялом
+      // мягкий скруглённый край у плеч: углы чуть короче середины
+      const edge = 1 - 0.05 * Math.pow(Math.abs(v - 0.5) * 2, 3);
+      const x = footX + along * len * edge;
+      // откинутое одеяло лежит у изножья в пределах матраса (не свисает), накрывая — расправляется во всю ширину
+      let z = z0 + (v - 0.5) * (W - 0.06 + (WB - W + 0.06) * Math.max(cover, hump * 0.6));
+      let y = floor + (folded ? 0.03 + (u - c) * 0.025 : 0);
+      // кот под одеялом: ткань ложится по силуэту (или мягкий «горб», если костей нет — спрайт/риг)
       if (hump > 0) {
-        const dx = (x - hc.x) / 0.52, dz = (z - hc.z) / 0.42;
-        const q = 1 - dx * dx - dz * dz;
-        if (q > 0) y += hump * 0.36 * Math.pow(q, 0.6);
+        // мягкий купол по месту сна (округлость ткани) + силуэт тела по костям (ничего не торчит)
+        const ex = (x - (spot.x - 0.22)) / 0.55, ez = (z - spot.z) / 0.42;
+        const q = 1 - ex * ex - ez * ez;
+        let rise = q > 0 ? 0.32 * Math.pow(q, 0.6) : 0;
+        if (bodyOn) {
+          rise = Math.max(rise, hfAt(x, z) - floor);
+          // край у плеч не обрывается стенкой: последние ~12 см ткань мягко спускается к матрасу
+          const toEdge = (c - along) * len;
+          if (!folded && toEdge < 0.12) rise *= 0.55 + 0.45 * (toEdge / 0.12);
+        }
+        else if (q > 0) rise = 0.3 * Math.pow(q, 0.6);
+        y += hump * rise;
       }
-      // свисает по бокам матраса
+      // мелкие складки ткани
+      y += 0.005 * Math.sin(u * 37 + v * 11) * Math.sin(v * 23);
+      // свисает по бокам матраса мягкой дугой
       const over = Math.abs(z - z0) - W / 2;
+      // у стены (сзади) ткань не свисает, если под ней лапы кота — иначе пятки торчат из-под одеяла
       if (over > 0) {
-        y -= Math.min(0.2, over * 1.6);
-        z -= Math.sign(z - z0) * over * 0.55;
+        const k = Math.min(1, over / 0.14);
+        y -= 0.2 * k * k * (z < z0 ? 1 - hump : 1);
+        z -= Math.sign(z - z0) * over * (0.35 + 0.4 * k);
       }
       pos.setXYZ(i, x, y, z);
-      void col;
     }
     pos.needsUpdate = true;
     geo.computeVertexNormals();
@@ -247,7 +282,7 @@ export function buildBed(batch: BatchLike, cx: number, win: { x: number; y: numb
     for (let i = 0; i < pos.count; i++) {
       n.fromBufferAttribute(nor, i);
       if (n.y < 0) n.negate();
-      const l = 0.72 + 0.26 * Math.max(0, n.dot(SUN)) + 0.06 * n.y;
+      const l = 0.7 + 0.28 * Math.max(0, n.dot(SUN)) + 0.06 * n.y;
       const fold = base[i * 2] > c ? 1.06 : 1;
       col.setXYZ(i, Math.min(1, l * fold), Math.min(1, l * fold), Math.min(1, l * fold));
     }
@@ -255,20 +290,75 @@ export function buildBed(batch: BatchLike, cx: number, win: { x: number; y: numb
     geo.computeBoundingSphere();
     dirty = false;
   };
+  /** капсулы тела (мир) → карта высот: верх капсул, расширение на клетку, два прохода размытия, зазор под ткань */
+  const setBody = (caps: { a: THREE.Vector3; b: THREE.Vector3; r: number }[] | null, shoulderX?: number) => {
+    if (!caps) {
+      bodyOn = false;
+      dirty = true;
+      return;
+    }
+    const raw = new Float32Array(HX * HZ).fill(BED.top);
+    for (let j = 0; j < HZ; j++)
+      for (let i = 0; i < HX; i++) {
+        const x = hx0 + ((hx1 - hx0) * i) / (HX - 1), z = hz0 + ((hz1 - hz0) * j) / (HZ - 1);
+        let top = BED.top;
+        for (const cp of caps) {
+          const dx = cp.b.x - cp.a.x, dz = cp.b.z - cp.a.z, l2 = dx * dx + dz * dz;
+          const t = l2 < 1e-6 ? 0.5 : THREE.MathUtils.clamp(((x - cp.a.x) * dx + (z - cp.a.z) * dz) / l2, 0, 1);
+          const cx = cp.a.x + dx * t, cz = cp.a.z + dz * t, cy = cp.a.y + (cp.b.y - cp.a.y) * t;
+          const d2 = (x - cx) * (x - cx) + (z - cz) * (z - cz);
+          if (d2 < cp.r * cp.r) top = Math.max(top, cy + Math.sqrt(cp.r * cp.r - d2));
+        }
+        raw[j * HX + i] = top;
+      }
+    // расширение (ткань не прилипает к телу вплотную) и размытие (мягкие складки)
+    const tmp = new Float32Array(HX * HZ);
+    for (let j = 0; j < HZ; j++)
+      for (let i = 0; i < HX; i++) {
+        let m = BED.top;
+        for (let b = -1; b <= 1; b++) for (let a = -1; a <= 1; a++) {
+          const ii = Math.min(HX - 1, Math.max(0, i + a)), jj = Math.min(HZ - 1, Math.max(0, j + b));
+          m = Math.max(m, raw[jj * HX + ii]);
+        }
+        tmp[j * HX + i] = m;
+      }
+    for (let pass = 0; pass < 4; pass++) {
+      const src = pass % 2 ? HF : tmp, dst = pass % 2 ? tmp : HF;
+      for (let j = 0; j < HZ; j++)
+        for (let i = 0; i < HX; i++) {
+          let sum = 0, n = 0;
+          for (let b = -1; b <= 1; b++) for (let a = -1; a <= 1; a++) {
+            const ii = Math.min(HX - 1, Math.max(0, i + a)), jj = Math.min(HZ - 1, Math.max(0, j + b));
+            sum += src[jj * HX + ii];
+            n++;
+          }
+          dst[j * HX + i] = Math.max(sum / n, raw[j * HX + i]);
+        }
+    }
+    // после чётного числа проходов результат — в tmp
+    for (let k = 0; k < HF.length; k++) HF[k] = tmp[k] + 0.025;
+    bodyOn = true;
+    if (shoulderX !== undefined) coverLen = THREE.MathUtils.clamp(shoulderX - footX, L * 0.45, L * 0.85);
+    dirty = true;
+  };
   shape();
 
-  // ───────── ночник на тумбочке (свечение) ─────────
-  const lampAt = new THREE.Vector3(cx + 1.06, 0.7, -1.45);
+  // ───────── ночник-луна на стене над изголовьем ─────────
+  const lampAt = new THREE.Vector3(x0 + L / 2 - 0.12, 1.32, BACK_Z_WALL + 0.06);
+  S(new THREE.CircleGeometry(0.16, 20), PAL.white, { p: [lampAt.x, lampAt.y, BACK_Z_WALL + 0.02] }, { emissive: true });
+  S(new THREE.CircleGeometry(0.12, 20), PAL.sun, { p: [lampAt.x - 0.02, lampAt.y + 0.01, BACK_Z_WALL + 0.03] }, { emissive: true });
+  S(new THREE.CircleGeometry(0.105, 20), PAL.white, { p: [lampAt.x + 0.045, lampAt.y + 0.04, BACK_Z_WALL + 0.035] }, { emissive: true });
+
   const lampMat = new THREE.MeshBasicMaterial({ map: glowTex(), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0 });
   const lampGlow = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), lampMat);
-  lampGlow.position.copy(lampAt).add(new THREE.Vector3(0, 0, 0.12));
-  lampGlow.scale.setScalar(1.3);
+  lampGlow.position.copy(lampAt).add(new THREE.Vector3(0, 0, 0.05));
+  lampGlow.scale.setScalar(1.1);
   lampGlow.renderOrder = 3;
   group.add(lampGlow);
   const poolMat = lampMat.clone();
   const pool = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), poolMat);
-  pool.position.set(lampAt.x - 0.2, 0.9, BACK_Z_WALL + 0.02);
-  pool.scale.set(2.2, 1.8, 1);
+  pool.position.set(lampAt.x - 0.1, 1.2, BACK_Z_WALL + 0.025);
+  pool.scale.set(2.0, 1.6, 1);
   pool.renderOrder = 2;
   group.add(pool);
   let lamp = 0, lampGoal = 0;
@@ -322,6 +412,7 @@ export function buildBed(batch: BatchLike, cx: number, win: { x: number; y: numb
     setHump(k) {
       humpGoal = THREE.MathUtils.clamp(k, 0, 1);
     },
+    setBody,
     setLamp(k) {
       lampGoal = THREE.MathUtils.clamp(k, 0, 1);
     },

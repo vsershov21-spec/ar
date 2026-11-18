@@ -3,9 +3,11 @@
  * касания во сне, время суток, голосовые фразы. Исполнение (свет, путь кота, одеяло, клипы, Zzz, реплики) —
  * src/home/bedFlow.ts, модель кровати — src/home/bedProp.ts. Тесты — tests/bed.test.ts.
  *
- *   awake ──«Уложить спать» / «спать» / «баю-бай»──► tucking (залезть → лечь → одеяло) ──► asleep
+ *   awake ──«Уложить спать» / «спать» / «баю-бай»──► tucking (подойти к кровати сбоку → залезть → лечь на бок →
+ *         одеяло натягивается от изножья до плеч) ──► asleep
  *   asleep ── тап: бормочет / ворочается (не просыпается); 3 тапа за 1,6 с, «Разбудить», «просыпайся», шторка ──► waking
- *   waking (потянуться → одеяло долой → спрыгнуть) ──► awake (реплика: доброе утро / «ну вот, разбудили»)
+ *   waking — ровно наоборот: одеяло откидывается к изножью → потянуться и сесть на край → спрыгнуть на пол у кровати →
+ *         отойти на своё место сбоку, лицом к зрителю ──► awake (реплика: доброе утро / «ну вот, разбудили»)
  *
  * Тишина ребёнка сну не мешает (кот не просыпается сам), уход в другую комнату и из дома — тоже.
  */
@@ -14,12 +16,12 @@ export type BedState = 'awake' | 'tucking' | 'asleep' | 'waking';
 
 /** кровать в единицах комнаты (рост кота ≈ 1,1); модель — bedProp.ts */
 export const BED = {
-  length: 1.5,
+  length: 1.32,
   width: 0.95,
   /** верх матраса */
   top: 0.42,
-  /** центр кровати от точки зоны (x) и по глубине (z) */
-  dx: 0,
+  /** центр кровати от точки зоны (x) и по глубине (z): кровать правее центра, кот стоит слева от неё (zones.ts spot) */
+  dx: 0.36,
   z: -0.78,
 };
 /** где кот стоит в зоне (= CAT_Z комнаты, room.ts; копия — чтобы логика не тянула three.js-модуль комнаты) */
@@ -27,28 +29,30 @@ export const STAND_Z = 0.2;
 
 /** шаги перехода: id клипа каталога (content/animations.json) и длительность; путь корня считает bedFlow */
 export interface BedStep {
-  id: 'approach' | 'get_into_bed' | 'lie_down_side' | 'cover' | 'wake_stretch_in_bed' | 'uncover' | 'hop_out_of_bed';
+  id: 'approach' | 'get_into_bed' | 'lie_down_side' | 'cover' | 'uncover' | 'wake_stretch_in_bed' | 'hop_out_of_bed' | 'walk_back';
   clip: string;
   ms: number;
 }
 
-/** уложить: подойти к кровати → забраться → лечь на бок → одеяло накрывает */
+/** уложить: подойти к длинному краю кровати и повернуться к ней → забраться → лечь на бок → одеяло от изножья до плеч */
 export const TUCK_STEPS: readonly BedStep[] = [
-  { id: 'approach', clip: 'walk', ms: 600 },
+  { id: 'approach', clip: 'walk_to_bedside', ms: 1200 },
   { id: 'get_into_bed', clip: 'get_into_bed', ms: 1300 },
   { id: 'lie_down_side', clip: 'lie_down_side', ms: 1200 },
-  { id: 'cover', clip: 'sleep_loop_bed', ms: 1000 },
+  { id: 'cover', clip: 'sleep_loop_bed', ms: 900 },
 ];
-/** разбудить: потянуться и зевнуть лёжа → одеяло долой → спрыгнуть на пол */
+/** разбудить — обратный порядок: одеяло к изножью → потянуться и сесть на край → спрыгнуть → отойти на место */
 export const WAKE_STEPS: readonly BedStep[] = [
-  { id: 'wake_stretch_in_bed', clip: 'wake_stretch_in_bed', ms: 1800 },
-  { id: 'uncover', clip: 'wake_stretch_in_bed', ms: 500 },
+  { id: 'uncover', clip: 'sleep_loop_bed', ms: 800 },
+  { id: 'wake_stretch_in_bed', clip: 'wake_stretch_in_bed', ms: 1700 },
   { id: 'hop_out_of_bed', clip: 'hop_out_of_bed', ms: 1000 },
+  { id: 'walk_back', clip: 'walk', ms: 1000 },
 ];
-/** кот проснулся сам по команде ребёнка (кнопка «Танцуй» посреди сна): сразу спрыгнуть */
+/** кот проснулся по команде ребёнка (кнопка «Танцуй» посреди сна): тот же порядок, быстрее, без потягивания */
 export const QUICK_WAKE_STEPS: readonly BedStep[] = [
-  { id: 'uncover', clip: 'hop_out_of_bed', ms: 300 },
+  { id: 'uncover', clip: 'sleep_loop_bed', ms: 350 },
   { id: 'hop_out_of_bed', clip: 'hop_out_of_bed', ms: 800 },
+  { id: 'walk_back', clip: 'walk', ms: 700 },
 ];
 
 /** петля сна и «ворочается» во сне */

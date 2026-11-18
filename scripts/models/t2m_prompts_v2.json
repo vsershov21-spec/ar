@@ -88,12 +88,13 @@
   "world_tired_idle": "Tired cat stands slouching, head slowly nodding off, jerks awake and slouches again. Seamless loop, stays in place.",
   "world_knocked_over": "Cat gets pushed, stumbles backward and falls onto its bottom, rubs the back of the head, then gets up and dusts off. Starts and ends in a neutral standing pose facing forward, in place.",
   "world_pillow_hug": "Cat hugs a big soft pillow to the chest, rubs the cheek against it and sways happily. Starts and ends in a neutral standing pose facing forward, in place.",
-  "get_into_bed": "Cat stands facing forward, crouches, puts both front paws up on a knee-high soft bed, springs up with a small hop and pulls itself onto it, ending on its knees and front paws, then turns the head to the right. Stays in place.",
+  "get_into_bed": "Cat stands with its back to the viewer at the long side of a knee-high soft bed, puts both front paws up on the mattress, climbs up sideways onto it one knee after the other and ends kneeling on all fours on the mattress, then turns the head to the right toward the pillow. Stays in place.",
   "lie_down_side": "Cat kneeling on all fours on a soft mattress slowly lowers onto the left elbow, rolls onto its left side with the head to the right, pulls the knees up and tucks the paws to the chest, resting the cheek on a pillow and closing the eyes. Stays in place.",
   "sleep_loop_bed": "Cat sleeps curled on its left side with the head resting on a pillow to the right, belly breathing slowly up and down, one ear twitches once. Seamless loop, stays in place.",
   "turn_over_sleep": "Sleeping cat lying on its left side stirs, mumbles, rolls halfway onto its back with a lazy wave of one paw, then rolls back onto its side and settles asleep again, eyes closed. Stays in place.",
-  "wake_stretch_in_bed": "Cat lying on its left side in bed opens its eyes, stretches the arms over the head and the legs out long, yawns widely with a paw over the mouth, then sits up facing forward with the legs stretched out in front. Stays in place.",
-  "hop_out_of_bed": "Cat sitting on the edge of a bed scoots forward, pushes off with the paws and hops down onto the floor, lands softly with bent knees and stands up facing forward. Ends in a neutral standing pose, in place."
+  "wake_stretch_in_bed": "Cat lying on its left side in bed opens its eyes, stretches the arms over the head and the legs out long, yawns widely with a paw over the mouth, then sits up and swings round to sit on the edge of the bed facing forward with the legs dangling. Stays in place.",
+  "hop_out_of_bed": "Cat sitting on the side edge of a bed with the legs dangling, facing the viewer, pushes off with both paws and hops down to the floor beside the bed, lands softly with bent knees and stands up facing forward. Ends in a neutral standing pose, in place.",
+  "walk_to_bedside": "Sleepy cat walks slowly in place with small shuffling steps, head slightly lowered, rubbing one eye with a paw once, arms relaxed. Seamless loop, does not move forward."
  },
  "specs": {
   "poke_head": {
@@ -951,11 +952,11 @@
    "group": "Сон и кровать",
    "durationS": 1.3,
    "loop": false,
-   "start": "стойка idle спиной к зрителю",
+   "start": "стойка спиной к зрителю у длинного края кровати",
    "end": "на коленях и передних лапах на матрасе (= первый кадр lie_down_side)",
    "replaces": "нет (опора jump + путь сцены)",
-   "trigger": "«Уложить спать»: чип спальни, голос «спать / ложись спать / баю-бай», предложения по времени суток",
-   "root": "сцена: дуга от края кровати к sleep_spot (вверх 0,38 роста, вглубь 0,45, вершина +0,3); в клипе на месте"
+   "trigger": "«Уложить спать» после walk_to_bedside",
+   "root": "сцена: дуга сбоку от пола у длинного края к sleep_spot (вверх 0,38 роста, вглубь 0,5, вершина +0,3); в клипе на месте"
   },
   "lie_down_side": {
    "priority": "P0",
@@ -996,9 +997,9 @@
    "durationS": 1.8,
    "loop": false,
    "start": "поза sleep_loop_bed",
-   "end": "сидит на матрасе лицом к зрителю, ноги вперёд (= первый кадр hop_out_of_bed)",
+   "end": "сидит на краю матраса лицом к зрителю, ноги свешены (= первый кадр hop_out_of_bed)",
    "replaces": "нет (опора wake_startle)",
-   "trigger": "«Разбудить», «просыпайся / утро», шторка, три тапа",
+   "trigger": "после того как сцена откинула одеяло к изножью (3 тапа, «Разбудить», голос, шторка)",
    "root": "на месте, таз 0,14 → 0,2"
   },
   "hop_out_of_bed": {
@@ -1006,11 +1007,22 @@
    "group": "Сон и кровать",
    "durationS": 1.0,
    "loop": false,
-   "start": "сидит на матрасе",
-   "end": "стойка idle лицом к зрителю",
+   "start": "сидит на краю матраса, ноги свешены",
+   "end": "стойка idle на полу у кровати лицом к зрителю, потом сцена ведёт на место сбоку",
    "replaces": "нет (опора jump + путь сцены)",
    "trigger": "последний шаг пробуждения",
-   "root": "сцена: дуга с матраса на пол (вниз 0,38, к зрителю 0,95, вершина +0,3); в клипе на месте"
+   "root": "сцена: вбок с края матраса на пол у кровати (вниз 0,38, к зрителю 0,35, вершина +0,25); в клипе на месте"
+  },
+  "walk_to_bedside": {
+   "priority": "P1",
+   "group": "Сон и кровать",
+   "durationS": 1.2,
+   "loop": true,
+   "start": "стойка idle сбоку от кровати",
+   "end": "стойка спиной к зрителю у длинного края",
+   "replaces": "по желанию; опора walk + путь сцены",
+   "trigger": "первый шаг «уложить»",
+   "root": "сцена: вдоль кровати к длинному краю и поворот к ней; в клипе на месте"
   }
  },
  "props": {
@@ -1086,6 +1098,7 @@
    "status": "процедурная есть (src/home/bedProp.ts); GLB по желанию",
    "priority": "P0",
    "for": [
+    "walk_to_bedside",
     "get_into_bed",
     "lie_down_side",
     "sleep_loop_bed",

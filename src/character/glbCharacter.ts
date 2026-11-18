@@ -413,6 +413,14 @@ export class GlbCharacter implements Character {
    */
   poseTweak: ((rot: (bone: string, axis: 'up' | 'side' | 'fwd', a: number) => void, dt: number) => void) | null = null;
 
+  /** мировая позиция кости (имя Mixamo без префикса): сцена кладёт кота на матрас и укрывает одеялом по силуэту */
+  boneWorld(name: string, out: THREE.Vector3): boolean {
+    const b = this.bones.get(name);
+    if (!b) return false;
+    b.getWorldPosition(out);
+    return true;
+  }
+
   /** имя клипа GLB → id каталога (своё имя + TRIPO_ALIAS) */
   static aliasIds(name: string) {
     const key = name.toLowerCase().replace(/^.*\|/, '');

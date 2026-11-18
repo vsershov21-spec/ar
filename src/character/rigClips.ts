@@ -321,6 +321,7 @@ export const RIG_CLIPS: Record<string, ClipFn> = {
     return { ...s, b: { ...s.b, Spine1: [0.9, 0, 0], Neck: [0.4, 0, 0], Head: [0.5, 0, 0.3], LeftArm: [-1.2, 0, -0.2], RightArm: [-1.2, 0, 0.2], LeftForeArm: [-1.2, 0, 0], RightForeArm: [-1.2, 0, 0], Tail1: [-0.2, 1.2, 0], LeftEar1: [-0.5, 0, 0], RightEar1: [-0.5, 0, 0] }, root: { y: -0.24, s: 1 + 0.025 * S(t * 1.6) }, lids: 1 };
   },
   // ── кровать (мир кота, src/home/bedFlow.ts): путь корня — у сцены, здесь только поза ──
+  walk_to_bedside: (k, t) => RIG_CLIPS.walk(k, t),
   get_into_bed: (k, t) => jump(k, t),
   lie_down_side: (k, t) => {
     const s = RIG_CLIPS.sleep_loop(k, t);

@@ -16,7 +16,7 @@
  */
 import * as THREE from 'three';
 import './home.css';
-import { ZONES, DEFAULT_ZONE, HomeOfferRule, OFFER_SHOW_MS, isZoneId, offerChips, zoneAfterSwipe, zoneIndex, type OfferWhy, type ZoneDef, type ZoneId } from './zones';
+import { ZONES, DEFAULT_ZONE, zoneSpot, zoneCam, HomeOfferRule, OFFER_SHOW_MS, isZoneId, offerChips, zoneAfterSwipe, zoneIndex, type OfferWhy, type ZoneDef, type ZoneId } from './zones';
 import { HOME_ICON, registerHomeIcons } from './icons';
 import type { Room } from './room';
 import type { Chip } from '../scenario/suggest';
@@ -69,7 +69,7 @@ export interface HomeHost {
   ui: { root: HTMLElement; toast(t: string, ms?: number): void; closeCatalog(): void; nudge(m: null): void; hidePressMenu(): void; error(t: string, s: string): void; canReanchor: boolean };
   audio: { play(id: string, v?: number): unknown; ctx?: AudioContext | null; muted?: boolean };
   /** эффекты (Zzz над спящим котом в кровати) */
-  fx?: { play(id: string): unknown; stop?(id: string): void };
+  fx?: { play(id: string): unknown; stop?(id: string): void; kill?(pred: (id: string) => boolean): void; clearParticles?(): void; filter?: ((id: string) => boolean) | null };
   energy: { activity(now: number, boost?: boolean): void };
   /** пересчитать чипы кота */
   suggest(): void;
@@ -101,7 +101,7 @@ export class HomeMode {
   private lostSince = -1;
   private now = 0;
   /** перебежка между зонами: from → to, t 0..1 */
-  private move: { from: number; to: number; t: number; dir: number } | null = null;
+  private move: { from: ZoneDef; to: ZoneDef; t: number; dir: number } | null = null;
   private camX = 0;
   private aspect = 9 / 19.5;
   private par = { x: 0, y: 0, tx: 0, ty: 0, g0: NaN, b0: NaN };
@@ -238,7 +238,7 @@ export class HomeMode {
     h.tracker.isTracking = true;
     h.tracker.anchor.visible = false;
     h.scene.add(room.group);
-    this.placeCat(this.zoneDef.x);
+    this.placeCat();
     this.camX = this.zoneDef.x;
     h.stage.useView({ anchor: room.anchor, camera: this.camera });
     h.stage.resetPosition();
@@ -355,10 +355,10 @@ export class HomeMode {
   /** перейти в зону: кот перебегает вместе с камерой */
   go(id: ZoneId | undefined): boolean {
     if (!id || this.phase !== 'home' || id === this.zone || this.move) return false;
-    const from = this.zoneDef.x;
+    const from = this.zoneDef;
     this.zone = id;
-    const to = this.zoneDef.x;
-    this.move = { from, to, t: 0, dir: Math.sign(to - from) };
+    const to = this.zoneDef;
+    this.move = { from, to, t: 0, dir: Math.sign(zoneSpot(to).x - zoneSpot(from).x) };
     const h = this.h;
     // кот в кровати остаётся спать: камера уходит одна
     const held = !!this.bed?.holdsCat;
@@ -489,16 +489,16 @@ export class HomeMode {
       const m = this.move;
       m.t = Math.min(1, m.t + (dt * 1000) / SWITCH_MS);
       const k = ease(m.t);
-      const x = m.from + (m.to - m.from) * k;
+      const a = zoneSpot(m.from), b = zoneSpot(m.to);
       // разворот по ходу бега в начале, к зрителю — в конце
       const turn = Math.min(1, m.t / 0.18, (1 - m.t) / 0.22);
-      if (!held) this.placeCat(x, (m.dir * Math.PI) / 2 * Math.max(0, turn));
-      this.camX = x;
+      if (!held) this.placeCat(a.x + (b.x - a.x) * k, (m.dir * Math.PI) / 2 * Math.max(0, turn), a.z + (b.z - a.z) * k);
+      this.camX = m.from.x + (m.to.x - m.from.x) * k;
       if (m.t >= 1) {
         this.move = null;
         if (!held) {
           h.stage.cfg.yawFollow = true;
-          this.placeCat(this.zoneDef.x);
+          this.placeCat();
           h.character()?.play('idle');
           this.sayZone(this.zoneDef.enterEvent);
         }
@@ -520,11 +520,11 @@ export class HomeMode {
     this.frame();
   }
 
-  private placeCat(x: number, yaw = 0) {
-    const z = this.zoneDef;
-    // по пути лежанка спальни не поднимает кота
-    const y = this.move ? 0 : z.floorY;
-    this.room?.placeAnchor(x, y, yaw);
+  /** кот в точке зоны (спальня — у кровати сбоку, zones.ts spot); x/z — по пути между зонами */
+  private placeCat(x?: number, yaw = 0, z?: number) {
+    const zd = this.zoneDef, sp = zoneSpot(zd);
+    const y = this.move ? 0 : zd.floorY;
+    this.room?.placeAnchor(x ?? sp.x, y, yaw, z ?? sp.z);
   }
 
   private sayZone(event: string) {
@@ -578,14 +578,14 @@ export class HomeMode {
     const catH = this.h.stage.cfg.height;
     const frac = land ? 0.56 : 0.42;
     const feetAt = land ? 0.8 : 0.72;
-    // кот в кровати: камера чуть выше и дальше (плавно)
-    const fb = this.bed?.frameBias() ?? { dy: 0, zoom: 1, dx: 0 };
+    // ракурс зоны (спальня — дальше, чтобы кровать с котом рядом помещалась целиком) + кот в кровати; плавно
+    const zc = zoneCam(this.zoneDef), fb = this.bed?.frameBias() ?? { dy: 0, zoom: 1, dx: 0 };
     const c = this.cam;
-    c.dy += (fb.dy - c.dy) * 0.08;
-    c.zoom += (fb.zoom - c.zoom) * 0.08;
-    c.dx += (fb.dx - c.dx) * 0.08;
-    const halfH = catH / frac / 2;
-    const D = (halfH / Math.tan(THREE.MathUtils.degToRad(cam.fov / 2))) * c.zoom;
+    c.dy += (zc.dy + fb.dy - c.dy) * 0.08;
+    c.zoom += (zc.zoom * fb.zoom - c.zoom) * 0.08;
+    c.dx += (zc.dx + fb.dx - c.dx) * 0.08;
+    const halfH = (catH / frac / 2) * c.zoom;
+    const D = halfH / Math.tan(THREE.MathUtils.degToRad(cam.fov / 2));
     const yc = (2 * feetAt - 1) * halfH + (this.move ? 0 : this.zoneDef.floorY) + c.dy;
     const pitch = THREE.MathUtils.degToRad(7);
     const p = this.par;

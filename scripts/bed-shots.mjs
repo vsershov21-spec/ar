@@ -1,8 +1,9 @@
 #!/usr/bin/env node
-// Снимки кровати кота (src/home/bedFlow.ts, lab): docs/ui/bed_{night,asleep,wake}.png, 390×844.
-//   night  — уложили вечером (?bed=night): полумрак, ночник, шторка, одеяло, «спокойной ночи»
-//   asleep — спит днём, тап — бормочет во сне (Zzz, чипы «Разбудить» / «Открыть шторку»)
-//   wake   — разбудили (?bed=wake): шторка вверх, одеяло сползло, кот садится в кровати
+// Снимки кровати кота (src/home/bedFlow.ts, lab): docs/ui/bed_{beside,climb,covered,wake}.png, 390×844.
+//   beside  — спальня днём: кот стоит на полу сбоку от кровати (у изножья), лицом к зрителю, кровать целиком
+//   climb   — «Уложить спать»: подошёл к длинному краю, повернулся и забирается на матрас
+//   covered — спит на боку, голова на подушке, одеяло по силуэту до плеч, ночник, шторка, Zzz
+//   wake    — разбудили: одеяло откинуто к изножью, кот сел на край кровати, шторка вверх
 // Запуск: npx vite --port 4180 & node scripts/bed-shots.mjs   (HOME_PORT, CHROME, HOME_CAT=kind|hooligan|glitter — по желанию)
 import fs from 'node:fs';
 import path from 'node:path';
@@ -52,27 +53,30 @@ async function scene(name, bed, hour, steps) {
   await until(() => window.__app.home.phase === 'home');
   await steps(page, until);
   await page.screenshot({ path: path.join(outDir, `bed_${name}.png`) });
-  const st = await page.evaluate(() => ({ bed: window.__app.home.bed.state, light: +window.__app.home.lightLevel.toFixed(2), zzz: window.__app.home.bed.zzz, clip: window.__app.character?.currentClip }));
+  const st = await page.evaluate(() => ({ fx: window.__app.fx.activeIds, bed: window.__app.home.bed.state, light: +window.__app.home.lightLevel.toFixed(2), zzz: window.__app.home.bed.zzz, clip: window.__app.character?.currentClip }));
   console.log('  ✓', name, JSON.stringify(st), errors.length ? `ошибки: ${errors.join(' | ')}` : '');
   await page.close();
 }
 
-await scene('night', 'night', 21, async (page, until) => {
-  await until(() => window.__app.home.bed.state === 'asleep');
-  await wait(700); // пузырь «спокойной ночи» ещё виден
+const step = (id, k) => `(() => { const p = window.__app.home.bed.m.progress(performance.now()); return p.step?.id === '${id}' && p.k >= ${k}; })()`;
+await scene('beside', 'none', 12, async () => {
+  await wait(2500);
 });
-await scene('asleep', 'sleep', 12, async (page, until) => {
+await scene('climb', 'none', 12, async (page, until) => {
+  await wait(1500);
+  await page.evaluate(() => {
+    window.__slowAt = performance.now();
+    window.__app.home.act('home:sleep');
+  });
+  await until(step('get_into_bed', 0.62));
+});
+await scene('covered', 'sleep', 21, async (page, until) => {
   await until(() => window.__app.home.bed.state === 'asleep');
   await wait(2500);
-  await page.evaluate(() => window.__app.home.onTouch('tap_cat'));
-  await wait(900);
 });
 await scene('wake', 'wake', 12, async (page, until) => {
   await until(() => window.__app.home.bed.state === 'waking');
   await page.evaluate(() => (window.__slowAt = performance.now()));
-  await until(() => {
-    const p = window.__app.home.bed.m.progress(performance.now());
-    return p.step?.id === 'wake_stretch_in_bed' && p.k > 0.72;
-  });
+  await until(step('wake_stretch_in_bed', 0.9));
 });
 await browser.close();

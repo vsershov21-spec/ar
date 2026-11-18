@@ -184,9 +184,9 @@ export interface Room {
   bounceBall(): void;
   /**
    * ставит якорь кота в точку зоны (x — центр зоны, y — пол); z — глубина (по умолчанию CAT_Z), roll — крен
-   * вокруг оси взгляда (кот лёг на бок в кровати)
+   * вокруг продольной оси кота (лёг на бок в кровати), tilt — наклон вокруг оси взгляда (выровнять лежащего кота)
    */
-  placeAnchor(x: number, y: number, yaw?: number, z?: number, roll?: number): void;
+  placeAnchor(x: number, y: number, yaw?: number, z?: number, roll?: number, tilt?: number): void;
   /** кровать спальни (одеяло, ночник, шторка); в тестах может не быть */
   readonly bed?: BedProp;
   update(dt: number): void;
@@ -194,7 +194,7 @@ export interface Room {
 }
 
 const AX_X = new THREE.Vector3(1, 0, 0), AX_Y = new THREE.Vector3(0, 1, 0), AX_Z = new THREE.Vector3(0, 0, 1);
-const qTmp = new THREE.Quaternion(), qTmp2 = new THREE.Quaternion();
+const qTmp = new THREE.Quaternion(), qTmp2 = new THREE.Quaternion(), qTmp3 = new THREE.Quaternion();
 
 /** точка, где стоит кот в зоне (по Z — чуть ближе к зрителю, чем центр коврика) */
 export const CAT_Z = 0.2;
@@ -360,12 +360,12 @@ export function buildRoom(): Room {
   // ───────── СПАЛЬНЯ (x ≈ 3.6): кровать с подушкой и одеялом (bedProp.ts), тумбочка с ночником, гирлянда, картина с луной, мишка ─────────
   const bx = 3.6;
   // ковёр-облако перед кроватью
-  b.add(cyl(1.0, 1.0, 0.015, 26), '#F2F6FF', { p: [bx, 0.008, CAT_Z - 0.1], s: [1.15, 1, 0.6] }, { ao: 0 });
+  b.add(cyl(1.0, 1.0, 0.015, 26), '#F2F6FF', { p: [bx - 0.15, 0.008, 0.05], s: [1.35, 1, 0.55] }, { ao: 0 });
   // тумбочка с ночником (у изголовья)
-  b.add(rbox(0.42, 0.55, 0.4, 0.06), PAL.white, { p: [bx + 1.06, 0.28, -1.45] });
-  b.add(rbox(0.3, 0.03, 0.03, 0.01), PAL.teal, { p: [bx + 1.06, 0.4, -1.24] });
-  b.add(ball(0.13, 2), PAL.sun, { p: [bx + 1.06, 0.7, -1.45], s: [1, 1.15, 1] }, { emissive: true });
-  b.add(cyl(0.07, 0.09, 0.1, 10), PAL.teal, { p: [bx + 1.06, 0.6, -1.45] });
+  b.add(rbox(0.42, 0.55, 0.4, 0.06), PAL.white, { p: [bx + 1.48, 0.28, -1.45] });
+  b.add(rbox(0.3, 0.03, 0.03, 0.01), PAL.teal, { p: [bx + 1.48, 0.4, -1.24] });
+  b.add(ball(0.13, 2), PAL.sun, { p: [bx + 1.48, 0.7, -1.45], s: [1, 1.15, 1] }, { emissive: true });
+  b.add(cyl(0.07, 0.09, 0.1, 10), PAL.teal, { p: [bx + 1.48, 0.6, -1.45] });
   // картина с луной и звёздами
   b.add(rbox(0.62, 0.5, 0.04, 0.03), PAL.white, { p: [bx - 0.55, 1.8, BACK_Z + 0.03] });
   b.add(rbox(0.54, 0.42, 0.02, 0.02), '#2E3A6E', { p: [bx - 0.55, 1.8, BACK_Z + 0.055] }, { emissive: true });
@@ -384,7 +384,7 @@ export function buildRoom(): Room {
   }
   garland.forEach((p, k) => b.add(ball(0.045, 1), [PAL.lime, PAL.teal, PAL.sun, PAL.coral][k % 4], { p: [p.x, p.y - 0.05, p.z] }, { emissive: true }));
   // мишка
-  const tb = new THREE.Vector3(bx - 1.25, 0, -0.35);
+  const tb = new THREE.Vector3(bx - 1.3, 0, -1.3);
   b.add(ball(0.2, 1), '#E8B98A', { p: [tb.x, 0.2, tb.z], s: [1, 1.1, 0.9] });
   b.add(ball(0.14, 1), '#E8B98A', { p: [tb.x, 0.5, tb.z] });
   for (const s of [-1, 1]) b.add(ball(0.055, 1), '#D9A472', { p: [tb.x + s * 0.11, 0.62, tb.z] });
@@ -395,7 +395,7 @@ export function buildRoom(): Room {
   group.add(room);
   // кровать: статика — отдельная сетка (её прячет GLB-кровать), живые части — свои
   const bedB = new Batch();
-  const bed = buildBed(bedB, bx, bedWin, { x: bx, z: CAT_Z });
+  const bed = buildBed(bedB, bx, bedWin, { x: ZONES[2].spot?.x ?? bx, z: ZONES[2].spot?.z ?? CAT_Z });
   const bedMesh = bedB.mesh(mat, 'home-bed-static');
   group.add(bedMesh);
   group.add(bed.group);
@@ -423,8 +423,8 @@ export function buildRoom(): Room {
   blob(0.55, 0.78, 0.55, 0.45);
   blob(kx + 0.85, tz, 0.8, 0.6);
   blob(kx - 0.2, BACK_Z + 0.7, 2.6, 0.5);
-  blob(bx, -0.78, 1.9, 1.3);
-  blob(bx + 1.06, -1.45, 0.65, 0.5);
+  blob(bx + 0.34, -0.78, 1.8, 1.3);
+  blob(bx + 1.48, -1.45, 0.65, 0.5);
   blob(tb.x, tb.z, 0.55, 0.45);
   group.add(blobs);
 
@@ -440,7 +440,7 @@ export function buildRoom(): Room {
   };
   glow(-0.85, 1.55, -1.05, 1.1);
   glow(kx, 2.38, -0.5, 1.2);
-  glow(bx + 1.06, 0.7, -1.3, 0.7);
+  glow(bx + 1.48, 0.7, -1.3, 0.7);
   for (const p of garland.filter((_, k) => k % 2 === 0)) glow(p.x, p.y - 0.05, p.z + 0.02, 0.28);
   group.add(glows);
 
@@ -515,11 +515,11 @@ export function buildRoom(): Room {
       ballT = 0;
     },
     bed,
-    placeAnchor(x, y, yaw = 0, z = CAT_Z, roll = 0) {
+    placeAnchor(x, y, yaw = 0, z = CAT_Z, roll = 0, tilt = 0) {
       // точка опоры Stage (footY = −0,1 карты) — на 0,1 ближе к зрителю: кот стоит ровно на z
       anchor.position.set(x, y, z - 0.1);
       // сначала «карта на пол» (−90° по X), потом крен вокруг оси взгляда (мировая Z) и поворот вокруг вертикали
-      anchor.quaternion.setFromAxisAngle(AX_Y, yaw).multiply(qTmp.setFromAxisAngle(AX_Z, roll)).multiply(qTmp2.setFromAxisAngle(AX_X, -Math.PI / 2));
+      anchor.quaternion.setFromAxisAngle(AX_Z, tilt).multiply(qTmp3.setFromAxisAngle(AX_Y, yaw)).multiply(qTmp.setFromAxisAngle(AX_Z, roll)).multiply(qTmp2.setFromAxisAngle(AX_X, -Math.PI / 2));
       anchor.updateMatrixWorld(true);
     },
     update(dt) {

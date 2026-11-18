@@ -6,13 +6,16 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as THREE from 'three';
-import { STAND_Z, BedMachine, BedOfferRule, TUCK_STEPS, WAKE_STEPS, TAP_WINDOW_MS, OFFER_QUIET_MS, bedIntent, daypart, morningWake, isNight } from '../src/home/bed';
+import { STAND_Z, BedMachine, BedOfferRule, TUCK_STEPS, WAKE_STEPS, QUICK_WAKE_STEPS, TAP_WINDOW_MS, OFFER_QUIET_MS, bedIntent, daypart, morningWake, isNight } from '../src/home/bed';
 import { HomeMode, type HomeHost } from '../src/home/homeMode';
 import { CAT_Z, type Room } from '../src/home/room';
 import { loadMemory } from '../src/scenario/memory';
+import { ZONES } from '../src/home/zones';
+import { BED } from '../src/home/bed';
 
 const TUCK_MS = TUCK_STEPS.reduce((s, x) => s + x.ms, 0);
 const WAKE_MS = WAKE_STEPS.reduce((s, x) => s + x.ms, 0);
+const QUICK_MS = QUICK_WAKE_STEPS.reduce((s, x) => s + x.ms, 0);
 
 /** прогнать автомат до конца перехода */
 function run(m: BedMachine, from: number, ms: number, step = 50) {
@@ -46,7 +49,7 @@ describe('автомат сна', () => {
     expect(m.state).toBe('asleep');
   });
 
-  it('три тапа за 1,6 с — просыпается: потянуться → одеяло долой → спрыгнуть → на полу', () => {
+  it('три тапа за 1,6 с — просыпается в обратном порядке: одеяло к изножью → потянуться и сесть → спрыгнуть → на место', () => {
     const m = new BedMachine();
     m.sleepNow(0);
     expect(m.tap(1000)).toBe('murmur');
@@ -55,8 +58,10 @@ describe('автомат сна', () => {
     expect(m.state).toBe('waking');
     expect(m.wakeWhy).toBe('taps');
     const seen: string[] = [];
+    expect(m.step?.id).toBe('uncover');
     for (let t = 1600; t <= 1600 + WAKE_MS + 50; t += 50) for (const e of m.tick(t)) seen.push(e.step?.id ?? e.done!);
-    expect(seen).toEqual(['uncover', 'hop_out_of_bed', 'awake']);
+    expect(m.step).toBeNull(); // шаги уже пройдены в цикле
+    expect(seen).toEqual(['wake_stretch_in_bed', 'hop_out_of_bed', 'walk_back', 'awake']);
     expect(m.state).toBe('awake');
   });
 
@@ -175,7 +180,7 @@ function makeHost() {
   root.appendChild(uiRoot);
   document.body.appendChild(root);
   const ui = { root: uiRoot, toast: vi.fn(), closeCatalog: vi.fn(), nudge: vi.fn(), hidePressMenu: vi.fn(), error: vi.fn(), canReanchor: true };
-  const fx = { play: vi.fn(), stop: vi.fn() };
+  const fx = { play: vi.fn(), stop: vi.fn(), kill: vi.fn(), clearParticles: vi.fn(), filter: null as ((id: string) => boolean) | null };
   const rooms: ReturnType<typeof fakeRoom>[] = [];
   const host: HomeHost = {
     root, scene, renderer: { setClearColor: vi.fn() }, tracker, stage, director, character: () => character, ui,
@@ -226,6 +231,29 @@ afterEach(() => {
 });
 
 describe('кровать в доме', () => {
+  it('спальня: кот стоит сбоку от кровати (у изножья), а не перед ней; камера отодвинута — кровать целиком', async () => {
+    const { home, rooms } = await atHome(12, 'bedroom');
+    const bedroom = ZONES.find((z) => z.id === 'bedroom')!;
+    const last = rooms[0].placeAnchor.mock.calls.at(-1)!;
+    expect(last[0]).toBe(bedroom.spot!.x);
+    expect(last[3]).toBe(bedroom.spot!.z);
+    // изножье кровати правее точки кота
+    expect(bedroom.x + BED.dx - BED.length / 2).toBeGreaterThan(bedroom.spot!.x + 0.15);
+    expect(bedroom.cam!.zoom).toBeGreaterThan(1.5);
+    void home;
+  });
+
+  it('над спящим — только Zzz: фильтр эффектов; пробуждение убирает Zzz сразу (kill), фильтр снимается', async () => {
+    const env = await asleep();
+    const fx = env.host.fx as unknown as { filter: ((id: string) => boolean) | null; kill: ReturnType<typeof vi.fn> };
+    expect(fx.filter?.('hearts_float')).toBe(false);
+    expect(fx.filter?.('zzz')).toBe(true);
+    env.home.act('home:wake');
+    expect(fx.kill).toHaveBeenCalled();
+    expect(fx.kill.mock.calls.some((c) => c[0]('zzz') === true)).toBe(true);
+    expect(fx.filter).toBeNull();
+  });
+
   it('«Уложить спать»: кот в кровати, дрёма режиссёра, Zzz, свет ночь, чипы «Разбудить» / «Открыть шторку», реплика пузырём', async () => {
     const { home, bed, director, fx, character, rooms } = await asleep();
     expect(director.dozing).toBe(true);
@@ -255,7 +283,7 @@ describe('кровать в доме', () => {
     expect(bed.state).toBe('asleep');
     home.onTouch('tap_cat_belly');
     expect(bed.state).toBe('waking');
-    expect(fx.stop).toHaveBeenCalledWith('zzz');
+    expect(fx.kill).toHaveBeenCalled();
     expect(bed.zzz).toBe(false);
     expect(director.dozing).toBe(false);
     expect(home.chips([])).toEqual([]);
@@ -289,7 +317,7 @@ describe('кровать в доме', () => {
     expect(home.zone).toBe('living');
     expect(bed.state).toBe('asleep');
     expect(bed.zzz).toBe(false);
-    expect(fx.stop).toHaveBeenLastCalledWith('zzz');
+    expect(fx.kill).toHaveBeenCalled();
     // кот не бежал в гостиную: якорь двигает только кровать (точка спальни)
     for (const c of rooms[0].placeAnchor.mock.calls.slice(placed)) expect(c[0]).toBeGreaterThan(3);
     expect(home.chips([]).map((c) => c.id)).toEqual(['home:to_bed', 'home:wake']);
@@ -314,9 +342,9 @@ describe('кровать в доме', () => {
 
   it('«На карту» во сне: Zzz комнаты снимаются, кот дремлет у карты; касание на карте будит — кровать сбрасывается', async () => {
     const { home, bed, director, fx, character } = await asleep();
-    fx.stop.mockClear();
+    fx.kill.mockClear();
     expect(home.exit()).toBe(true);
-    expect(fx.stop).toHaveBeenCalledWith('zzz');
+    expect(fx.kill).toHaveBeenCalled();
     expect(director.interaction).not.toHaveBeenCalledWith('wake_up');
     await tick(home, 1200);
     expect(home.phase).toBe('ar');
@@ -336,7 +364,7 @@ describe('кровать в доме', () => {
     director.dozing = false; // director.action → childAct
     await tick(home, 100);
     expect(bed.state).toBe('waking');
-    await tick(home, 1300);
+    await tick(home, QUICK_MS + 200);
     expect(bed.state).toBe('awake');
     expect(director.showLine).not.toHaveBeenCalledWith('wake_morning');
   });

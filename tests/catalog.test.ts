@@ -20,7 +20,7 @@ describe('каталоги content/', () => {
   });
 
   it('для каждого клипа каталога есть процедурная заглушка рига', () => {
-    expect(CLIP_IDS.length).toBe(77);
+    expect(CLIP_IDS.length).toBe(78);
     const missing = CLIP_IDS.filter((id) => !RIG_CLIPS[id]);
     expect(missing).toEqual([]);
     for (const id of CLIP_IDS) {

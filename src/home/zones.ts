@@ -23,6 +23,10 @@ export interface ZoneDef {
   x: number;
   /** пол под котом (кровать спальни — отдельно: src/home/bedFlow.ts кладёт кота на матрас) */
   floorY: number;
+  /** где стоит кот (по умолчанию — центр зоны x, CAT_Z): спальня — сбоку от кровати */
+  spot?: { x: number; z: number };
+  /** ракурс зоны: сдвиг камеры по X, отдаление (1 — как в гостиной), подъём */
+  cam?: { dx: number; zoom: number; dy: number };
   /** реплика кота при входе в зону (озвученная — звучит, иначе только подпись-иконка) */
   enterEvent: string;
   actions: ZoneAction[];
@@ -45,11 +49,17 @@ export const ZONES: readonly ZoneDef[] = [
   },
   {
     id: 'bedroom', title: 'Спальня', icon: 'home_moon', x: 3.6, floorY: 0, enterEvent: 'home_bedroom',
+    // кот стоит на полу слева от кровати (у изножья), лицом к зрителю; камера дальше — кровать видна целиком
+    spot: { x: 3.08, z: -0.08 },
+    cam: { dx: 0.06, zoom: 1.9, dy: -0.4 },
     actions: [{ id: 'home:sleep', label: 'Уложить спать', icon: 'moon' }],
   },
 ];
 
 export const DEFAULT_ZONE: ZoneId = 'living';
+/** точка кота в зоне (CAT_Z = 0,2 — как в room.ts) */
+export const zoneSpot = (z: ZoneDef) => z.spot ?? { x: z.x, z: 0.2 };
+export const zoneCam = (z: ZoneDef) => z.cam ?? { dx: 0, zoom: 1, dy: 0 };
 export const zoneIndex = (id: string): number => {
   const i = ZONES.findIndex((z) => z.id === id);
   return i < 0 ? ZONES.findIndex((z) => z.id === DEFAULT_ZONE) : i;
