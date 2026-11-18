@@ -1,0 +1,1095 @@
+{
+ "$comment": "Промпты Tripo Text-to-Motion v2 (ТЗ: docs/animations/TZ.md). prompts — плоская карта id → текст в формате t2m_prompts.json (make_anim_lib.py называет клипы по первым 55 символам — они уникальны и не пересекаются с v1). specs — параметры для приёмки и каталога content/animations.json. props — реквизит: есть/нужна модель, крепление, промпт Tripo text-to-3D. Генерация не запускалась.",
+ "version": 2,
+ "skeleton": "Mixamo 65 костей (как hooligan_rig_v1.glb); пальцы, хвост и уши в клипе не нужны",
+ "prompts": {
+  "poke_head": "Quick flinch: the cat is tapped on top of the head, ducks the head down sharply with shoulders raised for a split second, then bounces back up. Then stands still. Starts and ends in a neutral standing pose facing forward, in place.",
+  "poke_cheek": "Quick reaction: the cat gets a light tap on the right cheek, tilts the head away to the left with a little shoulder shrug, then bounces back to center. Then stands still. Starts and ends in a neutral standing pose facing forward, in place.",
+  "poke_belly": "Ticklish cat: a quick tap on the belly makes it fold forward at the waist with both paws pressed to the tummy, giggles with two short shoulder bounces, then straightens up. Then stands still. Starts and ends in a neutral standing pose facing forward, in place.",
+  "poke_paw": "Quick reaction: the cat yanks the right paw back to the chest as if touched, shakes the paw twice, then lowers it back down. Then stands still. Starts and ends in a neutral standing pose facing forward, in place.",
+  "poke_tail": "Startled hop: the cat jumps a little on the spot with arms flung out, glances back over the right shoulder with the head only, then faces forward again. Then stands still. Starts and ends in a neutral standing pose facing forward, in place.",
+  "appear_jump_in": "Cat pops up from a deep crouch: springs straight up out of the floor with arms raised, lands softly on the same spot with bent knees, gives a quick shoulder shake and stands up proudly. Ends in a neutral standing pose facing forward, in place.",
+  "dive_out": "Cat waves goodbye with the right paw, crouches, hops up and dives head first straight down into the floor like jumping into water, arms together above the head. Stays in place.",
+  "turn_step": "Cat marks time in place with small quick steps, lifting the feet alternately a few centimetres, body and head facing straight forward, arms relaxed. Seamless loop, does not rotate or move.",
+  "fall_asleep": "Sleepy cat yawns with a paw over the mouth, slowly kneels down, lies down on its right side and curls up into a ball with paws tucked under the chin, falling asleep.",
+  "wake_up": "Cat curled up asleep on its right side jolts awake, lifts the head, sits up rubbing one eye with the paw, stands up and does a short stretch with arms up. Ends in a neutral standing pose facing forward, in place.",
+  "treat_eat_hooligan": "Cocky cat tosses a small treat up, catches it in the mouth, chews with a smug nod and raises one paw in approval. Starts and ends in a neutral standing pose facing forward, in place.",
+  "treat_eat_kind": "Gentle cat takes a small treat with both paws, sniffs it, takes a bite, chews happily with closed eyes and pats its tummy. Starts and ends in a neutral standing pose facing forward, in place.",
+  "treat_eat_glitter": "Graceful cat picks up a tiny treat delicately, nibbles it, presses a paw to the cheek in delight and does a small happy bounce on the toes. Starts and ends in a neutral standing pose facing forward, in place.",
+  "scratch_enjoy": "Blissful cat leans the head to the side and up into an invisible scratching hand, eyes half closed, rubs the head against it while one leg twitches happily three times. Starts and ends in a neutral standing pose facing forward, in place.",
+  "surprise_trick_hooligan": "Cocky cat hides both paws behind the back, then whips them out pointing both paws at the viewer with a confident lean back. Starts and ends in a neutral standing pose facing forward, in place.",
+  "surprise_trick_kind": "Gentle cat hides both paws behind the back, then slowly brings them forward cupped together as if offering a surprise, smiling. Starts and ends in a neutral standing pose facing forward, in place.",
+  "surprise_trick_glitter": "Graceful cat does a quick spin on the toes and finishes with both arms wide open in a jazz hands ta-da pose. Starts and ends in a neutral standing pose facing forward, in place.",
+  "tease_hooligan": "Cheeky cat puts a paw on its nose and wiggles it, sticks out the tongue and bounces from foot to foot teasingly. Starts and ends in a neutral standing pose facing forward, in place.",
+  "tease_kind": "Playful cat holds both paws open next to the head and waggles them teasingly, then giggles shyly with a paw over the mouth. Starts and ends in a neutral standing pose facing forward, in place.",
+  "tease_glitter": "Graceful cat lifts the chin up haughtily, turns the head away with a little flick, then peeks back with a sly sideways glance. Starts and ends in a neutral standing pose facing forward, in place.",
+  "sad_sigh": "Sad cat slowly drops the shoulders and looks down, lets out a big heavy sigh, scuffs one foot on the floor, then lifts the head a little. Starts and ends in a neutral standing pose facing forward, in place.",
+  "rps_throw": "Cat plays rock paper scissors: shakes the right fist up and down three times in front of the chest, then thrusts the paw forward toward the viewer and holds it. Starts and ends in a neutral standing pose facing forward, in place.",
+  "sit_down": "Cat sits down on the floor from standing: bends the knees and lowers onto its bottom with the legs stretched forward and paws resting on the knees.",
+  "sit_idle": "Cat sits on the floor with legs stretched forward, swinging the feet alternately and gently swaying the head side to side. Seamless loop, stays seated.",
+  "stand_up": "Cat seated on the floor with legs stretched forward pulls the feet in, pushes up with the paws and stands up briskly. Ends in a neutral standing pose facing forward, in place.",
+  "wave": "Friendly cat raises the right paw above the head and waves it side to side three times, feet staying planted. Then stands still. Starts and ends in a neutral standing pose facing forward, in place.",
+  "offended": "Pouting cat crosses the arms over the chest, turns the head away with the chin up and a huff, then peeks back at the viewer out of the corner of the eye. Starts and ends in a neutral standing pose facing forward, in place.",
+  "walk": "Cartoon cat walks in place with a bouncy cheerful stride, arms swinging, head facing forward. Seamless walk cycle, no forward travel.",
+  "run": "Cartoon cat runs in place with quick light steps, arms pumping, leaning slightly forward. Seamless run cycle, no forward travel.",
+  "jump": "Cheerful cat bends the knees and springs straight up with both arms raised, lands softly on the same spot. Then stands still. Starts and ends in a neutral standing pose facing forward, in place.",
+  "flip": "Athletic cat does a backflip on the spot: crouches, jumps, flips backward and lands on the same spot with arms open in a ta-da pose. Then stands still. Starts and ends in a neutral standing pose facing forward, in place.",
+  "flinch": "Startled cat recoils backward with the upper body, paws pulled up to the chest for a moment, feet stay planted. Then stands still. Starts and ends in a neutral standing pose facing forward, in place.",
+  "knock_glass": "Curious cat leans toward the viewer and knocks twice on an invisible glass window in front of the face with the right paw knuckles. Then stands still. Starts and ends in a neutral standing pose facing forward, in place.",
+  "listen": "Attentive cat tilts the head to one side and holds a paw cupped behind the ear as if listening closely, nodding slightly. Seamless loop, stays in place.",
+  "comfort": "Caring cat leans gently toward the viewer, places the right palm flat on an invisible glass window in front, and nods softly twice with a warm look. Starts and ends in a neutral standing pose facing forward, in place.",
+  "dizzy": "Dizzy cat sways the upper body in wobbly circles with knees buckling, almost loses balance, then shakes the head hard to recover. Starts and ends in a neutral standing pose facing forward, in place.",
+  "snowglobe_shake": "Excited cat holds a ball-sized object in both paws at chest height, shakes it up and down four times vigorously, then raises it to eye level and gazes at it. Starts and ends in a neutral standing pose facing forward, in place.",
+  "idle_glitter_twirl": "Graceful cat rises on the toes, does one full pirouette in place with arms curved overhead, and finishes with a paw under the chin. Then stands still. Ends facing forward. Starts and ends in a neutral standing pose facing forward, in place.",
+  "idle_hooligan_headphones": "Cool cat nods the head to a beat, taps the right foot and flicks the left paw in rhythm, right paw resting on the chest. Seamless loop, stays in place.",
+  "hug_receive_hooligan": "Cool cat shrugs, opens the arms, gives the viewer a quick hug with two pats on the back, then scratches the back of the head awkwardly. Starts and ends in a neutral standing pose facing forward, in place.",
+  "hug_receive_glitter": "Delighted cat clasps the paws to the cheeks, then opens the arms and hugs the viewer warmly, swaying side to side on the toes. Starts and ends in a neutral standing pose facing forward, in place.",
+  "celebrate": "Happy cat jumps up with both fists in the air, lands and pumps one fist down with a big yes. Then stands still. Starts and ends in a neutral standing pose facing forward, in place.",
+  "sticker_slap": "Cat slaps the right palm flat onto an invisible glass window in front at chest height, once, quickly. Then stands still. Starts and ends in a neutral standing pose facing forward, in place.",
+  "sing": "Cat sings into an invisible microphone held in the right paw near the mouth, sways side to side and spreads the left arm dramatically. Seamless loop, stays in place.",
+  "idle_kind_cocoa": "Cozy cat brings both paws together at chest height as if holding a mug, raises it to the mouth, blows on it, tilts it for a slow sip, sighs happily and lowers the paws. Starts and ends in a neutral standing pose facing forward, in place.",
+  "idle_glitter_mirror": "Vain cat lifts a small hand mirror in the left paw to the face, adjusts a bow on top of the head with the right paw, turns the head left and right admiring itself, then lowers the mirror. Starts and ends in a neutral standing pose facing forward, in place.",
+  "skate_ride": "Cool cat steps onto a skateboard with the left foot, pushes off once with the right foot, rides balancing with arms out and knees bent, then steps off and stands. Stays in place. Starts and ends in a neutral standing pose facing forward, in place.",
+  "skate_ollie": "Cool cat standing sideways on a skateboard crouches and does an ollie jump with knees tucked, lands back on the board and throws one arm up triumphantly. Stays in place.",
+  "tumble": "Clumsy cat tucks and does a forward roll on the spot, pops back up and brushes itself off. Then stands still. Starts and ends in a neutral standing pose facing forward, in place.",
+  "sticker_react": "Cat follows something peeling off in front with the eyes and head, mouth open in surprise, one paw reaching up a little. Then stands still. Starts and ends in a neutral standing pose facing forward, in place.",
+  "idle_kind_hug_self": "Warm cat wraps the arms around itself in a cozy self hug, eyes closed, sways gently side to side with a smile. Starts and ends in a neutral standing pose facing forward, in place.",
+  "idle_look_around": "Curious cat looks to the left, then to the right, then back at the viewer with a small head tilt. Starts and ends in a neutral standing pose facing forward, in place.",
+  "idle_tail_play": "Playful cat glances back over the shoulder at its own tail, swipes at it twice with a paw while twisting the upper body, then gives up and faces forward giggling. Starts and ends in a neutral standing pose facing forward, in place.",
+  "fall_off_card": "Cat suddenly loses balance as if the floor tilts, windmills the arms, crouches low and grabs the floor with both paws. Stays in place. Starts and ends in a neutral standing pose facing forward, in place.",
+  "dance_kind": "Gentle cat dances in place swaying side to side and clapping on every sway, feet stepping lightly without travelling. Seamless loop.",
+  "dance_glitter": "Graceful cat dances in place on the toes, makes a heart shape with the paws above the head, does a half turn and back. Seamless loop, feet stay in place.",
+  "world_portal_jump_in": "Excited cat waves the viewer to follow, crouches and leaps up and forward toward the camera with both arms stretched ahead like diving through a hoop. Stays in place.",
+  "world_portal_land": "Cat flies in tucked into a ball, opens up, lands on both feet with a squash, and finishes with arms open in a ta-da pose. Ends in a neutral standing pose facing forward, in place.",
+  "world_invite_follow": "Cat beckons the viewer with the right paw twice, then points over the shoulder with the paw as if saying come on, follow me. Starts and ends in a neutral standing pose facing forward, in place.",
+  "world_room_enter": "Cat walks two steps in place, stops, plants the feet and waves hello cheerfully. Starts and ends in a neutral standing pose facing forward, in place.",
+  "world_room_exit": "Cat waves over the shoulder and starts walking in place with a bouncy stride. Stays in place.",
+  "world_eat_bowl": "Cat crouches over a bowl on the floor, leans down and eats with three dips of the head, chewing happily. Seamless loop, stays crouched.",
+  "world_eat_bowl_start": "Hungry cat rubs the paws together and crouches down over a bowl on the floor.",
+  "world_eat_bowl_end": "Full cat stands up from crouching over a bowl, pats the round tummy and licks the lips contentedly. Ends in a neutral standing pose facing forward, in place.",
+  "world_drink_cup": "Cat raises a cup to the mouth with both paws, drinks in long gulps tilting it up, then lowers it and wipes the mouth with the back of a paw. Starts and ends in a neutral standing pose facing forward, in place.",
+  "world_bed_get_in": "Sleepy cat yawns, sits down on the edge of a bed, lies back onto the pillow and folds the paws on the chest.",
+  "world_sleep_bed": "Cat sleeps on its back with paws folded on the chest, chest rising and falling slowly, one foot twitches once. Seamless loop.",
+  "world_bed_get_out": "Cat lying on its back sits up with a big stretch, swings the legs down and hops out of bed onto the floor. Ends in a neutral standing pose facing forward, in place.",
+  "world_wash_face": "Cat licks the right paw, then rubs it over the face and behind the ear three times like a real cat washing, and admires the clean paw. Starts and ends in a neutral standing pose facing forward, in place.",
+  "world_brush_teeth": "Cat brushes its teeth with a toothbrush in the right paw, moving it quickly side to side in front of the mouth, swaying slightly. Seamless loop, stays in place.",
+  "world_shake_off": "Wet cat shakes its whole body vigorously from head to toes like a dog shaking off water, then stands proudly. Starts and ends in a neutral standing pose facing forward, in place.",
+  "world_ball_kick": "Cat takes a small swing and kicks a ball with the right foot, then raises the arms happily. Then stands still. Starts and ends in a neutral standing pose facing forward, in place.",
+  "world_ball_throw": "Cat holds a ball in both paws at the chest, raises it overhead and throws it toward the viewer. Then stands still. Starts and ends in a neutral standing pose facing forward, in place.",
+  "world_ball_catch": "Cat reaches both paws forward, catches a ball at chest height, hugs it and lifts it up proudly. Starts and ends in a neutral standing pose facing forward, in place.",
+  "world_wardrobe_change": "Cat covers itself with both arms, spins around quickly once and strikes a fashion pose showing off a new outfit. Starts and ends in a neutral standing pose facing forward, in place.",
+  "world_outfit_show": "Proud cat looks down at its outfit, puts the paws on the hips and turns slightly left and right like a model. Starts and ends in a neutral standing pose facing forward, in place.",
+  "world_item_sniff": "Curious cat leans forward to sniff something on the floor in front, tilts the head, then straightens up. Starts and ends in a neutral standing pose facing forward, in place.",
+  "world_item_like": "Cat sees something it loves, clasps the paws to the cheeks and does a happy little hop. Starts and ends in a neutral standing pose facing forward, in place.",
+  "world_item_dislike": "Cat turns the head away with a grimace and pushes something away with one paw, shaking the head. Starts and ends in a neutral standing pose facing forward, in place.",
+  "world_pick_up": "Cat bends down, picks up an object from the floor with both paws and stands up holding it at the chest.",
+  "world_put_down": "Cat holding an object at the chest bends down, places it on the floor and stands up. Ends in a neutral standing pose facing forward, in place.",
+  "world_hungry": "Hungry cat holds its tummy with both paws, slumps a little and looks up at the viewer with pleading eyes. Starts and ends in a neutral standing pose facing forward, in place.",
+  "world_tired_idle": "Tired cat stands slouching, head slowly nodding off, jerks awake and slouches again. Seamless loop, stays in place.",
+  "world_knocked_over": "Cat gets pushed, stumbles backward and falls onto its bottom, rubs the back of the head, then gets up and dusts off. Starts and ends in a neutral standing pose facing forward, in place.",
+  "world_pillow_hug": "Cat hugs a big soft pillow to the chest, rubs the cheek against it and sways happily. Starts and ends in a neutral standing pose facing forward, in place."
+ },
+ "specs": {
+  "poke_head": {
+   "priority": "P0",
+   "group": "Касания",
+   "durationS": 1.0,
+   "loop": false,
+   "start": "стойка idle",
+   "end": "стойка idle",
+   "replaces": "`poke_head` (5 с вместо 1.0 с)",
+   "trigger": "тап по голове (tap_cat_head), кнопка «Почесать» до появления scratch_enjoy"
+  },
+  "poke_cheek": {
+   "priority": "P0",
+   "group": "Касания",
+   "durationS": 0.9,
+   "loop": false,
+   "start": "стойка idle",
+   "end": "стойка idle",
+   "replaces": "`poke_cheek` (5 с вместо 0.9 с)",
+   "trigger": "тап по щеке (tap_cat_cheek), кнопка «Щёчка»"
+  },
+  "poke_belly": {
+   "priority": "P0",
+   "group": "Касания",
+   "durationS": 1.2,
+   "loop": false,
+   "start": "стойка idle",
+   "end": "стойка idle",
+   "replaces": "`poke_belly` (5 с вместо 1.2 с)",
+   "trigger": "тап по животу (tap_cat_belly), кнопка «Щекотка»"
+  },
+  "poke_paw": {
+   "priority": "P0",
+   "group": "Касания",
+   "durationS": 0.9,
+   "loop": false,
+   "start": "стойка idle",
+   "end": "стойка idle",
+   "replaces": "`poke_paw` (5 с вместо 0.9 с)",
+   "trigger": "тап по лапе (tap_cat_paw), кнопка «Лапка»"
+  },
+  "poke_tail": {
+   "priority": "P0",
+   "group": "Касания",
+   "durationS": 1.0,
+   "loop": false,
+   "start": "стойка idle",
+   "end": "стойка idle",
+   "replaces": "`poke_tail` (5 с вместо 1.0 с)",
+   "trigger": "тап по хвосту (tap_cat_tail)"
+  },
+  "appear_jump_in": {
+   "priority": "P0",
+   "group": "Сценарий",
+   "durationS": 1.6,
+   "loop": false,
+   "start": "присед глубоко (корень ≈0,10 роста), лапы у груди — «внутри карты»",
+   "end": "стойка idle",
+   "replaces": "`jump_down` (прыжок сверху вниз, 3,7 с)",
+   "trigger": "intro, card_found (director `appear`)"
+  },
+  "dive_out": {
+   "priority": "P0",
+   "group": "Сценарий",
+   "durationS": 1.4,
+   "loop": false,
+   "start": "стойка idle",
+   "end": "глубокий присед/«нырок» вниз головой — кот уходит в карту (дальше прячет код)",
+   "replaces": "`dive` (нырок вперёд 2,7 с) и `run` в director `goodbye`",
+   "trigger": "goodbye, outro (кот ныряет в карту)"
+  },
+  "turn_step": {
+   "priority": "P0",
+   "group": "Сцена",
+   "durationS": 0.8,
+   "loop": true,
+   "start": "стойка idle",
+   "end": "стойка idle",
+   "replaces": "нет клипа: поворот к зрителю/к цели идёт программно в idle — лапы «едут»",
+   "trigger": "stage.turn: |угол| > 25° (к зрителю, перед ходьбой)"
+  },
+  "fall_asleep": {
+   "priority": "P0",
+   "group": "Сон",
+   "durationS": 2.2,
+   "loop": false,
+   "start": "стойка idle",
+   "end": "клубок лёжа на боку (как `sleep_loop`)",
+   "replaces": "переход idle → `sleep_loop` за 0,45 с (корень 0,24→0,07)",
+   "trigger": "sleep (кнопка «Усыпи», лестница тишины → дрёма), затем петля sleep_loop"
+  },
+  "wake_up": {
+   "priority": "P0",
+   "group": "Сон",
+   "durationS": 2.0,
+   "loop": false,
+   "start": "клубок лёжа на боку (как `sleep_loop`)",
+   "end": "стойка idle",
+   "replaces": "`wake_startle` (начинается стоя)",
+   "trigger": "wake_up (касание/голос во сне)"
+  },
+  "treat_eat_hooligan": {
+   "priority": "P0",
+   "group": "Действия-кнопки",
+   "durationS": 2.5,
+   "loop": false,
+   "start": "стойка idle",
+   "end": "стойка idle",
+   "replaces": "кнопка «Угостить» играет `celebrate` (прыжок радости)",
+   "trigger": "treat (кнопка «Угостить»)"
+  },
+  "treat_eat_kind": {
+   "priority": "P0",
+   "group": "Действия-кнопки",
+   "durationS": 2.5,
+   "loop": false,
+   "start": "стойка idle",
+   "end": "стойка idle",
+   "replaces": "кнопка «Угостить» играет `celebrate` (прыжок радости)",
+   "trigger": "treat (кнопка «Угостить»)"
+  },
+  "treat_eat_glitter": {
+   "priority": "P0",
+   "group": "Действия-кнопки",
+   "durationS": 2.5,
+   "loop": false,
+   "start": "стойка idle",
+   "end": "стойка idle",
+   "replaces": "кнопка «Угостить» играет `celebrate` (прыжок радости)",
+   "trigger": "treat (кнопка «Угостить»)"
+  },
+  "scratch_enjoy": {
+   "priority": "P0",
+   "group": "Действия-кнопки",
+   "durationS": 2.0,
+   "loop": false,
+   "start": "стойка idle",
+   "end": "стойка idle",
+   "replaces": "кнопка «Почесать» играет тычок `poke_head`",
+   "trigger": "кнопка «Почесать» (новое событие scratch вместо tap_cat_head)"
+  },
+  "surprise_trick_hooligan": {
+   "priority": "P0",
+   "group": "Действия-кнопки",
+   "durationS": 2.0,
+   "loop": false,
+   "start": "стойка idle",
+   "end": "стойка idle",
+   "replaces": "кнопка «Удиви» играет `surprised` (кот сам пугается)",
+   "trigger": "surprise (кнопка «Удиви»)"
+  },
+  "surprise_trick_kind": {
+   "priority": "P0",
+   "group": "Действия-кнопки",
+   "durationS": 2.0,
+   "loop": false,
+   "start": "стойка idle",
+   "end": "стойка idle",
+   "replaces": "кнопка «Удиви» играет `surprised` (кот сам пугается)",
+   "trigger": "surprise (кнопка «Удиви»)"
+  },
+  "surprise_trick_glitter": {
+   "priority": "P0",
+   "group": "Действия-кнопки",
+   "durationS": 2.0,
+   "loop": false,
+   "start": "стойка idle",
+   "end": "стойка idle",
+   "replaces": "кнопка «Удиви» играет `surprised` (кот сам пугается)",
+   "trigger": "surprise (кнопка «Удиви»)"
+  },
+  "tease_hooligan": {
+   "priority": "P0",
+   "group": "Действия-кнопки",
+   "durationS": 1.8,
+   "loop": false,
+   "start": "стойка idle",
+   "end": "стойка idle",
+   "replaces": "кнопка «Подразни» играет `offended` (16,6 с) / `shy`",
+   "trigger": "tease (кнопка «Подразни»)"
+  },
+  "tease_kind": {
+   "priority": "P0",
+   "group": "Действия-кнопки",
+   "durationS": 1.8,
+   "loop": false,
+   "start": "стойка idle",
+   "end": "стойка idle",
+   "replaces": "кнопка «Подразни» играет `offended` (16,6 с) / `shy`",
+   "trigger": "tease (кнопка «Подразни»)"
+  },
+  "tease_glitter": {
+   "priority": "P0",
+   "group": "Действия-кнопки",
+   "durationS": 1.8,
+   "loop": false,
+   "start": "стойка idle",
+   "end": "стойка idle",
+   "replaces": "кнопка «Подразни» играет `offended` (16,6 с) / `shy`",
+   "trigger": "tease (кнопка «Подразни»)"
+  },
+  "sad_sigh": {
+   "priority": "P0",
+   "group": "Игры",
+   "durationS": 2.5,
+   "loop": false,
+   "start": "стойка idle",
+   "end": "стойка idle",
+   "replaces": "игра emo «грустный» = `ears_back` (additive) — тело стоит в idle",
+   "trigger": "emo_is_sad; также реплики с emotion sad"
+  },
+  "rps_throw": {
+   "priority": "P0",
+   "group": "Игры",
+   "durationS": 1.8,
+   "loop": false,
+   "start": "стойка idle",
+   "end": "правая лапа вытянута вперёд на уровне груди, держит 0,5 с",
+   "replaces": "показ «камень/ножницы/бумага» = `proud` (руки в боки)",
+   "trigger": "rps_go → rps_is_rock|paper|scissors"
+  },
+  "sit_down": {
+   "priority": "P0",
+   "group": "Команды",
+   "durationS": 1.0,
+   "loop": false,
+   "start": "стойка idle",
+   "end": "сидит на полу (поза `sit_idle` v2)",
+   "replaces": "`sit` (6,9 с, кот сидит с первого кадра)",
+   "trigger": "sit («сядь», игра «Повтори движение»)"
+  },
+  "sit_idle": {
+   "priority": "P0",
+   "group": "Команды",
+   "durationS": 3.0,
+   "loop": true,
+   "start": "сидит на полу (поза `sit_idle` v2)",
+   "end": "сидит на полу (поза `sit_idle` v2)",
+   "replaces": "алиас `standing_relax` (стоит)",
+   "trigger": "после sit_down, пока ребёнок не скажет «встань»/не коснётся"
+  },
+  "stand_up": {
+   "priority": "P0",
+   "group": "Команды",
+   "durationS": 0.9,
+   "loop": false,
+   "start": "сидит на полу (поза `sit_idle` v2)",
+   "end": "стойка idle",
+   "replaces": "`stand_up` (встаёт с пола, не из позы sit)",
+   "trigger": "выход из sit_idle"
+  },
+  "wave": {
+   "priority": "P0",
+   "group": "Сценарий",
+   "durationS": 1.4,
+   "loop": false,
+   "start": "стойка idle",
+   "end": "стойка idle",
+   "replaces": "пресет `greet_01` (шаг на месте — лапы скользят, pop 14)",
+   "trigger": "hello, wave, game_bye, simon_is_wave и ещё 25 реакций"
+  },
+  "offended": {
+   "priority": "P0",
+   "group": "Эмоции",
+   "durationS": 2.2,
+   "loop": false,
+   "start": "стойка idle",
+   "end": "стойка idle",
+   "replaces": "пресет `fold_arms` (16,6 с)",
+   "trigger": "tease (Х,Б до вариантов), rude, poke_combo, emo_is_angry"
+  },
+  "walk": {
+   "priority": "P1",
+   "group": "Сцена",
+   "durationS": 1.0,
+   "loop": true,
+   "start": "стойка idle",
+   "end": "стойка idle",
+   "replaces": "пресет `walk` 2,3 с (скольжение на старте)",
+   "trigger": "walk_to (тап по карте)"
+  },
+  "run": {
+   "priority": "P1",
+   "group": "Сцена",
+   "durationS": 0.6,
+   "loop": true,
+   "start": "стойка idle",
+   "end": "стойка idle",
+   "replaces": "пресет `run` (шум jit 49)",
+   "trigger": "walk_far"
+  },
+  "jump": {
+   "priority": "P1",
+   "group": "Команды",
+   "durationS": 1.2,
+   "loop": false,
+   "start": "стойка idle",
+   "end": "стойка idle",
+   "replaces": "`jump` 4,6 с",
+   "trigger": "jump, simon_is_jump, blow_stickers"
+  },
+  "flip": {
+   "priority": "P1",
+   "group": "Команды",
+   "durationS": 1.4,
+   "loop": false,
+   "start": "стойка idle",
+   "end": "стойка idle",
+   "replaces": "`flip` 4,3 с, скольжение на приземлении",
+   "trigger": "flip, double_tap, simon_is_flip"
+  },
+  "flinch": {
+   "priority": "P1",
+   "group": "Касания",
+   "durationS": 0.7,
+   "loop": false,
+   "start": "стойка idle",
+   "end": "стойка idle",
+   "replaces": "пресет `frightened` 3,4 с с подскоком",
+   "trigger": "poke_hard"
+  },
+  "knock_glass": {
+   "priority": "P1",
+   "group": "Стекло",
+   "durationS": 1.0,
+   "loop": false,
+   "start": "стойка idle",
+   "end": "стойка idle",
+   "replaces": "`knock_glass` 4,7 с, pop 27",
+   "trigger": "tap_screen"
+  },
+  "listen": {
+   "priority": "P1",
+   "group": "Сценарий",
+   "durationS": 2.0,
+   "loop": true,
+   "start": "стойка idle",
+   "end": "стойка idle",
+   "replaces": "алиас `agree` (кивает)",
+   "trigger": "ask_name, echo_start, unknown, *_more — ожидание ответа"
+  },
+  "comfort": {
+   "priority": "P1",
+   "group": "Безопасность",
+   "durationS": 3.0,
+   "loop": false,
+   "start": "стойка idle",
+   "end": "стойка idle",
+   "replaces": "алиас `hug` (обнимает себя)",
+   "trigger": "sad, scared (диалог поддержки)"
+  },
+  "dizzy": {
+   "priority": "P1",
+   "group": "Эмоции",
+   "durationS": 2.0,
+   "loop": false,
+   "start": "стойка idle",
+   "end": "стойка idle",
+   "replaces": "`dizzy` вялый (p95 1,0)",
+   "trigger": "shake, spam"
+  },
+  "snowglobe_shake": {
+   "priority": "P1",
+   "group": "Предметы",
+   "durationS": 2.0,
+   "loop": false,
+   "start": "стойка idle",
+   "end": "стойка idle",
+   "replaces": "`snowglobe_shake` (2,2 с пустого начала, почти неподвижен)",
+   "trigger": "shake (Блёстка)"
+  },
+  "idle_glitter_twirl": {
+   "priority": "P1",
+   "group": "Idle",
+   "durationS": 2.5,
+   "loop": false,
+   "start": "стойка idle",
+   "end": "стойка idle",
+   "replaces": "алиас `dance_03` (12 с танца)",
+   "trigger": "idle Блёстки, swipe"
+  },
+  "idle_hooligan_headphones": {
+   "priority": "P1",
+   "group": "Idle",
+   "durationS": 4.0,
+   "loop": true,
+   "start": "стойка idle",
+   "end": "стойка idle",
+   "replaces": "одноразовое «надеть наушники» в петле",
+   "trigger": "idle Хулигана"
+  },
+  "hug_receive_hooligan": {
+   "priority": "P1",
+   "group": "Действия-кнопки",
+   "durationS": 2.5,
+   "loop": false,
+   "start": "стойка idle",
+   "end": "стойка idle",
+   "replaces": "«Обнять» у Хулигана = `purr_stroke`",
+   "trigger": "stroke_long / кнопка «Обнять» (Хулиган)"
+  },
+  "hug_receive_glitter": {
+   "priority": "P1",
+   "group": "Действия-кнопки",
+   "durationS": 2.5,
+   "loop": false,
+   "start": "стойка idle",
+   "end": "стойка idle",
+   "replaces": "«Обнять» у Блёстки = `purr_stroke`",
+   "trigger": "stroke_long / кнопка «Обнять» (Блёстка)"
+  },
+  "celebrate": {
+   "priority": "P1",
+   "group": "Эмоции",
+   "durationS": 1.8,
+   "loop": false,
+   "start": "стойка idle",
+   "end": "стойка idle",
+   "replaces": "`celebrate` 4,8 с, pop 16 (39 реакций)",
+   "trigger": "yes, nice_name, riddle_right, treat (до treat_eat), …"
+  },
+  "sticker_slap": {
+   "priority": "P1",
+   "group": "Сценарий",
+   "durationS": 0.7,
+   "loop": false,
+   "start": "стойка idle",
+   "end": "стойка idle",
+   "replaces": "`sticker_slap` 5 с для серии шлепков",
+   "trigger": "switch_start, stickers (серия)"
+  },
+  "sing": {
+   "priority": "P1",
+   "group": "Сценарий",
+   "durationS": 4.0,
+   "loop": true,
+   "start": "стойка idle",
+   "end": "стойка idle",
+   "replaces": "пресет `sing_01` 15,5 с",
+   "trigger": "sing"
+  },
+  "idle_kind_cocoa": {
+   "priority": "P1",
+   "group": "Предметы",
+   "durationS": 4.0,
+   "loop": false,
+   "start": "стойка idle",
+   "end": "стойка idle",
+   "replaces": "`idle_kind_cocoa` (кружка не наклоняется, появляется из воздуха)",
+   "trigger": "idle Добряка, silence"
+  },
+  "idle_glitter_mirror": {
+   "priority": "P1",
+   "group": "Предметы",
+   "durationS": 3.5,
+   "loop": false,
+   "start": "стойка idle",
+   "end": "стойка idle",
+   "replaces": "`idle_glitter_mirror` (зеркальце висит весь клип)",
+   "trigger": "idle Блёстки, silence"
+  },
+  "skate_ride": {
+   "priority": "P1",
+   "group": "Предметы",
+   "durationS": 4.0,
+   "loop": false,
+   "start": "стойка idle",
+   "end": "стойка idle",
+   "replaces": "`idle_hooligan_skate` (скейт невидим, ноги дрожат)",
+   "trigger": "idle Хулигана"
+  },
+  "skate_ollie": {
+   "priority": "P2",
+   "group": "Предметы",
+   "durationS": 2.0,
+   "loop": false,
+   "start": "стоит на доске (последний кадр 1,2 с skate_ride)",
+   "end": "стоит на доске",
+   "replaces": "нет",
+   "trigger": "double_tap/«трюк» Хулигана (вариант к gum_blow)"
+  },
+  "tumble": {
+   "priority": "P2",
+   "group": "Касания",
+   "durationS": 1.4,
+   "loop": false,
+   "start": "стойка idle",
+   "end": "стойка idle",
+   "replaces": "пресет `defeat_02` 6,2 с",
+   "trigger": "spam (Хулиган)"
+  },
+  "sticker_react": {
+   "priority": "P2",
+   "group": "Сценарий",
+   "durationS": 1.0,
+   "loop": false,
+   "start": "стойка idle",
+   "end": "стойка idle",
+   "replaces": "алиас `laugh_01`",
+   "trigger": "sticker_peel"
+  },
+  "idle_kind_hug_self": {
+   "priority": "P2",
+   "group": "Idle",
+   "durationS": 3.0,
+   "loop": false,
+   "start": "стойка idle",
+   "end": "стойка idle",
+   "replaces": "алиас `hug` (= comfort)",
+   "trigger": "idle Добряка"
+  },
+  "idle_look_around": {
+   "priority": "P2",
+   "group": "Idle",
+   "durationS": 3.5,
+   "loop": false,
+   "start": "стойка idle",
+   "end": "стойка idle",
+   "replaces": "пресет `look_around` 15,6 с",
+   "trigger": "idle"
+  },
+  "idle_tail_play": {
+   "priority": "P2",
+   "group": "Idle",
+   "durationS": 3.0,
+   "loop": false,
+   "start": "стойка idle",
+   "end": "стойка idle",
+   "replaces": "`idle_tail_play` (вращение корпуса против сцены)",
+   "trigger": "idle Хулигана/Блёстки"
+  },
+  "fall_off_card": {
+   "priority": "P2",
+   "group": "Сценарий",
+   "durationS": 1.4,
+   "loop": false,
+   "start": "стойка idle",
+   "end": "стойка idle",
+   "replaces": "пресет `fall`",
+   "trigger": "card_lost (идея: кот теряет опору)"
+  },
+  "dance_kind": {
+   "priority": "P2",
+   "group": "Танцы",
+   "durationS": 4.0,
+   "loop": true,
+   "start": "стойка idle",
+   "end": "стойка idle",
+   "replaces": "пресет `dance_02` (скольжение 0,15)",
+   "trigger": "dance Добряка"
+  },
+  "dance_glitter": {
+   "priority": "P2",
+   "group": "Танцы",
+   "durationS": 4.0,
+   "loop": true,
+   "start": "стойка idle",
+   "end": "стойка idle",
+   "replaces": "пресет `dance_03` (скольжение 0,19)",
+   "trigger": "dance Блёстки"
+  },
+  "world_portal_jump_in": {
+   "priority": "W0",
+   "group": "Мир кота",
+   "durationS": 1.6,
+   "loop": false,
+   "start": "стойка idle",
+   "end": "в прыжке, сжат (дальше масштаб/вспышка — код)",
+   "replaces": "нет",
+   "trigger": "«Пойдём, покажу свой дом»: с карты прыжок в «портал» (в телефон)"
+  },
+  "world_portal_land": {
+   "priority": "W0",
+   "group": "Мир кота",
+   "durationS": 1.4,
+   "loop": false,
+   "start": "в полёте, сгруппирован",
+   "end": "стойка idle",
+   "replaces": "нет",
+   "trigger": "выпрыгивает из портала в комнату / обратно на карту"
+  },
+  "world_invite_follow": {
+   "priority": "W0",
+   "group": "Мир кота",
+   "durationS": 2.0,
+   "loop": false,
+   "start": "стойка idle",
+   "end": "полуоборот в сторону цели (yaw ≤ 45°)",
+   "replaces": "нет",
+   "trigger": "зовёт за собой (перед порталом / к предмету)"
+  },
+  "world_room_enter": {
+   "priority": "W1",
+   "group": "Мир кота",
+   "durationS": 2.0,
+   "loop": false,
+   "start": "шаг (как walk)",
+   "end": "стойка idle",
+   "replaces": "нет",
+   "trigger": "входит в комнату (из-за кадра)"
+  },
+  "world_room_exit": {
+   "priority": "W1",
+   "group": "Мир кота",
+   "durationS": 1.6,
+   "loop": false,
+   "start": "стойка idle",
+   "end": "шаг (переход в walk)",
+   "replaces": "нет",
+   "trigger": "уходит из комнаты"
+  },
+  "world_eat_bowl": {
+   "priority": "W1",
+   "group": "Мир кота",
+   "durationS": 3.0,
+   "loop": true,
+   "start": "присед над миской (корень ≈0,14)",
+   "end": "то же",
+   "replaces": "нет",
+   "trigger": "ест из миски (тамагочи: голод)"
+  },
+  "world_eat_bowl_start": {
+   "priority": "W1",
+   "group": "Мир кота",
+   "durationS": 0.8,
+   "loop": false,
+   "start": "стойка idle",
+   "end": "присед eat_bowl",
+   "replaces": "нет",
+   "trigger": "присесть к миске"
+  },
+  "world_eat_bowl_end": {
+   "priority": "W1",
+   "group": "Мир кота",
+   "durationS": 1.5,
+   "loop": false,
+   "start": "присед eat_bowl",
+   "end": "стойка idle",
+   "replaces": "нет",
+   "trigger": "наелся"
+  },
+  "world_drink_cup": {
+   "priority": "W1",
+   "group": "Мир кота",
+   "durationS": 2.5,
+   "loop": false,
+   "start": "стойка idle",
+   "end": "стойка idle",
+   "replaces": "нет",
+   "trigger": "пьёт молоко из кружки (проп cup_milk = cocoa_mug)"
+  },
+  "world_bed_get_in": {
+   "priority": "W1",
+   "group": "Мир кота",
+   "durationS": 2.5,
+   "loop": false,
+   "start": "стойка idle",
+   "end": "лёжа на спине, лапы на груди (поза sleep_bed)",
+   "replaces": "нет",
+   "trigger": "ложится в кровать (сон)"
+  },
+  "world_sleep_bed": {
+   "priority": "W1",
+   "group": "Мир кота",
+   "durationS": 4.0,
+   "loop": true,
+   "start": "на спине",
+   "end": "то же",
+   "replaces": "нет",
+   "trigger": "спит в кровати (петля)"
+  },
+  "world_bed_get_out": {
+   "priority": "W1",
+   "group": "Мир кота",
+   "durationS": 2.5,
+   "loop": false,
+   "start": "на спине",
+   "end": "стойка idle",
+   "replaces": "нет",
+   "trigger": "встаёт с кровати"
+  },
+  "world_wash_face": {
+   "priority": "W1",
+   "group": "Мир кота",
+   "durationS": 3.0,
+   "loop": false,
+   "start": "стойка idle",
+   "end": "стойка idle",
+   "replaces": "нет",
+   "trigger": "умывается лапой (тамагочи: чистота)"
+  },
+  "world_brush_teeth": {
+   "priority": "W1",
+   "group": "Мир кота",
+   "durationS": 3.0,
+   "loop": true,
+   "start": "стойка idle",
+   "end": "стойка idle",
+   "replaces": "нет",
+   "trigger": "чистит зубы (проп toothbrush)"
+  },
+  "world_shake_off": {
+   "priority": "W1",
+   "group": "Мир кота",
+   "durationS": 1.5,
+   "loop": false,
+   "start": "стойка idle",
+   "end": "стойка idle",
+   "replaces": "нет",
+   "trigger": "отряхивается всем телом (после мытья/дождя)"
+  },
+  "world_ball_kick": {
+   "priority": "W1",
+   "group": "Мир кота",
+   "durationS": 1.2,
+   "loop": false,
+   "start": "стойка idle",
+   "end": "стойка idle",
+   "replaces": "нет",
+   "trigger": "пинает мяч"
+  },
+  "world_ball_throw": {
+   "priority": "W1",
+   "group": "Мир кота",
+   "durationS": 1.4,
+   "loop": false,
+   "start": "стойка idle",
+   "end": "стойка idle",
+   "replaces": "нет",
+   "trigger": "бросает мяч ребёнку"
+  },
+  "world_ball_catch": {
+   "priority": "W1",
+   "group": "Мир кота",
+   "durationS": 1.2,
+   "loop": false,
+   "start": "стойка idle",
+   "end": "стойка idle",
+   "replaces": "нет",
+   "trigger": "ловит мяч"
+  },
+  "world_wardrobe_change": {
+   "priority": "W1",
+   "group": "Мир кота",
+   "durationS": 2.0,
+   "loop": false,
+   "start": "стойка idle",
+   "end": "стойка idle",
+   "replaces": "нет",
+   "trigger": "переодевание у гардероба: прячется за дверцу/кружится, в 1,0 с — смена меша"
+  },
+  "world_outfit_show": {
+   "priority": "W1",
+   "group": "Мир кота",
+   "durationS": 2.0,
+   "loop": false,
+   "start": "стойка idle",
+   "end": "стойка idle",
+   "replaces": "нет",
+   "trigger": "показывает обновку"
+  },
+  "world_item_sniff": {
+   "priority": "W2",
+   "group": "Мир кота",
+   "durationS": 2.0,
+   "loop": false,
+   "start": "стойка idle",
+   "end": "стойка idle",
+   "replaces": "нет",
+   "trigger": "реакция на предмет: нюхает/рассматривает"
+  },
+  "world_item_like": {
+   "priority": "W2",
+   "group": "Мир кота",
+   "durationS": 1.5,
+   "loop": false,
+   "start": "стойка idle",
+   "end": "стойка idle",
+   "replaces": "нет",
+   "trigger": "предмет понравился"
+  },
+  "world_item_dislike": {
+   "priority": "W2",
+   "group": "Мир кота",
+   "durationS": 1.5,
+   "loop": false,
+   "start": "стойка idle",
+   "end": "стойка idle",
+   "replaces": "нет",
+   "trigger": "предмет не понравился («фу»)"
+  },
+  "world_pick_up": {
+   "priority": "W2",
+   "group": "Мир кота",
+   "durationS": 1.2,
+   "loop": false,
+   "start": "стойка idle",
+   "end": "стоит, предмет в двух лапах у груди",
+   "replaces": "нет",
+   "trigger": "поднимает предмет с пола"
+  },
+  "world_put_down": {
+   "priority": "W2",
+   "group": "Мир кота",
+   "durationS": 1.2,
+   "loop": false,
+   "start": "предмет у груди",
+   "end": "стойка idle",
+   "replaces": "нет",
+   "trigger": "кладёт предмет"
+  },
+  "world_hungry": {
+   "priority": "W2",
+   "group": "Мир кота",
+   "durationS": 2.5,
+   "loop": false,
+   "start": "стойка idle",
+   "end": "стойка idle",
+   "replaces": "нет",
+   "trigger": "тамагочи: голоден"
+  },
+  "world_tired_idle": {
+   "priority": "W2",
+   "group": "Мир кота",
+   "durationS": 4.0,
+   "loop": true,
+   "start": "стойка idle",
+   "end": "стойка idle",
+   "replaces": "нет",
+   "trigger": "тамагочи: устал (петля)"
+  },
+  "world_knocked_over": {
+   "priority": "W2",
+   "group": "Мир кота",
+   "durationS": 2.5,
+   "loop": false,
+   "start": "стойка idle",
+   "end": "стойка idle",
+   "replaces": "нет",
+   "trigger": "толкнули (как у Тома): падает на попу и встаёт"
+  },
+  "world_pillow_hug": {
+   "priority": "W2",
+   "group": "Мир кота",
+   "durationS": 3.0,
+   "loop": false,
+   "start": "стойка idle",
+   "end": "стойка idle",
+   "replaces": "нет",
+   "trigger": "обнимает подушку (проп pillow)"
+  }
+ },
+ "props": {
+  "treat_snack": {
+   "status": "нужна",
+   "priority": "P0",
+   "for": [
+    "treat_eat_hooligan",
+    "treat_eat_kind",
+    "treat_eat_glitter"
+   ],
+   "bone": "RightHand",
+   "size": 0.05,
+   "prompt": "A small cartoon fish-shaped cookie treat for a cat, golden brown, glossy icing stripe, chunky stylized shape, game asset, simple clean topology"
+  },
+  "skateboard": {
+   "status": "нужна",
+   "priority": "P1",
+   "for": [
+    "skate_ride",
+    "skate_ollie"
+   ],
+   "anchor": "ground",
+   "size": 0.12,
+   "prompt": "A small cartoon skateboard, black deck with lime green grip edges and pink wheels, chunky stylized proportions, game asset, low detail, clean topology"
+  },
+  "microphone": {
+   "status": "нужна",
+   "priority": "P2",
+   "for": [
+    "sing"
+   ],
+   "bone": "RightHand",
+   "size": 0.1,
+   "prompt": "A cartoon handheld microphone, silver mesh head, lime green handle, chunky stylized, game asset"
+  },
+  "bowl": {
+   "status": "нужна",
+   "priority": "W1",
+   "for": [
+    "world_eat_bowl",
+    "world_eat_bowl_start",
+    "world_eat_bowl_end"
+   ],
+   "anchor": "ground",
+   "size": 0.08,
+   "prompt": "A cute cartoon cat food bowl with a paw print on the side, mint green ceramic, filled with kibble, stylized game asset"
+  },
+  "ball": {
+   "status": "нужна",
+   "priority": "W1",
+   "for": [
+    "world_ball_kick",
+    "world_ball_throw",
+    "world_ball_catch"
+   ],
+   "bone": "both",
+   "size": 0.1,
+   "prompt": "A soft cartoon toy ball with green and white stripes, slightly squashy look, stylized game asset"
+  },
+  "pillow": {
+   "status": "нужна",
+   "priority": "W2",
+   "for": [
+    "world_pillow_hug",
+    "world_bed_get_in"
+   ],
+   "bone": "both",
+   "size": 0.2,
+   "prompt": "A big soft cartoon pillow, pale lavender fabric with a star pattern, plump stylized shape, game asset"
+  },
+  "bed": {
+   "status": "нужна (сцена, не в лапе)",
+   "priority": "W1",
+   "for": [
+    "world_bed_get_in",
+    "world_sleep_bed",
+    "world_bed_get_out"
+   ],
+   "anchor": "scene",
+   "prompt": "A small cozy cartoon cat bed, wooden frame, mint blanket and lavender pillow, stylized children room furniture, game asset"
+  },
+  "toothbrush": {
+   "status": "нужна",
+   "priority": "W1",
+   "for": [
+    "world_brush_teeth"
+   ],
+   "bone": "RightHand",
+   "size": 0.1,
+   "prompt": "A cartoon toothbrush, lime green handle, white bristles with a dab of toothpaste, chunky stylized, game asset"
+  },
+  "wardrobe": {
+   "status": "нужна (сцена)",
+   "priority": "W1",
+   "for": [
+    "world_wardrobe_change",
+    "world_outfit_show"
+   ],
+   "anchor": "scene",
+   "prompt": "A small cartoon wardrobe for a children room, rounded wooden doors with star handles, pastel mint and cream, stylized game asset"
+  },
+  "cup_milk": {
+   "status": "есть: cocoa_mug.glb (перекрасить)",
+   "priority": "W1",
+   "for": [
+    "world_drink_cup"
+   ],
+   "bone": "both",
+   "size": 0.08,
+   "prompt": null
+  },
+  "cocoa_mug": {
+   "status": "есть: public/models/props/cocoa_mug.glb",
+   "priority": "P1",
+   "for": [
+    "idle_kind_cocoa"
+   ],
+   "bone": "both",
+   "size": 0.08,
+   "prompt": null
+  },
+  "hand_mirror": {
+   "status": "есть: public/models/props/hand_mirror.glb",
+   "priority": "P1",
+   "for": [
+    "idle_glitter_mirror"
+   ],
+   "bone": "LeftHand",
+   "size": 0.16,
+   "prompt": null
+  },
+  "snow_globe": {
+   "status": "есть: public/models/props/snow_globe.glb",
+   "priority": "P1",
+   "for": [
+    "snowglobe_shake"
+   ],
+   "bone": "both",
+   "size": 0.13,
+   "prompt": null
+  },
+  "bubble_wand": {
+   "status": "есть: public/models/props/bubble_wand.glb",
+   "priority": "—",
+   "for": [
+    "kind_bubbles"
+   ],
+   "bone": "RightHand",
+   "size": 0.17,
+   "prompt": null
+  }
+ }
+}
