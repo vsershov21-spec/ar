@@ -7,7 +7,8 @@
 //
 //   npm run qa                         — всё (сборка ~1,5 мин + прогон ~10 мин)
 //   npm run qa -- --no-build           — без пересборки (bench-out/qa/dist уже есть)
-//   npm run qa -- --only first,return  — только сессии first | return | denied
+//   npm run qa -- --only first,return  — только сессии first | return | denied | chaos
+//   npm run qa -- --only chaos --no-build — хаотичные тапы (?flow=chaos, src/debug/flows.ts; docs/qa/CHAOS.md): 40 с бури
 //   npm run qa -- --throttle 2 --k 6 --headful --keep (не закрывать браузер) --url http://localhost:5173/ (свой сервер)
 //
 // Голос: озвучку заменяет scripts/scenario/fake-voice.mjs (тишина длиной как реплика, набор «озвученного» —
@@ -38,7 +39,7 @@ const URL0 = arg('--url', `http://localhost:${PORT}/`);
 const THROTTLE = Number(arg('--throttle', 4));
 const K = Number(arg('--k', 6));
 const GPU = arg('--gpu', 'stub');
-const ONLY = arg('--only', 'first,return,denied').split(',');
+const ONLY = arg('--only', 'first,return,denied,chaos').split(',');
 const IPHONE_UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Mobile/15E148 Safari/604.1';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const log = (...a) => console.log(`[qa ${new Date().toISOString().slice(11, 19)}]`, ...a);
@@ -980,6 +981,100 @@ async function sessionDenied(browser) {
   return { s, rec: [], err, long: [] };
 }
 
+// ───────────── сессия 4: хаотичные тапы (?flow=chaos — автотапер в странице, настоящие pointer-события) ─────────────
+// Ассерты: касание обрабатывается быстро (худшее и среднее время dispatchEvent), кадры не проваливаются, очередь реплик
+// не растёт, после бури кот договаривает и возвращается в покой, ошибок нет. Пороги — для headless CPU ×THROTTLE.
+async function sessionChaos(browser, ctx) {
+  const DUR = Number(arg('--chaos-dur', 40));
+  const s = await openPage(browser, ctx, 'chaos', { memory: { name: 'Маша', persona: 'hooligan', met: true, visits: 3 } });
+  await s.page.goto(`${URL0}?flow=chaos&dur=${DUR}`, { waitUntil: 'domcontentloaded' });
+  await s.cdp.send('Emulation.setCPUThrottlingRate', { rate: THROTTLE });
+  let wakeBtn;
+  await s.step('chaos_start', 'Хаос: старт и посадка (повторный визит, ?flow=chaos)', async (st) => {
+    wakeBtn = await onboarding(s, st);
+    if (!wakeBtn) throw new Error('нет кнопки wake');
+    await permissionsAndLanding(s, wakeBtn);
+    const ok = await s.until(() => window.__app.stage.root.visible && ['play', 'free'].includes(window.__app.director.state.phase), 90000);
+    s.check(ok, 'кот не вышел в игру за 90 с');
+    // зона под пальцем: капсулы костей (быстро) против луча по скинованной сетке (старый путь) — сетка точек вокруг кота
+    const z = await s.ev(() => {
+      const app = window.__app, ch = app.character, r = app.ui.catRect?.();
+      if (!r || !ch.hitZoneMesh) return null;
+      const THREE_RAY = app.ray ?? null;
+      const w = app.root.clientWidth, h = app.root.clientHeight;
+      let n = 0, same = 0, onBoth = 0, onlyMesh = 0, onlyProxy = 0, tm = 0, tp = 0;
+      const diff = {};
+      for (let i = 0; i <= 10; i++)
+        for (let j = 0; j <= 12; j++) {
+          const x = r.cx + (i / 10 - 0.5) * r.half * 3.2, y = r.top + (j / 12) * (r.bottom - r.top) * 1.1 - 10;
+          const ray = THREE_RAY;
+          ray.setFromCamera({ x: (x / w) * 2 - 1, y: -(y / h) * 2 + 1 }, app.tracker.camera);
+          app.stage.root.updateMatrixWorld(true);
+          let t0 = performance.now();
+          const a = ch.hitZoneMesh(ray);
+          tm += performance.now() - t0;
+          t0 = performance.now();
+          const b = ch.hitZone(ray);
+          tp += performance.now() - t0;
+          n++;
+          if (a === b) same++;
+          else diff[`${a}→${b}`] = (diff[`${a}→${b}`] ?? 0) + 1;
+          if (a && b) onBoth++;
+          else if (a) onlyMesh++;
+          else if (b) onlyProxy++;
+        }
+      return { n, same, onBoth, onlyMesh, onlyProxy, meshMs: tm / n, proxyMs: tp / n, diff };
+    }).catch((e) => ({ err: String(e) }));
+    if (z?.n) {
+      s.note(`зоны касания: капсулы против сетки — совпало ${z.same}/${z.n} (${Math.round((z.same / z.n) * 100)}%), «на коте» только по сетке ${z.onlyMesh}, только по капсулам ${z.onlyProxy}; время на точку: сетка ${z.meshMs.toFixed(2)} мс, капсулы ${z.proxyMs.toFixed(3)} мс; расхождения ${JSON.stringify(z.diff)}`);
+      s.check(z.same / z.n >= 0.8, `зоны капсул расходятся с сеткой: совпало ${z.same}/${z.n}`, 'warn');
+    } else s.note(`сверка зон: ${JSON.stringify(z)}`);
+    await s.sample('baseline', true);
+  });
+  await s.step('chaos_storm', `Хаос: ${DUR} с тапов 5–15/с по коту и мимо, глажка, долгое, кнопки, фразы`, async (st) => {
+    const go = await s.until(() => !!window.__chaos, 20000);
+    if (!s.check(go, 'автотапер не запустился (window.__chaos)')) return;
+    const long0 = await s.ev(() => window.__qaLong.length);
+    let maxQ = 0, clips = new Set(), samples = 0;
+    const end = Date.now() + (DUR + 60) * 1000;
+    while (Date.now() < end) {
+      const r = await s.ev(() => ({ run: window.__chaos.running, q: window.__app.director.queue.pending.length, clip: window.__app.character.currentClip }));
+      maxQ = Math.max(maxQ, r.q);
+      clips.add(r.clip);
+      samples++;
+      if (!r.run) break;
+      await sleep(500);
+    }
+    st.shots.push(await s.shot('chaos_mid'));
+    const c = await s.ev(() => ({ ...window.__chaos, avg: window.__chaos.sumMs / Math.max(1, window.__chaos.n) }));
+    const long = await s.ev((n) => window.__qaLong.slice(n).filter((x) => x.ms > 200).length, long0);
+    s.note(`касаний ${c.taps}, глажек ${c.strokes}, долгих ${c.longs}, кнопок ${c.buttons}, фраз ${c.phrases}; обработка pointer-события: ср. ${c.avg.toFixed(2)} мс, худшее ${c.maxMs.toFixed(1)} мс (CPU ×${THROTTLE}); к/с мин ${Number.isFinite(c.fpsMin) ? c.fpsMin.toFixed(0) : '—'}; длинных задач > 200 мс: ${long}; очередь реплик макс. ${maxQ}; клипов за бурю ${clips.size}`);
+    s.check(!c.running, 'буря не закончилась вовремя');
+    // headless: главный поток занят SwiftShader и чтением кадра камеры (BUGS № 13) — таймеры автотапера опаздывают
+    s.check(c.taps > DUR, `автотапер сделал мало касаний: ${c.taps}`, 'warn');
+    // 2 мс на телефоне ≈ 2×THROTTLE в headless; худшее — с запасом на сборку мусора
+    s.check(c.avg < 2 * THROTTLE, `касание обрабатывается в среднем ${c.avg.toFixed(2)} мс (бюджет ${2 * THROTTLE} мс при CPU ×${THROTTLE})`);
+    s.check(c.maxMs < 16 * THROTTLE, `худшее касание ${c.maxMs.toFixed(1)} мс — дольше кадра (×${THROTTLE})`, 'warn');
+    s.check(maxQ <= 4, `очередь реплик выросла до ${maxQ}`);
+    s.check(long <= 3, `длинных задач > 200 мс во время бури: ${long}`, 'warn');
+  });
+  await s.step('chaos_after', 'Хаос: после бури кот договаривает и возвращается в покой', async () => {
+    const quiet = await s.waitQuiet(30000);
+    s.check(quiet, 'кот не замолчал за 30 с после бури');
+    await sleep(5000);
+    const r = await s.ev(() => ({ clip: window.__app.character.currentClip, q: window.__app.director.queue.busy, phase: window.__app.director.state.phase, zzz: window.__app.fx.activeIds?.includes?.('zzz') }));
+    s.check(/^(idle|talk|listen|sleep|walk)/.test(r.clip) || r.q, `кот «залип» в клипе ${r.clip}`);
+    s.check(['play', 'free'].includes(r.phase), `после бури фаза ${r.phase}`);
+    await s.sample('final', true);
+  });
+  const rec = await s.rec().catch(() => []);
+  const err = await s.ev(() => window.__qaErr ?? []).catch(() => []);
+  const long = await s.ev(() => (window.__qaLong ?? []).map((x) => ({ ...x, rt: Math.round(x.at - (window.__qaR0 ?? 0)) }))).catch(() => []);
+  const draws = await s.ev(() => (window.__qaDrawWin ?? []).map(([a, b]) => [a - (window.__qaR0 ?? 0), b - (window.__qaR0 ?? 0)])).catch(() => []);
+  if (PROFILE) await dumpProfile(s);
+  return { s, rec, err, long, draws };
+}
+
 // ───────────── запуск ─────────────
 media();
 if (!flag('--no-build') && !arg('--url', '')) build();
@@ -1012,6 +1107,11 @@ try {
     if (!flag('--keep')) await r.s.page.close();
   }
   if (ONLY.includes('denied')) sessions.push(await sessionDenied(browser));
+  if (ONLY.includes('chaos')) {
+    const r = await sessionChaos(browser, await browser.createBrowserContext());
+    sessions.push(r);
+    if (!flag('--keep')) await r.s.page.close();
+  }
 } finally {
   const results = sessions.map((x) => ({ name: x.s.name, steps: x.s.steps, metrics: x.s.metrics, console: x.s.console, err: x.err, long: x.long, rec: x.rec, analysis: analyze(x) }));
   fs.writeFileSync(path.join(OUT, 'results.json'), JSON.stringify(results.map(({ rec, ...r }) => r), null, 1));

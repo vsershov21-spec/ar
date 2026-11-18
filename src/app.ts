@@ -32,9 +32,11 @@ import { progressReady } from './progress';
 import { PERSONA_IDS } from './persona/types';
 import { setGlRenderer } from './core/glRenderer';
 import { EnergyBudget, defaultPixelRatio, fxNeedsBoost, isMobileDevice } from './core/energy';
+import { isPersonaId } from './persona/types';
+import { prepareFlowMemory, runFlow } from './debug/flows';
 
 export type CharacterMode = 'sprite' | 'rig' | 'glb';
-export type TrackerKind = 'card' | 'mindar' | 'debug' | '8thwall' | 'webxr';
+export type TrackerKind = 'card' | 'mindar' | 'debug' | '8thwall' | 'webxr' | 'nocard';
 
 export interface AppParams {
   debug: boolean;
@@ -48,8 +50,11 @@ export interface AppParams {
 export function readParams(search = location.search): AppParams {
   const q = new URLSearchParams(search);
   const debug = q.has('debug');
-  const t = (q.get('tracker') as TrackerKind) || (debug ? 'debug' : 'card');
-  const c = (q.get('char') as CharacterMode) || 'glb';
+  // ?nocard — кот на столе без карты (камера фоном, ?nocard=off — без камеры): страница тестовых флоу /test
+  const t = (q.get('tracker') as TrackerKind) || (q.has('nocard') ? 'nocard' : debug ? 'debug' : 'card');
+  // ?char=hooligan|kind|glitter — выбор кота (3D); ?char=sprite|rig|glb — режим персонажа, как раньше
+  const cq = q.get('char');
+  const c = (cq && isPersonaId(cq) ? 'glb' : (cq as CharacterMode)) || 'glb';
   // микрофон: по умолчанию «слушаю всегда»; ?mic=ptt — по кнопке; выбор ребёнка/родителя запоминается
   let savedMic: string | null = null;
   try {
@@ -206,7 +211,8 @@ export class App {
     // модель выбранного характера и библиотека движений: качаются, пока ребёнок листает онбординг
     // (код 3D-персонажа — параллельно, а не после звуков и режиссёра)
     if (p.character === 'glb' && !new URLSearchParams(location.search).get('glb')) {
-      const own = (ASSETS.glbByPersona as Record<string, string>)[loadMemory().persona ?? PERSONA_IDS[0]];
+      const sp = new URLSearchParams(location.search), qc = sp.get('cat') ?? sp.get('char');
+      const own = (ASSETS.glbByPersona as Record<string, string>)[(isPersonaId(qc) ? qc : loadMemory().persona) ?? PERSONA_IDS[0]];
       if (own) prefetchModel(own, 'high');
       prefetchModel(ASSETS.glbAnims, 'high');
       void import('./character/glbCharacter').catch(() => undefined);
@@ -225,6 +231,7 @@ export class App {
     this.bindVoice();
 
     await progressReady(); // память с сервера (≤ 1,5 с от старта страницы; обычно уже готова к этому моменту)
+    prepareFlowMemory(); // ?flow=… — без знакомства, сразу игра (src/debug/flows.ts)
     this.director = new Director({
       tracker: this.tracker, stage: this.stage, fx: this.fx, audio: this.audio, voice: this.voice, ui: this.ui,
       content, glCanvas: this.renderer.domElement, size: () => ({ w: this.root.clientWidth, h: this.root.clientHeight }),
@@ -260,6 +267,7 @@ export class App {
     window.addEventListener('resize', () => this.resize());
     this.resize();
     this.renderer.setAnimationLoop(() => this.frame());
+    runFlow(this);
   }
 
   /** слой эффектов: звук, точки кота, лог, характер (палитра, fxTuning, наклейки из content/src/*.meta.json) */
@@ -494,6 +502,10 @@ export class App {
 
   private async makeTracker(kind: TrackerKind): Promise<Tracker> {
     if (kind === 'debug') return new DebugTracker(asset(ASSETS.cardImage));
+    if (kind === 'nocard') {
+      const { NoCardTracker } = await import('./tracker/noCardTracker');
+      return new NoCardTracker(asset(ASSETS.cardImage), this.root, new URLSearchParams(location.search).get('nocard') !== 'off');
+    }
     if (kind === '8thwall') {
       const { EighthWallTracker } = await import('./tracker/eighthWallTracker');
       const c = document.createElement('canvas');

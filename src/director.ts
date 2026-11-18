@@ -21,7 +21,8 @@ import type { PickedLine } from './persona/picker';
 import type { ContentLine, FxName, PersonaId, Riddle } from './persona/types';
 import { isPersonaId, PERSONA_IDS } from './persona/types';
 import { runtimeClip, runtimeFx, runtimeSound } from './persona/runtimeMap';
-import type { Character, Emote } from './character/types';
+import { CLIPS, type Character, type Emote } from './character/types';
+import { resolveClip } from './character/clips';
 import type { Stage } from './stage';
 import type { FxLayer } from './fx/fxLayer';
 import type { Audio } from './audio/audio';
@@ -74,6 +75,19 @@ const COVER_FX = new Set(['snow_globe', 'steam', 'steam_draw', 'steam_heart', 'k
 const COVER_GAP_MS = 10_000;
 const USER_ACT_MS = 2500;
 const CARD_LOST_SAY_MS = 1500;
+/**
+ * Хаотичные тапы (docs/qa/CHAOS.md, docs/qa/BUGS.md № 19–20): тап пальцем по коту / мимо, пока кот ещё произносит
+ * реплику на прошлый тап (< TAP_LINE_HOLD_MS), — без новой реплики (эмоция и звук — да): иначе 10–15 тапов в секунду
+ * давали стаккато «Ха- Ой- Хв-» по 70 мс. Клип реакции меняется не чаще раза в TAP_CLIP_HOLD_MS (кот не дёргается).
+ * spam, poke_combo, поглаживание и кнопки — без задержки.
+ */
+const TAP_RE = /^(tap_cat|tap_screen)/;
+const TAP_LINE_HOLD_MS = 900;
+const TAP_CLIP_HOLD_MS = 350;
+/** петли, которые держатся законно: сон, ходьба, покой, мурчание (его снимает stroke_end); остальные петли реакций — до конца реплики */
+const LOOP_KEEP = /^(idle|sleep_loop|walk|run|purr_stroke)/;
+const LOOP_MAX_MS = 3000;
+const DANCE_MAX_MS = 8000;
 
 /** панель действий и каталог «Что умеет кот»: кнопка → событие режиссёра (таблица — scenario/actions.ts) */
 export { ACTIONS, type ActionId } from './scenario/actions';
@@ -118,12 +132,25 @@ export class Director extends Emitter<DirectorEvents> {
   private coachPending = false;
   /** ?synth — разрешить синтез браузера для неозвученных реплик (по умолчанию: есть озвучка — без синтеза, только пузырь) */
   private allowSynth = typeof location !== 'undefined' && new URLSearchParams(location.search).has('synth');
+  /** идёт обработка тапа пальцем (не кнопки): реакции действует удержание TAP_*_HOLD_MS */
+  private fingerTap = false;
+  private fromButton = false;
+  private lastTapLineAt = -1e9;
+  private lastTapClipAt = -1e9;
+  private loopTimer = 0;
 
   constructor(private d: DirectorDeps) {
     super();
     // ?fresh — для проверки продактом: знакомство с нуля (имя, характер, «уже знакомы» стираются)
     if (typeof location !== 'undefined' && new URLSearchParams(location.search).has('fresh')) clearMemory();
     const mem = loadMemory();
+    // ?cat=hooligan|kind|glitter (или ?char=<характер>) — страница тестовых флоу /test: какой кот выйдет
+    const qcat = typeof location !== 'undefined' ? new URLSearchParams(location.search) : null;
+    const cat = qcat?.get('cat') ?? qcat?.get('char');
+    if (isPersonaId(cat)) {
+      mem.persona = cat;
+      saveMemory({ persona: cat });
+    }
     const ctxEv = contextEvent(new Date(), mem.lastVisitAt);
     this.state = initialState(mem, ctxEv);
     this.personas = new PersonaContext(d.content, mem.persona);
@@ -168,7 +195,7 @@ export class Director extends Emitter<DirectorEvents> {
     const prev = this.state;
     // ребёнок ответил на вопрос узла (или раньше, чем кот договорил вопрос): недоговорённый вопрос не звучит
     const dl = prev.dialog;
-    if (dl?.listening && (e.type === 'intent' || e.type === 'answer' || e.type === 'name' || e.type === 'skip_name' || e.type === 'choose')) {
+    if (dl?.listening && (e.type === 'intent' || e.type === 'answer' || e.type === 'game_answer' || e.type === 'name' || e.type === 'skip_name' || e.type === 'choose')) {
       const tag = `${dl.id}.${dl.node}`;
       if (this.queue.drop((it) => it.tag === tag)) this.log(`снят недоговорённый вопрос ${tag}`);
     }
@@ -180,6 +207,19 @@ export class Director extends Emitter<DirectorEvents> {
     // вход в игру; конец мини-игры, в которой ребёнок участвовал, — тишина считается отсюда.
     // Предложение кота, оставшееся без ответа, лестницу не сбрасывает (иначе «ты тут?» по кругу)
     if ((playing(r.state.phase) && !playing(prev.phase)) || (prev.dialog && !r.state.dialog && this.lastUserAct >= this.dialogStartedAt)) this.ladder.reset(now);
+    // игру бросили ради другой (кнопка «Камень, ножницы…» посреди «Угадай эмоцию», «мне грустно», другой диалог):
+    // её недосказанные реплики («не угадал», «это был весёлый я») не звучат перед новой (docs/qa/BUGS.md № 24)
+    // Новая игра началась, а прошлая ещё договаривает «ладно, поиграем потом» в очереди — тоже не звучит.
+    const pd = prev.dialog, nd = r.state.dialog;
+    // кнопка той же игры посреди игры («Повтори движение» ещё раз) — игра началась заново
+    const restart = !!pd && pd.id === nd?.id && e.type === 'intent' && !!e.intent.button && resolveTrigger(this.cfg.dialogs, e.intent.type)?.id === pd.id;
+    if (pd && (pd.id !== nd?.id || restart) && (nd || (e.type === 'intent' && e.intent.button))) {
+      const pre = `${pd.id}.`;
+      if (this.queue.drop((it) => !!it.tag?.startsWith(pre))) this.log(`сняты реплики брошенной игры ${pd.id}`);
+    } else if (!pd && nd) {
+      const cur = this.queue.current;
+      if (this.queue.drop((it) => it !== cur && !!it.tag)) this.log(`сняты хвосты прошлой игры перед ${nd.id}`);
+    }
     if (e.type !== 'timer' || e.id !== 'pause_end')
       this.log(`${e.type}${'kind' in e ? ':' + e.kind : ''}${'intent' in e ? ':' + e.intent.type : ''}${'result' in e ? ':' + e.result : ''} → ${r.state.phase}${r.state.dialog ? ` [${r.state.dialog.id}.${r.state.dialog.node}]` : ''}`);
     for (const a of r.actions) this.exec(a);
@@ -266,7 +306,12 @@ export class Director extends Emitter<DirectorEvents> {
         }
       }
     }
-    this.dispatch(kind === 'shake' ? { type: 'shake' } : { type: 'interaction', kind });
+    this.fingerTap = !this.fromButton && TAP_RE.test(kind);
+    try {
+      this.dispatch(kind === 'shake' ? { type: 'shake' } : { type: 'interaction', kind });
+    } finally {
+      this.fingerTap = false;
+    }
   }
 
   private canWalk() {
@@ -296,7 +341,12 @@ export class Director extends Emitter<DirectorEvents> {
       const path = Array.from({ length: 9 }, (_, i) => ({ x: w * (0.22 + i * 0.07), y: h * (0.5 - Math.sin((i / 8) * Math.PI) * 0.08) }));
       return this.interaction('swipe', { from: path[0], path, x: path[8].x, y: path[8].y });
     }
-    this.interaction(r.touch as InteractionKind);
+    this.fromButton = true;
+    try {
+      this.interaction(r.touch as InteractionKind);
+    } finally {
+      this.fromButton = false;
+    }
     if (r.touch === 'sleep') {
       // «Усыпи»: подремлет и проснётся сам, если ребёнок ничего не нажал
       const at = this.lastUserAct;
@@ -324,6 +374,8 @@ export class Director extends Emitter<DirectorEvents> {
       this.dozing = false;
       this.stopSleepFx();
       if (this.character && !this.d.stage.walking) this.character.play('idle');
+      // лицо «сплю» (эмоция без срока) не остаётся на проснувшемся коте, если у команды нет своей эмоции
+      (this.character as Character & { clearEmotion?: () => void })?.clearEmotion?.();
       this.log('проснулся (действие ребёнка)');
     }
   }
@@ -601,10 +653,18 @@ export class Director extends Emitter<DirectorEvents> {
       this.stopSleepFx();
     }
     this.emotion(event);
+    const tap = this.fingerTap;
     if (quiet) {
       // знакомство / мини-игра: касание видно (клип, эффект, эмоция), но слова не перебивают шаг
       const def = this.persona.reactions[event];
-      if (def) this.playVisual({ clip: def.clip, fx: def.fx ? [def.fx] : [], sound: def.sound });
+      if (def) this.playVisual({ clip: def.clip, fx: def.fx ? [def.fx] : [], sound: def.sound, tap });
+      return;
+    }
+    // тап, пока кот ещё говорит ответ на прошлый тап: без новой реплики (и без перебивания её на полуслове)
+    const cur = this.queue.current;
+    if (tap && cur?.priority === 1 && performance.now() - this.lastTapLineAt < TAP_LINE_HOLD_MS) {
+      const def = this.persona.reactions[event];
+      if (def) this.playVisual({ clip: def.clip, sound: def.sound, tap });
       return;
     }
     const o = { name: this.state.name, prefer: this.prefer, strict: this.strictVoice };
@@ -616,12 +676,12 @@ export class Director extends Emitter<DirectorEvents> {
     if (!pk) {
       if (this.picker.coolingDown(event)) return;
       const def = this.persona.reactions[event];
-      if (def) this.playVisual({ clip: def.clip, fx: def.fx ? [def.fx] : [], sound: def.sound });
+      if (def) this.playVisual({ clip: def.clip, fx: def.fx ? [def.fx] : [], sound: def.sound, tap });
       else this.log(`нет реакции «${event}» у ${this.persona.id}`);
       return;
     }
-    this.playVisual({ clip: pk.clip, fx: pk.fx ? [pk.fx] : [], sound: pk.sound, face: pk.face });
-    this.enqueue(pk, false);
+    this.playVisual({ clip: pk.clip, fx: pk.fx ? [pk.fx] : [], sound: pk.sound, face: pk.face, tap });
+    if (this.enqueue(pk, false) && tap) this.lastTapLineAt = performance.now();
   }
 
   private get picker() {
@@ -731,7 +791,8 @@ export class Director extends Emitter<DirectorEvents> {
     this.emit('log', `🗨 ${lineId}: ${pk.text}`);
     if (pk.event === 'meet_skills') this.startCoach();
     const prevClip = this.character.currentClip;
-    const talk = prevClip === 'idle' && !this.d.stage.walking;
+    // покой — и вариант покоя (idle_look_around…): кот начинает «говорить» телом
+    const talk = /^idle/.test(prevClip) && !this.d.stage.walking;
     if (talk) this.character.play('talk', { loop: true });
     const v = p.voice;
     const req: SpeakRequest & { lineId: string; piperVoice: string; pitchSemitones: number; emotion: string } = {
@@ -753,8 +814,11 @@ export class Director extends Emitter<DirectorEvents> {
     const v = p.voice;
     const t = text.trim().slice(0, 120);
     if (!t) return;
+    // ребёнок тараторит: повторяем последнюю фразу, а не копим очередь из повторов (docs/qa/BUGS.md № 25)
+    const cur = this.queue.current;
+    this.queue.drop((it) => it !== cur && (it.event === 'echo' || it.tag === 'echo.repeat'));
     this.queue.say({
-      persona: p.id, event: 'echo', priority: 2, interruptible: true,
+      persona: p.id, event: 'echo', priority: 2, interruptible: true, tag: 'echo.say',
       run: async () => {
         this.d.ui.say(t, p.name, p.id, 60_000);
         const voice = this.d.voice as VoicePlayer & { echo?: (t: string, o: { persona: string; pitchSemitones: number; rate: number }) => Promise<void> };
@@ -801,14 +865,45 @@ export class Director extends Emitter<DirectorEvents> {
     else if (FACE_EMOTE[preset]) ch.emote(FACE_EMOTE[preset], 1400);
   }
 
-  private playVisual(v: { clip?: string; fx?: string[]; sound?: string; face?: string }) {
+  private playVisual(v: { clip?: string; fx?: string[]; sound?: string; face?: string; tap?: boolean }) {
     const d = this.d;
     const snd = runtimeSound(v.sound, (s) => d.audio.has(s));
     if (snd) d.audio.play(snd);
     const clip = runtimeClip(v.clip);
-    if (clip && !d.stage.walking) this.character.play(clip);
+    const now = performance.now();
+    // тапы чаще TAP_CLIP_HOLD_MS — клип прошлого тапа доигрывает (а не 5 смен позы за 0,3 с)
+    const held = v.tap && now - this.lastTapClipAt < TAP_CLIP_HOLD_MS;
+    if (clip && !d.stage.walking && !held) {
+      this.character.play(clip);
+      if (v.tap) this.lastTapClipAt = now;
+      this.guardLoop(clip);
+    }
     for (const f of v.fx ?? []) void this.runFx(f);
     this.face(v.face);
+  }
+
+  /**
+   * Петля реакции (talk_excited, listen, press_glass, peek_from_edge, танец…) сама не кончается: раньше кот после
+   * «help» / «invite» / долгого нажатия так и стоял в «говорящей» позе (docs/qa/BUGS.md № 21). Возврат в покой —
+   * когда реплика кончилась и прошло LOOP_MAX_MS (танец — DANCE_MAX_MS).
+   */
+  private guardLoop(clip: string) {
+    const def = resolveClip(clip, this.persona.id);
+    if (def?.layer === 'additive') return; // уши/хвост поверх тела — петлю тела не трогают
+    clearTimeout(this.loopTimer);
+    this.loopTimer = 0;
+    if (!def?.loop || LOOP_KEEP.test(def.id)) return;
+    const t0 = performance.now();
+    const check = () => {
+      this.loopTimer = 0;
+      if (!this.character || this.character.currentClip !== clip || this.d.stage.walking) return;
+      if ((this.d.voice.speaking || this.queue.busy) && performance.now() - t0 < 30_000) {
+        this.loopTimer = window.setTimeout(check, 400);
+        return;
+      }
+      this.character.play('idle');
+    };
+    this.loopTimer = window.setTimeout(check, /^dance/.test(def.id) ? DANCE_MAX_MS : LOOP_MAX_MS);
   }
 
   /**
@@ -962,7 +1057,9 @@ export class Director extends Emitter<DirectorEvents> {
       if ((this.idleT += dt) > 8 + Math.random() * 4) {
         this.idleT = 0;
         const clip = runtimeClip(this.personas.pickIdle());
-        if (clip && clip !== 'idle') this.character.play(clip);
+        // вариант покоя — один проход: петля (idle_breathe, наушники) иначе играла до конца сессии, currentClip
+        // переставал быть 'idle' — больше ни вариантов, ни «говорящего» тела на репликах (docs/qa/BUGS.md № 22)
+        if (clip && clip !== 'idle') this.character.play(clip, CLIPS[clip].loop ? { loop: false } : {});
       }
     } else this.idleT = 0;
     this.idleTick(playing);
@@ -1010,6 +1107,37 @@ export class Director extends Emitter<DirectorEvents> {
   /** любая активность пользователя (касание, голос) откладывает инициативу кота */
   activity() {
     turn.userActivity();
+  }
+
+  /**
+   * Тестовые флоу (?flow=…, src/debug/flows.ts, страница /test): прыжок в состояние после посадки кота.
+   * Мини-игры — как кнопка каталога, «дрёма» — как после 110 с тишины, «смена» и «грустно» — как сказал ребёнок.
+   */
+  flow(name: string): boolean {
+    switch (name) {
+      case 'riddle':
+      case 'echo':
+      case 'emo':
+      case 'rps':
+      case 'simon':
+        this.action(name);
+        return true;
+      case 'doze':
+        this.ladder.fired(performance.now());
+        this.react('sleep');
+        return true;
+      case 'switch':
+        this.text('давай другого');
+        return true;
+      case 'sad':
+        this.text('мне грустно');
+        return true;
+      case 'outro':
+        this.dispatch({ type: 'outro_request' });
+        return true;
+    }
+    this.log(`нет флоу «${name}»`);
+    return false;
   }
 
   static readonly kidsUrl = ASSETS.sberKidsUrl;

@@ -41,6 +41,14 @@
 - Ошибка сжатия не роняет сборку — модель остаётся исходной. `AR_MODEL_OPT=0 npm run build` — выключить.
 - Вручную: `node scripts/build/model-opt.mjs public/models/kind_v1.glb --out /tmp/kind.glb`.
 
+### Страницы /test и /test/admin
+
+`vite build` собирает `index.html` и все `test/**/index.html` (`vite.config.ts → pages()`): `dist/test/index.html`
+(тестовые флоу), `dist/test/admin/index.html`. Пути ассетов в них относительные (`../assets/…`), поэтому страница
+открывается по адресу со слэшем: `file_server` Caddy сам перенаправляет `/test` → `/test/`. Если в блоке `ar.vershov.com`
+стоит SPA-запасной путь (`try_files {path} /index.html`), продакту нужно добавить каталоги:
+`try_files {path} {path}/index.html /index.html` — иначе `/test` отдаст главную страницу.
+
 ## Логи и откат
 
 - Лог сборок на сервере: `/srv/ar/update.log`.

@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#21a038" />
+  <meta name="robots" content="noindex" />
+  <title>СберКот — тестовые флоу</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧪</text></svg>" />
+  <!-- Страница для продакта и команд: каждый флоу — ссылка на прототип с параметрами URL (src/debug/flows.ts, src/app.ts).
+       Модификаторы сверху добавляются ко всем ссылкам: «без карты», «любая карта», debug, perf, кот. Список параметров — docs/DEVICE_TEST.md. -->
+  <style>
+    :root {
+      --green: #21a038; --green-d: #13742a; --green-t: #157a2c; --lime: #b5e36a; --teal: #0b5e6b; --ink: #1f2a2e; --ink-2: #5b6a70;
+      --font: 'SB Sans Text', -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, sans-serif;
+    }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html { background: #eef3f1; }
+    body { margin: 0; font: 15px/1.4 var(--font); color: var(--ink); -webkit-font-smoothing: antialiased; padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 32px); }
+    header {
+      padding: calc(env(safe-area-inset-top, 0px) + 20px) 16px 22px; color: #fff; border-radius: 0 0 28px 28px;
+      background: radial-gradient(90% 120% at 85% 8%, rgba(255,255,255,.35), transparent 55%), linear-gradient(135deg, #b5e36a 0%, #42c35b 48%, #21a038 100%);
+      box-shadow: 0 10px 30px rgba(19,116,42,.3);
+    }
+    header h1 { margin: 0 0 4px; font-size: 26px; line-height: 1.1; font-weight: 800; letter-spacing: -.01em; }
+    header p { margin: 0; font-size: 14px; opacity: .95; }
+    main { max-width: 640px; margin: 0 auto; padding: 0 12px; }
+    h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--green-t); margin: 24px 6px 8px; }
+    .mods { background: #fff; border-radius: 24px; padding: 12px; margin-top: -14px; position: relative; box-shadow: 0 8px 24px rgba(0,0,0,.08); }
+    .mods .row { display: flex; flex-wrap: wrap; gap: 8px; }
+    .mods .lbl { font-size: 12px; font-weight: 700; color: var(--ink-2); margin: 6px 4px 6px; }
+    .tg { border: 0; border-radius: 999px; padding: 9px 14px; min-height: 40px; font: 700 14px var(--font); color: var(--green-t);
+      background: linear-gradient(180deg, #fff, #eef5f1); box-shadow: 0 3px 0 #c5d6cc, 0 6px 14px rgba(0,0,0,.08); cursor: pointer; }
+    .tg[aria-pressed="true"] { color: #fff; background: linear-gradient(180deg, #34c252, #21a038); box-shadow: inset 0 2px 0 rgba(255,255,255,.3), 0 3px 0 var(--green-d), 0 6px 14px rgba(19,116,42,.3); }
+    .tg:active { transform: translateY(2px); }
+    .url { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--ink-2); margin: 10px 4px 2px; word-break: break-all; }
+    .card { background: #fff; border-radius: 24px; padding: 14px 14px 12px; margin: 10px 0; box-shadow: 0 6px 18px rgba(0,0,0,.07); }
+    .card h3 { margin: 0 0 6px; font-size: 18px; line-height: 1.2; font-weight: 800; }
+    .card .em { font-size: 22px; margin-right: 6px; }
+    .card dl { margin: 0 0 10px; display: grid; grid-template-columns: auto 1fr; gap: 2px 8px; font-size: 14px; }
+    .card dt { font-weight: 700; color: var(--ink-2); }
+    .card dd { margin: 0; }
+    .btns { display: flex; flex-wrap: wrap; gap: 8px; }
+    a.go, button.go {
+      display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 46px; padding: 10px 18px; border: 0; border-radius: 999px;
+      font: 800 15px var(--font); color: #fff; text-decoration: none; cursor: pointer;
+      background: linear-gradient(180deg, #34c252 0%, #21a038 100%); box-shadow: inset 0 2px 0 rgba(255,255,255,.35), 0 5px 0 var(--green-d), 0 10px 18px rgba(19,116,42,.28);
+    }
+    a.go.light, button.go.light { color: var(--green-t); background: linear-gradient(180deg, #fff 0%, #f1f6f3 100%); box-shadow: 0 5px 0 #c5d6cc, 0 10px 18px rgba(0,0,0,.1); }
+    a.go.teal { background: linear-gradient(180deg, #13808f, #0b5e6b); box-shadow: inset 0 2px 0 rgba(255,255,255,.25), 0 5px 0 #073f48, 0 10px 18px rgba(7,63,72,.3); }
+    button.go.danger { background: linear-gradient(180deg, #ff7a6b, #e5483a); box-shadow: inset 0 2px 0 rgba(255,255,255,.3), 0 5px 0 #a8291e, 0 10px 18px rgba(168,41,30,.25); }
+    a.go:active, button.go:active { transform: translateY(3px); box-shadow: 0 2px 0 var(--green-d); }
+    pre { background: #f4f8f6; border-radius: 12px; padding: 10px; font-size: 12px; white-space: pre-wrap; word-break: break-all; margin: 10px 0 0; }
+    footer { text-align: center; color: var(--ink-2); font-size: 12px; margin: 24px 16px 0; }
+    code { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; background: #eef5f1; padding: 1px 5px; border-radius: 6px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>🐱 СберКот · тестовые флоу</h1>
+    <p>Открой ссылку на телефоне, нажми «Открыть камеру». Каждая карточка — что проверяем и что должно получиться.</p>
+  </header>
+  <main>
+    <section class="mods" aria-label="Модификаторы ко всем ссылкам">
+      <div class="lbl">Где кот</div>
+      <div class="row" data-group="where">
+        <button class="tg" data-mod="" aria-pressed="true">На карте Сбера</button>
+        <button class="tg" data-mod="anycard">На любой карте</button>
+        <button class="tg" data-mod="nocard">Без карты (камера фоном)</button>
+        <button class="tg" data-mod="nocard=off">Без карты и камеры</button>
+      </div>
+      <div class="lbl">Кот</div>
+      <div class="row" data-group="cat">
+        <button class="tg" data-mod="" aria-pressed="true">Как в памяти</button>
+        <button class="tg" data-mod="cat=hooligan">Хулиган</button>
+        <button class="tg" data-mod="cat=kind">Добряк</button>
+        <button class="tg" data-mod="cat=glitter">Блёстка</button>
+      </div>
+      <div class="lbl">Отладка</div>
+      <div class="row" data-group="dbg" data-multi>
+        <button class="tg" data-mod="debug">Лог (?debug)</button>
+        <button class="tg" data-mod="perf">Замеры (?perf)</button>
+        <button class="tg" data-mod="synth">Синтез речи (?synth)</button>
+        <button class="tg" data-mod="mic=ptt">Микрофон по кнопке</button>
+      </div>
+      <div class="url" id="mods-url"></div>
+    </section>
+
+    <h2>Сценарий</h2>
+    <div id="cards"></div>
+
+    <h2>Память кота</h2>
+    <div class="card">
+      <h3><span class="em">🧽</span>Очистить память кота</h3>
+      <dl><dt>Что</dt><dd>Стирает имя, характер, «уже знакомы», число визитов и режим микрофона на этом телефоне (localStorage).</dd>
+        <dt>Ждём</dt><dd>Следующий запуск — знакомство с нуля, как у нового ребёнка.</dd></dl>
+      <div class="btns"><button class="go danger" id="wipe">Очистить память</button><button class="go light" id="show">Что помнит кот</button></div>
+      <pre id="mem" hidden></pre>
+    </div>
+    <div class="card">
+      <h3><span class="em">☁️</span>Прогресс на сервере</h3>
+      <dl><dt>Что</dt><dd>Память кота хранится и на сервере по коду устройства (docs/qa/TEST_FLOWS.md). Кнопка ниже стирает её и на телефоне, и на сервере.</dd>
+        <dt>Ждём</dt><dd>«Готово…»; следующий запуск — знакомство с нуля. Ссылка «Сброс по ссылке» — то же через <code>?reset=1</code>.</dd></dl>
+      <div id="progress"></div>
+      <div class="btns" style="margin-top:10px"><a class="go light" id="reset-link" href="../?reset=1">Сброс по ссылке</a><a class="go teal" href="./admin/">Админ-сброс по коду</a></div>
+    </div>
+
+    <footer>Параметры URL и чек-лист — <code>docs/DEVICE_TEST.md</code>. Хаос-матрица — <code>docs/qa/CHAOS.md</code>.</footer>
+  </main>
+
+  <script type="module">
+    import { mountProgressReset } from '../src/progress/resetBlock.ts';
+    mountProgressReset(document.getElementById('progress'));
+  </script>
+  <script type="module">
+    // флоу: [эмодзи, заголовок, что проверяем, ожидание, [[подпись, параметры, стиль?]…], карта не нужна?]
+    const FLOWS = [
+      ['👋', 'Знакомство с нуля', 'Первый визит: поздравление → «как тебя зовут?» → имя → «я — …» → обучалка «погладь меня».', 'Все шаги голосом, касания во время знакомства — без слов; в конце три кнопки внизу и подсказка.', [['С нуля', 'fresh']]],
+      ['🔁', 'Повторный визит', 'Кот уже знаком («Маша», если имени нет): без знакомства.', 'Одна тёплая реплика «с возвращением» и трюк, сразу игра; лапка активна.', [['Повторный', 'flow=return']]],
+      ['🍽️', 'Без карты — кот на столе', 'Проверка сценария, реплик и касаний без поиска карты: кот сразу на виртуальной площадке.', 'После «Открыть камеру» кот выходит через ~1 с в центре экрана, камера фоном (или фирменный фон без камеры).', [['Камера фоном', 'nocard'], ['Без камеры', 'nocard=off', 'light']], true],
+      ['💳', 'Любая карта', 'Посадка на любую банковскую карту (без проверки, что она Сбера).', 'Кот садится на любую карту на столе за ≤ 2 с.', [['Любая карта', 'anycard']], true],
+      ['🟢', 'Только карта Сбера', 'Обычный режим: проверка знака/дизайна карты.', 'На карте Сбера кот садится; на чужой карте — подсказка, кот не выходит.', [['Карта Сбера', '']], true],
+      ['❓', 'Загадка', 'Мини-игра сразу после посадки.', 'Кот загадывает; неверно → подсказка; «Сдаюсь» → ответ → «ещё?»; касания посреди — только клип.', [['Загадка', 'flow=riddle']]],
+      ['🦜', 'Повторялка', 'Повтор голосом кота.', 'Скажи фразу — кот повторяет выше тоном; «хватит» или 20 с тишины — «режим попугая выключен».', [['Повторялка', 'flow=echo']]],
+      ['🎭', 'Угадай эмоцию', 'Кот показывает эмоцию лицом и клипом.', 'Чипы-ответы; верно — радость, мимо — показ ещё раз, потом «это был …» и «ещё?».', [['Эмоции', 'flow=emo']]],
+      ['✊', 'Камень, ножницы, бумага', 'Кот выбирает заранее, «раз, два, три!».', 'Ответ чипом или голосом → «у меня …» и кто выиграл → «ещё раунд?».', [['КНБ', 'flow=rps']]],
+      ['🕺', 'Повтори движение', 'Кот показывает движение, ребёнок жмёт такую же кнопку.', 'Кнопка движения — ответ; другая кнопка заканчивает игру; три раунда — победа.', [['Повтори', 'flow=simon']]],
+      ['😴', 'Дрёма сейчас', 'Кот засыпает сразу (как после 110 с тишины).', 'Zzz над котом, кот молчит; тап — «А? Я не спал!», Zzz пропадают; кнопка — будит и сразу выполняет.', [['Дрёма', 'flow=doze']]],
+      ['🔄', 'Смена кота', '«Давай другого»: экран заклеен наклейками.', 'Встряска (или «Сдёрнуть») → новый образ здоровается одной репликой; «нет» — отмена; 15 с без встряски — наклейки слетают сами.', [['Смена', 'flow=switch']]],
+      ['💚', 'Мне грустно', 'Безопасность: бережный ответ.', 'Кот поддерживает и советует позвать взрослого; затем реагирует на касание, кнопку и фразу.', [['Грустно', 'flow=sad']]],
+      ['🐾', 'Хаотичные тапы', 'Автотапер: 5–15 касаний в секунду по коту и мимо, глажка, долгое нажатие, кнопки, фразы (60 с).', 'Кот не «дёргается» и не тараторит обрывками, к/с без провалов, касание ≤ 2 мс (табличка сверху); после — снова покой.', [['5–15 в с', 'flow=chaos'], ['15 в с', 'flow=chaos&rate=15', 'light'], ['5 в с', 'flow=chaos&rate=5', 'light']]],
+      ['🏠', 'Зов в СберKids', 'Конец сессии сразу (обычно — через 4–6 мин).', 'Кот зовёт к брату в СберKids, кнопка «В СберKids»; игра продолжается.', [['Зов', 'flow=outro']]],
+      ['🔋', 'Энергия и качество', 'Энергобюджет и адаптивное качество.', '⚡ выключен — 60 к/с всегда; q=0 — максимум, q=3 — минимум (мех, чёткость); в ?debug видно уровень.', [['Без энергобюджета', 'energy=0'], ['Энергобюджет', 'energy=1', 'light'], ['q=0', 'q=0', 'light'], ['q=3', 'q=3', 'light'], ['30 к/с', 'fps=30', 'light'], ['dpr=1', 'dpr=1', 'light']]],
+      ['🛠️', 'Отладка', 'Лог режиссёра, замеры кадра, карта без камеры.', '?debug — панель и лог («тишина 30 с → offer»); ?perf — window.__perf.report(); tracker=debug — нарисованная карта.', [['?debug', 'debug', 'teal'], ['?perf', 'perf', 'teal'], ['Карта без камеры', 'tracker=debug', 'teal']]],
+    ];
+
+    const base = new URL('../', location.href);
+    const state = { where: '', cat: '', dbg: new Set() };
+    const mods = (noCardOk) => {
+      const p = [];
+      if (state.where && !noCardOk) p.push(state.where);
+      if (state.cat) p.push(state.cat);
+      for (const m of state.dbg) p.push(m);
+      return p;
+    };
+    const href = (params, own) => {
+      const p = [params, ...mods(own)].filter(Boolean);
+      return new URL(p.length ? `?${p.join('&')}` : '', base).href;
+    };
+    const cards = document.getElementById('cards');
+    for (const [em, title, what, expect, links, own] of FLOWS) {
+      const c = document.createElement('article');
+      c.className = 'card';
+      c.innerHTML = `<h3><span class="em">${em}</span>${title}</h3><dl><dt>Что</dt><dd>${what}</dd><dt>Ждём</dt><dd>${expect}</dd></dl><div class="btns"></div>`;
+      for (const [label, params, style] of links) {
+        const a = document.createElement('a');
+        a.className = `go ${style ?? ''}`;
+        a.textContent = label;
+        a.dataset.params = params;
+        if (own) a.dataset.own = '1';
+        c.querySelector('.btns').appendChild(a);
+      }
+      cards.appendChild(c);
+    }
+    const refresh = () => {
+      for (const a of document.querySelectorAll('a.go[data-params]')) a.href = href(a.dataset.params, !!a.dataset.own);
+      const m = mods(false);
+      document.getElementById('mods-url').textContent = m.length ? `ко всем ссылкам: ${m.map((x) => '?' + x).join(' ')}` : 'модификаторов нет';
+    };
+    for (const g of document.querySelectorAll('[data-group]')) {
+      const multi = g.hasAttribute('data-multi');
+      g.addEventListener('click', (e) => {
+        const b = e.target.closest('.tg');
+        if (!b) return;
+        if (multi) {
+          const on = b.getAttribute('aria-pressed') !== 'true';
+          b.setAttribute('aria-pressed', String(on));
+          state.dbg[on ? 'add' : 'delete'](b.dataset.mod);
+        } else {
+          for (const x of g.querySelectorAll('.tg')) x.setAttribute('aria-pressed', String(x === b));
+          state[g.dataset.group] = b.dataset.mod;
+        }
+        refresh();
+      });
+    }
+    refresh();
+
+    const KEYS = ['sber-ar-cat:v1', 'ar.micMode'];
+    const mem = document.getElementById('mem');
+    const show = () => {
+      let t = '';
+      try {
+        t = KEYS.map((k) => `${k}: ${localStorage.getItem(k) ?? '—'}`).join('\n');
+      } catch {
+        t = 'хранилище недоступно (приватный режим?)';
+      }
+      mem.textContent = t;
+      mem.hidden = false;
+    };
+    document.getElementById('show').addEventListener('click', show);
+    document.getElementById('wipe').addEventListener('click', () => {
+      try {
+        // всё, что кот хранит на телефоне: память сценария, режим микрофона и прочие ключи прототипа (ar.*, sber-ar-cat*)
+        for (const k of Object.keys(localStorage)) if (KEYS.includes(k) || /^(ar\.|sber-ar-cat)/.test(k)) localStorage.removeItem(k);
+      } catch {}
+      show();
+      mem.textContent = 'Память очищена ✓\n' + mem.textContent;
+    });
+  </script>
+</body>
+</html>

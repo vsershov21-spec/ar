@@ -39,6 +39,22 @@ const BONE_ZONE: Record<string, TouchZone> = {
   Spine: 'belly', Spine1: 'body', Spine2: 'body', Hips: 'body', Tail1: 'tail', Tail2: 'tail', Tail3: 'tail', Tail4: 'tail',
 };
 
+/**
+ * Точка касания на коте — по «капсулам» вокруг костей (отрезок кость → дочерняя кость, радиус в долях роста кота),
+ * а не лучом по скинованной сетке: тот пересчитывает каждую вершину по костям — 15–20 мс на телефоне (QA-стенд, хаос:
+ * в среднем 69 мс на касание при CPU ×4, кадры по 1 с при 10 тапах в секунду; docs/qa/BUGS.md № 26). Капсулы — ~40
+ * отрезков, микросекунды. Зона, как и раньше, — ближайшая кость к точке. ?hit=mesh — старый путь (сравнение).
+ */
+const CAPSULE_R: [RegExp, number][] = [
+  [/Head/, 0.17], [/Neck/, 0.1], [/Spine|Hips/, 0.16], [/Shoulder/, 0.07], [/ForeArm|Hand/, 0.06], [/Arm/, 0.065],
+  [/UpLeg/, 0.08], [/Leg/, 0.07], [/Foot|Toe/, 0.06], [/Tail/, 0.05], [/Ear/, 0.06],
+];
+const FINGER = /Thumb|Index|Middle|Ring|Pinky|_End$|Eye|Jaw|Tongue/;
+const HIT_MESH = typeof location !== 'undefined' && /[?&]hit=mesh\b/.test(location.search);
+const HP_A = new THREE.Vector3();
+const HP_B = new THREE.Vector3();
+const HP_P = new THREE.Vector3();
+
 
 /**
  * Пресеты Tripo (скелет Mixamo) → id каталога content/animations.json. Клип из GLB с таким именем
@@ -183,6 +199,8 @@ export class GlbCharacter implements Character {
   /** габарит с запасом (уши, лапы в стороны) — для движения пальца при поглаживании (hitCoarse) */
   private coarseBox = new THREE.Mesh(new THREE.BoxGeometry(0.8, 1.15, 0.6), new THREE.MeshBasicMaterial({ visible: false }));
   private faces = new Map<string, THREE.Object3D>();
+  /** капсулы костей для касаний (hitProxy) */
+  private capsules: { b: THREE.Object3D; c: THREE.Object3D | null; r: number }[] = [];
   private morphMeshes: THREE.Mesh[] = [];
   private time = 0;
   private q = new THREE.Quaternion();
@@ -239,8 +257,15 @@ export class GlbCharacter implements Character {
     // мех по силуэту (оболочки) — если стадия body_detail положила в GLB меш BD_FurShell
     buildFurShells(model);
 
+    this.capsules = [];
     model.traverse((o) => {
       const name = o.name.replace(/^mixamorig:?/, '');
+      if ((o as THREE.Bone).isBone && !FINGER.test(name)) {
+        const r = CAPSULE_R.find(([re]) => re.test(name))?.[1] ?? 0.05;
+        // голова: до макушки (HeadTop_End), остальные — до первой дочерней кости
+        const c = o.children.find((x) => (x as THREE.Bone).isBone && (!FINGER.test(x.name) || /HeadTop/.test(x.name))) ?? null;
+        this.capsules.push({ b: o, c, r });
+      }
       if ((o as THREE.Bone).isBone && BONES.includes(name)) {
         this.bones.set(name, o as THREE.Bone);
         this.rest.set(name, o.quaternion.clone());
@@ -695,10 +720,42 @@ export class GlbCharacter implements Character {
     return ray.intersectObject(this.coarseBox, false).length > 0;
   }
 
+  /** первая по лучу капсула кости: точка на луче против неё (или null — мимо капсул) */
+  private hitProxy(ray: THREE.Raycaster): THREE.Vector3 | null {
+    const s = this.object.getWorldScale(this.tv).x;
+    let best = Infinity, out: THREE.Vector3 | null = null;
+    for (const k of this.capsules) {
+      k.b.getWorldPosition(HP_A);
+      if (k.c) k.c.getWorldPosition(HP_B);
+      else HP_B.copy(HP_A);
+      const d2 = ray.ray.distanceSqToSegment(HP_A, HP_B, HP_P);
+      const R = k.r * s;
+      if (d2 > R * R) continue;
+      const t = HP_P.distanceTo(ray.ray.origin) - Math.sqrt(R * R - d2);
+      if (t < best) {
+        best = t;
+        out = (out ?? new THREE.Vector3()).copy(HP_P);
+      }
+    }
+    return out;
+  }
+
   /** зона: ближайшая к точке попадания кость (щека — голова сбоку от морды) */
   hitZone(ray: THREE.Raycaster): TouchZone | null {
+    return this.zoneAtPoint(HIT_MESH || !this.capsules.length ? this.meshPoint(ray) : this.hitProxy(ray) ?? ray.intersectObject(this.hitBox, false)[0]?.point ?? null);
+  }
+
+  /** старый путь — луч по скинованной сетке (дорого; ?hit=mesh и сверка в QA-стенде) */
+  hitZoneMesh(ray: THREE.Raycaster): TouchZone | null {
+    return this.zoneAtPoint(this.meshPoint(ray));
+  }
+
+  private meshPoint(ray: THREE.Raycaster): THREE.Vector3 | null {
     const hit = this.model ? ray.intersectObject(this.model, true)[0] : undefined;
-    const p = hit?.point ?? ray.intersectObject(this.hitBox, false)[0]?.point;
+    return hit?.point ?? ray.intersectObject(this.hitBox, false)[0]?.point ?? null;
+  }
+
+  private zoneAtPoint(p: THREE.Vector3 | null): TouchZone | null {
     if (!p) return null;
     let best: TouchZone = 'body', bd = Infinity;
     const wp = new THREE.Vector3();
