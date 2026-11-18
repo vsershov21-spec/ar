@@ -1,0 +1,1242 @@
+событие,группа,характер,id,эмоция,текст,символов,озвучено,статус
+point_camera,сценарий,hooligan,hooligan.point_camera.01,cheeky,"Эй, я тут, в карте! Наведи на неё камеру.",41,да,на сервере
+point_camera,сценарий,hooligan,hooligan.point_camera.02,cheeky,"Ну и где карта? Покажи её, не стесняйся.",40,да,на сервере
+point_camera,сценарий,hooligan,hooligan.point_camera.03,neutral,Карту в кадр — и я выпрыгну. Честно.,36,да,на сервере
+point_camera,сценарий,hooligan,hooligan.point_camera.04,cheeky,Тут темно и скучно. Выпусти меня — наведи камеру на карту.,58,да,на сервере
+intro,сценарий,hooligan,hooligan.intro.01,surprised,"Опа! Свет, камера, я! Йо, привет!",33,да,на сервере
+intro,сценарий,hooligan,hooligan.intro.02,excited,Свобода! Я там с утра сидел. Привет!,36,да,на сервере
+intro,сценарий,hooligan,hooligan.intro.03,cheeky,"Не ждали? А я тут. Хе-хе, привет!",33,да,на сервере
+meet_card,сценарий,hooligan,hooligan.meet_card.01,surprised,"Опа! Это твоя карта? Всё, теперь я живу в ней!",46,да,на сервере
+meet_card,сценарий,hooligan,hooligan.meet_card.02,excited,"Ничего себе карта! Чур, я в ней живу.",37,да,на сервере
+meet_card,сценарий,hooligan,hooligan.meet_card.03,cheeky,"Йо! Классная карта. Я тут поселился, окей?",42,да,на сервере
+meet_congrats,сценарий,hooligan,hooligan.meet_congrats.01,happy,Поздравляю! Своя карта — это круто. Привет!,43,да,на сервере
+meet_congrats,сценарий,hooligan,hooligan.meet_congrats.02,proud,С картой тебя! Теперь у нас своя банда. Привет!,47,да,на сервере
+meet_congrats,сценарий,hooligan,hooligan.meet_congrats.03,excited,Поздравляю с картой! Дай пять — и привет!,41,да,на сервере
+meet_self,сценарий,hooligan,hooligan.meet_self.01,proud,А я Хулиган — кот из твоей карты.,33,да,на сервере
+meet_self,сценарий,hooligan,hooligan.meet_self.02,cheeky,"Я — Хулиган. Кот, жвачка и куча трюков.",39,да,на сервере
+meet_self,сценарий,hooligan,hooligan.meet_self.03,happy,Меня зовут Хулиган. Живу в карте и дружу с тобой.,49,да,на сервере
+meet_skills,сценарий,hooligan,hooligan.meet_skills.01,happy,Погладь меня пальцем или пощекочи живот. А кнопки внизу — мои трюки!,68,да,на сервере
+meet_skills,сценарий,hooligan,hooligan.meet_skills.02,cheeky,"Тыкни меня, погладь или потряси телефон. И жми кнопки внизу!",60,да,на сервере
+meet_skills,сценарий,hooligan,hooligan.meet_skills.03,neutral,"Гладь, щекочи, жми кнопки внизу — и болтай со мной. Погнали!",60,да,на сервере
+ask_name,сценарий,hooligan,hooligan.ask_name.01,neutral,"Как тебя зовут? Можешь не говорить, я не обижусь.",49,да,на сервере
+ask_name,сценарий,hooligan,hooligan.ask_name.02,cheeky,Я кот из карты. А ты кто? Имя скажешь?,38,да,на сервере
+ask_name,сценарий,hooligan,hooligan.ask_name.03,neutral,Давай знакомиться. Тебя как звать?,34,да,на сервере
+nice_name,сценарий,hooligan,hooligan.nice_name.01,happy,{name}? Норм имя. Запомню.,26,да,на сервере
+nice_name,сценарий,hooligan,hooligan.nice_name.02,proud,{name}! Звучит круто. Почти как я.,34,да,на сервере
+nice_name,сценарий,hooligan,hooligan.nice_name.03,happy,"{name}! Будем знакомы, дай пять.",32,да,на сервере
+nice_name,сценарий,hooligan,hooligan.nice_name.04,cheeky,{name}. Записал в свой секретный блокнот.,41,да,на сервере
+nice_name,сценарий,hooligan,hooligan.nice_name.05,cheeky,Классное имя. Мне бы такое.,27,да,на сервере
+nice_name,сценарий,hooligan,hooligan.nice_name.06,happy,"Запомнил. Теперь мы знакомы, дай пять!",38,да,на сервере
+no_name,сценарий,hooligan,hooligan.no_name.01,cheeky,"Ладно, тайный агент. Уважаю.",28,да,на сервере
+no_name,сценарий,hooligan,hooligan.no_name.02,neutral,Без проблем. Буду звать тебя просто — друг.,43,да,на сервере
+no_name,сценарий,hooligan,hooligan.no_name.03,cheeky,"Окей, без имён. Так даже загадочнее.",36,да,на сервере
+mic_hint,сценарий,hooligan,hooligan.mic_hint.01,neutral,Жми кнопку с микрофоном и говори. Я слушаю.,43,да,на сервере
+mic_hint,сценарий,hooligan,hooligan.mic_hint.02,cheeky,Видишь микрофон внизу? Зажми его и говори.,42,да,на сервере
+mic_hint,сценарий,hooligan,hooligan.mic_hint.03,neutral,Разреши микрофон — и поболтаем.,31,да,на сервере
+choose,сценарий,hooligan,hooligan.choose.01,cheeky,У меня три образа. Тыкай в наклейку — переоденусь.,50,да,на сервере
+choose,сценарий,hooligan,hooligan.choose.02,neutral,"Хулиган, Добряк или Блёстка? Выбирай, кем мне быть.",51,да,на сервере
+choose,сценарий,hooligan,hooligan.choose.03,cheeky,"Спорим, выберешь меня такого? Но можно и других.",48,да,на сервере
+invite,сценарий,hooligan,hooligan.invite.01,excited,"Тыкай в меня, стучи по экрану. Или тряхни телефон, если не боишься.",67,да,на сервере
+invite,сценарий,hooligan,hooligan.invite.02,cheeky,Скажи «повторяй» — повторю всё твоим голосом. Только смешнее.,61,да,на сервере
+invite,сценарий,hooligan,hooligan.invite.03,neutral,Тапни по карте — я туда пойду. Тапни мимо — постучу в стекло.,61,да,на сервере
+switch_ask,сценарий,hooligan,hooligan.switch_ask.01,cheeky,Сменить прикид? Скажи «давай» или «не надо».,44,нет,в работе: switch_ask
+switch_ask,сценарий,hooligan,hooligan.switch_ask.02,cheeky,Другого меня позвать? Скажи «давай».,36,нет,в работе: switch_ask
+switch_start,сценарий,hooligan,hooligan.switch_start.01,cheeky,"Ща переоденусь, не подглядывай!",31,да,на сервере
+switch_start,сценарий,hooligan,hooligan.switch_start.02,cheeky,"Секунду, достаю другой образ.",29,да,на сервере
+switch_start,сценарий,hooligan,hooligan.switch_start.03,cheeky,Отвернись! Шучу. Клею наклейки.,31,да,на сервере
+shake_prompt,сценарий,hooligan,hooligan.shake_prompt.01,cheeky,Тряхни — и увидишь нового меня.,31,да,на сервере
+shake_prompt,сценарий,hooligan,hooligan.shake_prompt.02,excited,"Тряси телефон, как газировку!",29,да,на сервере
+shake_prompt,сценарий,hooligan,hooligan.shake_prompt.03,neutral,Готово. Тряхни посильнее.,25,да,на сервере
+hello_new,сценарий,hooligan,hooligan.hello_new.01,proud,Ну как тебе? Новый я!,21,да,на сервере
+hello_new,сценарий,hooligan,hooligan.hello_new.02,cheeky,Та-да! Узнаёшь?,15,да,на сервере
+hello_new,сценарий,hooligan,hooligan.hello_new.03,proud,Вот это я понимаю — стиль!,26,да,на сервере
+filler,сценарий,hooligan,hooligan.filler.01,neutral,Эх... скейт бы сейчас. И рампу.,31,да,на сервере
+filler,сценарий,hooligan,hooligan.filler.02,cheeky,"Хм, чем бы заняться? Может, постучать тебе в экран?",51,да,на сервере
+filler,сценарий,hooligan,hooligan.filler.03,neutral,Ла-ла-ла... Тишина какая-то подозрительная.,43,да,на сервере
+filler,сценарий,hooligan,hooligan.filler.04,cheeky,"Я, между прочим, умею сальто. Скажи «сальто» — покажу.",54,да,на сервере
+filler,сценарий,hooligan,hooligan.filler.05,neutral,"Интересно, что брат ест на обед. Наверное, кашу. Он же правильный.",66,да,на сервере
+filler,сценарий,hooligan,hooligan.filler.06,cheeky,"У меня есть скейт. Маленький, но очень быстрый.",47,да,на сервере
+outro,сценарий,hooligan,hooligan.outro.01,neutral,"Дальше — у меня дома, в СберKids. Там брат. Кнопка внизу.",57,да,на сервере
+outro,сценарий,hooligan,hooligan.outro.02,cheeky,"Заглянешь ко мне в СберKids? Там брат, он про деньги шарит.",59,да,на сервере
+outro,сценарий,hooligan,hooligan.outro.03,excited,"Погнали ко мне! Кнопка внизу — жми, я догоню.",45,да,на сервере
+welcome_back,сценарий,hooligan,hooligan.welcome_back.01,happy,{name}! Снова ты. Я как раз заскучал.,37,да,на сервере
+welcome_back,сценарий,hooligan,hooligan.welcome_back.02,cheeky,"{name}, йо! Я знал, что ты вернёшься.",37,да,на сервере
+welcome_back,сценарий,hooligan,hooligan.welcome_back.03,excited,{name}! Ну наконец-то. Погнали!,31,да,на сервере
+welcome_back,сценарий,hooligan,hooligan.welcome_back.04,cheeky,"Опять ты! Отлично, а то я тут чуть не уснул.",44,да,на сервере
+welcome_back,сценарий,hooligan,hooligan.welcome_back.05,happy,"О, кто вернулся! Привет. Продолжаем?",36,да,на сервере
+goodbye,сценарий,hooligan,hooligan.goodbye.01,neutral,"Давай, до связи! Карту не теряй.",32,да,на сервере
+goodbye,сценарий,hooligan,hooligan.goodbye.02,cheeky,"Пока! Я в карте, если что. Стучи.",33,да,на сервере
+goodbye,сценарий,hooligan,hooligan.goodbye.03,happy,Было круто. Возвращайся!,24,да,на сервере
+tap_cat,касания/карта/время,hooligan,hooligan.tap_cat.01,cheeky,"Эй, щекотно!",12,да,на сервере
+tap_cat,касания/карта/время,hooligan,hooligan.tap_cat.02,cheeky,Тык засчитан.,13,да,на сервере
+tap_cat,касания/карта/время,hooligan,hooligan.tap_cat.03,happy,Неплохо тыкаешь. Для новичка.,29,да,на сервере
+tap_cat,касания/карта/время,hooligan,hooligan.tap_cat.04,cheeky,Тык в кота — к удаче. Наверное.,31,да,на сервере
+tap_cat,касания/карта/время,hooligan,hooligan.tap_cat.05,cheeky,"Ещё тык, и начну брать плату. Жвачкой.",38,нет,в работе: дельта 18.11
+tap_cat_head,касания/карта/время,hooligan,hooligan.tap_cat_head.01,annoyed,"Э, кепку помнёшь!",17,да,на сервере
+tap_cat_head,касания/карта/время,hooligan,hooligan.tap_cat_head.02,cheeky,"По голове не надо, там мысли.",29,да,на сервере
+tap_cat_head,касания/карта/время,hooligan,hooligan.tap_cat_head.03,cheeky,"Ай! Ну ладно, это было смешно.",30,да,на сервере
+tap_cat_head,касания/карта/время,hooligan,hooligan.tap_cat_head.04,cheeky,"Эй, причёску под кепкой не трогать!",35,нет,в работе: дельта 18.11
+tap_cat_head,касания/карта/время,hooligan,hooligan.tap_cat_head.05,cheeky,"Тук по макушке. Там, между прочим, гениальные идеи.",51,нет,в работе: дельта 18.11
+tap_cat_cheek,касания/карта/время,hooligan,hooligan.tap_cat_cheek.01,shy,"Чё, щёку мнёшь? Да, пушистая. Знаю.",35,да,на сервере
+tap_cat_cheek,касания/карта/время,hooligan,hooligan.tap_cat_cheek.02,cheeky,Пф-ф! Я тебе не воздушный шарик.,32,да,на сервере
+tap_cat_cheek,касания/карта/время,hooligan,hooligan.tap_cat_cheek.03,happy,"Хе, мягкая, да? Только никому.",30,да,на сервере
+tap_cat_belly,касания/карта/время,hooligan,hooligan.tap_cat_belly.01,happy,"Ха-ха, не-не-не, только не живот!",33,да,на сервере
+tap_cat_belly,касания/карта/время,hooligan,hooligan.tap_cat_belly.02,cheeky,Живот — запретная зона! Вход по пропускам.,42,да,на сервере
+tap_cat_belly,касания/карта/время,hooligan,hooligan.tap_cat_belly.03,excited,"Щекотка! Сдаюсь, сдаюсь!",24,да,на сервере
+tap_cat_belly,касания/карта/время,hooligan,hooligan.tap_cat_belly.04,excited,Ха-ха! Пузо щекотать нечестно!,30,нет,в работе: дельта 18.11
+tap_cat_belly,касания/карта/время,hooligan,hooligan.tap_cat_belly.05,cheeky,"Стоп, это мой пресс! Ладно, не пресс. Ха-ха!",44,нет,в работе: дельта 18.11
+tap_cat_paw,касания/карта/время,hooligan,hooligan.tap_cat_paw.01,cheeky,"Дай пять! А, это просто тык.",28,да,на сервере
+tap_cat_paw,касания/карта/время,hooligan,hooligan.tap_cat_paw.02,neutral,"Это моя лапа. Для скейта, между прочим.",39,да,на сервере
+tap_cat_paw,касания/карта/время,hooligan,hooligan.tap_cat_paw.03,cheeky,Хочешь лапу? Сначала покажи трюк.,33,да,на сервере
+tap_cat_paw,касания/карта/время,hooligan,hooligan.tap_cat_paw.04,cheeky,Эта лапа рисует граффити. Аккуратнее с ней.,43,нет,в работе: дельта 18.11
+tap_cat_paw,касания/карта/время,hooligan,hooligan.tap_cat_paw.05,happy,"Ладно, держи пять. Только лапу верни!",37,нет,в работе: дельта 18.11
+tap_cat_tail,касания/карта/время,hooligan,hooligan.tap_cat_tail.01,surprised,"Ай, хвост! Он чувствительный!",29,да,на сервере
+tap_cat_tail,касания/карта/время,hooligan,hooligan.tap_cat_tail.02,annoyed,"Хвост — это святое, слышишь?",28,да,на сервере
+tap_cat_tail,касания/карта/время,hooligan,hooligan.tap_cat_tail.03,cheeky,"Хвост не кнопка, не нажимается!",31,да,на сервере
+tap_cat_tail,касания/карта/время,hooligan,hooligan.tap_cat_tail.04,annoyed,Хвост мне нужен на скейте. Это руль!,36,нет,в работе: дельта 18.11
+tap_cat_tail,касания/карта/время,hooligan,hooligan.tap_cat_tail.05,cheeky,"За хвост? Ну всё, ловлю твой палец!",35,нет,в работе: дельта 18.11
+poke_combo,касания/карта/время,hooligan,hooligan.poke_combo.01,annoyed,Три раза в одно место? Серьёзно?,32,да,на сервере
+poke_combo,касания/карта/время,hooligan,hooligan.poke_combo.02,cheeky,"Окей, победа твоя. Я ухожу. Шучу, я тут.",40,да,на сервере
+poke_combo,касания/карта/время,hooligan,hooligan.poke_combo.03,annoyed,"Ну всё, я обиделся. На три секунды.",35,да,на сервере
+poke_hard,касания/карта/время,hooligan,hooligan.poke_hard.01,annoyed,Воу! Это было резко.,20,да,на сервере
+poke_hard,касания/карта/время,hooligan,hooligan.poke_hard.02,annoyed,"Эй! Я крутой, но вообще-то нежный.",34,да,на сервере
+poke_hard,касания/карта/время,hooligan,hooligan.poke_hard.03,offended,"Не, так не играем. Давай нежнее.",32,да,на сервере
+stroke,касания/карта/время,hooligan,hooligan.stroke.01,happy,"Мурр... ладно, так можно.",25,да,на сервере
+stroke,касания/карта/время,hooligan,hooligan.stroke.02,shy,"Только никому не говори, что я мурчу.",37,да,на сервере
+stroke,касания/карта/время,hooligan,hooligan.stroke.03,happy,"Вот тут, за ухом. Да, вот так.",30,да,на сервере
+stroke,касания/карта/время,hooligan,hooligan.stroke.04,shy,Мурр... Только пацанам со двора не рассказывай.,47,нет,в работе: дельта 18.11
+stroke,касания/карта/время,hooligan,hooligan.stroke.05,happy,"Ещё за ухом. Да, вот тут. Респект.",34,нет,в работе: дельта 18.11
+stroke_long,касания/карта/время,hooligan,hooligan.stroke_long.01,shy,"Ну всё, меня приручили. Это секрет.",35,да,на сервере
+stroke_long,касания/карта/время,hooligan,hooligan.stroke_long.02,happy,"Мурр... Я сейчас растаю, как пломбир на солнце.",47,да,на сервере
+stroke_long,касания/карта/время,hooligan,hooligan.stroke_long.03,shy,"Хулиганы тоже любят, когда их гладят. Тс-с.",43,да,на сервере
+stroke_long,касания/карта/время,hooligan,hooligan.stroke_long.04,shy,"Обнимашки? Ладно, только быстро. Ну ладно, не быстро.",53,нет,в работе: дельта 18.11
+tap_screen,касания/карта/время,hooligan,hooligan.tap_screen.01,cheeky,"Тук-тук, чё надо?",17,да,на сервере
+tap_screen,касания/карта/время,hooligan,hooligan.tap_screen.02,cheeky,"Эй, это моё окно! Я его утром мыл.",34,да,на сервере
+tap_screen,касания/карта/время,hooligan,hooligan.tap_screen.03,neutral,"Стучишь? Я дома, заходи.",24,да,на сервере
+tap_screen,касания/карта/время,hooligan,hooligan.tap_screen.04,cheeky,Курьер? Я ничего не заказывал.,30,да,на сервере
+tap_screen,касания/карта/время,hooligan,hooligan.tap_screen.05,cheeky,Тук-тук в ответ!,16,да,на сервере
+double_tap,касания/карта/время,hooligan,hooligan.double_tap.01,excited,"Смотри, чё умею!",16,да,на сервере
+double_tap,касания/карта/время,hooligan,hooligan.double_tap.02,proud,Пузырь-рекордсмен!,18,да,на сервере
+double_tap,касания/карта/время,hooligan,hooligan.double_tap.03,cheeky,Хоп — и пузырь на весь экран!,29,да,на сервере
+double_tap,касания/карта/время,hooligan,hooligan.double_tap.04,cheeky,Пузырь размером с арбуз! Ну почти.,34,нет,в работе: дельта 18.11
+double_tap,касания/карта/время,hooligan,hooligan.double_tap.05,proud,"Фокус-покус, жвачка, пузырь!",28,нет,в работе: дельта 18.11
+walk_to,касания/карта/время,hooligan,hooligan.walk_to.01,neutral,Иду-иду.,8,да,на сервере
+walk_to,касания/карта/время,hooligan,hooligan.walk_to.02,cheeky,"Туда? Ладно, шеф.",17,да,на сервере
+walk_to,касания/карта/время,hooligan,hooligan.walk_to.03,neutral,Пешком? Где мой скейт...,24,да,на сервере
+walk_to,касания/карта/время,hooligan,hooligan.walk_to.04,cheeky,Уже бегу!,9,да,на сервере
+swipe,касания/карта/время,hooligan,hooligan.swipe.01,cheeky,"Хе, когти — во!",15,да,на сервере
+swipe,касания/карта/время,hooligan,hooligan.swipe.02,cheeky,"Царап-царап. Стекло целое, не бойся.",36,да,на сервере
+swipe,касания/карта/время,hooligan,hooligan.swipe.03,neutral,Граффити на стекле. Красота.,28,да,на сервере
+swipe,касания/карта/время,hooligan,hooligan.swipe.04,cheeky,Это мой автограф. Береги.,25,да,на сервере
+longpress,касания/карта/время,hooligan,hooligan.longpress.01,cheeky,"Чё, держишь меня? Я не убегу.",29,да,на сервере
+longpress,касания/карта/время,hooligan,hooligan.longpress.02,neutral,"Ладно, постою у стекла.",23,да,на сервере
+longpress,касания/карта/время,hooligan,hooligan.longpress.03,cheeky,"Нос к носу, ха!",15,да,на сервере
+treat,касания/карта/время,hooligan,hooligan.treat.01,happy,Ням! Рыбка — топ. Спасибо!,26,да,на сервере
+treat,касания/карта/время,hooligan,hooligan.treat.02,cheeky,"О, вкусняшка! Ещё одну? Шучу. Спасибо!",38,да,на сервере
+treat,касания/карта/время,hooligan,hooligan.treat.03,excited,Хрум-хрум! Вот это я понимаю — угощение!,40,да,на сервере
+treat,касания/карта/время,hooligan,hooligan.treat.04,excited,Хрусть! Это вкуснее жвачки. Почти.,34,нет,в работе: дельта 18.11
+treat,касания/карта/время,hooligan,hooligan.treat.05,cheeky,Вкусняшка засчитана. За такое и трюк не жалко.,46,нет,в работе: дельта 18.11
+shake,касания/карта/время,hooligan,hooligan.shake.01,annoyed,"Эй, я так укачаюсь!",19,да,на сервере
+shake,касания/карта/время,hooligan,hooligan.shake.02,surprised,Э! Я чуть не улетел!,20,да,на сервере
+shake,касания/карта/время,hooligan,hooligan.shake.03,cheeky,"Я тебе не коктейль, хватит трясти!",34,да,на сервере
+spam,касания/карта/время,hooligan,hooligan.spam.01,annoyed,Стоп-стоп-стоп! Пальцы не устали?,33,да,на сервере
+spam,касания/карта/время,hooligan,hooligan.spam.02,cheeky,Тыц-тыц-тыц... Голова кругом!,29,да,на сервере
+spam,касания/карта/время,hooligan,hooligan.spam.03,cheeky,"Ты чё, на рекорд идёшь?",23,да,на сервере
+silence,касания/карта/время,hooligan,hooligan.silence.01,neutral,"Скукота... Спорим, ты не тыкнешь в меня?",40,да,на сервере
+silence,касания/карта/время,hooligan,hooligan.silence.02,cheeky,"Эй, ты тут? Я жду, вообще-то.",29,да,на сервере
+silence,касания/карта/время,hooligan,hooligan.silence.03,neutral,"Тишина... Может, позвать другого меня? Тряхни телефон.",54,да,на сервере
+silence,касания/карта/время,hooligan,hooligan.silence.04,cheeky,Скажи «повторяй за мной» — будет смешно.,40,да,на сервере
+sleep,касания/карта/время,hooligan,hooligan.sleep.01,sleepy,Ладно... я... чуть-чуть... посплю...,36,да,на сервере
+sleep,касания/карта/время,hooligan,hooligan.sleep.02,sleepy,"Разбуди, если что... хр-р...",28,да,на сервере
+wake_up,касания/карта/время,hooligan,hooligan.wake_up.01,surprised,А? Чё? Я не спал! Я думал.,26,да,на сервере
+wake_up,касания/карта/время,hooligan,hooligan.wake_up.02,cheeky,"О, ты тут. А я сон про скейт смотрел.",37,да,на сервере
+wake_up,касания/карта/время,hooligan,hooligan.wake_up.03,surprised,"Кто меня разбудил? А, это ты. Норм.",35,да,на сервере
+sticker_peel,касания/карта/время,hooligan,hooligan.sticker_peel.01,cheeky,"Эй, это моя наклейка!",21,да,на сервере
+sticker_peel,касания/карта/время,hooligan,hooligan.sticker_peel.02,neutral,"Отклеивай, у меня ещё есть.",27,да,на сервере
+sticker_peel,касания/карта/время,hooligan,hooligan.sticker_peel.03,cheeky,Ловко! Точно не профи?,22,да,на сервере
+stickers_all_gone,касания/карта/время,hooligan,hooligan.stickers_all_gone.01,surprised,Все наклейки сняты? Без встряски? Уважаю.,41,да,на сервере
+stickers_all_gone,касания/карта/время,hooligan,hooligan.stickers_all_gone.02,proud,Чисто! Ну ты чистюля.,21,да,на сервере
+card_lost,касания/карта/время,hooligan,hooligan.card_lost.01,annoyed,"Эй, куда карта делась?",22,да,на сервере
+card_lost,касания/карта/время,hooligan,hooligan.card_lost.02,cheeky,"Алё, а карта где? Я на ней стоял вообще-то!",43,да,на сервере
+card_lost,касания/карта/время,hooligan,hooligan.card_lost.03,annoyed,"Верни карту, мне стоять не на чем!",34,да,на сервере
+card_found,касания/карта/время,hooligan,hooligan.card_found.01,happy,"О, карта вернулась!",19,да,на сервере
+card_found,касания/карта/время,hooligan,hooligan.card_found.02,neutral,"Вот, другое дело.",17,да,на сервере
+card_found,касания/карта/время,hooligan,hooligan.card_found.03,cheeky,Карта на месте — я на месте.,28,да,на сервере
+card_far,касания/карта/время,hooligan,hooligan.card_far.01,neutral,Ты где? Поднеси карту поближе.,30,да,на сервере
+card_far,касания/карта/время,hooligan,hooligan.card_far.02,cheeky,Я тебя еле вижу. Ближе давай.,29,да,на сервере
+card_close,касания/карта/время,hooligan,hooligan.card_close.01,surprised,"Воу, слишком близко! Отодвинь чуток.",36,да,на сервере
+card_close,касания/карта/время,hooligan,hooligan.card_close.02,cheeky,Я не влезаю! Отодвинь карту.,28,да,на сервере
+low_light,касания/карта/время,hooligan,hooligan.low_light.01,neutral,Темновато. Включи свет — хочу тебя видеть.,42,да,на сервере
+low_light,касания/карта/время,hooligan,hooligan.low_light.02,cheeky,"Тут как ночью. Включи свет, а?",30,да,на сервере
+hello,голос ребёнка,hooligan,hooligan.hello.01,happy,Салют!,6,да,на сервере
+hello,голос ребёнка,hooligan,hooligan.hello.02,happy,Привет! Как жизнь?,18,да,на сервере
+hello,голос ребёнка,hooligan,hooligan.hello.03,cheeky,Йо! Рад видеть.,15,да,на сервере
+bye,голос ребёнка,hooligan,hooligan.bye.01,neutral,Уже уходишь? Точно?,19,да,на сервере
+bye,голос ребёнка,hooligan,hooligan.bye.02,cheeky,"Пока? Серьёзно? Скажи «да», если точно.",39,да,на сервере
+bye,голос ребёнка,hooligan,hooligan.bye.03,neutral,"Всё, пора? Тогда скажи «да».",28,да,на сервере
+yes,голос ребёнка,hooligan,hooligan.yes.01,happy,Вот и я говорю!,15,да,на сервере
+yes,голос ребёнка,hooligan,hooligan.yes.02,neutral,"Ага, договорились.",18,да,на сервере
+yes,голос ребёнка,hooligan,hooligan.yes.03,cheeky,Чётко.,6,да,на сервере
+no,голос ребёнка,hooligan,hooligan.no.01,neutral,Не хочешь — как хочешь.,23,да,на сервере
+no,голос ребёнка,hooligan,hooligan.no.02,neutral,Ладно-ладно.,12,да,на сервере
+no,голос ребёнка,hooligan,hooligan.no.03,cheeky,"Ну и не надо. Спорим, передумаешь?",34,да,на сервере
+skip,голос ребёнка,hooligan,hooligan.skip.01,neutral,"Ладно, дальше.",14,да,на сервере
+skip,голос ребёнка,hooligan,hooligan.skip.02,neutral,Проехали.,9,да,на сервере
+skip,голос ребёнка,hooligan,hooligan.skip.03,neutral,"Пропускаем, без вопросов.",25,да,на сервере
+unknown,голос ребёнка,hooligan,hooligan.unknown.01,cheeky,Чё? Не расслышал.,17,да,на сервере
+unknown,голос ребёнка,hooligan,hooligan.unknown.02,cheeky,"Не понял, но звучит дерзко.",27,да,на сервере
+unknown,голос ребёнка,hooligan,hooligan.unknown.03,neutral,"Скажи по-другому, а?",20,да,на сервере
+unknown,голос ребёнка,hooligan,hooligan.unknown.04,neutral,Связь барахлит. Повтори?,24,да,на сервере
+name_ask,голос ребёнка,hooligan,hooligan.name_ask.01,proud,Я брат СберКота. Близнец. Только поинтереснее.,46,да,на сервере
+name_ask,голос ребёнка,hooligan,hooligan.name_ask.02,cheeky,Я Хулиган! Кот из твоей карты и мастер трюков.,46,нет,в работе: дельта 18.11
+name_ask,голос ребёнка,hooligan,hooligan.name_ask.03,neutral,"Хулиган я. Близнец СберКота, только с характером.",49,нет,в работе: дельта 18.11
+age_ask,голос ребёнка,hooligan,hooligan.age_ask.01,cheeky,"Столько же, сколько брату. Мы же близнецы.",42,да,на сервере
+age_ask,голос ребёнка,hooligan,hooligan.age_ask.02,cheeky,"Достаточно, чтобы кататься на скейте.",37,да,на сервере
+age_ask,голос ребёнка,hooligan,hooligan.age_ask.03,neutral,Взрослый уже. Но кепку ношу задом наперёд.,42,да,на сервере
+brother_ask,голос ребёнка,hooligan,hooligan.brother_ask.01,neutral,Мой брат — СберКот. Живёт в СберKids и про деньги всё знает.,60,да,на сервере
+brother_ask,голос ребёнка,hooligan,hooligan.brother_ask.02,cheeky,"Брат? Он у нас ботаник. Но добрый, честно.",42,да,на сервере
+money,голос ребёнка,hooligan,hooligan.money.01,neutral,Это к брату! Он про деньги всё знает.,37,да,на сервере
+money,голос ребёнка,hooligan,hooligan.money.02,cheeky,Деньги? Это к брату! Я по трюкам.,33,да,на сервере
+money,голос ребёнка,hooligan,hooligan.money.03,neutral,"Копить, тратить — это всё к брату. Он шарит.",44,да,на сервере
+sberkids,голос ребёнка,hooligan,hooligan.sberkids.01,excited,К брату? Йо! Открыть СберKids?,30,да,на сервере
+sberkids,голос ребёнка,hooligan,hooligan.sberkids.02,neutral,"Брат обрадуется, хоть и виду не подаст. Идём?",45,да,на сервере
+sberkids,голос ребёнка,hooligan,hooligan.sberkids.03,cheeky,В СберKids? Это можно. Открываю?,32,да,на сервере
+flip,голос ребёнка,hooligan,hooligan.flip.01,excited,Смотри внимательно!,19,да,на сервере
+flip,голос ребёнка,hooligan,hooligan.flip.02,proud,Сальто? Легко!,14,да,на сервере
+flip,голос ребёнка,hooligan,hooligan.flip.03,cheeky,Хоп! Как тебе?,14,да,на сервере
+flip,голос ребёнка,hooligan,hooligan.flip.04,proud,Сальто с разворотом! Скейт бы обзавидовался.,44,нет,в работе: дельта 18.11
+flip,голос ребёнка,hooligan,hooligan.flip.05,cheeky,"Хоп! Кепка на месте, проверено.",31,нет,в работе: дельта 18.11
+jump,голос ребёнка,hooligan,hooligan.jump.01,excited,Оп!,3,да,на сервере
+jump,голос ребёнка,hooligan,hooligan.jump.02,cheeky,"Прыжок! Оценки, пожалуйста.",27,да,на сервере
+jump,голос ребёнка,hooligan,hooligan.jump.03,proud,Вот это прыжок! Олимпийский.,28,да,на сервере
+dance,голос ребёнка,hooligan,hooligan.dance.01,excited,"Диджей, музыку!",15,да,на сервере
+dance,голос ребёнка,hooligan,hooligan.dance.02,proud,Танцую как умею. А умею круто.,30,да,на сервере
+dance,голос ребёнка,hooligan,hooligan.dance.03,cheeky,"Оп-оп, смотри, какой движ!",26,да,на сервере
+dance,голос ребёнка,hooligan,hooligan.dance.04,cheeky,"Брейк-данс! Пол не царапаю, честно.",35,нет,в работе: дельта 18.11
+dance,голос ребёнка,hooligan,hooligan.dance.05,excited,"Музыка в голове, движ в лапах!",30,нет,в работе: дельта 18.11
+sit,голос ребёнка,hooligan,hooligan.sit.01,neutral,"Сижу. Только недолго, я непоседа.",33,да,на сервере
+sit,голос ребёнка,hooligan,hooligan.sit.02,cheeky,Сел. Дальше что? Лапу давать не буду.,37,да,на сервере
+wave,голос ребёнка,hooligan,hooligan.wave.01,happy,Йо-йо! Это я машу.,18,да,на сервере
+wave,голос ребёнка,hooligan,hooligan.wave.02,cheeky,Машу. Видно меня?,17,да,на сервере
+sing,голос ребёнка,hooligan,hooligan.sing.01,cheeky,"Йо, я кот, я на скейте, лучше всех на этом свете! Всё, концерт окончен.",71,да,на сервере
+sing,голос ребёнка,hooligan,hooligan.sing.02,cheeky,"Ля-ля... Не, я лучше рэп. Кот — компот... Ну, рифма же!",55,да,на сервере
+gum,голос ребёнка,hooligan,hooligan.gum.01,excited,Трюк? Легко. Смотри!,20,да,на сервере
+gum,голос ребёнка,hooligan,hooligan.gum.02,proud,Фирменный пузырь. Только не лопни.,34,да,на сервере
+gum,голос ребёнка,hooligan,hooligan.gum.03,cheeky,Жвачка наготове. Внимание... чпок!,34,да,на сервере
+stickers,голос ребёнка,hooligan,hooligan.stickers.01,cheeky,Наклейки? Держи! Отклеивай за уголок.,37,да,на сервере
+stickers,голос ребёнка,hooligan,hooligan.stickers.02,cheeky,Шлёп! Шлёп! Красота.,20,да,на сервере
+change_persona,голос ребёнка,hooligan,hooligan.change_persona.01,cheeky,"Хочешь другого меня? Ладно, переодеваюсь.",41,да,на сервере
+change_persona,голос ребёнка,hooligan,hooligan.change_persona.02,neutral,"Окей, меняю прикид. Не уходи.",29,да,на сервере
+choose_hooligan,голос ребёнка,hooligan,hooligan.choose_hooligan.01,proud,Хулиган? Правильный выбор!,26,да,на сервере
+choose_hooligan,голос ребёнка,hooligan,hooligan.choose_hooligan.02,cheeky,Хулиган на месте. Погнали!,26,да,на сервере
+choose_kind,голос ребёнка,hooligan,hooligan.choose_kind.01,neutral,"Добряк? Ладно, буду милым. Попробую.",36,да,на сервере
+choose_glitter,голос ребёнка,hooligan,hooligan.choose_glitter.01,cheeky,"Блёстка? Сестрёнка вредная, но классная. Ща!",44,да,на сервере
+compliment,голос ребёнка,hooligan,hooligan.compliment.01,shy,"Ну... ты тоже ничего. Ладно, с тобой классно.",45,да,на сервере
+compliment,голос ребёнка,hooligan,hooligan.compliment.02,proud,Знаю! Но всё равно приятно.,27,да,на сервере
+compliment,голос ребёнка,hooligan,hooligan.compliment.03,shy,Хулиганы не краснеют. Я и не краснею. Это свет так падает.,58,да,на сервере
+rude,голос ребёнка,hooligan,hooligan.rude.01,neutral,Так говорить не круто. Давай лучше трюк покажу.,47,да,на сервере
+rude,голос ребёнка,hooligan,hooligan.rude.02,neutral,"Ого, слова какие. Сделаю вид, что не слышал.",44,да,на сервере
+rude,голос ребёнка,hooligan,hooligan.rude.03,cheeky,Даже хулиганы так не говорят. Мир?,34,да,на сервере
+sad,голос ребёнка,hooligan,hooligan.sad.01,caring,"Эй, грустно бывает. Я рядом. Расскажи маме или папе, они поймут.",64,да,на сервере
+sad,голос ребёнка,hooligan,hooligan.sad.02,caring,Я с тобой. Обними экран — я обниму в ответ. И позови взрослого.,63,да,на сервере
+sad,голос ребёнка,hooligan,hooligan.sad.03,caring,"Давай я просто посижу рядом. И поговори со взрослым, которому доверяешь.",72,да,на сервере
+scared,голос ребёнка,hooligan,hooligan.scared.01,caring,"Страшно бывает даже крутым. Позови взрослого, пусть побудет рядом.",66,да,на сервере
+scared,голос ребёнка,hooligan,hooligan.scared.02,caring,Я тут. Давай подышим: вдох... выдох. И позови маму или папу.,60,да,на сервере
+scared,голос ребёнка,hooligan,hooligan.scared.03,caring,"Я никуда не ухожу. Позови маму, папу или другого взрослого.",59,да,на сервере
+bored,голос ребёнка,hooligan,hooligan.bored.01,cheeky,"Скучно? Скажи «повторяй за мной». Будет весело, отвечаю.",56,да,на сервере
+bored,голос ребёнка,hooligan,hooligan.bored.02,cheeky,Тряхни телефон — увидишь другого меня.,38,да,на сервере
+bored,голос ребёнка,hooligan,hooligan.bored.03,excited,Скажи «сальто» — покажу трюк.,29,да,на сервере
+riddle,голос ребёнка,hooligan,hooligan.riddle.01,cheeky,"Загадку? Ща, слушай.",20,да,на сервере
+riddle,голос ребёнка,hooligan,hooligan.riddle.02,neutral,"Окей, напряги мозги.",20,да,на сервере
+riddle,голос ребёнка,hooligan,hooligan.riddle.03,cheeky,"Спорим, не отгадаешь? Слушай.",29,да,на сервере
+joke,голос ребёнка,hooligan,hooligan.joke.01,cheeky,Почему кот сидит у компьютера? Следит за мышкой! Хе-хе.,55,да,на сервере
+joke,голос ребёнка,hooligan,hooligan.joke.02,cheeky,"Кот встал на скейт, а скейт уехал. Кот ему: «Ну и катись!» Хе-хе.",65,да,на сервере
+joke,голос ребёнка,hooligan,hooligan.joke.03,cheeky,Чем кот отличается от скейта? Скейт не мурчит. Я проверял.,58,да,на сервере
+help,голос ребёнка,hooligan,hooligan.help.01,cheeky,"Погладь меня, тыкни в живот или жми кнопки внизу. А ещё скажи «сальто»!",71,да,на сервере
+help,голос ребёнка,hooligan,hooligan.help.02,excited,"Я умею сальто, танцы и загадки. Нажми кнопку внизу — покажу.",60,да,на сервере
+help,голос ребёнка,hooligan,hooligan.help.03,neutral,Скажи «танцуй» или «загадку». Или просто погладь меня пальцем.,62,да,на сервере
+thanks,голос ребёнка,hooligan,hooligan.thanks.01,happy,Да не за что!,13,да,на сервере
+thanks,голос ребёнка,hooligan,hooligan.thanks.02,cheeky,Обращайся. Я тут живу.,22,да,на сервере
+thanks,голос ребёнка,hooligan,hooligan.thanks.03,neutral,Без проблем.,12,да,на сервере
+echo_start,голос ребёнка,hooligan,hooligan.echo_start.01,cheeky,"Давай, говори. Я повторю.",25,да,на сервере
+echo_start,голос ребёнка,hooligan,hooligan.echo_start.02,cheeky,Режим попугая включён. Говори!,30,да,на сервере
+echo_start,голос ребёнка,hooligan,hooligan.echo_start.03,neutral,"Скажи что-нибудь. Повторю, только смешнее.",42,да,на сервере
+echo_done,голос ребёнка,hooligan,hooligan.echo_done.01,cheeky,Похоже? Я ещё и не так могу.,28,да,на сервере
+echo_done,голос ребёнка,hooligan,hooligan.echo_done.02,happy,"Ха, мой голос круче.",20,да,на сервере
+echo_done,голос ребёнка,hooligan,hooligan.echo_done.03,cheeky,"Давай ещё, это огонь!",21,да,на сервере
+echo_stop,голос ребёнка,hooligan,hooligan.echo_stop.01,neutral,"Всё, режим попугая выключен.",28,да,на сервере
+echo_stop,голос ребёнка,hooligan,hooligan.echo_stop.02,cheeky,"Ладно, хватит. Было смешно.",27,да,на сервере
+echo_stop,голос ребёнка,hooligan,hooligan.echo_stop.03,neutral,"Окей, говорю своим голосом.",27,да,на сервере
+loud,голос ребёнка,hooligan,hooligan.loud.01,annoyed,"Ай, уши! Не кричи, я рядом.",27,да,на сервере
+loud,голос ребёнка,hooligan,hooligan.loud.02,surprised,"Воу, тише! У котов уши чуткие.",30,да,на сервере
+whisper,голос ребёнка,hooligan,hooligan.whisper.01,whisper,"Чё, шепчем? Ладно, это наш секрет.",34,да,на сервере
+whisper,голос ребёнка,hooligan,hooligan.whisper.02,whisper,Тс-с... Я тоже шёпотом. Никому ни слова.,40,да,на сервере
+surprise,касания/карта/время,hooligan,hooligan.surprise.01,surprised,Ого! Вот это сюрприз. Я аж кепку уронил.,40,да,на сервере
+surprise,касания/карта/время,hooligan,hooligan.surprise.02,surprised,Воу! Не ожидал. А ну ещё раз!,29,да,на сервере
+tease,касания/карта/время,hooligan,hooligan.tease.01,annoyed,Дразнишься? Я тоже умею: бе-бе-бе!,34,да,на сервере
+tease,касания/карта/время,hooligan,hooligan.tease.02,cheeky,Меня не проведёшь. Я самый спокойный кот. Почти.,48,да,на сервере
+clap,голос ребёнка,hooligan,hooligan.clap.01,surprised,Ой! Кто хлопнул? Я аж подпрыгнул.,33,да,на сервере
+clap,голос ребёнка,hooligan,hooligan.clap.02,cheeky,"Аплодисменты? Мне? Спасибо, спасибо.",36,да,на сервере
+morning,контекст входа,hooligan,hooligan.morning.01,happy,Доброе утро! Зубы уже чищены? Мои — почти.,42,да,на сервере
+morning,контекст входа,hooligan,hooligan.morning.02,cheeky,Утро! Самое время для трюков.,29,да,на сервере
+morning,контекст входа,hooligan,hooligan.morning.03,neutral,Утро... Я ещё сплю. Одним глазом.,33,да,на сервере
+evening,контекст входа,hooligan,hooligan.evening.01,sleepy,Уже вечер... Скоро спать. Но пару трюков успеем.,48,да,на сервере
+evening,контекст входа,hooligan,hooligan.evening.02,neutral,Вечер. Даже хулиганы ложатся спать. Иногда.,43,да,на сервере
+long_absence,контекст входа,hooligan,hooligan.long_absence.01,annoyed,"Где пропадаешь? Я тут скучал, между прочим!",43,да,на сервере
+long_absence,контекст входа,hooligan,hooligan.long_absence.02,cheeky,"Сто лет не виделись! Ладно, не сто. Но долго.",45,да,на сервере
+first_time_today,контекст входа,hooligan,hooligan.first_time_today.01,happy,"О, первый заход за день. Погнали!",33,да,на сервере
+first_time_today,контекст входа,hooligan,hooligan.first_time_today.02,cheeky,Сегодня ещё не виделись. Йо!,28,да,на сервере
+first_time_today,контекст входа,hooligan,hooligan.first_time_today.03,neutral,Без тебя тут скучно было. Привет!,33,да,на сервере
+offer_riddle,диалоги,hooligan,hooligan.offer_riddle.01,cheeky,"Слушай, загадку хочешь? Скажи «да».",35,да,на сервере
+offer_riddle,диалоги,hooligan,hooligan.offer_riddle.02,cheeky,"Спорим, мою загадку не отгадаешь? Загадать?",43,да,на сервере
+offer_riddle,диалоги,hooligan,hooligan.offer_riddle.03,happy,Есть загадка — огонь. Загадать?,31,да,на сервере
+offer_echo,диалоги,hooligan,hooligan.offer_echo.01,cheeky,Давай в повторялку? Ты говоришь — я повторяю. Играем?,53,да,на сервере
+offer_echo,диалоги,hooligan,hooligan.offer_echo.02,happy,"Хочешь, буду повторять за тобой? Скажи «да».",44,да,на сервере
+offer_echo,диалоги,hooligan,hooligan.offer_echo.03,cheeky,Скажи что-нибудь — повторю своим голосом. Попробуем?,52,да,на сервере
+offer_dance,диалоги,hooligan,hooligan.offer_dance.01,cheeky,"Показать, как я танцую? Скажи «да».",35,да,на сервере
+offer_dance,диалоги,hooligan,hooligan.offer_dance.02,excited,Хочешь танец? Я сегодня в форме.,32,да,на сервере
+offer_dance,диалоги,hooligan,hooligan.offer_dance.03,cheeky,Скучно стоять. Станцевать тебе?,31,да,на сервере
+ask_name_again,диалоги,hooligan,hooligan.ask_name_again.01,neutral,Не расслышал. Скажи имя ещё раз — или «дальше».,47,да,на сервере
+ask_name_again,диалоги,hooligan,hooligan.ask_name_again.02,cheeky,Чё-чё? Имя повтори. Можно и не говорить.,40,да,на сервере
+ask_name_again,диалоги,hooligan,hooligan.ask_name_again.03,neutral,Помехи какие-то. Как тебя звать?,32,да,на сервере
+sberkids_ask,диалоги,hooligan,hooligan.sberkids_ask.01,cheeky,Хочешь к брату в СберKids? Да или нет?,38,да,на сервере
+sberkids_ask,диалоги,hooligan,hooligan.sberkids_ask.02,neutral,Сгоняем к брату? Скажи «да».,28,да,на сервере
+sberkids_ask,диалоги,hooligan,hooligan.sberkids_ask.03,cheeky,Брат там ждёт. Идём к нему?,27,да,на сервере
+sberkids_yes,диалоги,hooligan,hooligan.sberkids_yes.01,excited,Погнали! Открываю СберKids.,27,да,на сервере
+sberkids_yes,диалоги,hooligan,hooligan.sberkids_yes.02,cheeky,Йо! Держись крепче — открываю.,30,да,на сервере
+sberkids_yes,диалоги,hooligan,hooligan.sberkids_yes.03,proud,"Чётко. Брат будет рад, открываю.",32,да,на сервере
+sberkids_no,диалоги,hooligan,hooligan.sberkids_no.01,neutral,"Окей, играем дальше.",20,да,на сервере
+sberkids_no,диалоги,hooligan,hooligan.sberkids_no.02,cheeky,"Не хочешь — ладно. Кнопка внизу, если что.",42,да,на сервере
+sberkids_no,диалоги,hooligan,hooligan.sberkids_no.03,neutral,"Ну и норм. Я тут, продолжаем.",29,да,на сервере
+bye_cancel,диалоги,hooligan,hooligan.bye_cancel.01,happy,"Остаёмся? Йо, отлично!",22,да,на сервере
+bye_cancel,диалоги,hooligan,hooligan.bye_cancel.02,cheeky,"Так и знал, что не уйдёшь. Хе-хе.",33,да,на сервере
+bye_cancel,диалоги,hooligan,hooligan.bye_cancel.03,neutral,"Ладно, ещё поиграем.",20,да,на сервере
+riddle_hint,диалоги,hooligan,hooligan.riddle_hint.01,neutral,Не-а. Подсказка:,16,да,на сервере
+riddle_hint,диалоги,hooligan,hooligan.riddle_hint.02,cheeky,Почти! Держи подсказку:,23,да,на сервере
+riddle_hint,диалоги,hooligan,hooligan.riddle_hint.03,neutral,Думай. Вот подсказка:,21,да,на сервере
+riddle_right,диалоги,hooligan,hooligan.riddle_right.01,excited,В точку! Респект.,17,да,на сервере
+riddle_right,диалоги,hooligan,hooligan.riddle_right.02,proud,Правильно! Мозг — огонь.,24,да,на сервере
+riddle_right,диалоги,hooligan,hooligan.riddle_right.03,cheeky,"Угадано! Ладно, ты шаришь.",26,да,на сервере
+riddle_answer,диалоги,hooligan,hooligan.riddle_answer.01,neutral,"Ответ — {answer}. Ничего, в следующий раз.",42,да,на сервере
+riddle_answer,диалоги,hooligan,hooligan.riddle_answer.02,cheeky,"Это {answer}! Хе-хе, хитрая была.",33,да,на сервере
+riddle_answer,диалоги,hooligan,hooligan.riddle_answer.03,neutral,"Правильный ответ — {answer}. Запомни, пригодится.",49,да,на сервере
+riddle_more,диалоги,hooligan,hooligan.riddle_more.01,cheeky,Ещё одну?,9,да,на сервере
+riddle_more,диалоги,hooligan,hooligan.riddle_more.02,neutral,Ещё загадку? Да или нет?,24,да,на сервере
+riddle_more,диалоги,hooligan,hooligan.riddle_more.03,cheeky,Продолжаем? Скажи «да».,23,да,на сервере
+riddle_bye,диалоги,hooligan,hooligan.riddle_bye.01,neutral,"Ладно, загадки потом.",21,да,на сервере
+riddle_bye,диалоги,hooligan,hooligan.riddle_bye.02,cheeky,"Окей, мозги отдыхают.",21,да,на сервере
+riddle_bye,диалоги,hooligan,hooligan.riddle_bye.03,neutral,Хватит так хватит. Играем дальше.,33,да,на сервере
+where_live,голос ребёнка,hooligan,hooligan.where_live.01,neutral,В твоей карте! А в СберKids живёт мой брат.,43,нет,в работе: дельта 18.11
+where_live,голос ребёнка,hooligan,hooligan.where_live.02,cheeky,"В карте. Тесновато, зато скейт помещается.",42,нет,в работе: дельта 18.11
+where_live,голос ребёнка,hooligan,hooligan.where_live.03,cheeky,"Днём в карте, а ночью катаюсь по экрану. Секрет!",48,нет,в работе: дельта 18.11
+likes,голос ребёнка,hooligan,hooligan.likes.01,cheeky,"Скейт, граффити и жвачку. И с тобой тусить.",43,нет,в работе: дельта 18.11
+likes,голос ребёнка,hooligan,hooligan.likes.02,excited,Кататься на скейте! И рыбку. И когда смешно.,44,нет,в работе: дельта 18.11
+likes,голос ребёнка,hooligan,hooligan.likes.03,cheeky,Рэп и пузыри из жвачки. Огромные!,33,нет,в работе: дельта 18.11
+friends,голос ребёнка,hooligan,hooligan.friends.01,happy,"Конечно! Ты, например.",22,нет,в работе: дельта 18.11
+friends,голос ребёнка,hooligan,hooligan.friends.02,cheeky,"Целая банда: брат, Добряк, Блёстка и ты.",40,нет,в работе: дельта 18.11
+friends,голос ребёнка,hooligan,hooligan.friends.03,neutral,Друзья есть. Но ты в списке номер один.,39,нет,в работе: дельта 18.11
+tale,голос ребёнка,hooligan,hooligan.tale.01,cheeky,"Жил-был кот на скейте. Катался, катался и докатился до твоей карты. Тут и живёт. Конец!",87,нет,в работе: дельта 18.11
+tale,голос ребёнка,hooligan,hooligan.tale.02,cheeky,"Сказка. Кот нарисовал на стене солнце. Стало так светло, что все проснулись. Даже брат. Конец.",94,нет,в работе: дельта 18.11
+tale,голос ребёнка,hooligan,hooligan.tale.03,neutral,"Однажды жвачка надулась так, что кот улетел на ней к звёздам. Вернулся к ужину. Конец!",86,нет,в работе: дельта 18.11
+friend,голос ребёнка,hooligan,hooligan.friend.01,shy,Дружить? Давай! Ты теперь в моей банде.,39,нет,в работе: дельта 18.11
+friend,голос ребёнка,hooligan,hooligan.friend.02,happy,Давай! Друг хулигана почти супергерой.,38,нет,в работе: дельта 18.11
+friend,голос ребёнка,hooligan,hooligan.friend.03,cheeky,Дружим! Дай пять. Только по-честному.,37,нет,в работе: дельта 18.11
+how_are_you,голос ребёнка,hooligan,hooligan.how_are_you.01,happy,"Норм! Даже отлично, раз ты тут.",31,нет,в работе: дельта 18.11
+how_are_you,голос ребёнка,hooligan,hooligan.how_are_you.02,cheeky,Как у кота на скейте: быстро и весело!,38,нет,в работе: дельта 18.11
+how_are_you,голос ребёнка,hooligan,hooligan.how_are_you.03,neutral,"Нормально. Скейт цел, кепка на месте.",37,нет,в работе: дельта 18.11
+offer_emo,диалоги,hooligan,hooligan.offer_emo.01,cheeky,"Хочешь, скорчу рожицу, а ты угадаешь, какой я?",46,нет,в работе: дельта 18.11
+offer_emo,диалоги,hooligan,hooligan.offer_emo.02,cheeky,"Спорим, не угадаешь мою рожицу? Играем?",39,нет,в работе: дельта 18.11
+offer_emo,диалоги,hooligan,hooligan.offer_emo.03,happy,Давай в «Угадай эмоцию»? Скажи «да».,36,нет,в работе: дельта 18.11
+offer_rps,диалоги,hooligan,hooligan.offer_rps.01,cheeky,"Сыграем в камень, ножницы, бумагу?",34,нет,в работе: дельта 18.11
+offer_rps,диалоги,hooligan,hooligan.offer_rps.02,cheeky,"Камень, ножницы, бумага. Вызываю тебя! Играем?",46,нет,в работе: дельта 18.11
+offer_rps,диалоги,hooligan,hooligan.offer_rps.03,excited,"Давай в камень, ножницы, бумагу? Скажи «да».",44,нет,в работе: дельта 18.11
+offer_simon,диалоги,hooligan,hooligan.offer_simon.01,cheeky,"Повторишь мои движения? Спорим, нет?",36,нет,в работе: дельта 18.11
+offer_simon,диалоги,hooligan,hooligan.offer_simon.02,excited,"Я показываю движение, ты повторяешь. Играем?",44,нет,в работе: дельта 18.11
+offer_simon,диалоги,hooligan,hooligan.offer_simon.03,cheeky,"Игра «Делай как я», только кнопками. Сыграем?",45,нет,в работе: дельта 18.11
+emo_start,мини-игры с выбором,hooligan,hooligan.emo_start.01,cheeky,"Играем! Я корчу рожицу, а ты угадываешь, какой я.",49,нет,в работе: дельта 18.11
+emo_start,мини-игры с выбором,hooligan,hooligan.emo_start.02,excited,Угадай мою рожицу! Я мастер кривляний.,38,нет,в работе: дельта 18.11
+emo_ask,мини-игры с выбором,hooligan,hooligan.emo_ask.01,cheeky,"Ну, какой я сейчас?",19,нет,в работе: дельта 18.11
+emo_ask,мини-игры с выбором,hooligan,hooligan.emo_ask.02,neutral,Смотри на морду. Какой я?,25,нет,в работе: дельта 18.11
+emo_wrong,мини-игры с выбором,hooligan,hooligan.emo_wrong.01,cheeky,"Не-а. Смотри ещё раз, внимательно.",34,нет,в работе: дельта 18.11
+emo_wrong,мини-игры с выбором,hooligan,hooligan.emo_wrong.02,neutral,Мимо! Глянь ещё разок.,22,нет,в работе: дельта 18.11
+emo_right,мини-игры с выбором,hooligan,hooligan.emo_right.01,excited,"В точку! Читаешь меня, как комикс.",34,нет,в работе: дельта 18.11
+emo_right,мини-игры с выбором,hooligan,hooligan.emo_right.02,proud,Угадано! Респект.,17,нет,в работе: дельта 18.11
+emo_is_happy,мини-игры с выбором,hooligan,hooligan.emo_is_happy.01,happy,"Это был весёлый я! Ну, как обычно.",34,нет,в работе: дельта 18.11
+emo_is_sad,мини-игры с выбором,hooligan,hooligan.emo_is_sad.01,sad,Это был грустный я. Но уже прошло.,34,нет,в работе: дельта 18.11
+emo_is_angry,мини-игры с выбором,hooligan,hooligan.emo_is_angry.01,annoyed,Это был сердитый я! Р-р-р. Шучу.,32,нет,в работе: дельта 18.11
+emo_is_surprised,мини-игры с выбором,hooligan,hooligan.emo_is_surprised.01,surprised,Это был удивлённый я! Ого-го.,29,нет,в работе: дельта 18.11
+emo_is_sleepy,мини-игры с выбором,hooligan,hooligan.emo_is_sleepy.01,sleepy,Это был сонный я. Хр-р... Ой.,29,нет,в работе: дельта 18.11
+emo_is_shy,мини-игры с выбором,hooligan,hooligan.emo_is_shy.01,shy,Это я стеснялся. Только никому!,31,нет,в работе: дельта 18.11
+rps_start,мини-игры с выбором,hooligan,hooligan.rps_start.01,cheeky,"Камень, ножницы, бумага! Скажи вслух, что выбираешь.",52,нет,в работе: дельта 18.11
+rps_start,мини-игры с выбором,hooligan,hooligan.rps_start.02,excited,"Играем! На счёт «три» говори: камень, ножницы или бумага.",57,нет,в работе: дельта 18.11
+rps_go,мини-игры с выбором,hooligan,hooligan.rps_go.01,cheeky,"Раз, два, три!",14,нет,в работе: дельта 18.11
+rps_go,мини-игры с выбором,hooligan,hooligan.rps_go.02,excited,"Камень, ножницы, бумага... раз, два, три!",41,нет,в работе: дельта 18.11
+rps_again,мини-игры с выбором,hooligan,hooligan.rps_again.01,neutral,"Не понял. Камень, ножницы или бумага?",37,нет,в работе: дельта 18.11
+rps_again,мини-игры с выбором,hooligan,hooligan.rps_again.02,cheeky,"Ну? Скажи одно: камень, ножницы или бумага.",43,нет,в работе: дельта 18.11
+rps_is_rock,мини-игры с выбором,hooligan,hooligan.rps_is_rock.01,proud,У меня камень!,14,нет,в работе: дельта 18.11
+rps_is_scissors,мини-игры с выбором,hooligan,hooligan.rps_is_scissors.01,cheeky,У меня ножницы! Чик-чик.,24,нет,в работе: дельта 18.11
+rps_is_paper,мини-игры с выбором,hooligan,hooligan.rps_is_paper.01,neutral,У меня бумага!,14,нет,в работе: дельта 18.11
+rps_win,мини-игры с выбором,hooligan,hooligan.rps_win.01,annoyed,"Эх, победа твоя! Ну ты даёшь.",29,нет,в работе: дельта 18.11
+rps_win,мини-игры с выбором,hooligan,hooligan.rps_win.02,cheeky,"Обыграли меня! Ладно, уважаю.",29,нет,в работе: дельта 18.11
+rps_lose,мини-игры с выбором,hooligan,hooligan.rps_lose.01,proud,"Йо, моя победа!",15,нет,в работе: дельта 18.11
+rps_lose,мини-игры с выбором,hooligan,hooligan.rps_lose.02,cheeky,"Хе-хе, я выиграл. Повезло, наверное.",36,нет,в работе: дельта 18.11
+rps_draw,мини-игры с выбором,hooligan,hooligan.rps_draw.01,surprised,Ничья! Мысли у нас одинаковые.,30,нет,в работе: дельта 18.11
+rps_draw,мини-игры с выбором,hooligan,hooligan.rps_draw.02,cheeky,"Ничья! Кажется, ты читаешь мои мысли.",37,нет,в работе: дельта 18.11
+simon_start,мини-игры с выбором,hooligan,hooligan.simon_start.01,cheeky,"Я показываю движение, а ты жмёшь такую же кнопку внизу. Погнали!",64,нет,в работе: дельта 18.11
+simon_start,мини-игры с выбором,hooligan,hooligan.simon_start.02,excited,"Делай как я! Смотри, что я делаю, и жми ту же кнопку.",53,нет,в работе: дельта 18.11
+simon_ask,мини-игры с выбором,hooligan,hooligan.simon_ask.01,cheeky,Смотри и повторяй!,18,нет,в работе: дельта 18.11
+simon_ask,мини-игры с выбором,hooligan,hooligan.simon_ask.02,neutral,Запоминай движение!,19,нет,в работе: дельта 18.11
+simon_wrong,мини-игры с выбором,hooligan,hooligan.simon_wrong.01,neutral,Не то! Смотри ещё раз.,22,нет,в работе: дельта 18.11
+simon_wrong,мини-игры с выбором,hooligan,hooligan.simon_wrong.02,cheeky,Мимо. Глянь внимательно.,24,нет,в работе: дельта 18.11
+simon_right,мини-игры с выбором,hooligan,hooligan.simon_right.01,excited,Чётко! Следующее!,17,нет,в работе: дельта 18.11
+simon_right,мини-игры с выбором,hooligan,hooligan.simon_right.02,proud,Есть! Дальше сложнее.,21,нет,в работе: дельта 18.11
+simon_done,мини-игры с выбором,hooligan,hooligan.simon_done.01,excited,Три из трёх! Повторяешь лучше всех.,35,нет,в работе: дельта 18.11
+simon_done,мини-игры с выбором,hooligan,hooligan.simon_done.02,proud,Всё повторено! Беру тебя в свою банду.,38,нет,в работе: дельта 18.11
+simon_is_jump,мини-игры с выбором,hooligan,hooligan.simon_is_jump.01,neutral,Это был прыжок!,15,нет,в работе: дельта 18.11
+simon_is_flip,мини-игры с выбором,hooligan,hooligan.simon_is_flip.01,neutral,Это было сальто!,16,нет,в работе: дельта 18.11
+simon_is_dance,мини-игры с выбором,hooligan,hooligan.simon_is_dance.01,neutral,Это был танец!,14,нет,в работе: дельта 18.11
+simon_is_wave,мини-игры с выбором,hooligan,hooligan.simon_is_wave.01,neutral,Это я лапой махал!,18,нет,в работе: дельта 18.11
+simon_is_sit,мини-игры с выбором,hooligan,hooligan.simon_is_sit.01,neutral,Я просто сел!,13,нет,в работе: дельта 18.11
+game_more,мини-игры с выбором,hooligan,hooligan.game_more.01,cheeky,Ещё раунд?,10,нет,в работе: дельта 18.11
+game_more,мини-игры с выбором,hooligan,hooligan.game_more.02,neutral,Ещё разок? Да или нет?,22,нет,в работе: дельта 18.11
+game_more,мини-игры с выбором,hooligan,hooligan.game_more.03,cheeky,Реванш? Скажи «да».,19,нет,в работе: дельта 18.11
+game_bye,мини-игры с выбором,hooligan,hooligan.game_bye.01,neutral,"Окей, игра окончена. Было огонь!",32,нет,в работе: дельта 18.11
+game_bye,мини-игры с выбором,hooligan,hooligan.game_bye.02,cheeky,"Ладно, перерыв. Лапы отдыхают.",30,нет,в работе: дельта 18.11
+game_bye,мини-игры с выбором,hooligan,hooligan.game_bye.03,neutral,Хватит так хватит. Ещё сыграем.,31,нет,в работе: дельта 18.11
+riddle_q,загадки,hooligan,hooligan.riddle.r01.q,neutral,"Без окон, без дверей, полна горница людей. Чё это?",50,да,на сервере
+riddle_hint,диалоги,hooligan,hooligan.riddle.r01.hint,neutral,"Растёт на грядке, зелёный и в пупырышках.",41,да,на сервере
+riddle_q,загадки,hooligan,hooligan.riddle.r02.q,neutral,Висит груша — нельзя скушать. Ну?,33,да,на сервере
+riddle_hint,диалоги,hooligan,hooligan.riddle.r02.hint,neutral,"Её включают, когда темно.",25,да,на сервере
+riddle_q,загадки,hooligan,hooligan.riddle.r03.q,neutral,Зимой и летом одним цветом. Чё такое?,37,да,на сервере
+riddle_hint,диалоги,hooligan,hooligan.riddle.r03.hint,neutral,На Новый год её наряжают.,25,да,на сервере
+riddle_q,загадки,hooligan,hooligan.riddle.r04.q,neutral,"Сто одёжек, и все без застёжек. Ну, что это?",44,да,на сервере
+riddle_hint,диалоги,hooligan,hooligan.riddle.r04.hint,neutral,Из неё варят щи.,16,да,на сервере
+riddle_q,загадки,hooligan,hooligan.riddle.r05.q,neutral,"Хозяин леса, любит мёд, а зимой в берлоге спит. Кто это?",56,да,на сервере
+riddle_hint,диалоги,hooligan,hooligan.riddle.r05.hint,neutral,"Большой, бурый и косолапый.",27,да,на сервере
+riddle_q,загадки,hooligan,hooligan.riddle.r06.q,neutral,"Два кольца, два конца, посередине гвоздик.",42,да,на сервере
+riddle_hint,диалоги,hooligan,hooligan.riddle.r06.hint,neutral,"Ими режут бумагу. Осторожно, острые!",36,да,на сервере
+riddle_q,загадки,hooligan,hooligan.riddle.r07.q,neutral,"Кто приходит, кто уходит — все её за ручку водят.",49,да,на сервере
+riddle_hint,диалоги,hooligan,hooligan.riddle.r07.hint,neutral,Через неё заходят в комнату.,28,да,на сервере
+riddle_q,загадки,hooligan,hooligan.riddle.r08.q,neutral,"Что можно увидеть с закрытыми глазами? Спорим, не знаешь?",57,да,на сервере
+riddle_hint,диалоги,hooligan,hooligan.riddle.r08.hint,neutral,Это бывает ночью.,17,да,на сервере
+point_camera,сценарий,kind,kind.point_camera.01,caring,"Привет! Я тут, в карте. Наведи на неё камеру, пожалуйста.",57,да,на сервере
+point_camera,сценарий,kind,kind.point_camera.02,neutral,Покажи карточку камере — и мы встретимся.,41,да,на сервере
+point_camera,сценарий,kind,kind.point_camera.03,happy,"Ой, кто-то пришёл! Наведи камеру на карту, я выгляну.",53,да,на сервере
+intro,сценарий,kind,kind.intro.01,excited,"Ух ты, меня нашли! Привет!",26,да,на сервере
+intro,сценарий,kind,kind.intro.02,happy,"Здравствуй! Как здорово, что ты тут. Я тебя ждал.",49,да,на сервере
+intro,сценарий,kind,kind.intro.03,surprised,"Ой, как светло! Привет. Я немножко стесняюсь.",45,да,на сервере
+meet_card,сценарий,kind,kind.meet_card.01,surprised,Ой! Это твоя карта? Теперь я живу в ней.,40,да,на сервере
+meet_card,сценарий,kind,kind.meet_card.02,happy,"Какая хорошая карта! Можно, я буду в ней жить?",46,да,на сервере
+meet_card,сценарий,kind,kind.meet_card.03,caring,"Ух ты, своя карта! Я теперь живу в ней.",39,да,на сервере
+meet_congrats,сценарий,kind,kind.meet_congrats.01,happy,Поздравляю с картой! Привет-привет!,35,да,на сервере
+meet_congrats,сценарий,kind,kind.meet_congrats.02,excited,Своя карта — это здорово! Поздравляю. Привет!,45,да,на сервере
+meet_congrats,сценарий,kind,kind.meet_congrats.03,caring,Поздравляю тебя! И привет. Очень рад встрече.,45,да,на сервере
+meet_self,сценарий,kind,kind.meet_self.01,caring,"А я Добряк — кот, который живёт в твоей карте.",46,да,на сервере
+meet_self,сценарий,kind,kind.meet_self.02,happy,Меня зовут Добряк. Я умею мурчать и дружить.,44,да,на сервере
+meet_self,сценарий,kind,kind.meet_self.03,happy,"Я Добряк, твой тёплый кот из карты.",35,да,на сервере
+meet_skills,сценарий,kind,kind.meet_skills.01,caring,Погладь меня пальцем — я замурчу. А кнопки внизу — наши игры.,61,да,на сервере
+meet_skills,сценарий,kind,kind.meet_skills.02,happy,"Меня можно гладить, щекотать и угощать. Нажми любую кнопку внизу!",65,да,на сервере
+meet_skills,сценарий,kind,kind.meet_skills.03,neutral,Погладь меня или нажми кнопку внизу. А ещё со мной можно говорить.,66,да,на сервере
+ask_name,сценарий,kind,kind.ask_name.01,caring,Как тебя зовут? Если не хочется — можно не говорить.,52,да,на сервере
+ask_name,сценарий,kind,kind.ask_name.02,neutral,Давай познакомимся? А то я тут один мурчу.,42,нет,в работе: дельта 18.11
+ask_name,сценарий,kind,kind.ask_name.03,happy,Я люблю имена. Скажешь своё?,28,да,на сервере
+nice_name,сценарий,kind,kind.nice_name.01,happy,{name}! Какое хорошее имя.,26,да,на сервере
+nice_name,сценарий,kind,kind.nice_name.02,caring,{name}... Очень приятно. А я Кот.,33,да,на сервере
+nice_name,сценарий,kind,kind.nice_name.03,excited,{name}! Здорово. Теперь мы знакомы.,35,да,на сервере
+nice_name,сценарий,kind,kind.nice_name.04,happy,"Красивое имя. Мне нравится, как оно звучит.",43,да,на сервере
+nice_name,сценарий,kind,kind.nice_name.05,caring,Очень приятно познакомиться!,28,да,на сервере
+no_name,сценарий,kind,kind.no_name.01,caring,"Хорошо, секрет так секрет. Буду звать тебя «дружок».",52,да,на сервере
+no_name,сценарий,kind,kind.no_name.02,happy,"Не страшно. Главное, что ты здесь.",34,да,на сервере
+no_name,сценарий,kind,kind.no_name.03,neutral,"Хорошо. Может, потом скажешь.",29,да,на сервере
+mic_hint,сценарий,kind,kind.mic_hint.01,caring,Нажми кнопку с микрофоном и скажи что-нибудь. Я слушаю.,55,да,на сервере
+mic_hint,сценарий,kind,kind.mic_hint.02,neutral,"Держи кнопку внизу, когда говоришь. Так я тебя услышу.",54,да,на сервере
+mic_hint,сценарий,kind,kind.mic_hint.03,caring,"Разреши микрофон, пожалуйста. Так мы сможем поболтать.",54,да,на сервере
+choose,сценарий,kind,kind.choose.01,neutral,"Я бываю разным: Хулиган, Добряк, Блёстка. Какой тебе нравится?",62,да,на сервере
+choose,сценарий,kind,kind.choose.02,caring,"Выбери, каким мне быть. Просто нажми на наклейку.",49,да,на сервере
+choose,сценарий,kind,kind.choose.03,happy,"Хочешь, я останусь добряком? Или выбери другого меня — я не обижусь.",68,да,на сервере
+invite,сценарий,kind,kind.invite.01,happy,"Меня можно гладить. Только медленно, я это люблю.",49,да,на сервере
+invite,сценарий,kind,kind.invite.02,neutral,Нажми на карту — я подойду. Подержи палец на экране — подышу на стекло.,71,да,на сервере
+invite,сценарий,kind,kind.invite.03,caring,А ещё можно сказать «повторяй за мной». Я буду говорить твоими словами.,71,да,на сервере
+switch_ask,сценарий,kind,kind.switch_ask.01,caring,"Хочешь, я стану другим котом? Скажи «давай» или «не надо».",58,нет,в работе: switch_ask
+switch_ask,сценарий,kind,kind.switch_ask.02,happy,Переодеться в другой образ? Скажи «давай».,42,нет,в работе: switch_ask
+switch_start,сценарий,kind,kind.switch_start.01,neutral,"Минуточку, я переоденусь.",25,да,на сервере
+switch_start,сценарий,kind,kind.switch_start.02,happy,Сейчас будет сюрприз! Закрываю окошко наклейками.,49,да,на сервере
+switch_start,сценарий,kind,kind.switch_start.03,caring,"Не уходи, я быстро.",19,да,на сервере
+shake_prompt,сценарий,kind,kind.shake_prompt.01,neutral,"Встряхни телефон — и посмотри, что получилось.",46,да,на сервере
+shake_prompt,сценарий,kind,kind.shake_prompt.02,happy,Теперь потряси немножко. Только аккуратно.,42,да,на сервере
+hello_new,сценарий,kind,kind.hello_new.01,happy,Ну как? Я новый!,16,да,на сервере
+hello_new,сценарий,kind,kind.hello_new.02,surprised,"Ой, это я? Мне нравится!",24,да,на сервере
+hello_new,сценарий,kind,kind.hello_new.03,caring,"Вот и я. Непривычно, но, кажется, мне идёт.",43,да,на сервере
+filler,сценарий,kind,kind.filler.01,neutral,"Знаешь, я люблю какао. С пенкой.",32,да,на сервере
+filler,сценарий,kind,kind.filler.02,happy,Мурр... У тебя тут уютно.,25,да,на сервере
+filler,сценарий,kind,kind.filler.03,caring,Можно просто посидеть вместе. Это тоже хорошо.,46,да,на сервере
+filler,сценарий,kind,kind.filler.04,neutral,"Интересно, что сегодня было у тебя хорошего?",44,да,на сервере
+filler,сценарий,kind,kind.filler.05,happy,"Если погладить меня, я замурчу. Проверим?",41,да,на сервере
+outro,сценарий,kind,kind.outro.01,caring,"Мне пора домой, в СберKids. Там брат. Пойдём вместе?",52,да,на сервере
+outro,сценарий,kind,kind.outro.02,happy,Дома у нас тепло и много интересного. Нажми на кнопку — я покажу.,65,да,на сервере
+outro,сценарий,kind,kind.outro.03,neutral,Брат ждёт нас в СберKids. Кнопка внизу.,39,да,на сервере
+welcome_back,сценарий,kind,kind.welcome_back.01,happy,{name}! Как я рад тебя видеть.,30,да,на сервере
+welcome_back,сценарий,kind,kind.welcome_back.02,caring,"{name}, привет! Я по тебе скучал.",33,да,на сервере
+welcome_back,сценарий,kind,kind.welcome_back.03,excited,{name}! Ты тут. Как хорошо.,27,да,на сервере
+welcome_back,сценарий,kind,kind.welcome_back.04,happy,"О, снова ты! Как я рад.",23,да,на сервере
+welcome_back,сценарий,kind,kind.welcome_back.05,caring,Привет! А я как раз какао сварил.,33,да,на сервере
+goodbye,сценарий,kind,kind.goodbye.01,caring,Пока-пока. Береги себя!,23,да,на сервере
+goodbye,сценарий,kind,kind.goodbye.02,happy,До встречи! Я буду ждать в карте.,33,да,на сервере
+goodbye,сценарий,kind,kind.goodbye.03,neutral,Мне было хорошо с тобой. Приходи ещё.,37,да,на сервере
+tap_cat,касания/карта/время,kind,kind.tap_cat.01,happy,"Ой, привет!",11,да,на сервере
+tap_cat,касания/карта/время,kind,kind.tap_cat.02,happy,"Хи-хи, щекотно немножко.",24,да,на сервере
+tap_cat,касания/карта/время,kind,kind.tap_cat.03,caring,Тук — и я улыбаюсь.,19,да,на сервере
+tap_cat,касания/карта/время,kind,kind.tap_cat.04,caring,"Тук-тук по коту! Я тут, рядышком.",33,нет,в работе: дельта 18.11
+tap_cat_head,касания/карта/время,kind,kind.tap_cat_head.01,happy,"Голову можно погладить, вот так, медленно.",42,да,на сервере
+tap_cat_head,касания/карта/время,kind,kind.tap_cat_head.02,neutral,"Ой, по макушке. Это почти как погладить.",40,да,на сервере
+tap_cat_head,касания/карта/время,kind,kind.tap_cat_head.03,happy,"По макушке? Мурр, это как маленькая обнимашка.",46,нет,в работе: дельта 18.11
+tap_cat_head,касания/карта/время,kind,kind.tap_cat_head.04,caring,"Ушки любят, когда их трогают ласково. Вот так.",46,нет,в работе: дельта 18.11
+tap_cat_head,касания/карта/время,kind,kind.tap_cat_head.05,shy,Тук по голове. Там живут добрые мысли.,38,нет,в работе: дельта 18.11
+tap_cat_cheek,касания/карта/время,kind,kind.tap_cat_cheek.01,shy,"Щёки мягкие, да? Мне все так говорят.",37,да,на сервере
+tap_cat_cheek,касания/карта/время,kind,kind.tap_cat_cheek.02,happy,Пф-ф... Щека теперь как булочка.,32,да,на сервере
+tap_cat_belly,касания/карта/время,kind,kind.tap_cat_belly.01,happy,"Ха-ха, живот! Щекотно-щекотно!",30,да,на сервере
+tap_cat_belly,касания/карта/время,kind,kind.tap_cat_belly.02,shy,"Ой-ой, там я очень боюсь щекотки!",33,да,на сервере
+tap_cat_belly,касания/карта/время,kind,kind.tap_cat_belly.03,happy,"Хи-хи-хи! Животик щекотный, ой, не могу!",40,нет,в работе: дельта 18.11
+tap_cat_belly,касания/карта/время,kind,kind.tap_cat_belly.04,excited,"Щекотка! Ой, сейчас от смеха пузыри пойдут!",43,нет,в работе: дельта 18.11
+tap_cat_belly,касания/карта/время,kind,kind.tap_cat_belly.05,shy,"Пузико! Только тихонько, оно стеснительное.",43,нет,в работе: дельта 18.11
+tap_cat_paw,касания/карта/время,kind,kind.tap_cat_paw.01,happy,"Давай лапу! Вот, держи.",23,да,на сервере
+tap_cat_paw,касания/карта/время,kind,kind.tap_cat_paw.02,caring,Лапопожатие! Очень приятно.,27,да,на сервере
+tap_cat_paw,касания/карта/время,kind,kind.tap_cat_paw.03,happy,Лапка в лапку! Теперь мы друзья.,32,нет,в работе: дельта 18.11
+tap_cat_paw,касания/карта/время,kind,kind.tap_cat_paw.04,caring,"Тёплая лапка, правда? Я её для тебя грел.",41,нет,в работе: дельта 18.11
+tap_cat_paw,касания/карта/время,kind,kind.tap_cat_paw.05,happy,Дай пять! Мягкие-мягкие пять.,29,нет,в работе: дельта 18.11
+tap_cat_tail,касания/карта/время,kind,kind.tap_cat_tail.01,surprised,"Ой, хвост! Аккуратнее, он нежный.",33,да,на сервере
+tap_cat_tail,касания/карта/время,kind,kind.tap_cat_tail.02,caring,"Хвост лучше не трогать, ладно? Он у меня один.",46,да,на сервере
+tap_cat_tail,касания/карта/время,kind,kind.tap_cat_tail.03,surprised,"Ой, хвостик! Он пушистый, как облачко.",38,нет,в работе: дельта 18.11
+tap_cat_tail,касания/карта/время,kind,kind.tap_cat_tail.04,happy,"Хвост виляет, значит, я радуюсь.",32,нет,в работе: дельта 18.11
+tap_cat_tail,касания/карта/время,kind,kind.tap_cat_tail.05,caring,Хвостик щекотно. Лучше погладь меня по спинке.,46,нет,в работе: дельта 18.11
+poke_combo,касания/карта/время,kind,kind.poke_combo.01,neutral,"Ты что-то ищешь у меня? Кнопки нет, честно.",43,да,на сервере
+poke_combo,касания/карта/время,kind,kind.poke_combo.02,happy,Три раза! Это наш секретный стук?,33,да,на сервере
+poke_hard,касания/карта/время,kind,kind.poke_hard.01,sad,"Ой, больно немножко. Давай нежнее, хорошо?",42,да,на сервере
+poke_hard,касания/карта/время,kind,kind.poke_hard.02,caring,"Ничего, я не обижаюсь. Просто погладь медленно.",47,да,на сервере
+stroke,касания/карта/время,kind,kind.stroke.01,happy,Мурр... как хорошо.,19,да,на сервере
+stroke,касания/карта/время,kind,kind.stroke.02,happy,"Вот так, ещё. Ты очень нежно гладишь.",37,да,на сервере
+stroke,касания/карта/время,kind,kind.stroke.03,caring,Мур. Это значит «спасибо» по-кошачьи.,37,да,на сервере
+stroke,касания/карта/время,kind,kind.stroke.04,happy,"Мур-мур. Гладь ещё, мне так спокойно.",37,нет,в работе: дельта 18.11
+stroke,касания/карта/время,kind,kind.stroke.05,caring,"Ты гладишь, а я мурчу. Это наша песенка.",40,нет,в работе: дельта 18.11
+stroke_long,касания/карта/время,kind,kind.stroke_long.01,happy,Мурр... Я сейчас самый счастливый кот.,38,да,на сервере
+stroke_long,касания/карта/время,kind,kind.stroke_long.02,caring,Спасибо. Я так и уснуть могу.,29,да,на сервере
+stroke_long,касания/карта/время,kind,kind.stroke_long.03,shy,"Можно я тебя обниму? Вот так, через стекло.",43,да,на сервере
+stroke_long,касания/карта/время,kind,kind.stroke_long.04,shy,Обнимашки! Самые тёплые на свете.,33,нет,в работе: дельта 18.11
+stroke_long,касания/карта/время,kind,kind.stroke_long.05,caring,"Мурр... Обниму тебя крепко-крепко, через экран.",47,нет,в работе: дельта 18.11
+tap_screen,касания/карта/время,kind,kind.tap_screen.01,happy,Тук-тук! Я тоже так умею.,25,да,на сервере
+tap_screen,касания/карта/время,kind,kind.tap_screen.02,caring,"Я тут, я тут!",13,да,на сервере
+tap_screen,касания/карта/время,kind,kind.tap_screen.03,neutral,Кто стучится? Это друг!,23,да,на сервере
+tap_screen,касания/карта/время,kind,kind.tap_screen.04,happy,Тук-тук — открыто!,18,да,на сервере
+double_tap,касания/карта/время,kind,kind.double_tap.01,excited,"Смотри, пузыри! Лопай их пальцем.",33,да,на сервере
+double_tap,касания/карта/время,kind,kind.double_tap.02,happy,Пузыри-пузыри! Поймаешь?,24,да,на сервере
+double_tap,касания/карта/время,kind,kind.double_tap.03,caring,Каждый пузырь — маленькое желание.,34,да,на сервере
+double_tap,касания/карта/время,kind,kind.double_tap.04,happy,Пузыри для тебя! Загадай желание и лопни.,41,нет,в работе: дельта 18.11
+double_tap,касания/карта/время,kind,kind.double_tap.05,excited,Фокус! Самый большой пузырь. Он тоже тебя обнимает.,51,нет,в работе: дельта 18.11
+walk_to,касания/карта/время,kind,kind.walk_to.01,neutral,"Иду, иду, не спешу.",19,да,на сервере
+walk_to,касания/карта/время,kind,kind.walk_to.02,happy,"Туда? Хорошо, сейчас.",21,да,на сервере
+walk_to,касания/карта/время,kind,kind.walk_to.03,caring,"Хорошо, подойду поближе.",24,да,на сервере
+swipe,касания/карта/время,kind,kind.swipe.01,happy,Подышу на стекло... и нарисую сердечко!,39,да,на сервере
+swipe,касания/карта/время,kind,kind.swipe.02,caring,Видишь? Это тебе.,17,да,на сервере
+swipe,касания/карта/время,kind,kind.swipe.03,neutral,Порисуем вместе? Проведи пальцем по запотевшему стеклу.,55,да,на сервере
+longpress,касания/карта/время,kind,kind.longpress.01,happy,"Ой, тёплая ладошка! Подержи ещё.",32,да,на сервере
+longpress,касания/карта/время,kind,kind.longpress.02,caring,"Прислоню лапу с той стороны. Вот, мы рядом.",43,да,на сервере
+longpress,касания/карта/время,kind,kind.longpress.03,neutral,Ха-а... Запотело! Можно рисовать.,33,да,на сервере
+treat,касания/карта/время,kind,kind.treat.01,happy,"Ой, рыбка! Спасибо, очень вкусно.",33,да,на сервере
+treat,касания/карта/время,kind,kind.treat.02,caring,"Мм, молочко! Спасибо, что заботишься обо мне.",45,да,на сервере
+treat,касания/карта/время,kind,kind.treat.03,excited,Ням! Самое вкусное угощение на свете.,37,да,на сервере
+treat,касания/карта/время,kind,kind.treat.04,happy,"Мм, печенька! Поделюсь с тобой. Половинку тебе!",47,нет,в работе: дельта 18.11
+treat,касания/карта/время,kind,kind.treat.05,caring,Спасибо! С тобой даже рыбка вкуснее.,36,нет,в работе: дельта 18.11
+shake,касания/карта/время,kind,kind.shake.01,surprised,"Ой-ой, качает! Как на кораблике.",32,да,на сервере
+shake,касания/карта/время,kind,kind.shake.02,neutral,"Тише-тише, у меня какао разольётся.",35,да,на сервере
+shake,касания/карта/время,kind,kind.shake.03,caring,"Ух, голова кружится. Давай поаккуратнее.",40,да,на сервере
+spam,касания/карта/время,kind,kind.spam.01,caring,"Ой, как быстро! Давай помедленнее, я не успеваю.",48,да,на сервере
+spam,касания/карта/время,kind,kind.spam.02,neutral,"Тап-тап-тап... подожди, дай отдышаться.",39,да,на сервере
+spam,касания/карта/время,kind,kind.spam.03,happy,Ух... Давай передохнём. Я посчитаю до трёх.,43,да,на сервере
+silence,касания/карта/время,kind,kind.silence.01,neutral,"Я тут, если что. Можно просто помолчать вместе.",47,да,на сервере
+silence,касания/карта/время,kind,kind.silence.02,caring,"Хочешь, я спою? Скажи «спой».",29,да,на сервере
+silence,касания/карта/время,kind,kind.silence.03,neutral,"Тишина... Слышишь, как я мурчу?",31,да,на сервере
+sleep,касания/карта/время,kind,kind.sleep.01,sleepy,Я немножко подремлю... совсем чуть-чуть...,42,да,на сервере
+sleep,касания/карта/время,kind,kind.sleep.02,sleepy,Сладких снов мне... мур...,26,да,на сервере
+wake_up,касания/карта/время,kind,kind.wake_up.01,surprised,"Ой, я задремал. Привет!",23,да,на сервере
+wake_up,касания/карта/время,kind,kind.wake_up.02,happy,"Меня разбудили! Ничего, я рад.",30,да,на сервере
+sticker_peel,касания/карта/время,kind,kind.sticker_peel.01,happy,"Аккуратно, вот так. Здорово получается.",39,да,на сервере
+sticker_peel,касания/карта/время,kind,kind.sticker_peel.02,neutral,Отклеиваешь? Можешь оставить себе.,34,да,на сервере
+sticker_peel,касания/карта/время,kind,kind.sticker_peel.03,caring,"Ой, как ловко!",14,да,на сервере
+stickers_all_gone,касания/карта/время,kind,kind.stickers_all_gone.01,excited,Всё чисто! Какое у тебя терпение.,33,да,на сервере
+stickers_all_gone,касания/карта/время,kind,kind.stickers_all_gone.02,happy,Окошко снова прозрачное. Спасибо!,33,да,на сервере
+card_lost,касания/карта/время,kind,kind.card_lost.01,caring,"Ой, карточка пропала. Покажи её снова, я подожду.",49,да,на сервере
+card_lost,касания/карта/время,kind,kind.card_lost.02,neutral,Я тебя не вижу. Где карта?,26,да,на сервере
+card_lost,касания/карта/время,kind,kind.card_lost.03,caring,"Не волнуйся, я тут. Просто наведи камеру на карту.",50,да,на сервере
+card_found,касания/карта/время,kind,kind.card_found.01,happy,Вот ты где! Я соскучился.,25,да,на сервере
+card_found,касания/карта/время,kind,kind.card_found.02,happy,"Фух, нашлась. Я уже волновался.",31,да,на сервере
+card_found,касания/карта/время,kind,kind.card_found.03,neutral,Нашлась! Здорово.,17,да,на сервере
+card_far,касания/карта/время,kind,kind.card_far.01,caring,"Поднеси карту поближе, мне плохо видно.",39,да,на сервере
+card_far,касания/карта/время,kind,kind.card_far.02,neutral,Ты далеко. Поднеси меня поближе.,32,да,на сервере
+card_close,касания/карта/время,kind,kind.card_close.01,surprised,"Ой, мы почти нос к носу! Отодвинь чуть-чуть.",44,да,на сервере
+card_close,касания/карта/время,kind,kind.card_close.02,neutral,"Отодвинь карту немножко, я не помещаюсь.",40,да,на сервере
+low_light,касания/карта/время,kind,kind.low_light.01,caring,"Темно, как вечером. Включи свет, чтобы я тебя видел.",52,да,на сервере
+low_light,касания/карта/время,kind,kind.low_light.02,neutral,Мне в темноте плохо видно. Можно свет?,38,да,на сервере
+hello,голос ребёнка,kind,kind.hello.01,happy,Привет! Как дела?,17,да,на сервере
+hello,голос ребёнка,kind,kind.hello.02,happy,Здравствуй-здравствуй!,22,да,на сервере
+hello,голос ребёнка,kind,kind.hello.03,caring,"Привет! Я рад, что ты тут.",26,да,на сервере
+bye,голос ребёнка,kind,kind.bye.01,caring,Уже уходишь? Точно-точно?,25,да,на сервере
+bye,голос ребёнка,kind,kind.bye.02,neutral,"Пора прощаться? Скажи «да», если пора.",38,да,на сервере
+bye,голос ребёнка,kind,kind.bye.03,neutral,Уходишь? Скажи «да» — и я помашу.,33,да,на сервере
+yes,голос ребёнка,kind,kind.yes.01,happy,Вот и славно!,13,да,на сервере
+yes,голос ребёнка,kind,kind.yes.02,happy,Договорились.,13,да,на сервере
+yes,голос ребёнка,kind,kind.yes.03,caring,"Хорошо, так и сделаем.",22,да,на сервере
+no,голос ребёнка,kind,kind.no.01,caring,"Хорошо, не будем.",17,да,на сервере
+no,голос ребёнка,kind,kind.no.02,neutral,Понял. Ничего страшного.,24,да,на сервере
+no,голос ребёнка,kind,kind.no.03,caring,"Как скажешь. Может, потом.",26,да,на сервере
+skip,голос ребёнка,kind,kind.skip.01,neutral,"Хорошо, дальше.",15,да,на сервере
+skip,голос ребёнка,kind,kind.skip.02,neutral,Пропустим. Ничего.,18,да,на сервере
+unknown,голос ребёнка,kind,kind.unknown.01,caring,"Прости, я не расслышал. Скажи ещё раз?",38,да,на сервере
+unknown,голос ребёнка,kind,kind.unknown.02,neutral,"Уши шевельнулись, а слова не поймал. Повторишь?",47,да,на сервере
+unknown,голос ребёнка,kind,kind.unknown.03,caring,Я пока не все слова знаю. Скажи по-другому?,43,да,на сервере
+name_ask,голос ребёнка,kind,kind.name_ask.01,happy,"Я Добряк, близнец СберКота. Самый тёплый из нас.",48,нет,в работе: дельта 18.11
+name_ask,голос ребёнка,kind,kind.name_ask.02,neutral,Меня зовут Добряк. А мой брат СберКот живёт в СберKids.,55,нет,в работе: дельта 18.11
+name_ask,голос ребёнка,kind,kind.name_ask.03,happy,Я Добряк! Кот из твоей карты. Люблю обнимашки и пузыри.,55,нет,в работе: дельта 18.11
+age_ask,голос ребёнка,kind,kind.age_ask.01,neutral,Мы с братом ровесники. Близнецы же.,35,да,на сервере
+age_ask,голос ребёнка,kind,kind.age_ask.02,happy,Взрослый уже. Но какао люблю как в детстве.,43,да,на сервере
+brother_ask,голос ребёнка,kind,kind.brother_ask.01,caring,Мой брат — СберКот. Умный и всегда помогает. Живёт в СберKids.,62,да,на сервере
+brother_ask,голос ребёнка,kind,kind.brother_ask.02,happy,Брат? Он лучший! Умный и очень добрый.,38,да,на сервере
+money,голос ребёнка,kind,kind.money.01,neutral,Про деньги — это к брату. Он объясняет лучше всех.,50,да,на сервере
+money,голос ребёнка,kind,kind.money.02,caring,Накопить на что-то? Это к брату — он подскажет как.,51,да,на сервере
+money,голос ребёнка,kind,kind.money.03,neutral,"Ой, это не ко мне, это к брату. Он в этом разбирается.",54,да,на сервере
+sberkids,голос ребёнка,kind,kind.sberkids.01,happy,К брату? Как здорово! Открыть СберKids?,39,да,на сервере
+sberkids,голос ребёнка,kind,kind.sberkids.02,caring,Брат будет очень рад. Пойдём к нему?,36,да,на сервере
+sberkids,голос ребёнка,kind,kind.sberkids.03,caring,В СберKids? Конечно. Идём прямо сейчас?,39,да,на сервере
+flip,голос ребёнка,kind,kind.flip.01,excited,"Ой, страшновато... но давай! Оп!",32,да,на сервере
+flip,голос ребёнка,kind,kind.flip.02,proud,Получилось! Я сам не ожидал.,28,да,на сервере
+flip,голос ребёнка,kind,kind.flip.03,happy,Сальто для тебя!,16,да,на сервере
+flip,голос ребёнка,kind,kind.flip.04,happy,"Кувырок! Голова кружится, но весело.",36,нет,в работе: дельта 18.11
+flip,голос ребёнка,kind,kind.flip.05,surprised,"Ой, получилось! Держи пузырик в честь сальто.",45,нет,в работе: дельта 18.11
+jump,голос ребёнка,kind,kind.jump.01,happy,Прыг! Получилось?,17,да,на сервере
+jump,голос ребёнка,kind,kind.jump.02,excited,Прыг-скок!,10,да,на сервере
+jump,голос ребёнка,kind,kind.jump.03,happy,"Прыг-прыг! Как зайчик, только кот.",34,да,на сервере
+dance,голос ребёнка,kind,kind.dance.01,happy,"Танцую! Хлоп-хлоп, повторяй со мной.",36,да,на сервере
+dance,голос ребёнка,kind,kind.dance.02,excited,"Давай вместе! Качаемся влево, вправо!",37,да,на сервере
+dance,голос ребёнка,kind,kind.dance.03,happy,"Я не очень умею, но мне весело.",31,да,на сервере
+dance,голос ребёнка,kind,kind.dance.04,happy,Танцую и пускаю пузыри! Буль-буль!,34,нет,в работе: дельта 18.11
+dance,голос ребёнка,kind,kind.dance.05,caring,"Медленный танец, для обнимашек. Покачаемся?",43,нет,в работе: дельта 18.11
+sit,голос ребёнка,kind,kind.sit.01,neutral,Присел. Посидим вместе?,23,да,на сервере
+sit,голос ребёнка,kind,kind.sit.02,happy,"Сижу, как воспитанный кот.",26,да,на сервере
+wave,голос ребёнка,kind,kind.wave.01,happy,Машу-машу! Привет!,18,да,на сервере
+wave,голос ребёнка,kind,kind.wave.02,caring,Вот моя лапа. Видишь?,21,да,на сервере
+sing,голос ребёнка,kind,kind.sing.01,happy,"Мур-мур-мур, я пою, песенку тебе дарю. Мур-мур-мур, хорошо, что ты здесь!",73,да,на сервере
+sing,голос ребёнка,kind,kind.sing.02,caring,"Ля-ля-ля, тёплый день, мне мурлыкать не лень. Ой, придумал на ходу.",67,да,на сервере
+gum,голос ребёнка,kind,kind.gum.01,excited,Трюк? Сейчас... пузыри!,23,да,на сервере
+gum,голос ребёнка,kind,kind.gum.02,happy,Мой любимый трюк — мыльные пузыри.,34,да,на сервере
+gum,голос ребёнка,kind,kind.gum.03,caring,Для тебя — самый большой пузырь.,32,да,на сервере
+stickers,голос ребёнка,kind,kind.stickers.01,happy,Держи наклейку-сердечко. И ещё одну!,36,да,на сервере
+stickers,голос ребёнка,kind,kind.stickers.02,neutral,Наклейки! Отклеивай за уголок.,30,да,на сервере
+change_persona,голос ребёнка,kind,kind.change_persona.01,neutral,"Хочешь другого меня? Хорошо, я переоденусь.",43,да,на сервере
+change_persona,голос ребёнка,kind,kind.change_persona.02,caring,Конечно. Каким мне быть?,24,да,на сервере
+choose_hooligan,голос ребёнка,kind,kind.choose_hooligan.01,neutral,"Хулиган? Ладно, побуду немножко дерзким. Совсем чуть-чуть.",58,да,на сервере
+choose_kind,голос ребёнка,kind,kind.choose_kind.01,happy,Добряк! Мне очень нравится этот выбор.,38,да,на сервере
+choose_kind,голос ребёнка,kind,kind.choose_kind.02,caring,"Хорошо, я буду добрым-предобрым.",32,да,на сервере
+choose_glitter,голос ребёнка,kind,kind.choose_glitter.01,happy,Блёстка? Она очень весёлая. Сейчас превращусь!,46,да,на сервере
+compliment,голос ребёнка,kind,kind.compliment.01,shy,"Ой, спасибо... С тобой тоже очень хорошо.",41,да,на сервере
+compliment,голос ребёнка,kind,kind.compliment.02,happy,Правда? Я теперь весь день буду улыбаться.,42,да,на сервере
+compliment,голос ребёнка,kind,kind.compliment.03,shy,Мурр... Я сейчас покраснею.,27,да,на сервере
+rude,голос ребёнка,kind,kind.rude.01,sad,Мне немножко грустно от таких слов. Давай дружить?,50,да,на сервере
+rude,голос ребёнка,kind,kind.rude.02,caring,"Бывает, настроение плохое. Погладь меня — вдруг поможет.",56,да,на сервере
+rude,голос ребёнка,kind,kind.rude.03,neutral,Я всё равно с тобой. Давай лучше пузыри?,40,да,на сервере
+sad,голос ребёнка,kind,kind.sad.01,caring,"Мне жаль, что тебе грустно. Я рядом. Расскажи маме или папе — они помогут.",74,да,на сервере
+sad,голос ребёнка,kind,kind.sad.02,caring,"Грустить можно. Я просто побуду рядом. И поговори со взрослым, которому доверяешь.",82,да,на сервере
+sad,голос ребёнка,kind,kind.sad.03,caring,"Обними экран, я обниму с той стороны. А потом позови кого-нибудь из взрослых.",77,да,на сервере
+scared,голос ребёнка,kind,kind.scared.01,caring,"Я с тобой. Позови маму, папу или другого взрослого, пусть будут рядом.",70,да,на сервере
+scared,голос ребёнка,kind,kind.scared.02,caring,Давай вместе подышим. Вдох... и выдох. А теперь позови взрослого.,65,да,на сервере
+scared,голос ребёнка,kind,kind.scared.03,caring,"Я рядом и никуда не ухожу. Позови маму, папу или другого взрослого.",67,да,на сервере
+bored,голос ребёнка,kind,kind.bored.01,happy,Давай пузыри? Скажи «пузыри».,29,да,на сервере
+bored,голос ребёнка,kind,kind.bored.02,caring,"Можно погладить меня. Я замурчу, это приятно.",45,да,на сервере
+bored,голос ребёнка,kind,kind.bored.03,neutral,Скажи «повторяй за мной» — будет весело.,40,да,на сервере
+riddle,голос ребёнка,kind,kind.riddle.01,happy,Загадку? С радостью. Слушай внимательно.,40,да,на сервере
+riddle,голос ребёнка,kind,kind.riddle.02,caring,Люблю загадки. Вот одна.,24,да,на сервере
+riddle,голос ребёнка,kind,kind.riddle.03,neutral,"Сейчас загадаю. Не торопись, подумай.",37,да,на сервере
+joke,голос ребёнка,kind,kind.joke.01,happy,Какой зефир любят коты? Мур-шмеллоу! Хи-хи.,43,да,на сервере
+joke,голос ребёнка,kind,kind.joke.02,happy,Почему коты дружат с клубками? Клубки никогда не спорят.,56,да,на сервере
+joke,голос ребёнка,kind,kind.joke.03,neutral,"Я хотел рассказать шутку, но забыл. Ну вот, это тоже смешно.",60,да,на сервере
+help,голос ребёнка,kind,kind.help.01,caring,Погладь меня пальцем или нажми кнопку внизу. Ещё можно сказать «спой».,70,да,на сервере
+help,голос ребёнка,kind,kind.help.02,happy,"Я умею петь, танцевать и загадывать загадки. Кнопки — внизу.",60,да,на сервере
+help,голос ребёнка,kind,kind.help.03,neutral,Скажи «танцуй» или «повторяй за мной». Или угости меня — кнопка внизу.,70,да,на сервере
+thanks,голос ребёнка,kind,kind.thanks.01,happy,Пожалуйста!,11,да,на сервере
+thanks,голос ребёнка,kind,kind.thanks.02,caring,Не за что. Мне только в радость.,32,да,на сервере
+thanks,голос ребёнка,kind,kind.thanks.03,happy,Мурр... Обращайся.,18,да,на сервере
+echo_start,голос ребёнка,kind,kind.echo_start.01,happy,Говори! А я повторю.,20,да,на сервере
+echo_start,голос ребёнка,kind,kind.echo_start.02,caring,Я слушаю очень внимательно. Скажи что-нибудь.,45,да,на сервере
+echo_start,голос ребёнка,kind,kind.echo_start.03,neutral,Режим повторялки включён.,25,да,на сервере
+echo_done,голос ребёнка,kind,kind.echo_done.01,happy,Похоже получилось?,18,да,на сервере
+echo_done,голос ребёнка,kind,kind.echo_done.02,happy,"Ой, у меня смешной голос!",25,да,на сервере
+echo_done,голос ребёнка,kind,kind.echo_done.03,caring,"Говори ещё, мне нравится.",25,да,на сервере
+echo_stop,голос ребёнка,kind,kind.echo_stop.01,neutral,"Хорошо, больше не повторяю.",27,да,на сервере
+echo_stop,голос ребёнка,kind,kind.echo_stop.02,happy,Было весело! Повторялка выключена.,34,да,на сервере
+echo_stop,голос ребёнка,kind,kind.echo_stop.03,caring,"Всё, теперь снова говорю своим голосом.",39,да,на сервере
+loud,голос ребёнка,kind,kind.loud.01,sad,"Ой, громко! У меня уши чуткие. Можно потише?",44,да,на сервере
+loud,голос ребёнка,kind,kind.loud.02,caring,"Я тебя слышу, даже если говорить тихо.",38,да,на сервере
+whisper,голос ребёнка,kind,kind.whisper.01,whisper,Шёпотом даже уютнее. Я тоже шепчу.,34,да,на сервере
+whisper,голос ребёнка,kind,kind.whisper.02,whisper,Это секрет? Я никому.,21,да,на сервере
+surprise,касания/карта/время,kind,kind.surprise.01,surprised,Ой! Как неожиданно! Я даже ушки поднял.,39,да,на сервере
+surprise,касания/карта/время,kind,kind.surprise.02,happy,"Ух ты, вот это сюрприз! Мне понравилось.",40,да,на сервере
+tease,касания/карта/время,kind,kind.tease.01,happy,"Хи-хи, ты меня дразнишь? А я не обижаюсь.",41,да,на сервере
+tease,касания/карта/время,kind,kind.tease.02,shy,"Дразнишься? Ну ничего, мне всё равно с тобой хорошо.",52,да,на сервере
+clap,голос ребёнка,kind,kind.clap.01,surprised,Ой! Хлоп! Я испугался... но совсем чуть-чуть.,45,да,на сервере
+clap,голос ребёнка,kind,kind.clap.02,happy,Хлопаем вместе? Хлоп-хлоп!,26,да,на сервере
+morning,контекст входа,kind,kind.morning.01,happy,Доброе утро! Как спалось?,25,да,на сервере
+morning,контекст входа,kind,kind.morning.02,caring,Утро! Не забудь позавтракать. Я уже выпил какао.,48,да,на сервере
+morning,контекст входа,kind,kind.morning.03,neutral,Утро — моё любимое время. Мурр.,31,да,на сервере
+evening,контекст входа,kind,kind.evening.01,sleepy,Уже вечер. Немножко поиграем — и отдыхать.,42,да,на сервере
+evening,контекст входа,kind,kind.evening.02,caring,"Вечер — время для тихих игр. Погладь меня, я помурчу.",53,да,на сервере
+long_absence,контекст входа,kind,kind.long_absence.01,caring,Давно не виделись! Я скучал. Как ты?,36,да,на сервере
+long_absence,контекст входа,kind,kind.long_absence.02,happy,"Как хорошо, что ты снова тут. Я ждал.",37,да,на сервере
+first_time_today,контекст входа,kind,kind.first_time_today.01,happy,Первая встреча за сегодня! Привет!,34,да,на сервере
+first_time_today,контекст входа,kind,kind.first_time_today.02,caring,Сегодня мы ещё не виделись. Здравствуй!,39,да,на сервере
+first_time_today,контекст входа,kind,kind.first_time_today.03,neutral,Новый день — новая встреча. Привет!,35,да,на сервере
+offer_riddle,диалоги,kind,kind.offer_riddle.01,caring,"Хочешь, загадаю загадку? Скажи «да».",36,да,на сервере
+offer_riddle,диалоги,kind,kind.offer_riddle.02,happy,У меня есть добрая загадка. Загадать?,37,да,на сервере
+offer_riddle,диалоги,kind,kind.offer_riddle.03,caring,"Давай я загадаю, а ты отгадаешь? Скажи «да».",44,да,на сервере
+offer_echo,диалоги,kind,kind.offer_echo.01,happy,Давай поиграем в повторялку? Ты скажешь — я повторю.,52,да,на сервере
+offer_echo,диалоги,kind,kind.offer_echo.02,caring,"Хочешь, я буду повторять за тобой? Скажи «да».",46,да,на сервере
+offer_echo,диалоги,kind,kind.offer_echo.03,happy,Скажи «да» — и я буду повторять за тобой.,41,да,на сервере
+offer_dance,диалоги,kind,kind.offer_dance.01,happy,"Хочешь, я станцую? Немножко, как умею.",38,да,на сервере
+offer_dance,диалоги,kind,kind.offer_dance.02,caring,Можно я потанцую для тебя? Скажи «да».,38,да,на сервере
+offer_dance,диалоги,kind,kind.offer_dance.03,happy,Я разучил новый танец. Показать?,32,да,на сервере
+ask_name_again,диалоги,kind,kind.ask_name_again.01,caring,Я не расслышал. Скажешь ещё раз? Или скажи «дальше».,52,да,на сервере
+ask_name_again,диалоги,kind,kind.ask_name_again.02,neutral,"Повтори, пожалуйста, своё имя. Можно и не говорить.",51,да,на сервере
+ask_name_again,диалоги,kind,kind.ask_name_again.03,happy,Я весь внимание. Как тебя зовут?,32,да,на сервере
+sberkids_ask,диалоги,kind,kind.sberkids_ask.01,caring,Хочешь заглянуть к брату в СберKids?,36,да,на сервере
+sberkids_ask,диалоги,kind,kind.sberkids_ask.02,happy,Пойдём к брату? Он будет рад.,29,да,на сервере
+sberkids_ask,диалоги,kind,kind.sberkids_ask.03,neutral,Отвести тебя к брату? Скажи «да» или «нет».,43,да,на сервере
+sberkids_yes,диалоги,kind,kind.sberkids_yes.01,happy,Пойдём! Открываю СберKids.,26,да,на сервере
+sberkids_yes,диалоги,kind,kind.sberkids_yes.02,caring,"Хорошо, пойдём. Открываю.",25,да,на сервере
+sberkids_yes,диалоги,kind,kind.sberkids_yes.03,excited,Как здорово! Сейчас откроется.,30,да,на сервере
+sberkids_no,диалоги,kind,kind.sberkids_no.01,caring,"Хорошо, останемся тут.",22,да,на сервере
+sberkids_no,диалоги,kind,kind.sberkids_no.02,neutral,"Ничего, брат подождёт. Играем дальше.",37,да,на сервере
+sberkids_no,диалоги,kind,kind.sberkids_no.03,happy,Тогда поиграем ещё. Мурр.,25,да,на сервере
+bye_cancel,диалоги,kind,kind.bye_cancel.01,happy,"Ура, ещё посидим вместе!",24,да,на сервере
+bye_cancel,диалоги,kind,kind.bye_cancel.02,caring,Как хорошо. Я рад.,18,да,на сервере
+bye_cancel,диалоги,kind,kind.bye_cancel.03,neutral,Тогда продолжаем.,17,да,на сервере
+riddle_hint,диалоги,kind,kind.riddle_hint.01,caring,Почти. Вот подсказка:,21,да,на сервере
+riddle_hint,диалоги,kind,kind.riddle_hint.02,neutral,Подумай ещё. Подсказка:,23,да,на сервере
+riddle_hint,диалоги,kind,kind.riddle_hint.03,caring,"Ничего, давай помогу:",21,да,на сервере
+riddle_right,диалоги,kind,kind.riddle_right.01,excited,Правильно! Здорово получилось.,30,да,на сервере
+riddle_right,диалоги,kind,kind.riddle_right.02,happy,Да! Угадано. Мурр.,18,да,на сервере
+riddle_right,диалоги,kind,kind.riddle_right.03,proud,Верно! Ловко отгадано.,22,да,на сервере
+riddle_answer,диалоги,kind,kind.riddle_answer.01,caring,Это {answer}. Хитрая была загадка.,34,да,на сервере
+riddle_answer,диалоги,kind,kind.riddle_answer.02,neutral,Ответ — {answer}. В следующий раз точно получится.,50,да,на сервере
+riddle_answer,диалоги,kind,kind.riddle_answer.03,happy,Это {answer}! Теперь ты знаешь.,31,да,на сервере
+riddle_more,диалоги,kind,kind.riddle_more.01,happy,Ещё загадку?,12,да,на сервере
+riddle_more,диалоги,kind,kind.riddle_more.02,caring,Загадать ещё одну?,18,да,на сервере
+riddle_more,диалоги,kind,kind.riddle_more.03,neutral,Хочешь ещё? Скажи «да».,23,да,на сервере
+riddle_bye,диалоги,kind,kind.riddle_bye.01,caring,"Хорошо, загадки отдохнут.",25,да,на сервере
+riddle_bye,диалоги,kind,kind.riddle_bye.02,neutral,"Ладно, потом ещё загадаю.",25,да,на сервере
+riddle_bye,диалоги,kind,kind.riddle_bye.03,happy,Было интересно. Играем дальше.,30,да,на сервере
+where_live,голос ребёнка,kind,kind.where_live.01,caring,В твоей карте! Тут тепло и уютно.,33,нет,в работе: дельта 18.11
+where_live,голос ребёнка,kind,kind.where_live.02,happy,"В карте, а в гостях бываю у брата в СберKids.",45,нет,в работе: дельта 18.11
+where_live,голос ребёнка,kind,kind.where_live.03,happy,В карте. У меня там плед и какао.,33,нет,в работе: дельта 18.11
+likes,голос ребёнка,kind,kind.likes.01,happy,"Какао с пенкой, мыльные пузыри и обнимашки.",43,нет,в работе: дельта 18.11
+likes,голос ребёнка,kind,kind.likes.02,caring,"Люблю, когда меня гладят. И когда ты улыбаешься.",48,нет,в работе: дельта 18.11
+likes,голос ребёнка,kind,kind.likes.03,happy,"Пузыри! Большие, маленькие, всякие.",35,нет,в работе: дельта 18.11
+friends,голос ребёнка,kind,kind.friends.01,happy,Конечно! Ты мой друг. И брат СберКот.,37,нет,в работе: дельта 18.11
+friends,голос ребёнка,kind,kind.friends.02,caring,"Есть. Хулиган и Блёстка, мои близнецы. И ты.",44,нет,в работе: дельта 18.11
+friends,голос ребёнка,kind,kind.friends.03,happy,Друзей много не бывает. А с тобой дружить лучше всего.,54,нет,в работе: дельта 18.11
+tale,голос ребёнка,kind,kind.tale.01,caring,"Жил-был котёнок, который боялся темноты. Он надул светящийся пузырь, и стало светло. Спокойной сказки!",102,нет,в работе: дельта 18.11
+tale,голос ребёнка,kind,kind.tale.02,happy,"Сказка про какао. Кот сварил его так много, что угостил всех соседей. И все подружились. Конец.",95,нет,в работе: дельта 18.11
+tale,голос ребёнка,kind,kind.tale.03,caring,Однажды пузырь улетел к облаку. Облако его обняло и стало мягким-мягким. Вот и сказочке конец.,94,нет,в работе: дельта 18.11
+friend,голос ребёнка,kind,kind.friend.01,shy,Давай! Я так рад. Теперь у нас дружба навсегда.,47,нет,в работе: дельта 18.11
+friend,голос ребёнка,kind,kind.friend.02,happy,Конечно! Друзья обнимаются. Обними экран!,41,нет,в работе: дельта 18.11
+friend,голос ребёнка,kind,kind.friend.03,caring,Дружим! Я буду тебя ждать в карте.,34,нет,в работе: дельта 18.11
+how_are_you,голос ребёнка,kind,kind.how_are_you.01,happy,"Хорошо! А раз ты тут, ещё лучше.",32,нет,в работе: дельта 18.11
+how_are_you,голос ребёнка,kind,kind.how_are_you.02,caring,"Тепло и уютно. Спасибо, что спрашиваешь.",40,нет,в работе: дельта 18.11
+how_are_you,голос ребёнка,kind,kind.how_are_you.03,happy,"Мурр, отлично! Только что пил какао.",36,нет,в работе: дельта 18.11
+offer_emo,диалоги,kind,kind.offer_emo.01,caring,"Хочешь, я покажу настроение, а ты угадаешь?",43,нет,в работе: дельта 18.11
+offer_emo,диалоги,kind,kind.offer_emo.02,happy,Поиграем в «Угадай эмоцию»? Скажи «да».,39,нет,в работе: дельта 18.11
+offer_emo,диалоги,kind,kind.offer_emo.03,happy,"Я сделаю мордочку, а ты отгадаешь. Играем?",42,нет,в работе: дельта 18.11
+offer_rps,диалоги,kind,kind.offer_rps.01,happy,"Сыграем в камень, ножницы, бумагу? По-доброму.",46,нет,в работе: дельта 18.11
+offer_rps,диалоги,kind,kind.offer_rps.02,caring,"Давай в камень, ножницы, бумагу? Скажи «да».",44,нет,в работе: дельта 18.11
+offer_rps,диалоги,kind,kind.offer_rps.03,happy,"Хочешь, сыграем в камень, ножницы, бумагу?",42,нет,в работе: дельта 18.11
+offer_simon,диалоги,kind,kind.offer_simon.01,happy,"Давай я покажу движение, а ты повторишь?",40,нет,в работе: дельта 18.11
+offer_simon,диалоги,kind,kind.offer_simon.02,caring,"Поиграем? Я двигаюсь, а ты жмёшь такую же кнопку.",49,нет,в работе: дельта 18.11
+offer_simon,диалоги,kind,kind.offer_simon.03,happy,Хочешь поиграть в «Делай как я»? Скажи «да».,44,нет,в работе: дельта 18.11
+emo_start,мини-игры с выбором,kind,kind.emo_start.01,happy,"Играем! Я покажу настроение, а ты угадай, какое.",48,нет,в работе: дельта 18.11
+emo_start,мини-игры с выбором,kind,kind.emo_start.02,caring,"Смотри на мою мордочку и скажи, какой я.",40,нет,в работе: дельта 18.11
+emo_ask,мини-игры с выбором,kind,kind.emo_ask.01,caring,Какой я сейчас?,15,нет,в работе: дельта 18.11
+emo_ask,мини-игры с выбором,kind,kind.emo_ask.02,happy,"А теперь угадай, какой я?",25,нет,в работе: дельта 18.11
+emo_wrong,мини-игры с выбором,kind,kind.emo_wrong.01,caring,Почти! Посмотри ещё разок.,26,нет,в работе: дельта 18.11
+emo_wrong,мини-игры с выбором,kind,kind.emo_wrong.02,neutral,Не совсем. Смотри внимательно.,30,нет,в работе: дельта 18.11
+emo_right,мини-игры с выбором,kind,kind.emo_right.01,excited,Правильно! Ты меня так хорошо понимаешь.,40,нет,в работе: дельта 18.11
+emo_right,мини-игры с выбором,kind,kind.emo_right.02,happy,"Угадано! Мурр, держи пузырик.",29,нет,в работе: дельта 18.11
+emo_is_happy,мини-игры с выбором,kind,kind.emo_is_happy.01,happy,Это я радовался! Мурр.,22,нет,в работе: дельта 18.11
+emo_is_sad,мини-игры с выбором,kind,kind.emo_is_sad.01,sad,Это я грустил. Но с тобой уже не грустно.,41,нет,в работе: дельта 18.11
+emo_is_angry,мини-игры с выбором,kind,kind.emo_is_angry.01,annoyed,"Это я сердился. Понарошку, честно.",34,нет,в работе: дельта 18.11
+emo_is_surprised,мини-игры с выбором,kind,kind.emo_is_surprised.01,surprised,Это я удивлялся! Ух ты!,23,нет,в работе: дельта 18.11
+emo_is_sleepy,мини-игры с выбором,kind,kind.emo_is_sleepy.01,sleepy,"Это я был сонный. Ох, зеваю.",28,нет,в работе: дельта 18.11
+emo_is_shy,мини-игры с выбором,kind,kind.emo_is_shy.01,shy,"Это я стеснялся. Ой, опять.",27,нет,в работе: дельта 18.11
+rps_start,мини-игры с выбором,kind,kind.rps_start.01,happy,"Камень, ножницы, бумага! Скажи, что выбираешь.",46,нет,в работе: дельта 18.11
+rps_start,мини-игры с выбором,kind,kind.rps_start.02,caring,"Я считаю до трёх, а ты говоришь: камень, ножницы или бумага.",60,нет,в работе: дельта 18.11
+rps_go,мини-игры с выбором,kind,kind.rps_go.01,happy,"Раз, два, три!",14,нет,в работе: дельта 18.11
+rps_go,мини-игры с выбором,kind,kind.rps_go.02,caring,"Камень, ножницы, бумага... раз, два, три!",41,нет,в работе: дельта 18.11
+rps_again,мини-игры с выбором,kind,kind.rps_again.01,caring,"Я не расслышал. Камень, ножницы или бумага?",43,нет,в работе: дельта 18.11
+rps_again,мини-игры с выбором,kind,kind.rps_again.02,neutral,"Скажи одно слово: камень, ножницы или бумага.",45,нет,в работе: дельта 18.11
+rps_is_rock,мини-игры с выбором,kind,kind.rps_is_rock.01,happy,У меня камень!,14,нет,в работе: дельта 18.11
+rps_is_scissors,мини-игры с выбором,kind,kind.rps_is_scissors.01,happy,У меня ножницы!,15,нет,в работе: дельта 18.11
+rps_is_paper,мини-игры с выбором,kind,kind.rps_is_paper.01,happy,У меня бумага!,14,нет,в работе: дельта 18.11
+rps_win,мини-игры с выбором,kind,kind.rps_win.01,happy,"Победа твоя! Поздравляю, мурр.",30,нет,в работе: дельта 18.11
+rps_win,мини-игры с выбором,kind,kind.rps_win.02,caring,Победа за тобой! Я за тебя рад.,31,нет,в работе: дельта 18.11
+rps_lose,мини-игры с выбором,kind,kind.rps_lose.01,happy,"Ой, у меня получилось! Это случайно.",36,нет,в работе: дельта 18.11
+rps_lose,мини-игры с выбором,kind,kind.rps_lose.02,shy,"Я выиграл. Хочешь, отдам тебе пузырик?",38,нет,в работе: дельта 18.11
+rps_draw,мини-игры с выбором,kind,kind.rps_draw.01,surprised,Ничья! Мы одинаково думаем.,27,нет,в работе: дельта 18.11
+rps_draw,мини-игры с выбором,kind,kind.rps_draw.02,happy,"Ничья! Значит, мы оба молодцы.",30,нет,в работе: дельта 18.11
+simon_start,мини-игры с выбором,kind,kind.simon_start.01,happy,"Я делаю движение, а ты нажимаешь такую же кнопку внизу.",55,нет,в работе: дельта 18.11
+simon_start,мини-игры с выбором,kind,kind.simon_start.02,caring,Смотри на меня и повторяй кнопкой. Не торопись.,47,нет,в работе: дельта 18.11
+simon_ask,мини-игры с выбором,kind,kind.simon_ask.01,happy,Смотри внимательно!,19,нет,в работе: дельта 18.11
+simon_ask,мини-игры с выбором,kind,kind.simon_ask.02,caring,Повторишь?,10,нет,в работе: дельта 18.11
+simon_wrong,мини-игры с выбором,kind,kind.simon_wrong.01,caring,"Не то. Ничего, смотри ещё раз.",30,нет,в работе: дельта 18.11
+simon_wrong,мини-игры с выбором,kind,kind.simon_wrong.02,neutral,Почти! Повторяю медленнее.,26,нет,в работе: дельта 18.11
+simon_right,мини-игры с выбором,kind,kind.simon_right.01,happy,Здорово! Следующее.,19,нет,в работе: дельта 18.11
+simon_right,мини-игры с выбором,kind,kind.simon_right.02,excited,Верно! Ещё одно.,16,нет,в работе: дельта 18.11
+simon_done,мини-игры с выбором,kind,kind.simon_done.01,excited,Три из трёх! Ты повторяешь лучше меня.,38,нет,в работе: дельта 18.11
+simon_done,мини-игры с выбором,kind,kind.simon_done.02,happy,Всё правильно! Держи обнимашку.,31,нет,в работе: дельта 18.11
+simon_is_jump,мини-игры с выбором,kind,kind.simon_is_jump.01,neutral,Это был прыжок!,15,нет,в работе: дельта 18.11
+simon_is_flip,мини-игры с выбором,kind,kind.simon_is_flip.01,neutral,Это было сальто!,16,нет,в работе: дельта 18.11
+simon_is_dance,мини-игры с выбором,kind,kind.simon_is_dance.01,neutral,Это был танец!,14,нет,в работе: дельта 18.11
+simon_is_wave,мини-игры с выбором,kind,kind.simon_is_wave.01,neutral,Это я помахал лапкой!,21,нет,в работе: дельта 18.11
+simon_is_sit,мини-игры с выбором,kind,kind.simon_is_sit.01,neutral,Это я присел!,13,нет,в работе: дельта 18.11
+game_more,мини-игры с выбором,kind,kind.game_more.01,happy,Ещё разок?,10,нет,в работе: дельта 18.11
+game_more,мини-игры с выбором,kind,kind.game_more.02,caring,Сыграем ещё? Скажи «да».,24,нет,в работе: дельта 18.11
+game_more,мини-игры с выбором,kind,kind.game_more.03,neutral,Ещё раунд? Да или нет?,22,нет,в работе: дельта 18.11
+game_bye,мини-игры с выбором,kind,kind.game_bye.01,caring,"Хорошо, отдохнём. Было весело.",30,нет,в работе: дельта 18.11
+game_bye,мини-игры с выбором,kind,kind.game_bye.02,happy,Спасибо за игру! Мурр.,22,нет,в работе: дельта 18.11
+game_bye,мини-игры с выбором,kind,kind.game_bye.03,neutral,"Ладно, поиграем потом.",22,нет,в работе: дельта 18.11
+riddle_q,загадки,kind,kind.riddle.r01.q,neutral,"Мягкие лапки, а в лапках царапки. Кто это?",42,да,на сервере
+riddle_hint,диалоги,kind,kind.riddle.r01.hint,neutral,Он мурчит. Совсем как я.,24,да,на сервере
+riddle_q,загадки,kind,kind.riddle.r02.q,neutral,"Сидит дед, во сто шуб одет. Кто его раздевает, тот слёзы проливает.",67,да,на сервере
+riddle_hint,диалоги,kind,kind.riddle.r02.hint,neutral,Его режут — и щиплет глаза.,27,да,на сервере
+riddle_q,загадки,kind,kind.riddle.r03.q,neutral,"Течёт, течёт — не вытечет. Бежит, бежит — не выбежит. Что это?",62,да,на сервере
+riddle_hint,диалоги,kind,kind.riddle.r03.hint,neutral,В ней плавают рыбы.,19,да,на сервере
+riddle_q,загадки,kind,kind.riddle.r04.q,neutral,"Без рук, без ног, а ворота открывает. Что это?",46,да,на сервере
+riddle_hint,диалоги,kind,kind.riddle.r04.hint,neutral,Он дует и качает деревья.,25,да,на сервере
+riddle_q,загадки,kind,kind.riddle.r05.q,neutral,"Что всегда идёт, но с места не сходит?",38,да,на сервере
+riddle_hint,диалоги,kind,kind.riddle.r05.hint,neutral,Они тикают: тик-так.,20,да,на сервере
+riddle_q,загадки,kind,kind.riddle.r06.q,neutral,"Пушистая вата плывёт куда-то. Чем вата ниже, тем дождик ближе.",62,да,на сервере
+riddle_hint,диалоги,kind,kind.riddle.r06.hint,neutral,Оно плывёт по небу.,19,да,на сервере
+riddle_q,загадки,kind,kind.riddle.r07.q,neutral,"Под землёй живёт, землю роет, а солнца почти не видит. Кто это?",63,да,на сервере
+riddle_hint,диалоги,kind,kind.riddle.r07.hint,neutral,"Маленький, в бархатной шубке.",29,да,на сервере
+riddle_q,загадки,kind,kind.riddle.r08.q,neutral,"Одеяло белое не руками сделано, с неба на землю упало. Что это?",63,да,на сервере
+riddle_hint,диалоги,kind,kind.riddle.r08.hint,neutral,Зимой из него лепят снеговика.,30,да,на сервере
+point_camera,сценарий,glitter,glitter.point_camera.01,excited,Ау! Я в карте! Наведи на неё камеру — будет красиво.,52,да,на сервере
+point_camera,сценарий,glitter,glitter.point_camera.02,neutral,"Где-где-где карта? Покажи её мне, пожалуйста!",45,да,на сервере
+point_camera,сценарий,glitter,glitter.point_camera.03,happy,Я уже накрасила ушки блёстками. Наведи камеру на карту!,55,да,на сервере
+intro,сценарий,glitter,glitter.intro.01,excited,"Та-дам! Привет! Ой, какая встреча!",34,да,на сервере
+intro,сценарий,glitter,glitter.intro.02,surprised,"Ой! Меня позвали? Вау, привет!",30,да,на сервере
+intro,сценарий,glitter,glitter.intro.03,excited,Блёстки — готовы! Улыбка — готова! Привет!,42,да,на сервере
+meet_card,сценарий,glitter,glitter.meet_card.01,excited,Ого! Это твоя карта? Теперь я живу в ней!,41,да,на сервере
+meet_card,сценарий,glitter,glitter.meet_card.02,surprised,"Вау, какая карта! Всё, я в ней поселилась.",42,да,на сервере
+meet_card,сценарий,glitter,glitter.meet_card.03,happy,"Ах, карта! Самый красивый домик для меня.",41,да,на сервере
+meet_congrats,сценарий,glitter,glitter.meet_congrats.01,excited,"Поздравляю, у тебя своя карта! Привет-привет!",45,да,на сервере
+meet_congrats,сценарий,glitter,glitter.meet_congrats.02,happy,Своя карта! Поздравляю! И привет!,33,да,на сервере
+meet_congrats,сценарий,glitter,glitter.meet_congrats.03,excited,"Ура, поздравляю с картой! Привет!",33,да,на сервере
+meet_self,сценарий,glitter,glitter.meet_self.01,proud,А я Блёстка — кошка из твоей карты.,35,да,на сервере
+meet_self,сценарий,glitter,glitter.meet_self.02,happy,Меня зовут Блёстка. Я люблю блеск и наклейки.,45,да,на сервере
+meet_self,сценарий,glitter,glitter.meet_self.03,excited,Я Блёстка! Самая блестящая кошка на свете.,42,да,на сервере
+meet_skills,сценарий,glitter,glitter.meet_skills.01,excited,Погладь меня пальцем или пощекочи животик. А кнопки внизу — мои фокусы!,71,да,на сервере
+meet_skills,сценарий,glitter,glitter.meet_skills.02,happy,"Меня можно гладить, щекотать и угощать. Жми кнопки внизу!",57,да,на сервере
+meet_skills,сценарий,glitter,glitter.meet_skills.03,neutral,Погладь меня или нажми кнопку внизу. А ещё со мной можно болтать!,65,да,на сервере
+ask_name,сценарий,glitter,glitter.ask_name.01,happy,Как тебя зовут? Мне очень-очень интересно.,42,да,на сервере
+ask_name,сценарий,glitter,glitter.ask_name.02,neutral,Скажи своё имя. Или не говори — можно и так.,44,да,на сервере
+ask_name,сценарий,glitter,glitter.ask_name.03,excited,Давай дружить! Как тебя зовут?,30,да,на сервере
+nice_name,сценарий,glitter,glitter.nice_name.01,excited,{name}! Ну какое же красивое имя!,33,да,на сервере
+nice_name,сценарий,glitter,glitter.nice_name.02,happy,{name}... звучит как песенка. Я запомнила!,42,да,на сервере
+nice_name,сценарий,glitter,glitter.nice_name.03,excited,"{name}, ура! Посыплю это имя блёстками.",39,да,на сервере
+nice_name,сценарий,glitter,glitter.nice_name.04,excited,"Ах, какое имя! Прямо для обложки журнала.",41,да,на сервере
+nice_name,сценарий,glitter,glitter.nice_name.05,happy,Какое имя! Запишу его блёстками.,32,нет,в работе: дельта 18.11
+no_name,сценарий,glitter,glitter.no_name.01,happy,Секрет? Обожаю секреты!,23,да,на сервере
+no_name,сценарий,glitter,glitter.no_name.02,happy,"Ничего, имя потом. Главное — мы уже дружим!",43,да,на сервере
+no_name,сценарий,glitter,glitter.no_name.03,neutral,Можно и без имени. Будем дружить просто так!,44,да,на сервере
+mic_hint,сценарий,glitter,glitter.mic_hint.01,neutral,Нажми на микрофон внизу — и у нас будет интервью!,49,да,на сервере
+mic_hint,сценарий,glitter,glitter.mic_hint.02,happy,Держи кнопку и говори — я всё-всё услышу.,41,да,на сервере
+mic_hint,сценарий,glitter,glitter.mic_hint.03,neutral,"Разреши микрофон, а то я ничего не слышу.",41,да,на сервере
+choose,сценарий,glitter,glitter.choose.01,excited,"Выбирай, какой мне быть! Хулиган, Добряк или я — Блёстка!",57,да,на сервере
+choose,сценарий,glitter,glitter.choose.02,happy,Три наклейки — три меня. Тыкни в любую!,39,да,на сервере
+choose,сценарий,glitter,glitter.choose.03,neutral,"Хочешь, я буду Блёсткой? Это лучший выбор. Ну, по-моему.",56,да,на сервере
+invite,сценарий,glitter,glitter.invite.01,excited,Проведи пальцем по экрану — будет блестящий след!,49,да,на сервере
+invite,сценарий,glitter,glitter.invite.02,happy,"Тряхни телефон — и всё закружится, как в снежном шаре.",54,да,на сервере
+invite,сценарий,glitter,glitter.invite.03,neutral,Подержи палец на экране — я поцелую стекло. Чмок!,49,да,на сервере
+switch_ask,сценарий,glitter,glitter.switch_ask.01,excited,Переодеться в новый образ? Скажи «давай»!,41,нет,в работе: switch_ask
+switch_ask,сценарий,glitter,glitter.switch_ask.02,happy,Хочешь другую меня? Скажи «давай» или «не надо».,48,нет,в работе: switch_ask
+switch_start,сценарий,glitter,glitter.switch_start.01,excited,"Минутку, я переодеваюсь! Не подглядывать!",41,да,на сервере
+switch_start,сценарий,glitter,glitter.switch_start.02,happy,"Наклейки-наклейки, закройте окошко!",35,да,на сервере
+switch_start,сценарий,glitter,glitter.switch_start.03,neutral,"Секундочку, выбираю наряд.",26,да,на сервере
+shake_prompt,сценарий,glitter,glitter.shake_prompt.01,excited,Теперь встряхни! Посильнее!,27,да,на сервере
+shake_prompt,сценарий,glitter,glitter.shake_prompt.02,happy,Тряси-тряси — сейчас будет сюрприз!,35,да,на сервере
+hello_new,сценарий,glitter,glitter.hello_new.01,excited,Та-дам! Ну как я?,17,да,на сервере
+hello_new,сценарий,glitter,glitter.hello_new.02,proud,"Новый образ! Скажи, что красиво.",32,да,на сервере
+hello_new,сценарий,glitter,glitter.hello_new.03,happy,Это я! Нравится?,16,да,на сервере
+filler,сценарий,glitter,glitter.filler.01,happy,"Ля-ля-ля... Интересно, мне пойдёт розовая кепка?",48,да,на сервере
+filler,сценарий,glitter,glitter.filler.02,neutral,"Интересно, сколько блёсток помещается в одну лапку?",51,да,на сервере
+filler,сценарий,glitter,glitter.filler.03,excited,А знаешь что? Я умею кружиться! Скажи «танцуй».,47,да,на сервере
+filler,сценарий,glitter,glitter.filler.04,neutral,Хочу новую наклейку. Голографическую.,37,да,на сервере
+filler,сценарий,glitter,glitter.filler.05,proud,"Если бы у кошек была неделя моды, я бы её открывала.",52,да,на сервере
+filler,сценарий,glitter,glitter.filler.06,shy,"Хи-хи. Ой, я задумалась.",24,да,на сервере
+outro,сценарий,glitter,glitter.outro.01,excited,"Пойдём ко мне домой, в СберKids! Там брат и куча всего интересного.",67,да,на сервере
+outro,сценарий,glitter,glitter.outro.02,happy,"Брат знает, как накопить на что-то красивое. Нажми на кнопку!",61,да,на сервере
+outro,сценарий,glitter,glitter.outro.03,neutral,"Жми кнопку внизу — я покажу, где мы живём.",42,да,на сервере
+welcome_back,сценарий,glitter,glitter.welcome_back.01,excited,{name}! Ты тут! Я сияю!,23,да,на сервере
+welcome_back,сценарий,glitter,glitter.welcome_back.02,happy,"{name}, привет! Я так рада!",27,да,на сервере
+welcome_back,сценарий,glitter,glitter.welcome_back.03,excited,"{name}, наконец-то! Я тебя так ждала.",37,да,на сервере
+welcome_back,сценарий,glitter,glitter.welcome_back.04,excited,"Ах, снова ты! Мой любимый зритель.",34,да,на сервере
+welcome_back,сценарий,glitter,glitter.welcome_back.05,happy,Привет-привет! Я так рада тебя видеть.,38,да,на сервере
+goodbye,сценарий,glitter,glitter.goodbye.01,happy,Пока-пока! Лови воздушный поцелуй. С блёстками!,47,да,на сервере
+goodbye,сценарий,glitter,glitter.goodbye.02,neutral,До встречи! Буду в карте наводить красоту.,42,да,на сервере
+goodbye,сценарий,glitter,glitter.goodbye.03,excited,Пока! Приходи скорее!,21,да,на сервере
+tap_cat,касания/карта/время,glitter,glitter.tap_cat.01,happy,"Ой! Осторожно, я при параде.",28,да,на сервере
+tap_cat,касания/карта/время,glitter,glitter.tap_cat.02,excited,"Тык! Хи-хи, щекотно.",20,да,на сервере
+tap_cat,касания/карта/время,glitter,glitter.tap_cat.03,happy,Ещё раз! Мне понравилось.,25,да,на сервере
+tap_cat,касания/карта/время,glitter,glitter.tap_cat.04,happy,Мур! Ещё разочек.,17,да,на сервере
+tap_cat_head,касания/карта/время,glitter,glitter.tap_cat_head.01,annoyed,"Ой, бантик! Аккуратно, я его час поправляла.",44,да,на сервере
+tap_cat_head,касания/карта/время,glitter,glitter.tap_cat_head.02,happy,Голову погладить можно. Только бантик не трогай!,48,да,на сервере
+tap_cat_head,касания/карта/время,glitter,glitter.tap_cat_head.03,happy,"Ой, корона! Шучу, это ушки. Но как корона.",42,нет,в работе: дельта 18.11
+tap_cat_head,касания/карта/время,glitter,glitter.tap_cat_head.04,shy,Тук по макушке! Там живут блестящие идеи.,41,нет,в работе: дельта 18.11
+tap_cat_head,касания/карта/время,glitter,glitter.tap_cat_head.05,excited,Причёска! Я над ней полчаса колдовала.,38,нет,в работе: дельта 18.11
+tap_cat_cheek,касания/карта/время,glitter,glitter.tap_cat_cheek.01,shy,"Хи-хи, щёчки! Они мягкие, правда?",33,да,на сервере
+tap_cat_cheek,касания/карта/время,glitter,glitter.tap_cat_cheek.02,happy,"Пф-ф! Как подушечка, да?",24,да,на сервере
+tap_cat_belly,касания/карта/время,glitter,glitter.tap_cat_belly.01,happy,"Ой-ой-ой, щекотно! Хи-хи-хи!",28,да,на сервере
+tap_cat_belly,касания/карта/время,glitter,glitter.tap_cat_belly.02,excited,Только не животик! Ха-ха!,25,да,на сервере
+tap_cat_belly,касания/карта/время,glitter,glitter.tap_cat_belly.03,excited,"Хи-хи-хи! Щекотно, блёстки сыплются!",36,нет,в работе: дельта 18.11
+tap_cat_belly,касания/карта/время,glitter,glitter.tap_cat_belly.04,happy,Только не животик! Я сейчас засмеюсь до звёздочек!,50,нет,в работе: дельта 18.11
+tap_cat_belly,касания/карта/время,glitter,glitter.tap_cat_belly.05,shy,"Ой-ой, щекотка! Это нечестно, хи-хи.",36,нет,в работе: дельта 18.11
+tap_cat_paw,касания/карта/время,glitter,glitter.tap_cat_paw.01,happy,"Лапка! Видишь, у меня маникюр с блёстками.",42,да,на сервере
+tap_cat_paw,касания/карта/время,glitter,glitter.tap_cat_paw.02,neutral,"Дай лапку — вот, держи мою.",27,да,на сервере
+tap_cat_paw,касания/карта/время,glitter,glitter.tap_cat_paw.03,proud,Маникюр с блёстками! Нравится?,30,нет,в работе: дельта 18.11
+tap_cat_paw,касания/карта/время,glitter,glitter.tap_cat_paw.04,happy,"Дай лапку! Вот так, по-звёздному.",33,нет,в работе: дельта 18.11
+tap_cat_paw,касания/карта/время,glitter,glitter.tap_cat_paw.05,excited,"Пять! Лапка сверкнула, видишь?",30,нет,в работе: дельта 18.11
+tap_cat_tail,касания/карта/время,glitter,glitter.tap_cat_tail.01,surprised,"Ай, хвостик! Он у меня с блёстками, не стряхни!",47,да,на сервере
+tap_cat_tail,касания/карта/время,glitter,glitter.tap_cat_tail.02,annoyed,"Хвост — не трогать! Ну, почти не трогать.",41,да,на сервере
+tap_cat_tail,касания/карта/время,glitter,glitter.tap_cat_tail.03,surprised,"Ой, хвостик! Он у меня как у кометы.",36,нет,в работе: дельта 18.11
+tap_cat_tail,касания/карта/время,glitter,glitter.tap_cat_tail.04,proud,"Хвост в тренде, правда? Только не мни.",38,нет,в работе: дельта 18.11
+tap_cat_tail,касания/карта/время,glitter,glitter.tap_cat_tail.05,happy,"Хвостиком машу, блёстками сыплю!",32,нет,в работе: дельта 18.11
+poke_combo,касания/карта/время,glitter,glitter.poke_combo.01,annoyed,"Ну всё, я обиделась! На одну секундочку.",40,да,на сервере
+poke_combo,касания/карта/время,glitter,glitter.poke_combo.02,neutral,"Три раза?! Это что, азбука Морзе?",33,да,на сервере
+poke_hard,касания/карта/время,glitter,glitter.poke_hard.01,annoyed,"Ой! Я же хрупкая, как ёлочная игрушка!",38,да,на сервере
+poke_hard,касания/карта/время,glitter,glitter.poke_hard.02,sad,Не надо так. Давай лучше нежно.,31,да,на сервере
+stroke,касания/карта/время,glitter,glitter.stroke.01,happy,Мурр... Обожаю!,15,да,на сервере
+stroke,касания/карта/время,glitter,glitter.stroke.02,happy,"Вот здесь, за ушком. Ах...",26,да,на сервере
+stroke,касания/карта/время,glitter,glitter.stroke.03,shy,"Мурчу. Красиво мурчу, правда?",29,да,на сервере
+stroke,касания/карта/время,glitter,glitter.stroke.04,happy,Мурр... Блёстки от удовольствия переливаются.,45,нет,в работе: дельта 18.11
+stroke,касания/карта/время,glitter,glitter.stroke.05,shy,Гладь ещё. Я как звёздочка под твоей ладошкой.,46,нет,в работе: дельта 18.11
+stroke_long,касания/карта/время,glitter,glitter.stroke_long.01,shy,Мурр... Можно так всегда?,25,да,на сервере
+stroke_long,касания/карта/время,glitter,glitter.stroke_long.02,happy,Я сейчас вся засияю от счастья.,31,да,на сервере
+stroke_long,касания/карта/время,glitter,glitter.stroke_long.03,excited,"Смотри, сердечки полетели! Это из-за тебя.",42,да,на сервере
+stroke_long,касания/карта/время,glitter,glitter.stroke_long.04,shy,Обнимашки! Самые сияющие на свете.,34,нет,в работе: дельта 18.11
+tap_screen,касания/карта/время,glitter,glitter.tap_screen.01,happy,Пуф — блёстки!,14,да,на сервере
+tap_screen,касания/карта/время,glitter,glitter.tap_screen.02,excited,Ещё-ещё! Красиво же!,20,да,на сервере
+tap_screen,касания/карта/время,glitter,glitter.tap_screen.03,happy,Тук-тук! Кто там? Блёстки!,26,да,на сервере
+tap_screen,касания/карта/время,glitter,glitter.tap_screen.04,neutral,Каждый тык — маленький салют.,29,да,на сервере
+tap_screen,касания/карта/время,glitter,glitter.tap_screen.05,excited,Давай украсим тут всё!,22,да,на сервере
+double_tap,касания/карта/время,glitter,glitter.double_tap.01,excited,Лови блёстки!,13,да,на сервере
+double_tap,касания/карта/время,glitter,glitter.double_tap.02,excited,Фух! Целое облако!,18,да,на сервере
+double_tap,касания/карта/время,glitter,glitter.double_tap.03,proud,"Вот это блеск, да?",18,да,на сервере
+double_tap,касания/карта/время,glitter,glitter.double_tap.04,excited,Фокус! Ловишь звёздочки?,24,нет,в работе: дельта 18.11
+double_tap,касания/карта/время,glitter,glitter.double_tap.05,proud,"Блёстки, блеск, сияние! Фокус удался.",37,нет,в работе: дельта 18.11
+walk_to,касания/карта/время,glitter,glitter.walk_to.01,happy,"Иду, как по подиуму.",20,да,на сервере
+walk_to,касания/карта/время,glitter,glitter.walk_to.02,neutral,Туда? Окей!,11,да,на сервере
+walk_to,касания/карта/время,glitter,glitter.walk_to.03,happy,"Топ-топ-топ, красиво иду?",25,да,на сервере
+swipe,касания/карта/время,glitter,glitter.swipe.01,excited,Блестящий след! Нарисуй что-нибудь.,35,да,на сервере
+swipe,касания/карта/время,glitter,glitter.swipe.02,happy,"Ух ты, как сверкает!",20,да,на сервере
+swipe,касания/карта/время,glitter,glitter.swipe.03,neutral,"Шурх-шурх... красиво шуршит, да?",32,да,на сервере
+swipe,касания/карта/время,glitter,glitter.swipe.04,happy,Рисуем вместе!,14,да,на сервере
+longpress,касания/карта/время,glitter,glitter.longpress.01,shy,Чмок! Это тебе.,15,да,на сервере
+longpress,касания/карта/время,glitter,glitter.longpress.02,happy,Я прижалась к стеклу — видишь мой носик?,40,да,на сервере
+longpress,касания/карта/время,glitter,glitter.longpress.03,excited,Отпечаток-сердечко на память!,29,да,на сервере
+treat,касания/карта/время,glitter,glitter.treat.01,excited,Ням! Рыбка с блёстками? Шучу. Вкусно!,37,да,на сервере
+treat,касания/карта/время,glitter,glitter.treat.02,happy,"Мм, вкусняшка! Спасибо, я так рада!",35,да,на сервере
+treat,касания/карта/время,glitter,glitter.treat.03,shy,"Хрум-хрум. Только никому не говори, что я сладкоежка!",53,да,на сервере
+treat,касания/карта/время,glitter,glitter.treat.04,excited,Звёздное печенье! Обожаю. Спасибо!,34,нет,в работе: дельта 18.11
+treat,касания/карта/время,glitter,glitter.treat.05,happy,"Ммм, вкусно! Это как десерт после показа мод.",45,нет,в работе: дельта 18.11
+shake,касания/карта/время,glitter,glitter.shake.01,excited,Ах! Снежный шар! Как красиво!,29,да,на сервере
+shake,касания/карта/время,glitter,glitter.shake.02,happy,Всё кружится-кружится...,24,да,на сервере
+shake,касания/карта/время,glitter,glitter.shake.03,surprised,"Ой-ой, у меня блёстки в ушах!",29,да,на сервере
+shake,касания/карта/время,glitter,glitter.shake.04,excited,Вжух — и всё сверкает!,22,да,на сервере
+spam,касания/карта/время,glitter,glitter.spam.01,annoyed,"Ой-ой-ой, у меня голова кружится! Стоп!",39,да,на сервере
+spam,касания/карта/время,glitter,glitter.spam.02,neutral,Слишком много блеска! Давай передохнём.,39,да,на сервере
+spam,касания/карта/время,glitter,glitter.spam.03,annoyed,Так быстро! Я не успеваю сверкать.,34,да,на сервере
+silence,касания/карта/время,glitter,glitter.silence.01,neutral,Ау? Ты тут? Я тут красивая стою.,32,да,на сервере
+silence,касания/карта/время,glitter,glitter.silence.02,happy,"Смотрюсь в экран, как в зеркальце. Ой, это же ты!",49,да,на сервере
+silence,касания/карта/время,glitter,glitter.silence.03,neutral,Скажи «повторяй за мной» — будет очень смешно.,46,да,на сервере
+silence,касания/карта/время,glitter,glitter.silence.04,happy,"Эй, а давай устроим фотосессию?",31,да,на сервере
+sleep,касания/карта/время,glitter,glitter.sleep.01,sleepy,Пойду посмотрю красивый сон...,30,да,на сервере
+sleep,касания/карта/время,glitter,glitter.sleep.02,sleepy,Тихо... Я дремлю... мур...,26,да,на сервере
+wake_up,касания/карта/время,glitter,glitter.wake_up.01,surprised,Ой! Я спала? Я не спала! Я отдыхала глазами.,44,да,на сервере
+wake_up,касания/карта/время,glitter,glitter.wake_up.02,happy,Привет! Мне снились блёстки.,28,да,на сервере
+sticker_peel,касания/карта/время,glitter,glitter.sticker_peel.01,happy,Аккуратненько! Вот так.,23,да,на сервере
+sticker_peel,касания/карта/время,glitter,glitter.sticker_peel.02,neutral,Это голографическая! Её можно сохранить.,40,да,на сервере
+sticker_peel,касания/карта/время,glitter,glitter.sticker_peel.03,excited,"Ой, как красиво отклеилась!",27,да,на сервере
+sticker_peel,касания/карта/время,glitter,glitter.sticker_peel.04,neutral,"Ничего, наклею новую.",21,да,на сервере
+stickers_all_gone,касания/карта/время,glitter,glitter.stickers_all_gone.01,excited,Все! До одной! Это было красиво.,32,да,на сервере
+stickers_all_gone,касания/карта/время,glitter,glitter.stickers_all_gone.02,happy,Окошко чистое. Можно новые клеить!,34,да,на сервере
+card_lost,касания/карта/время,glitter,glitter.card_lost.01,sad,"Ой, а где карта? Мне без неё не на чем стоять.",46,да,на сервере
+card_lost,касания/карта/время,glitter,glitter.card_lost.02,neutral,"Ой, карта пропала! Это не по сценарию.",38,да,на сервере
+card_lost,касания/карта/время,glitter,glitter.card_lost.03,annoyed,"Эй-эй, я же падаю! Верни карту.",31,да,на сервере
+card_found,касания/карта/время,glitter,glitter.card_found.01,excited,Ура! Нашлась!,13,да,на сервере
+card_found,касания/карта/время,glitter,glitter.card_found.02,happy,Снова вместе! Как хорошо.,25,да,на сервере
+card_found,касания/карта/время,glitter,glitter.card_found.03,neutral,Ну наконец-то!,14,да,на сервере
+card_found,касания/карта/время,glitter,glitter.card_found.04,happy,"Вот она, красавица!",19,да,на сервере
+card_far,касания/карта/время,glitter,glitter.card_far.01,neutral,Ты так далеко! Мне нужен крупный план.,38,да,на сервере
+card_far,касания/карта/время,glitter,glitter.card_far.02,happy,"Я тебя почти не вижу. Ближе, пожалуйста!",40,да,на сервере
+card_close,касания/карта/время,glitter,glitter.card_close.01,surprised,"Ой, слишком близко! У меня носик в экран упирается.",51,да,на сервере
+card_close,касания/карта/время,glitter,glitter.card_close.02,neutral,Отодвинь чуточку — меня видно только наполовину!,48,да,на сервере
+low_light,касания/карта/время,glitter,glitter.low_light.01,sad,Темно... блёстки не сверкают. Включи свет!,42,да,на сервере
+low_light,касания/карта/время,glitter,glitter.low_light.02,neutral,Можно свет? Хочу блестеть.,26,да,на сервере
+hello,голос ребёнка,glitter,glitter.hello.01,excited,Приветик!,9,да,на сервере
+hello,голос ребёнка,glitter,glitter.hello.02,happy,Привет-привет!,14,да,на сервере
+hello,голос ребёнка,glitter,glitter.hello.03,happy,Здравствуй! Я так рада!,23,да,на сервере
+hello,голос ребёнка,glitter,glitter.hello.04,excited,"Ой, привет! Ты сияешь!",22,да,на сервере
+bye,голос ребёнка,glitter,glitter.bye.01,sad,Уже? Ну нет... Точно уходишь?,29,да,на сервере
+bye,голос ребёнка,glitter,glitter.bye.02,neutral,"Пора? Скажи «да», если пора.",28,да,на сервере
+bye,голос ребёнка,glitter,glitter.bye.03,neutral,Уходишь? Если да — скажи «да».,30,да,на сервере
+yes,голос ребёнка,glitter,glitter.yes.01,excited,Ура!,4,да,на сервере
+yes,голос ребёнка,glitter,glitter.yes.02,happy,Договорились!,13,да,на сервере
+yes,голос ребёнка,glitter,glitter.yes.03,happy,Я так и знала!,14,да,на сервере
+no,голос ребёнка,glitter,glitter.no.01,neutral,"Ладно, блёстки подождут.",24,нет,в работе: дельта 18.11
+no,голос ребёнка,glitter,glitter.no.02,neutral,"Как скажешь, звёздочка!",23,нет,в работе: дельта 18.11
+no,голос ребёнка,glitter,glitter.no.03,annoyed,Хм. А я так хотела... Ладно!,28,да,на сервере
+skip,голос ребёнка,glitter,glitter.skip.01,neutral,Дальше так дальше.,18,да,на сервере
+skip,голос ребёнка,glitter,glitter.skip.02,neutral,Пропускаем! Следующий номер программы.,38,да,на сервере
+unknown,голос ребёнка,glitter,glitter.unknown.01,neutral,"Ой, я не расслышала. Скажи ещё раз?",35,да,на сервере
+unknown,голос ребёнка,glitter,glitter.unknown.02,happy,Что-что? У меня в ушках блёстки.,32,да,на сервере
+unknown,голос ребёнка,glitter,glitter.unknown.03,neutral,Не поняла. Скажи по-другому?,28,да,на сервере
+unknown,голос ребёнка,glitter,glitter.unknown.04,surprised,Это что-то волшебное? Не поняла.,32,да,на сервере
+name_ask,голос ребёнка,glitter,glitter.name_ask.01,proud,Я Блёстка! Сестра-близняшка СберКота. Самая блестящая в семье.,62,да,на сервере
+name_ask,голос ребёнка,glitter,glitter.name_ask.02,happy,"Меня зовут Блёстка. Ну, когда я в этом образе.",46,да,на сервере
+name_ask,голос ребёнка,glitter,glitter.name_ask.03,excited,Я Блёстка! Модная кошка из твоей карты.,39,нет,в работе: дельта 18.11
+age_ask,голос ребёнка,glitter,glitter.age_ask.01,neutral,Мы с братом одного возраста. Мы же близнецы!,44,да,на сервере
+age_ask,голос ребёнка,glitter,glitter.age_ask.02,proud,Девочек про возраст не спрашивают. Шучу! Как брату.,51,да,на сервере
+brother_ask,голос ребёнка,glitter,glitter.brother_ask.01,happy,Мой брат — СберКот. Он очень умный и живёт в СберKids.,54,да,на сервере
+brother_ask,голос ребёнка,glitter,glitter.brother_ask.02,neutral,Брат у нас про деньги. А я — про красоту.,41,да,на сервере
+money,голос ребёнка,glitter,glitter.money.01,neutral,Про деньги — это к брату! Он у нас умный.,41,да,на сервере
+money,голос ребёнка,glitter,glitter.money.02,happy,Накопить на что-то красивое? Это к брату — он знает как!,56,да,на сервере
+money,голос ребёнка,glitter,glitter.money.03,neutral,"Это к брату, а я — по блёсткам.",31,да,на сервере
+sberkids,голос ребёнка,glitter,glitter.sberkids.01,excited,К брату? Ура! Открыть СберKids?,31,да,на сервере
+sberkids,голос ребёнка,glitter,glitter.sberkids.02,happy,Брат так обрадуется! Идём к нему?,33,да,на сервере
+sberkids,голос ребёнка,glitter,glitter.sberkids.03,neutral,В СберKids? Обожаю! Открываем?,30,да,на сервере
+flip,голос ребёнка,glitter,glitter.flip.01,excited,Оп-ля! С блёстками!,19,да,на сервере
+flip,голос ребёнка,glitter,glitter.flip.02,proud,Сальто — как гимнастка!,23,да,на сервере
+flip,голос ребёнка,glitter,glitter.flip.03,excited,Ух! Ещё раз?,12,да,на сервере
+flip,голос ребёнка,glitter,glitter.flip.04,proud,"Смотри, как я умею!",19,да,на сервере
+flip,голос ребёнка,glitter,glitter.flip.05,excited,Звёздное сальто! Ты это видишь?,31,нет,в работе: дельта 18.11
+flip,голос ребёнка,glitter,glitter.flip.06,proud,"Сальто в платье! Сложно, но я смогла.",37,нет,в работе: дельта 18.11
+jump,голос ребёнка,glitter,glitter.jump.01,happy,Прыг!,5,да,на сервере
+jump,голос ребёнка,glitter,glitter.jump.02,excited,Прыг-прыг — и блёстки!,22,да,на сервере
+jump,голос ребёнка,glitter,glitter.jump.03,excited,Прыжок до звёзд!,16,нет,в работе: дельта 18.11
+dance,голос ребёнка,glitter,glitter.dance.01,excited,Танцуем! Кружимся!,18,да,на сервере
+dance,голос ребёнка,glitter,glitter.dance.02,happy,Я балерина... ну почти.,23,да,на сервере
+dance,голос ребёнка,glitter,glitter.dance.03,excited,Давай вместе! Сердечко лапками!,31,да,на сервере
+dance,голос ребёнка,glitter,glitter.dance.04,excited,"Танец звёздочки! Кружусь, кружусь!",34,нет,в работе: дельта 18.11
+dance,голос ребёнка,glitter,glitter.dance.05,proud,"Подиум мой! Смотри, какая походка.",34,нет,в работе: дельта 18.11
+sit,голос ребёнка,glitter,glitter.sit.01,neutral,Села. Красиво сижу?,19,да,на сервере
+sit,голос ребёнка,glitter,glitter.sit.02,happy,"Сижу, как на фотосессии.",24,да,на сервере
+wave,голос ребёнка,glitter,glitter.wave.01,happy,Машу! Видишь блёстки с лапки?,29,да,на сервере
+wave,голос ребёнка,glitter,glitter.wave.02,excited,Приве-е-ет!,11,да,на сервере
+sing,голос ребёнка,glitter,glitter.sing.01,excited,"Блёстки, блёстки, ярче всех, у меня большой успех! Ой, как хорошо получилось.",77,да,на сервере
+sing,голос ребёнка,glitter,glitter.sing.02,happy,"Ля-ля-ля, мур-мур-мур, я пою, а ты слушай! Всё, поклон.",55,да,на сервере
+gum,голос ребёнка,glitter,glitter.gum.01,excited,Трюк? Внимание... облако блёсток!,33,да,на сервере
+gum,голос ребёнка,glitter,glitter.gum.02,proud,Мой фирменный трюк. Аплодисменты!,33,да,на сервере
+gum,голос ребёнка,glitter,glitter.gum.03,happy,Лови! Только не чихай.,22,да,на сервере
+stickers,голос ребёнка,glitter,glitter.stickers.01,excited,Наклейки! Наклони телефон — они переливаются.,45,да,на сервере
+stickers,голос ребёнка,glitter,glitter.stickers.02,happy,Голографические! Отклеивай за уголок.,37,да,на сервере
+change_persona,голос ребёнка,glitter,glitter.change_persona.01,neutral,Другой образ? Обожаю переодеваться!,35,да,на сервере
+change_persona,голос ребёнка,glitter,glitter.change_persona.02,happy,Конечно! Сейчас будет новый образ.,34,да,на сервере
+choose_hooligan,голос ребёнка,glitter,glitter.choose_hooligan.01,neutral,"Хулиган? Ну ладно, братишка у нас дерзкий. Сейчас!",50,да,на сервере
+choose_kind,голос ребёнка,glitter,glitter.choose_kind.01,happy,Добряк! Он очень милый. Превращаюсь!,36,да,на сервере
+choose_glitter,голос ребёнка,glitter,glitter.choose_glitter.01,excited,Блёстка! Ура! Я знала!,22,да,на сервере
+choose_glitter,голос ребёнка,glitter,glitter.choose_glitter.02,proud,Отличный вкус!,14,да,на сервере
+compliment,голос ребёнка,glitter,glitter.compliment.01,shy,"Ой, спасибо! С тобой тоже очень классно!",40,да,на сервере
+compliment,голос ребёнка,glitter,glitter.compliment.02,excited,Правда? Я сейчас засияю!,24,да,на сервере
+compliment,голос ребёнка,glitter,glitter.compliment.03,shy,Мурр... Мне так приятно.,24,да,на сервере
+rude,голос ребёнка,glitter,glitter.rude.01,sad,Ой. Это было обидно. Давай лучше дружить?,41,да,на сервере
+rude,голос ребёнка,glitter,glitter.rude.02,neutral,"Я сделаю вид, что не слышала. Хочешь блёстки?",45,да,на сервере
+rude,голос ребёнка,glitter,glitter.rude.03,neutral,Такие слова не блестят. Давай другие?,37,да,на сервере
+sad,голос ребёнка,glitter,glitter.sad.01,caring,"Ой, мне так жаль. Я рядом. Расскажи маме или папе — они помогут.",64,да,на сервере
+sad,голос ребёнка,glitter,glitter.sad.02,caring,"Грустить можно. Я посижу рядом, тихонько. А потом позови взрослого.",67,да,на сервере
+sad,голос ребёнка,glitter,glitter.sad.03,caring,"Обними экран — я обниму в ответ. И поговори со взрослым, которому доверяешь.",76,да,на сервере
+scared,голос ребёнка,glitter,glitter.scared.01,caring,"Я с тобой. Позови кого-нибудь из взрослых, пусть будут рядом.",61,да,на сервере
+scared,голос ребёнка,glitter,glitter.scared.02,caring,Давай подышим вместе: вдох... выдох. И позови маму или папу.,60,да,на сервере
+scared,голос ребёнка,glitter,glitter.scared.03,caring,"Я рядом. Позови маму, папу или того, кому доверяешь.",52,да,на сервере
+bored,голос ребёнка,glitter,glitter.bored.01,excited,Тряхни телефон — будет снежный шар!,35,да,на сервере
+bored,голос ребёнка,glitter,glitter.bored.02,happy,Проведи пальцем по экрану — нарисуем блёстками.,47,да,на сервере
+bored,голос ребёнка,glitter,glitter.bored.03,neutral,Скажи «повторяй за мной» — я буду говорить твоим голосом.,57,да,на сервере
+riddle,голос ребёнка,glitter,glitter.riddle.01,excited,Загадку? Обожаю! Слушай.,24,да,на сервере
+riddle,голос ребёнка,glitter,glitter.riddle.02,happy,Сейчас загадаю красивую загадку.,32,да,на сервере
+riddle,голос ребёнка,glitter,glitter.riddle.03,neutral,"Внимание, загадка!",18,да,на сервере
+joke,голос ребёнка,glitter,glitter.joke.01,happy,Почему у меня столько блёсток? Я чихнула в коробку с ними! Хи-хи.,65,да,на сервере
+joke,голос ребёнка,glitter,glitter.joke.02,happy,Что сказала одна наклейка другой? «Держись!» Хи-хи.,51,да,на сервере
+joke,голос ребёнка,glitter,glitter.joke.03,neutral,"Я знаю смешную шутку, но она слишком блестящая. Ослепнешь!",58,да,на сервере
+joke,голос ребёнка,glitter,glitter.joke.04,happy,Почему звёзды не ссорятся? Им некогда — они сияют!,50,да,на сервере
+joke,голос ребёнка,glitter,glitter.joke.05,proud,"Я такая блестящая, что даже солнце щурится.",43,да,на сервере
+help,голос ребёнка,glitter,glitter.help.01,excited,"Погладь меня, пощекочи или жми кнопки внизу. Скажи «танцуй»!",60,да,на сервере
+help,голос ребёнка,glitter,glitter.help.02,happy,"Я умею танцевать, петь и блестеть! Кнопки внизу — мои фокусы.",61,да,на сервере
+help,голос ребёнка,glitter,glitter.help.03,neutral,Скажи «загадку» или «повторяй за мной». Или угости меня!,56,да,на сервере
+thanks,голос ребёнка,glitter,glitter.thanks.01,happy,Для тебя — всегда!,18,да,на сервере
+thanks,голос ребёнка,glitter,glitter.thanks.02,excited,Всегда рада!,12,да,на сервере
+thanks,голос ребёнка,glitter,glitter.thanks.03,happy,Всегда пожалуйста! Блестящего дня.,34,да,на сервере
+echo_start,голос ребёнка,glitter,glitter.echo_start.01,excited,Говори! Я повторю!,18,да,на сервере
+echo_start,голос ребёнка,glitter,glitter.echo_start.02,happy,Повторялка включена!,20,да,на сервере
+echo_start,голос ребёнка,glitter,glitter.echo_start.03,neutral,"Скажи что-нибудь — а я повторю, только звонче.",46,да,на сервере
+echo_done,голос ребёнка,glitter,glitter.echo_done.01,happy,"Хи-хи, похоже?",14,да,на сервере
+echo_done,голос ребёнка,glitter,glitter.echo_done.02,excited,"Ой, я пищу! Ещё!",16,да,на сервере
+echo_done,голос ребёнка,glitter,glitter.echo_done.03,happy,"Мне нравится твой голос. Ну, мой. Наш.",38,да,на сервере
+echo_stop,голос ребёнка,glitter,glitter.echo_stop.01,neutral,"Всё, повторялка ушла на перерыв.",32,да,на сервере
+echo_stop,голос ребёнка,glitter,glitter.echo_stop.02,happy,Было смешно! Повторялка выключена.,34,да,на сервере
+echo_stop,голос ребёнка,glitter,glitter.echo_stop.03,neutral,"Всё, снова говорю своим голосом.",32,да,на сервере
+loud,голос ребёнка,glitter,glitter.loud.01,annoyed,"А-а-ай, громко! У меня ушки!",28,да,на сервере
+loud,голос ребёнка,glitter,glitter.loud.02,sad,"Потише, пожалуйста. Я всё слышу.",32,да,на сервере
+whisper,голос ребёнка,glitter,glitter.whisper.01,whisper,Ш-ш-ш... это наш секрет. Я никому.,34,да,на сервере
+whisper,голос ребёнка,glitter,glitter.whisper.02,whisper,Шёпотом всё звучит загадочнее... Обожаю.,40,да,на сервере
+surprise,касания/карта/время,glitter,glitter.surprise.01,surprised,Ах! Вот это сюрприз! У меня даже блёстки подпрыгнули.,53,да,на сервере
+surprise,касания/карта/время,glitter,glitter.surprise.02,excited,Ого! Ещё! Ещё так сделай!,25,да,на сервере
+tease,касания/карта/время,glitter,glitter.tease.01,offended,Дразнишься? А я всё равно самая блестящая!,42,да,на сервере
+tease,касания/карта/время,glitter,glitter.tease.02,cheeky,Бе-бе-бе! Я тоже умею дразниться.,33,да,на сервере
+clap,голос ребёнка,glitter,glitter.clap.01,surprised,Ой! Я аж подпрыгнула. Это мне хлопают?,38,да,на сервере
+clap,голос ребёнка,glitter,glitter.clap.02,excited,Браво мне! Поклон!,18,да,на сервере
+morning,контекст входа,glitter,glitter.morning.01,happy,Доброе утро! Я уже причесала ушки.,34,да,на сервере
+morning,контекст входа,glitter,glitter.morning.02,excited,Утро! Самое время сверкать.,27,да,на сервере
+morning,контекст входа,glitter,glitter.morning.03,neutral,"Утро! Блёстки уже проснулись, а я почти.",40,да,на сервере
+evening,контекст входа,glitter,glitter.evening.01,sleepy,Уже вечер... скоро красивые сны.,32,да,на сервере
+evening,контекст входа,glitter,glitter.evening.02,neutral,Вечером блёстки сверкают как звёзды. Ещё чуть-чуть поиграем — и спать.,70,да,на сервере
+long_absence,контекст входа,glitter,glitter.long_absence.01,sad,Тебя так долго не было! Я скучала.,34,да,на сервере
+long_absence,контекст входа,glitter,glitter.long_absence.02,excited,Наконец-то! Я тебя так ждала!,29,да,на сервере
+first_time_today,контекст входа,glitter,glitter.first_time_today.01,happy,Первый раз сегодня! Привет-привет!,34,да,на сервере
+first_time_today,контекст входа,glitter,glitter.first_time_today.02,excited,Сегодня ещё не виделись! Ура!,29,да,на сервере
+first_time_today,контекст входа,glitter,glitter.first_time_today.03,neutral,Новый день — новый блеск. Привет!,33,да,на сервере
+offer_riddle,диалоги,glitter,glitter.offer_riddle.01,excited,Хочешь загадку? Она очень красивая! Скажи «да».,47,да,на сервере
+offer_riddle,диалоги,glitter,glitter.offer_riddle.02,happy,А загадать тебе загадку? Блестящую!,35,да,на сервере
+offer_riddle,диалоги,glitter,glitter.offer_riddle.03,excited,У меня есть загадка с секретом! Загадать?,41,да,на сервере
+offer_echo,диалоги,glitter,glitter.offer_echo.01,excited,Поиграем в повторялку? Скажи что-нибудь — я повторю!,52,да,на сервере
+offer_echo,диалоги,glitter,glitter.offer_echo.02,happy,"Хочешь, я буду повторять за тобой? Скажи «да»!",46,да,на сервере
+offer_echo,диалоги,glitter,glitter.offer_echo.03,excited,Давай я буду твоим эхом? Скажи «да»!,36,да,на сервере
+offer_dance,диалоги,glitter,glitter.offer_dance.01,excited,Показать мой танец? Скажи «да»!,31,да,на сервере
+offer_dance,диалоги,glitter,glitter.offer_dance.02,proud,"Хочешь, я покружусь? Я очень красиво кружусь.",45,да,на сервере
+offer_dance,диалоги,glitter,glitter.offer_dance.03,happy,Хочешь танец с блёстками? Скажи «да»!,37,да,на сервере
+ask_name_again,диалоги,glitter,glitter.ask_name_again.01,neutral,"Ой, я не расслышала. Скажи имя ещё раз? Или «дальше».",53,да,на сервере
+ask_name_again,диалоги,glitter,glitter.ask_name_again.02,happy,"Повтори, пожалуйста! Мне очень хочется знать.",45,да,на сервере
+ask_name_again,диалоги,glitter,glitter.ask_name_again.03,excited,"Как-как? Скажи ещё раз, как тебя зовут!",39,да,на сервере
+sberkids_ask,диалоги,glitter,glitter.sberkids_ask.01,excited,Пойдём к брату в СберKids?,26,да,на сервере
+sberkids_ask,диалоги,glitter,glitter.sberkids_ask.02,happy,Хочешь к брату? Там столько всего!,34,да,на сервере
+sberkids_ask,диалоги,glitter,glitter.sberkids_ask.03,neutral,Заглянем к брату? Скажи «да» или «нет».,39,да,на сервере
+sberkids_yes,диалоги,glitter,glitter.sberkids_yes.01,excited,Ура! Открываю СберKids!,23,да,на сервере
+sberkids_yes,диалоги,glitter,glitter.sberkids_yes.02,happy,Пошли-пошли! Открываю.,22,да,на сервере
+sberkids_yes,диалоги,glitter,glitter.sberkids_yes.03,proud,Отличное решение! Открываю.,27,да,на сервере
+sberkids_no,диалоги,glitter,glitter.sberkids_no.01,neutral,"Ладно, остаёмся тут.",20,да,на сервере
+sberkids_no,диалоги,glitter,glitter.sberkids_no.02,happy,Хорошо! Тогда ещё поблестим.,28,да,на сервере
+sberkids_no,диалоги,glitter,glitter.sberkids_no.03,neutral,"Ну ладно... Кнопка внизу, если что.",35,да,на сервере
+bye_cancel,диалоги,glitter,glitter.bye_cancel.01,excited,Ура! Остаёмся!,14,да,на сервере
+bye_cancel,диалоги,glitter,glitter.bye_cancel.02,happy,Как хорошо! Ещё поиграем.,25,да,на сервере
+bye_cancel,диалоги,glitter,glitter.bye_cancel.03,neutral,Фух. А я уже расстроилась.,26,да,на сервере
+riddle_hint,диалоги,glitter,glitter.riddle_hint.01,neutral,Не-а! Подсказка:,16,да,на сервере
+riddle_hint,диалоги,glitter,glitter.riddle_hint.02,happy,Почти-почти! Вот подсказка:,27,да,на сервере
+riddle_hint,диалоги,glitter,glitter.riddle_hint.03,neutral,Секретная подсказка:,20,да,на сервере
+riddle_right,диалоги,glitter,glitter.riddle_right.01,excited,Ура! Правильно!,15,да,на сервере
+riddle_right,диалоги,glitter,glitter.riddle_right.02,proud,В точку! Это блестяще!,22,да,на сервере
+riddle_right,диалоги,glitter,glitter.riddle_right.03,happy,Да-да-да! Угадано!,18,да,на сервере
+riddle_answer,диалоги,glitter,glitter.riddle_answer.01,neutral,"Та-дам, это {answer}! Хитренькая, правда?",41,да,на сервере
+riddle_answer,диалоги,glitter,glitter.riddle_answer.02,happy,Ответ — {answer}. Теперь ты знаешь!,35,да,на сервере
+riddle_answer,диалоги,glitter,glitter.riddle_answer.03,neutral,А ответ — {answer}! Следующая точно будет твоя.,47,да,на сервере
+riddle_more,диалоги,glitter,glitter.riddle_more.01,excited,Ещё одну загадочку?,19,да,на сервере
+riddle_more,диалоги,glitter,glitter.riddle_more.02,happy,Хочешь ещё загадку?,19,да,на сервере
+riddle_more,диалоги,glitter,glitter.riddle_more.03,neutral,Загадать ещё? Скажи «да».,25,да,на сервере
+riddle_bye,диалоги,glitter,glitter.riddle_bye.01,neutral,Загадки уходят на антракт.,26,да,на сервере
+riddle_bye,диалоги,glitter,glitter.riddle_bye.02,happy,Ладно! Было интересно.,22,да,на сервере
+riddle_bye,диалоги,glitter,glitter.riddle_bye.03,neutral,"Окей, играем дальше!",20,да,на сервере
+where_live,голос ребёнка,glitter,glitter.where_live.01,excited,В твоей карте! Это мой блестящий домик.,39,нет,в работе: дельта 18.11
+where_live,голос ребёнка,glitter,glitter.where_live.02,happy,В карте. У меня там гардероб и зеркальце.,41,нет,в работе: дельта 18.11
+where_live,голос ребёнка,glitter,glitter.where_live.03,proud,Под звёздами в твоей карте! А брат живёт в СберKids.,52,нет,в работе: дельта 18.11
+likes,голос ребёнка,glitter,glitter.likes.01,excited,"Блёстки, наряды и звёзды!",25,нет,в работе: дельта 18.11
+likes,голос ребёнка,glitter,glitter.likes.02,happy,Фотосессии! И наклейки. Голографические.,40,нет,в работе: дельта 18.11
+likes,голос ребёнка,glitter,glitter.likes.03,proud,"Смотреть на звёзды и сиять, как они.",36,нет,в работе: дельта 18.11
+friends,голос ребёнка,glitter,glitter.friends.01,excited,"Конечно! Ты, например. Моя звёздочка!",37,нет,в работе: дельта 18.11
+friends,голос ребёнка,glitter,glitter.friends.02,happy,"Хулиган и Добряк, мои братики. И ты!",36,нет,в работе: дельта 18.11
+friends,голос ребёнка,glitter,glitter.friends.03,proud,"Много! Звёзды, бабочки и ты, конечно.",37,нет,в работе: дельта 18.11
+tale,голос ребёнка,glitter,glitter.tale.01,happy,Жила-была звёздочка. Она упала в коробку с блёстками и стала сиять ещё ярче. А потом стала мной! Конец.,103,нет,в работе: дельта 18.11
+tale,голос ребёнка,glitter,glitter.tale.02,excited,"Сказка! Кошка сшила платье из радуги. Все ахнули, а дождик перестал. Вот и сказочке конец!",90,нет,в работе: дельта 18.11
+tale,голос ребёнка,glitter,glitter.tale.03,happy,Однажды луна потеряла блёстки. Кошка нашла их и вернула. С тех пор луна ей подмигивает. Конец!,94,нет,в работе: дельта 18.11
+friend,голос ребёнка,glitter,glitter.friend.01,excited,Давай! Теперь ты мой лучший друг.,33,нет,в работе: дельта 18.11
+friend,голос ребёнка,glitter,glitter.friend.02,shy,Дружить? Ура! Это самое блестящее предложение.,46,нет,в работе: дельта 18.11
+friend,голос ребёнка,glitter,glitter.friend.03,happy,Конечно! Друзья сияют вместе.,29,нет,в работе: дельта 18.11
+how_are_you,голос ребёнка,glitter,glitter.how_are_you.01,excited,Сияю! А с тобой ещё ярче.,25,нет,в работе: дельта 18.11
+how_are_you,голос ребёнка,glitter,glitter.how_are_you.02,happy,Блестяще! Как всегда.,21,нет,в работе: дельта 18.11
+how_are_you,голос ребёнка,glitter,glitter.how_are_you.03,proud,Отлично! Я сегодня особенно красивая.,37,нет,в работе: дельта 18.11
+offer_emo,диалоги,glitter,glitter.offer_emo.01,excited,"Хочешь, я покажу настроение, а ты угадаешь?",43,нет,в работе: дельта 18.11
+offer_emo,диалоги,glitter,glitter.offer_emo.02,happy,Поиграем в «Угадай эмоцию»? Я актриса!,38,нет,в работе: дельта 18.11
+offer_emo,диалоги,glitter,glitter.offer_emo.03,excited,"Я сделаю мордашку, как на фотосессии. Угадаешь? Играем?",55,нет,в работе: дельта 18.11
+offer_rps,диалоги,glitter,glitter.offer_rps.01,excited,"Сыграем в камень, ножницы, бумагу? Скажи «да»!",46,нет,в работе: дельта 18.11
+offer_rps,диалоги,glitter,glitter.offer_rps.02,happy,"Камень, ножницы, бумага? Я быстрая!",35,нет,в работе: дельта 18.11
+offer_rps,диалоги,glitter,glitter.offer_rps.03,proud,"Вызываю на камень, ножницы, бумагу! Играем?",43,нет,в работе: дельта 18.11
+offer_simon,диалоги,glitter,glitter.offer_simon.01,excited,"Давай я покажу движение, а ты повторишь? Как на подиуме!",56,нет,в работе: дельта 18.11
+offer_simon,диалоги,glitter,glitter.offer_simon.02,happy,Поиграем в «Делай как я»? Скажи «да».,37,нет,в работе: дельта 18.11
+offer_simon,диалоги,glitter,glitter.offer_simon.03,proud,Повторишь мои звёздные движения? Играем?,40,нет,в работе: дельта 18.11
+emo_start,мини-игры с выбором,glitter,glitter.emo_start.01,excited,"Играем! Я показываю настроение, а ты угадываешь, какая я.",57,нет,в работе: дельта 18.11
+emo_start,мини-игры с выбором,glitter,glitter.emo_start.02,happy,"Я актриса! Смотри на мордашку и угадай, какая я.",48,нет,в работе: дельта 18.11
+emo_ask,мини-игры с выбором,glitter,glitter.emo_ask.01,excited,Какая я сейчас?,15,нет,в работе: дельта 18.11
+emo_ask,мини-игры с выбором,glitter,glitter.emo_ask.02,happy,"Ну, угадаешь, какая я?",22,нет,в работе: дельта 18.11
+emo_wrong,мини-игры с выбором,glitter,glitter.emo_wrong.01,neutral,Не-а! Смотри ещё разок.,23,нет,в работе: дельта 18.11
+emo_wrong,мини-игры с выбором,glitter,glitter.emo_wrong.02,happy,Почти! Посмотри внимательнее.,29,нет,в работе: дельта 18.11
+emo_right,мини-игры с выбором,glitter,glitter.emo_right.01,excited,Угадано! Блестяще!,18,нет,в работе: дельта 18.11
+emo_right,мини-игры с выбором,glitter,glitter.emo_right.02,proud,В точку! Тебе бы в кино работать.,33,нет,в работе: дельта 18.11
+emo_is_happy,мини-игры с выбором,glitter,glitter.emo_is_happy.01,happy,Это я радовалась! Сияю!,23,нет,в работе: дельта 18.11
+emo_is_sad,мини-игры с выбором,glitter,glitter.emo_is_sad.01,sad,"Это я грустила. Но уже всё, блещу снова.",40,нет,в работе: дельта 18.11
+emo_is_angry,мини-игры с выбором,glitter,glitter.emo_is_angry.01,annoyed,Это я сердилась! Хм! Понарошку.,31,нет,в работе: дельта 18.11
+emo_is_surprised,мини-игры с выбором,glitter,glitter.emo_is_surprised.01,surprised,Это я удивлялась! Ах!,21,нет,в работе: дельта 18.11
+emo_is_sleepy,мини-игры с выбором,glitter,glitter.emo_is_sleepy.01,sleepy,Это я сонная. Звёздочки снятся...,33,нет,в работе: дельта 18.11
+emo_is_shy,мини-игры с выбором,glitter,glitter.emo_is_shy.01,shy,Это я стеснялась. Хи-хи.,24,нет,в работе: дельта 18.11
+rps_start,мини-игры с выбором,glitter,glitter.rps_start.01,excited,"Камень, ножницы, бумага! Говори вслух, что выбираешь.",53,нет,в работе: дельта 18.11
+rps_start,мини-игры с выбором,glitter,glitter.rps_start.02,happy,"На счёт «три» скажи: камень, ножницы или бумага!",48,нет,в работе: дельта 18.11
+rps_go,мини-игры с выбором,glitter,glitter.rps_go.01,excited,"Раз, два, три!",14,нет,в работе: дельта 18.11
+rps_go,мини-игры с выбором,glitter,glitter.rps_go.02,happy,"Камень, ножницы, бумага... раз, два, три!",41,нет,в работе: дельта 18.11
+rps_again,мини-игры с выбором,glitter,glitter.rps_again.01,neutral,"Не расслышала! Камень, ножницы или бумага?",42,нет,в работе: дельта 18.11
+rps_again,мини-игры с выбором,glitter,glitter.rps_again.02,happy,"Скажи одно: камень, ножницы или бумага.",39,нет,в работе: дельта 18.11
+rps_is_rock,мини-игры с выбором,glitter,glitter.rps_is_rock.01,proud,У меня камень! Драгоценный.,27,нет,в работе: дельта 18.11
+rps_is_scissors,мини-игры с выбором,glitter,glitter.rps_is_scissors.01,excited,"У меня ножницы! Чик-чик, как в ателье.",38,нет,в работе: дельта 18.11
+rps_is_paper,мини-игры с выбором,glitter,glitter.rps_is_paper.01,happy,У меня бумага! Блестящая.,25,нет,в работе: дельта 18.11
+rps_win,мини-игры с выбором,glitter,glitter.rps_win.01,offended,"Ой, победа твоя! Ну ладно, тебе идёт.",37,нет,в работе: дельта 18.11
+rps_win,мини-игры с выбором,glitter,glitter.rps_win.02,happy,Обыграли меня! Аплодисменты тебе.,33,нет,в работе: дельта 18.11
+rps_lose,мини-игры с выбором,glitter,glitter.rps_lose.01,proud,Я выиграла! Поклон!,19,нет,в работе: дельта 18.11
+rps_lose,мини-игры с выбором,glitter,glitter.rps_lose.02,excited,"Ура, моя победа! Блёстки в честь меня.",38,нет,в работе: дельта 18.11
+rps_draw,мини-игры с выбором,glitter,glitter.rps_draw.01,surprised,Ничья! Мы как близняшки.,24,нет,в работе: дельта 18.11
+rps_draw,мини-игры с выбором,glitter,glitter.rps_draw.02,happy,"Ничья! Одинаковый вкус, значит.",31,нет,в работе: дельта 18.11
+simon_start,мини-игры с выбором,glitter,glitter.simon_start.01,excited,"Я показываю движение, а ты жмёшь такую же кнопку внизу!",55,нет,в работе: дельта 18.11
+simon_start,мини-игры с выбором,glitter,glitter.simon_start.02,happy,Делай как я! Смотри на меня и жми ту же кнопку.,47,нет,в работе: дельта 18.11
+simon_ask,мини-игры с выбором,glitter,glitter.simon_ask.01,excited,Смотри и повторяй!,18,нет,в работе: дельта 18.11
+simon_ask,мини-игры с выбором,glitter,glitter.simon_ask.02,happy,Запоминай!,10,нет,в работе: дельта 18.11
+simon_wrong,мини-игры с выбором,glitter,glitter.simon_wrong.01,neutral,Не то! Смотри ещё раз.,22,нет,в работе: дельта 18.11
+simon_wrong,мини-игры с выбором,glitter,glitter.simon_wrong.02,happy,Почти! Ещё разок покажу.,24,нет,в работе: дельта 18.11
+simon_right,мини-игры с выбором,glitter,glitter.simon_right.01,excited,Блестяще! Следующее!,20,нет,в работе: дельта 18.11
+simon_right,мини-игры с выбором,glitter,glitter.simon_right.02,proud,Верно! Ты звезда.,17,нет,в работе: дельта 18.11
+simon_done,мини-игры с выбором,glitter,glitter.simon_done.01,excited,Три из трёх! Это звёздный результат!,36,нет,в работе: дельта 18.11
+simon_done,мини-игры с выбором,glitter,glitter.simon_done.02,proud,Всё повторено! Беру тебя на подиум.,35,нет,в работе: дельта 18.11
+simon_is_jump,мини-игры с выбором,glitter,glitter.simon_is_jump.01,neutral,Это был прыжок!,15,нет,в работе: дельта 18.11
+simon_is_flip,мини-игры с выбором,glitter,glitter.simon_is_flip.01,neutral,Это было сальто!,16,нет,в работе: дельта 18.11
+simon_is_dance,мини-игры с выбором,glitter,glitter.simon_is_dance.01,neutral,Это был танец!,14,нет,в работе: дельта 18.11
+simon_is_wave,мини-игры с выбором,glitter,glitter.simon_is_wave.01,neutral,Это я помахала лапкой!,22,нет,в работе: дельта 18.11
+simon_is_sit,мини-игры с выбором,glitter,glitter.simon_is_sit.01,neutral,Это я присела!,14,нет,в работе: дельта 18.11
+game_more,мини-игры с выбором,glitter,glitter.game_more.01,excited,Ещё разок?,10,нет,в работе: дельта 18.11
+game_more,мини-игры с выбором,glitter,glitter.game_more.02,happy,Ещё раунд? Скажи «да»!,22,нет,в работе: дельта 18.11
+game_more,мини-игры с выбором,glitter,glitter.game_more.03,neutral,Сыграем ещё? Да или нет?,24,нет,в работе: дельта 18.11
+game_bye,мини-игры с выбором,glitter,glitter.game_bye.01,happy,Спасибо за игру! Было блестяще.,31,нет,в работе: дельта 18.11
+game_bye,мини-игры с выбором,glitter,glitter.game_bye.02,neutral,"Ладно, антракт! Потом ещё сыграем.",34,нет,в работе: дельта 18.11
+game_bye,мини-игры с выбором,glitter,glitter.game_bye.03,excited,Игра окончена! Поклон!,22,нет,в работе: дельта 18.11
+riddle_q,загадки,glitter,glitter.riddle.r01.q,neutral,"Красная девица сидит в темнице, а коса на улице. Кто это?",57,да,на сервере
+riddle_hint,диалоги,glitter,glitter.riddle.r01.hint,neutral,Её очень любят зайцы.,21,да,на сервере
+riddle_q,загадки,glitter,glitter.riddle.r02.q,neutral,"Что блестит ночью на небе, совсем как мои блёстки?",50,да,на сервере
+riddle_hint,диалоги,glitter,glitter.riddle.r02.hint,neutral,"Их много-много, и они мигают.",29,да,на сервере
+riddle_q,загадки,glitter,glitter.riddle.r03.q,neutral,Разноцветное коромысло над рекой повисло. Что это?,50,да,на сервере
+riddle_hint,диалоги,glitter,glitter.riddle.r03.hint,neutral,Бывает после дождя. Семь цветов!,32,да,на сервере
+riddle_q,загадки,glitter,glitter.riddle.r04.q,neutral,"Гладкое, а не стекло. Блестит, а не вода. Всё повторяет, а само молчит.",71,да,на сервере
+riddle_hint,диалоги,glitter,glitter.riddle.r04.hint,neutral,В него я смотрюсь каждое утро.,30,да,на сервере
+riddle_q,загадки,glitter,glitter.riddle.r05.q,neutral,"Не птица, а с крыльями. Над цветами порхает, красотой сверкает.",63,да,на сервере
+riddle_hint,диалоги,glitter,glitter.riddle.r05.hint,neutral,Она бывает ярче моих блёсток.,29,да,на сервере
+riddle_q,загадки,glitter,glitter.riddle.r06.q,neutral,"Круглое, румяное, я расту на ветке. Что это?",44,да,на сервере
+riddle_hint,диалоги,glitter,glitter.riddle.r06.hint,neutral,"Бывает красное, зелёное и жёлтое.",33,да,на сервере
+riddle_q,загадки,glitter,glitter.riddle.r07.q,neutral,"Шёл долговяз, в сыру землю увяз. Что это?",41,да,на сервере
+riddle_hint,диалоги,glitter,glitter.riddle.r07.hint,neutral,От него прячутся под зонтиком.,30,да,на сервере
+riddle_q,загадки,glitter,glitter.riddle.r08.q,neutral,"Кругом вода, а пить нельзя. Что это?",36,да,на сервере
+riddle_hint,диалоги,glitter,glitter.riddle.r08.hint,neutral,Там волны и солёная вода.,25,да,на сервере
