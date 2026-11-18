@@ -44,6 +44,9 @@ tail -f /var/lib/vershov-commander/ar/meshy.log
 проверить в кабинете Meshy (Tasks) и, если задачи нет, `--redo id`. `402` (кредиты кончились) — стоп всего; `429` —
 пауза и повтор. Неудачные задачи Meshy (`FAILED`) кредиты не списывают, но и их повторяет только `--redo`.
 
+**Без ручного запуска:** задача в `automation/queue.json` (`kind: meshy`, `args: ["--only", "wave"]`, `maxCredits`) —
+сервер выполнит её сам и выложит клипы в ветку `server-out` ([automation/README.md](../../automation/README.md)).
+
 ## 3. Стоимость
 
 | шаг | кредиты |

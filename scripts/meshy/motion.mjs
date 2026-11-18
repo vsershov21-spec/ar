@@ -4,7 +4,7 @@
 //
 //   node motion.mjs --prompts t2m_prompts_v2.json                 — план: клипы, кредиты, баланс (ничего не тратит)
 //   node motion.mjs --prompts … --go                              — генерация (возобновляемо)
-//   --set p0|p1|p0,p1|all   --only id,id   --redo id,id   --jobs 3
+//   --set p0|p1|p0,p1|all   --only id,id   --redo id,id   --jobs 3   --max-credits 120 (оценка больше — стоп)
 //   --model-url https://ar.vershov.com/models/hooligan_v1.glb  --height 1.0
 //   --out /srv/ar-extra/models/anims/meshy   --state /var/lib/vershov-commander/ar/meshy
 //   --env /etc/ar-meshy.env  (MESHY_API_KEY=…; ключ читается здесь и никуда не выводится)
@@ -387,6 +387,9 @@ async function main() {
   }
   if (!api) throw new Stop('нет ключа MESHY_API_KEY');
   if (!todo.length) return log('всё уже есть');
+  // потолок прогона (ставит scripts/automation/ar-auto.mjs): оценка выше — не начинаем вовсе
+  const maxCr = opt('--max-credits', '');
+  if (maxCr !== '' && !(est <= Number(maxCr))) throw new Stop(`оценка ${est} кредитов > --max-credits ${maxCr} — не запускаю`);
   if (bal != null && bal < COST.t2m.prime + COST.anim) throw new Stop(`мало кредитов: ${bal}`);
 
   // 1. риг — один раз на все клипы (у трёх котов один скелет)

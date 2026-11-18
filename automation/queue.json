@@ -1,0 +1,11 @@
+{
+  "jobs": [
+    {
+      "id": "mirror-meshy",
+      "kind": "meshy",
+      "args": [],
+      "maxCredits": 0,
+      "note": "Без генерации: выгрузить все готовые клипы Meshy (slim GLB + manifest) в server-out/out/latest/meshy для просмотра"
+    }
+  ]
+}

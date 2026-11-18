@@ -1,0 +1,10 @@
+[Unit]
+Description=ar-auto каждые 5 минут
+
+[Timer]
+OnBootSec=3min
+OnUnitInactiveSec=5min
+RandomizedDelaySec=20s
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,13 @@
+# Очередь генераций (automation/queue.json в main) → задачи → выгрузка в ветку server-out. См. automation/README.md.
+[Unit]
+Description=ar-auto: очередь генераций из GitHub (Meshy/Tripo/ElevenLabs)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/opt/ar-auto/ar-auto.sh tick
+Environment=HOME=/root
+TimeoutStartSec=20min
+Nice=10
+# задачи идут в своих юнитах ar-auto-job-<вид> (systemd-run), tick только раздаёт их и выгружает статус

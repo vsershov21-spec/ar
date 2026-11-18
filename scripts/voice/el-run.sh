@@ -5,6 +5,7 @@
 #   bash scripts/voice/el-run.sh --plan          — только посчитать, сколько осталось (без сети к ElevenLabs)
 #   bash scripts/voice/el-run.sh --only kind     — только один характер (или подстрока id)
 #   tail -f /var/lib/vershov-commander/ar/el-run.log
+#   EL_REF=<sha> EL_WORK=… EL_LOG=… — конкретный коммит вместо main, своя рабочая папка и лог (так зовёт ar-auto)
 #
 # Ключ — из /var/lib/vershov-commander/.elevenlabs_key (читает node внутри процесса, в лог и консоль не попадает).
 # Вывод — /srv/ar-extra/voice-el (если папка доступна на запись), иначе /var/lib/vershov-commander/ar/voice-el;
@@ -13,16 +14,14 @@
 set -euo pipefail
 
 BASE=/var/lib/vershov-commander/ar
-LOG="$BASE/el-run.log"
+LOG="${EL_LOG:-$BASE/el-run.log}"
 WORK="${EL_WORK:-$BASE/el-work}"
 REPO="${EL_REPO:-https://github.com/vsershov21-spec/ar.git}"
+REF="${EL_REF:-main}"
 mkdir -p "$BASE"
 
-if [ -f "$WORK/.git/HEAD" ]; then
-  git -C "$WORK" fetch -q --depth 1 origin main && git -C "$WORK" reset -q --hard origin/main
-else
-  rm -rf "$WORK" && git clone -q --depth 1 -b main "$REPO" "$WORK"
-fi
+[ -f "$WORK/.git/HEAD" ] || { rm -rf "$WORK" && git clone -q --depth 1 -b main "$REPO" "$WORK"; }
+git -C "$WORK" fetch -q --depth 1 origin "$REF" && git -C "$WORK" reset -q --hard FETCH_HEAD
 cd "$WORK"
 # три зависимости синтеза (wasm, без нативной сборки — домашняя папка может быть noexec)
 if [ ! -d node_modules/mpg123-decoder ] || [ ! -d node_modules/wasm-media-encoders ] || [ ! -d node_modules/amaro ]; then

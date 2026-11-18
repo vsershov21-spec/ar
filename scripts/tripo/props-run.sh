@@ -5,13 +5,15 @@
 #   bash /tmp/props.sh                 — план: что сгенерируется и сколько кредитов (ничего не тратит)
 #   nohup bash /tmp/props.sh --go >/tmp/props.log 2>&1 &   — генерация в фоне; лог: tail -f /tmp/props.log
 #   bash /tmp/props.sh --go --only bed,skateboard           — только выбранные
+#   bash /tmp/props.sh --go --max-credits 250               — потолок прогона по оценке (dry-run) перед каждым предметом
+#   TRIPO_RAW=https://raw.githubusercontent.com/vsershov21-spec/ar/<sha> — промпты из конкретного коммита (ar-auto)
 # Готовое кладётся в /srv/ar-extra/models/props/<имя>.glb + <имя>.png (превью) и попадает на сайт со следующей
 # сборкой (attach-extra): https://ar.vershov.com/models/props/<имя>.glb. Уже готовые пропускаются (resume).
 set -u
-GO=0; ONLY=""
-while [ $# -gt 0 ]; do case "$1" in --go) GO=1;; --only) ONLY="$2"; shift;; esac; shift; done
+GO=0; ONLY=""; MAXCR=""
+while [ $# -gt 0 ]; do case "$1" in --go) GO=1;; --only) ONLY="$2"; shift;; --max-credits) MAXCR="$2"; shift;; esac; shift; done
 export TRIPO_CLIENT_APP=claude
-RAW=https://raw.githubusercontent.com/vsershov21-spec/ar/main
+RAW=${TRIPO_RAW:-https://raw.githubusercontent.com/vsershov21-spec/ar/main}
 WORK=/var/lib/vershov-commander/ar/tripo; OUT=/srv/ar-extra/models/props
 mkdir -p "$WORK" "$OUT"
 command -v tripo >/dev/null || { echo "нет tripo: npm install -g tripo-cli && tripo login --region ov"; exit 3; }
@@ -23,18 +25,22 @@ const style=" Soft rounded toy-like shapes, bright Sber palette (green #21A038, 
 for (const [k,v] of Object.entries(d.props||{})) { if(!v||!v.prompt) continue; if(only.length&&!only.includes(k)) continue;
   if(!only.length && /готов|есть/.test(v.status||"") && !/по желанию/.test(v.status||"")) continue;
   console.log(k+"\t"+(v.prompt+style).replace(/\s+/g," ")); }' "$WORK/prompts.json" "$ONLY" > "$WORK/list.tsv"
-N=$(wc -l < "$WORK/list.tsv"); TODO=0
+N=$(wc -l < "$WORK/list.tsv"); TODO=0; TOTAL=0; SPENT=0
 echo "=== $(date -Is) props-run $([ $GO = 1 ] && echo GO || echo PLAN) ==="
 tripo balance --json 2>/dev/null | sed 's/^/баланс: /'
 while IFS=$'\t' read -r name prompt; do
   if [ -s "$OUT/$name.glb" ]; then echo "✓ $name — уже есть"; continue; fi
   TODO=$((TODO+1))
+  est=$(tripo make "$prompt" --model tripo-p2 -p face_limit=8000 --dry-run --json 2>/dev/null | node -e 'let s="";process.stdin.on("data",c=>s+=c).on("end",()=>{try{const v=Number(JSON.parse(s).generation_credits_estimate);console.log(v>0?Math.ceil(v):"?")}catch{console.log("?")}})')
+  case "$est" in ''|*[!0-9]*) estn=110;; *) estn=$est;; esac
+  TOTAL=$((TOTAL+estn))
   if [ $GO = 0 ]; then
-    est=$(tripo make "$prompt" --model tripo-p2 -p face_limit=8000 --dry-run --json 2>/dev/null | node -e 'let s="";process.stdin.on("data",c=>s+=c).on("end",()=>{try{console.log(JSON.parse(s).generation_credits_estimate)}catch{console.log("?")}})')
     echo "• $name — ~${est} кредитов"
     continue
   fi
-  echo "▶ $name"
+  if [ -n "$MAXCR" ] && [ $((SPENT+estn)) -gt "$MAXCR" ]; then echo "■ лимит --max-credits $MAXCR: $name (~$estn) не запускаю"; break; fi
+  SPENT=$((SPENT+estn))
+  echo "▶ $name · ~$estn кр."
   res=$(tripo make "$prompt" --model tripo-p2 -p face_limit=8000 --json --yes --no-open -o "$WORK/$name" --name "prop_$name" 2>>"$WORK/$name.err")
   code=$?
   echo "$res" > "$WORK/$name.json"
@@ -46,6 +52,8 @@ while IFS=$'\t' read -r name prompt; do
   [ -s "$prev" ] && cp "$prev" "$OUT/$name.png"
 done < "$WORK/list.tsv"
 chown -R vershov-commander:caddy "$OUT" 2>/dev/null; chmod -R g+rX "$OUT" 2>/dev/null
+[ $GO = 0 ] && echo "оценка ≈ $TOTAL кредитов"
 [ $GO = 0 ] && echo "к генерации: $TODO из $N (≈110 кредитов за предмет). Запуск: nohup bash /tmp/props.sh --go >/tmp/props.log 2>&1 &"
+[ $GO = 1 ] && echo "потрачено по оценке ≈ $SPENT кредитов"
 [ $GO = 1 ] && { tripo balance --json 2>/dev/null | sed 's/^/баланс после: /'; echo "готово; на сайт — со следующей сборкой (любой push в main)"; }
 echo "=== done ==="

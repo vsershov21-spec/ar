@@ -49,6 +49,13 @@
 стоит SPA-запасной путь (`try_files {path} /index.html`), продакту нужно добавить каталоги:
 `try_files {path} {path}/index.html /index.html` — иначе `/test` отдаст главную страницу.
 
+## Генерации без ручных команд: ar-auto
+
+Meshy / Tripo / ElevenLabs запускаются на swe по очереди `automation/queue.json` из `main` (таймер `ar-auto.timer`,
+раз в 5 мин, root), результаты — в ветке `server-out` (`out/<id>/`, `out/latest/meshy/`). После задачи, изменившей
+`/srv/ar-extra`, ar-auto сам делает `systemctl start ar-update` — пустой коммит для пересборки не нужен.
+Установка, лимиты, формат задач — [automation/README.md](../automation/README.md).
+
 ## Логи и откат
 
 - Лог сборок на сервере: `/srv/ar/update.log`.
