@@ -37,6 +37,7 @@ import { EnergyBudget, defaultPixelRatio, fxNeedsBoost, isMobileDevice } from '.
 import { isPersonaId } from './persona/types';
 import { prepareFlowMemory, runFlow } from './debug/flows';
 import { feature } from './config/edition';
+import { OrbitPointers, OrbitView, bindOrbitKeys, bindOrbitWheel, isDesktopView, isTouchDevice, noCardCameraOff, showOrbitHint, type ViewPose } from './input/orbit';
 
 export type CharacterMode = 'sprite' | 'rig' | 'glb';
 export type TrackerKind = 'card' | 'mindar' | 'debug' | '8thwall' | 'webxr' | 'nocard';
@@ -54,7 +55,8 @@ export function readParams(search = location.search): AppParams {
   const q = new URLSearchParams(search);
   const debug = q.has('debug');
   // ?nocard — кот на столе без карты (камера фоном, ?nocard=off — без камеры): страница тестовых флоу /test
-  const t = (q.get('tracker') as TrackerKind) || (q.has('nocard') ? 'nocard' : debug ? 'debug' : 'card');
+  // ?desktop — псевдоним ?nocard=off для Mac/ПК: кот на фирменном фоне, вращение мышью (src/input/orbit.ts)
+  const t = (q.get('tracker') as TrackerKind) || (q.has('nocard') || q.has('desktop') ? 'nocard' : debug ? 'debug' : 'card');
   // ?char=hooligan|kind|glitter — выбор кота (3D); ?char=sprite|rig|glb — режим персонажа, как раньше
   const cq = q.get('char');
   const c = (cq && isPersonaId(cq) ? 'glb' : (cq as CharacterMode)) || 'glb';
@@ -65,7 +67,8 @@ export function readParams(search = location.search): AppParams {
   } catch {
     /* приватный режим */
   }
-  const mic = q.get('mic') || savedMic || 'auto';
+  // десктоп-просмотр: микрофон только по кнопке (браузер не спрашивает доступ при запуске)
+  const mic = q.get('mic') || (isDesktopView(search) ? 'ptt' : savedMic || 'auto');
   return { debug, tracker: t, character: ['sprite', 'rig', 'glb'].includes(c) ? c : 'sprite', asr: q.get('asr'), mic };
 }
 
@@ -226,6 +229,7 @@ export class App {
       void import('./character/glbCharacter').catch(() => undefined);
     }
     this.ui.setMicMode(this.engine.mode);
+    if (this.desktopView) this.ui.setWakeLabel('Позвать кота'); // без камеры: кнопка не обещает камеру
     if (typeof (this.tracker as unknown as { reanchor?: unknown }).reanchor === 'function') this.tracker.onFound(() => this.ui.showReanchor(true));
     this.catEnv = catEnv;
 
@@ -275,6 +279,7 @@ export class App {
       isChoiceSticker: (x, y) => !!this.fx.stickerAt(x, y)?.choice,
     });
     this.bindInput();
+    this.setupOrbit();
     this.home = new HomeMode({
       root: this.root, scene: this.scene, renderer: this.renderer, tracker: this.tracker as unknown as HomeHost['tracker'], stage: this.stage,
       director: this.director as unknown as HomeHost['director'], character: () => this.character, ui: this.ui, audio: this.audio,
@@ -541,7 +546,7 @@ export class App {
     if (kind === 'debug') return new DebugTracker(asset(ASSETS.cardImage));
     if (kind === 'nocard') {
       const { NoCardTracker } = await import('./tracker/noCardTracker');
-      return new NoCardTracker(asset(ASSETS.cardImage), this.root, new URLSearchParams(location.search).get('nocard') !== 'off');
+      return new NoCardTracker(asset(ASSETS.cardImage), this.root, !noCardCameraOff(location.search));
     }
     if (kind === '8thwall') {
       const { EighthWallTracker } = await import('./tracker/eighthWallTracker');
@@ -807,6 +812,30 @@ export class App {
     });
   }
 
+  /** десктоп-просмотр: без камеры и карты на Mac/ПК — не ждём датчиков и камеры, микрофон по кнопке */
+  readonly desktopView = isDesktopView(location.search);
+  private orbitView: OrbitView | null = null;
+  private hideOrbitHint: (() => void) | null = null;
+
+  /**
+   * Кот без карты (?nocard, ?desktop): площадку можно вращать — мышь (тянуть ≥ 6 px), колесо/щипок, двойной клик,
+   * клавиши; на телефоне — двумя пальцами (src/input/orbit.ts). Повёрнутая площадка — кот не разворачивается к зрителю.
+   */
+  private setupOrbit() {
+    if (this.params.tracker !== 'nocard' || !('spin' in this.tracker)) return;
+    const follow = this.stage.cfg.yawFollow;
+    const view = new OrbitView(this.tracker as unknown as ViewPose, (v) => {
+      this.stage.cfg.yawFollow = v.spun ? false : follow;
+      this.hideOrbitHint?.();
+    });
+    this.orbitView = view;
+    const ptr = new OrbitPointers(view);
+    this.input.orbit = ptr;
+    bindOrbitWheel(this.fx.canvas, view, () => this.input.activity());
+    bindOrbitKeys(view, () => this.input.activity());
+    (window as unknown as { __orbit?: OrbitView }).__orbit = view;
+  }
+
   /** «Разбудить кота»: всё, что требует жеста в iOS, — синхронно в начале обработчика */
   async wake() {
     // аудиосессия iOS — один раз и сразу «с микрофоном», если он будет: потом её никто не переключает
@@ -823,8 +852,14 @@ export class App {
     // не на «экономии трафика»
     if (!(navigator as any).connection?.saveData) setTimeout(() => void this.engine.asr.preload?.(), 3000);
     if (this.audio.maybeSilentSwitch) setTimeout(() => this.ui.toast('Не слышно кота? Проверь переключатель «Без звука» сбоку iPhone и громкость.', 5000), 2500);
-    const sensors = this.input.requestSensors();
-    this.ui.setStartBusy('Включаю камеру…');
+    // десктоп-просмотр: датчиков нет — не спрашиваем; микрофон — только по кнопке
+    const desk = this.desktopView;
+    const sensors = desk ? Promise.resolve(false) : this.input.requestSensors();
+    if (desk) {
+      micAsked = true;
+      this.input.motionGranted = false;
+    }
+    this.ui.setStartBusy(desk ? 'Зову кота…' : 'Включаю камеру…');
     try {
       const tv = this.tracker as unknown as { startVideo?: () => Promise<void>; withAudio?: boolean; audioStream?: MediaStream | null };
       // iOS: камера и микрофон одним запросом — второй getUserMedia за микрофоном рвёт видео
@@ -833,13 +868,16 @@ export class App {
       this.engine.mic.adopt(tv.audioStream ?? null);
       openMic();
       void sensors.then((ok) => {
-        this.director.log(`датчики: ${ok ? 'да' : 'нет'}`);
+        this.director.log(`датчики: ${desk ? 'десктоп-просмотр' : ok ? 'да' : 'нет'}`);
+        if (desk) return;
         // без гироскопа кот, когда карты не видно, «едет» вместе с телефоном — скажем, как включить
         if (!ok && (window as any).DeviceOrientationEvent?.requestPermission)
           setTimeout(() => this.ui.toast('Чтобы кот стоял на месте, когда карта вне кадра, разреши «Движение и ориентация»: закрой вкладку, открой снова и нажми «Разрешить»', 7000), 6000);
       });
       this.ui.hideStart();
       this.director.dispatch({ type: 'wake' });
+      // подсказка про мышь — один раз и только без касаний (телефон, iPad)
+      if (this.orbitView && !isTouchDevice()) setTimeout(() => (this.hideOrbitHint = showOrbitHint(this.root)), 1500);
       await this.tracker.start();
       openMic();
       this.resize();

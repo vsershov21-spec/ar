@@ -7,6 +7,7 @@ import { Emitter } from '../core/emitter';
 import { ShakeDetector, SilenceTimer, type Pt } from './gestures';
 import { TouchInterpreter, type TouchEvent } from './interpreter';
 import type { TouchZone } from '../character/types';
+import type { OrbitPointers } from './orbit';
 
 export type InputEvents = {
   /** тап по коту: zone и событие tap_cat_head / … / tap_cat */
@@ -58,6 +59,10 @@ export class Input extends Emitter<InputEvents> {
   private pointerId: number | null = null;
   motionGranted: boolean | null = null;
   enabled = true;
+  /** десктоп-просмотр (?nocard, src/input/orbit.ts): перетаскивание мышью / двумя пальцами вращает площадку */
+  orbit: OrbitPointers | null = null;
+  /** долгое нажатие уже сработало — это нажатие вращение не забирает */
+  private longFired = false;
 
   constructor(surface: HTMLElement, private hooks: InputHooks, now = performance.now()) {
     super();
@@ -66,7 +71,8 @@ export class Input extends Emitter<InputEvents> {
     surface.addEventListener('pointerdown', (e) => this.down(e));
     surface.addEventListener('pointermove', (e) => this.move(e));
     surface.addEventListener('pointerup', (e) => this.up(e));
-    surface.addEventListener('pointercancel', () => {
+    surface.addEventListener('pointercancel', (e) => {
+      this.orbit?.cancel(e);
       this.touch.cancel();
       this.pointerId = null;
       this.fxCapture = this.peeling = false;
@@ -74,9 +80,32 @@ export class Input extends Emitter<InputEvents> {
     surface.addEventListener('contextmenu', (e) => e.preventDefault());
   }
 
+  /** вращению можно забрать указатель: нет пузыря/тумана/наклейки/долгого нажатия */
+  private get orbitCanTake() {
+    return !this.choiceTap && !this.fxCapture && !this.peeling && !this.longFired;
+  }
+
+  /** вращение забрало касание: текущий жест отменяется (ни тапа, ни глажки) */
+  private yieldToOrbit(e: PointerEvent) {
+    if (this.pointerId !== null) this.touch.cancel();
+    this.pointerId = null;
+    try {
+      (e.target as Element | null)?.setPointerCapture?.(e.pointerId);
+    } catch {
+      /* указатель уже отпущен */
+    }
+  }
+
   private down(e: PointerEvent) {
-    if (!this.enabled || this.pointerId !== null) return;
+    if (!this.enabled) return;
+    if (this.orbit) {
+      const v = this.orbit.down(e, this.pointerId === null || this.orbitCanTake);
+      if (v === 'take') return this.yieldToOrbit(e);
+      if (v === 'swallow') return;
+    }
+    if (this.pointerId !== null) return;
     this.pointerId = e.pointerId;
+    this.longFired = false;
     this.activity(e.timeStamp);
     this.last = { x: e.clientX, y: e.clientY, t: e.timeStamp };
     this.vel = { x: 0, y: 0 };
@@ -97,6 +126,14 @@ export class Input extends Emitter<InputEvents> {
   }
 
   private move(e: PointerEvent) {
+    if (this.orbit) {
+      const v = this.orbit.move(e, this.orbitCanTake);
+      if (v === 'take') {
+        if (e.pointerId === this.pointerId) this.yieldToOrbit(e);
+        return;
+      }
+      if (v === 'swallow') return;
+    }
     if (e.pointerId !== this.pointerId) return;
     const dt = Math.max(1, e.timeStamp - this.last.t) / 1000;
     this.vel = { x: (e.clientX - this.last.x) / dt, y: (e.clientY - this.last.y) / dt };
@@ -116,6 +153,10 @@ export class Input extends Emitter<InputEvents> {
   }
 
   private up(e: PointerEvent) {
+    if (this.orbit && this.orbit.up(e) !== 'pass') {
+      if (e.pointerId === this.pointerId) this.yieldToOrbit(e);
+      return;
+    }
     if (e.pointerId !== this.pointerId) return;
     this.pointerId = null;
     this.activity(e.timeStamp);
@@ -156,6 +197,7 @@ export class Input extends Emitter<InputEvents> {
       case 'tap_screen':
         return this.emit('tap_screen', { x: e.x, y: e.y });
       case 'longpress':
+        this.longFired = true;
         return this.emit('longpress', { x: e.x, y: e.y, onCat: e.onCat });
       case 'longpress_end':
         return this.emit('longpress_end', { x: e.x, y: e.y });

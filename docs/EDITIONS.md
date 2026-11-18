@@ -52,7 +52,7 @@ if (feature('stickers.pack')) { /* новое */ } else { /* как в MVP */ }
 Параметры адреса проверяются централизованно: `PARAMS` в `edition.ts` (параметр → функция). В редакции, где функция
 выключена, `guardUrl()` (первый импорт `main.ts`, `src/config/boot.ts`) вырезает параметр из адреса до старта
 приложения — модули, которые сами читают `location.search` (cardTracker, flows, app.ts), его просто не видят.
-Ссылка со страницы /test несёт метку `?from=test` (или referrer `/test/`): с ней в MVP остаются `?flow` и `?nocard`
+Ссылка со страницы /test несёт метку `?from=test` (или referrer `/test/`): с ней в MVP остаются `?flow`, `?nocard` и `?desktop`
 (кроме флоу выключенных игр). `?debug` работает в обеих редакциях.
 
 Новая функция: строка в `FEATURES` (`mvp: false, lab: true`) + строка в этой таблице + `feature('…')` в точке входа.

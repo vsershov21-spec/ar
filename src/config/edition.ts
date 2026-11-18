@@ -78,6 +78,7 @@ export const PARAMS: Record<string, { feature: FeatureId; test?: boolean; keep?:
   rate: { feature: 'debug.flows', test: true },
   zone: { feature: 'debug.flows', test: true }, // ?flow=home&zone=kitchen (src/home)
   nocard: { feature: 'tracker.nocard', test: true },
+  desktop: { feature: 'tracker.nocard', test: true }, // ?desktop = ?nocard=off + вращение мышью (src/input/orbit.ts)
   anycard: { feature: 'card.anycard' },
   grab: { feature: 'card.grabExperimental', keep: ['main'] },
   glb: { feature: 'model.custom' },

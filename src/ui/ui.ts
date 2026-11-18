@@ -453,6 +453,12 @@ export class UI {
     this.start.classList.add('leaving');
     setTimeout(() => this.start.classList.add('hidden'), 300);
   }
+  /** подпись кнопки «Открыть камеру» (десктоп-просмотр без камеры — «Позвать кота», без значка камеры) */
+  setWakeLabel(text: string) {
+    const b = this.start.querySelector('.ob-wake') as HTMLButtonElement;
+    b.innerHTML = '<span></span>';
+    (b.firstChild as HTMLElement).textContent = text;
+  }
   setStartBusy(text: string) {
     const b = this.start.querySelector('.ob-wake') as HTMLButtonElement;
     b.innerHTML = `<span class="spinner" aria-hidden="true"></span><span></span>`;

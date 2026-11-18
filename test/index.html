@@ -93,6 +93,14 @@
       <div class="url" id="mods-url"></div>
     </section>
 
+    <h2>На компьютере</h2>
+    <div class="card">
+      <h3><span class="em">💻</span>Кот на Маке (без камеры)</h3>
+      <dl><dt>Что</dt><dd>Кот на фирменном фоне в Safari/Chrome на Mac: без камеры, карты и датчиков. Тянуть мышью — повернуть, колесо или щипок трекпада — приблизить, двойной клик или R — сброс; ← → ↑ ↓, + / −. Клик по коту — тап, Shift + тянуть — погладить.</dd>
+        <dt>Ждём</dt><dd>«Позвать кота» — без запроса камеры; кот выходит, вращается и приближается; клики по коту дают реакции, перетаскивание — нет. Микрофон — по кнопке.</dd></dl>
+      <div class="btns"><a class="go" id="mac-lab" href="../lab/?desktop">Lab</a><a class="go light" id="mac-mvp" href="../?from=test&amp;desktop">MVP</a></div>
+    </div>
+
     <h2>Сценарий</h2>
     <div id="cards"></div>
 
@@ -186,6 +194,8 @@
         a.href = href(a.dataset.params, !!a.dataset.own);
         a.classList.toggle('off', state.ed === 'mvp' && mvpOff([a.dataset.params, ...mods(!!a.dataset.own)].filter(Boolean).join('&')));
       }
+      document.getElementById('mac-lab').href = new URL('lab/?desktop', root).href;
+      document.getElementById('mac-mvp').href = new URL(`?${TEST_MARK}=test&desktop`, root).href;
       document.getElementById('reset-link').href = new URL(state.ed === 'lab' ? 'lab/?reset=1' : '?reset=1', root).href;
       const m = mods(false);
       document.getElementById('mods-url').textContent = m.length ? `ко всем ссылкам: ${m.map((x) => '?' + x).join(' ')}` : 'модификаторов нет';

@@ -17,6 +17,8 @@ export class DebugTracker extends TrackerBase implements Tracker {
   tilt = 1.0;
   distance = 3.2;
   yaw = 0.0;
+  /** поворот площадки вокруг нормали карты (десктоп-просмотр, src/input/orbit.ts) */
+  spin = 0.0;
 
   constructor(cardImageUrl: string) {
     super();
@@ -39,7 +41,7 @@ export class DebugTracker extends TrackerBase implements Tracker {
   placeCard(t: number) {
     const w = this.wobble ? 1 : 0;
     const q = new THREE.Quaternion().setFromEuler(
-      new THREE.Euler(-this.tilt + w * 0.05 * Math.sin(t * 0.9), this.yaw + w * 0.25 * Math.sin(t * 0.4), w * 0.04 * Math.sin(t * 1.3)),
+      new THREE.Euler(-this.tilt + w * 0.05 * Math.sin(t * 0.9), this.yaw + w * 0.25 * Math.sin(t * 0.4), this.spin + w * 0.04 * Math.sin(t * 1.3)),
     );
     const p = new THREE.Vector3(w * 0.06 * Math.sin(t * 0.7), -0.62, -this.distance);
     this.target!.compose(p, q, new THREE.Vector3(1, 1, 1));
