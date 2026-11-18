@@ -772,3 +772,8 @@ sleepy: Я так зеваю... Уложишь меня спать?
 sleepy: Спокойной ночи! До завтра, увидимся.
 sleepy: Сладких снов! Мне приснится скейт.
 whisper: Спокойной ночи... Ночник пусть горит... хр-р.
+
+# пилот: фирменное действие кнопкой каталога (scenario/actions.ts, config/pilot.ts) — без слов, клип и эффект
+## skate | clip=idle_hooligan_skate fx=skate_sparks sound=skate_grind
+## cocoa
+## mirror

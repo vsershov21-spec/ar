@@ -35,3 +35,33 @@ async function call(method: 'GET' | 'DELETE') {
 }
 $('find').onclick = () => void call('GET');
 $('reset').onclick = () => void call('DELETE');
+
+// ───────────── воронка (GET /api/progress/stats, docs/ANALYTICS.md) ─────────────
+const esc = (x: string) => x.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
+async function stats() {
+  const box = $<HTMLDivElement>('funnel');
+  box.textContent = '…';
+  try {
+    const days = Number($<HTMLInputElement>('days').value) || 14;
+    const r = await fetch(`/api/progress/stats?days=${days}`, { headers: { Authorization: 'Bearer ' + token.value.trim() }, cache: 'no-store' });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      box.textContent = r.status === 401 ? 'Неверный токен.' : r.status === 503 ? 'На сервере не задан PROGRESS_ADMIN_TOKEN.' : `Ошибка ${r.status}: ${j.error ?? ''} (сервис прогресса обновлён? scripts/deploy/pilot-setup.sh)`;
+      return;
+    }
+    const rows = j.rows as { day: string; edition: string; events: Record<string, { n: number; devices: number }> }[];
+    if (!rows.length) {
+      box.textContent = 'Событий пока нет.';
+      return;
+    }
+    const names = j.funnel as string[];
+    const head = `<tr><th>событие</th>${rows.map((x) => `<th>${esc(x.day)}<br>${esc(x.edition)}</th>`).join('')}</tr>`;
+    const body = names
+      .map((n) => `<tr><td>${esc(n)}</td>${rows.map((x) => (x.events[n] ? `<td>${x.events[n].n} / ${x.events[n].devices}</td>` : '<td>—</td>')).join('')}</tr>`)
+      .join('');
+    box.innerHTML = `<table>${head}${body}</table>`;
+  } catch (e) {
+    box.textContent = 'Сервер прогресса недоступен: ' + String(e);
+  }
+}
+$('stats').onclick = () => void stats();

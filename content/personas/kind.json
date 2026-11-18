@@ -645,6 +645,12 @@
     "home_cocoa": {
       "clip": "idle_kind_cocoa"
     },
+    "skate": {},
+    "cocoa": {
+      "clip": "idle_kind_cocoa",
+      "sound": "chime_soft"
+    },
+    "mirror": {},
     "home_ball": {
       "clip": "jump"
     },
@@ -3411,6 +3417,9 @@
         "face": "caring"
       }
     ],
+    "skate": [],
+    "cocoa": [],
+    "mirror": [],
     "home_ball": [
       {
         "id": "kind.home_ball.01",

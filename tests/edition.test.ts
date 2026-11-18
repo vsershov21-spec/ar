@@ -12,6 +12,16 @@ describe('редакции: таблица функций', () => {
     expect(EDITION).toBe('lab');
     expect(parseEdition(undefined)).toBe('lab');
     expect(parseEdition('mvp')).toBe('mvp');
+    expect(parseEdition('pilot')).toBe('pilot');
+  });
+  it('lab — надмножество пилота, кроме ограничений самого пилота (pilot.*)', () => {
+    for (const id of featuresOf('pilot')) if (!id.startsWith('pilot.')) expect(featureIn('lab', id), id).toBe(true);
+  });
+  it('пилот: кровать, пробуждение, прогресс, аналитика, раскраска-заглушка; без новых игр, пака наклеек и отладки', () => {
+    expect(featuresOf('pilot')).toEqual(expect.arrayContaining(['home', 'home.bed', 'awake', 'progress.server', 'games.base', 'cat.switch', 'catalog.signature', 'pilot.catalog', 'pilot.fx', 'pilot.switchCooldown', 'glass.gestures', 'analytics', 'card.paint']));
+    for (const id of ['games.new', 'stickers.pack', 'anims.new', 'anims.meshy', 'debug.flows', 'card.anycard', 'card.grabExperimental', 'tracker.nocard', 'model.custom'] as FeatureId[]) expect(featureIn('pilot', id), id).toBe(false);
+    expect(featureIn('mvp', 'card.paint')).toBe(false);
+    expect(featureIn('lab', 'card.paint')).toBe(true);
   });
   it('lab — надмножество MVP', () => {
     for (const id of featuresOf('mvp')) expect(featureIn('lab', id), id).toBe(true);
@@ -29,7 +39,8 @@ describe('редакции: таблица функций', () => {
       const cells = row!.split('|').map((c) => c.trim());
       expect(cells[2], `${id}: MVP`).toBe(f.mvp ? 'да' : '—');
       expect(cells[3], `${id}: lab`).toBe(f.lab ? 'да' : '—');
-      expect(['да', 'нет']).toContain(cells[4]);
+      expect(cells[4], `${id}: пилот`).toBe(f.pilot ? 'да' : '—');
+      expect(['да', 'нет']).toContain(cells[5]);
     }
   });
 });
@@ -48,6 +59,13 @@ describe('редакции: параметры адреса', () => {
     expect(filterSearch('?flow=echo', 'mvp', 'https://ar.vershov.com/test/').search).toBe('flow=echo');
     for (const g of NEW_GAMES) expect(filterSearch(`?from=test&flow=${g}`, 'mvp').search).toBe('from=test');
     expect(filterSearch('?from=test&anycard', 'mvp').search).toBe('from=test'); // anycard — только lab
+  });
+  it('пилот — как MVP: отладка только со страницы /test, новые игры — никогда; кровать — да', () => {
+    expect(filterSearch('?debug&anycard&flow=doze&nocard&glb=x.glb', 'pilot').search).toBe('debug');
+    expect(filterSearch('?from=test&flow=riddle&nocard=off', 'pilot').search).toBe('from=test&flow=riddle&nocard=off');
+    for (const g of NEW_GAMES) expect(filterSearch(`?from=test&flow=${g}`, 'pilot').search).toBe('from=test');
+    expect(filterSearch('?from=test&flow=home&zone=bedroom&bed=sleep', 'pilot').search).toBe('from=test&flow=home&zone=bedroom&bed=sleep');
+    expect(fromTestPage('', 'https://ar.vershov.com/mvp/test/')).toBe(true);
   });
   it('lab оставляет всё', () => {
     const q = '?debug&anycard&grab=bitmap&flow=rps&nocard';
@@ -146,8 +164,9 @@ describe('редакции: раздельное хранилище', () => {
     ls.setItem('a', '1');
     expect(ls.m.get('a')).toBe('1');
   });
-  it('cookie id устройства: mvp — ar_device, lab — lab_ar_device', () => {
+  it('cookie id устройства: mvp — ar_device, lab — lab_ar_device, пилот — pilot_ar_device', () => {
     expect(cookieName('')).toBe('ar_device');
     expect(cookieName('lab:')).toBe('lab_ar_device');
+    expect(cookieName('pilot:')).toBe('pilot_ar_device');
   });
 });

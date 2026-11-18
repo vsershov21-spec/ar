@@ -24,6 +24,7 @@ import { loadMemory, saveMemory } from '../scenario/memory';
 import { CAT_ICON } from '../ui/catalogIcons';
 import { feature } from '../config/edition';
 import { BedFlow } from './bedFlow';
+import { track } from '../analytics';
 
 export type HomePhase = 'ar' | 'to_home' | 'home' | 'to_ar';
 
@@ -192,6 +193,7 @@ export class HomeMode {
     this.offer = null;
     this.stats.enter++;
     h.director.log(`дом: вход (${why})`);
+    track('home_enter', { reason: why }); // воронка: lost (карта потеряна > 6 с) | quiet | memory | chip | button | flow
     // другая обстановка — мини-игра (загадка и т. п.) заканчивается, её чипы («Сдаюсь») не едут в дом
     h.director.dispatch({ type: 'context_change' });
     const bz = this.bed?.beforeEnter(this.bedParam === 'morning' ? 'morning' : undefined);
@@ -201,6 +203,9 @@ export class HomeMode {
     h.ui.nudge(null);
     h.energy.activity(performance.now());
     if (!this.bed?.holdsCat) h.character()?.play('jump');
+    // портал — на чистом стекле: пузыри, сердечки, блёстки с карты не летят поверх вспышки и не переезжают в комнату
+    h.fx?.kill?.((id) => id !== 'zzz');
+    h.fx?.clearParticles?.();
     h.audio.play('whoosh_big', 0.8);
     this.portalIn();
     const room = this.loadRoom();

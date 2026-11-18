@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Проверка двух редакций после `npm run build` (docs/EDITIONS.md):
+// Проверка трёх редакций после `npm run build` (docs/EDITIONS.md): mvp — dist/, lab — dist/lab/, pilot — dist/mvp/.
 //   статически — dist/ (mvp) и dist/lab/ (lab) есть; lab не дублирует ассеты public/ и модели; html lab — под /lab/;
 //                каждая сжатая модель из карты бандла lab лежит в dist/models/opt (одна копия на обе редакции);
 //   в браузере — локальный сервер как Caddy (статика dist/, /lab/* → /lab/index.html), headless Chrome:
@@ -17,6 +17,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const argv = process.argv.slice(2);
 const DIST = path.resolve(argv.includes('--dist') ? argv[argv.indexOf('--dist') + 1] : path.join(root, 'dist'));
 const LAB = path.join(DIST, 'lab');
+const PILOT = path.join(DIST, 'mvp');
 const fails = [];
 const ok = (cond, msg) => {
   console.log(`${cond ? '  ✓' : '  ✗'} ${msg}`);
@@ -27,6 +28,7 @@ const ok = (cond, msg) => {
 console.log('check-editions: сборки');
 ok(fs.existsSync(path.join(DIST, 'index.html')), 'dist/index.html (mvp)');
 ok(fs.existsSync(path.join(LAB, 'index.html')), 'dist/lab/index.html (lab)');
+ok(fs.existsSync(path.join(PILOT, 'index.html')), 'dist/mvp/index.html (pilot)');
 const SHARED = ['models', 'voice', 'sounds', 'video', 'targets', 'stickers', 'personas', 'external'];
 const dup = SHARED.filter((d) => fs.existsSync(path.join(LAB, d)));
 ok(!dup.length, `lab не копирует общие ассеты (${dup.join(', ') || 'нет копий'})`);
@@ -40,6 +42,15 @@ const mvpJs = js(path.join(DIST, 'assets'));
 const optPaths = (s) => [...new Set([...s.matchAll(/models\/(?:props\/)?opt\/[\w.-]+\.glb/g)].map((m) => m[0]))];
 const labOpt = optPaths(labJs), mvpOpt = optPaths(mvpJs);
 const missing = labOpt.filter((p) => !fs.existsSync(path.join(DIST, p)));
+// pilot: та же схема, что lab — только код, ассеты из корня
+const pDup = SHARED.filter((d) => fs.existsSync(path.join(PILOT, d)));
+ok(!pDup.length, `pilot не копирует общие ассеты (${pDup.join(', ') || 'нет копий'})`);
+ok(!fs.existsSync(path.join(PILOT, 'test')), 'pilot без страниц /test');
+const pilotHtml = fs.existsSync(path.join(PILOT, 'index.html')) ? fs.readFileSync(path.join(PILOT, 'index.html'), 'utf8') : '';
+const pRefs = [...pilotHtml.matchAll(/(?:src|href)="([^"]+)"/g)].map((m) => m[1]).filter((u) => !u.startsWith('data:'));
+ok(pRefs.length > 0 && pRefs.every((u) => u.startsWith('/mvp/assets/')), `html pilot: js/css под /mvp/assets/ (${pRefs.length})`);
+const pilotOpt = optPaths(js(path.join(PILOT, 'assets')));
+ok(pilotOpt.join() === mvpOpt.join() && pilotOpt.every((p) => fs.existsSync(path.join(DIST, p))), `сжатые модели pilot — те же файлы в dist/models/opt (${pilotOpt.length})`);
 ok(labOpt.length > 0 || mvpOpt.length === 0, `карта сжатых моделей в lab (${labOpt.length})`);
 ok(!missing.length, `сжатые модели lab — те же файлы в dist/models/opt${missing.length ? ': нет ' + missing.join(', ') : ''}`);
 ok(labOpt.join() === mvpOpt.join(), 'карта сжатых моделей mvp и lab совпадает');
@@ -75,7 +86,7 @@ function serve() {
     // как Caddy (docs/DEPLOY.md): файл → каталог/index.html → /lab/* → /lab/index.html → /index.html (только для «страниц»)
     let f = file(p);
     const isPage = !path.extname(p) || p.endsWith('.html');
-    if (!f && isPage) f = p.startsWith('/lab/') || p === '/lab' ? file('/lab/index.html') : file('/index.html');
+    if (!f && isPage) f = p.startsWith('/lab/') || p === '/lab' ? file('/lab/index.html') : p.startsWith('/mvp/') || p === '/mvp' ? file('/mvp/index.html') : file('/index.html');
     if (!f) return void (res.writeHead(404), res.end('404'));
     res.writeHead(200, { 'Content-Type': TYPES[path.extname(f)] ?? 'application/octet-stream' });
     fs.createReadStream(f).pipe(res);
@@ -116,6 +127,7 @@ async function browser() {
           triggers: dl ? Object.keys(dl.triggers) : null,
           dialogs: dl ? Object.keys(dl.dialogs) : null,
           progress: !!w.__progress?.sync,
+          analytics: !!w.__analytics,
           device: w.__progress?.device ?? null,
           rawKeys: Object.keys(localStorage),
           cookie: document.cookie,
@@ -160,6 +172,27 @@ async function browser() {
     ok(l.device !== m.device, 'id устройства lab ≠ mvp');
     const deep = await open('/lab/some/deep/link');
     ok(deep.edition === 'lab', 'SPA-фолбэк /lab/* → /lab/index.html');
+
+    // pilot (/mvp): отладка вырезана как в MVP, новых игр нет, свои ключи и cookie, аналитика есть
+    const pl = await open('/mvp/?anycard&grab=bitmap&flow=rps&glb=models/x.glb&nocard&debug&noanalytics');
+    const pAssets = assetReq(reqs);
+    ok(pl.edition === 'pilot', `/mvp/ → редакция ${pl.edition}`);
+    ok(pl.search === '?debug&noanalytics', `pilot: адрес очищен до «${pl.search}»`);
+    ok(!pl.badge, 'pilot: без плашки LAB');
+    ok(!!pl.triggers && !['emo_game', 'rps', 'simon'].some((t) => pl.triggers.includes(t)) && pl.triggers.includes('riddle') && pl.triggers.includes('echo_start'), 'pilot: загадка и повторялка, новых игр нет');
+    ok(!pl.analytics, 'pilot: ?noanalytics — аналитика выключена');
+    ok(pAssets.length > 0 && pAssets.every((r) => !new URL(r.url).pathname.startsWith('/mvp/')), 'pilot: ассеты из корня');
+    ok(!pAssets.some(bad), `pilot: ассеты без 404${pAssets.filter(bad).map((r) => ' ' + r.url).join('')}`);
+    const pl2 = await open('/mvp/?from=test&flow=riddle&nocard');
+    ok(/flow=riddle/.test(pl2.search) && /nocard/.test(pl2.search), `pilot, ссылка с /test: флоу остаётся (${pl2.search})`);
+    ok(pl2.analytics, 'pilot: аналитика включена');
+    ok(pl2.rawKeys.includes('pilot:ar.device'), 'pilot: свой id устройства (pilot:ar.device)');
+    ok(pl2.rawKeys.filter((k) => /^(pilot:|lab:)?(ar\.|sber-ar-cat)/.test(k)).every((k) => k.startsWith('pilot:') || m.rawKeys.includes(k) || l.rawKeys.includes(k) || mt.rawKeys.includes(k) || mt2.rawKeys.includes(k)), 'pilot: новые ключи — только с префиксом pilot:');
+    ok(/(^|; )pilot_ar_device=/.test(pl2.cookie), 'cookie: pilot_ar_device');
+    ok(pl2.device !== m.device && pl2.device !== l.device, 'id устройства pilot ≠ mvp, lab');
+    ok(!m.analytics, 'mvp: аналитики нет');
+    const pdeep = await open('/mvp/some/deep/link');
+    ok(pdeep.edition === 'pilot', 'SPA-фолбэк /mvp/* → /mvp/index.html');
     // страница /test: переключатель «Lab / MVP» для ссылок
     if (fs.existsSync(path.join(DIST, 'test/index.html'))) {
       await page.goto(base + '/test/', { waitUntil: 'networkidle0' });
@@ -172,6 +205,14 @@ async function browser() {
         await page.click('[data-group="ed"] [data-mod="mvp"]');
         const mvp = await links();
         ok(mvp.every((x) => x.href.startsWith('/?from=test')), '/test, MVP: ссылки на /?from=test');
+        if (await page.$('[data-group="ed"] [data-mod="pilot"]')) {
+          await page.click('[data-group="ed"] [data-mod="pilot"]');
+          const pil = await links();
+          ok(pil.length > 0 && pil.every((x) => x.href.startsWith('/mvp/?from=test')), `/test, Пилот: ссылки на /mvp/?from=test (${pil.length})`);
+          const poff = pil.filter((x) => x.off).map((x) => x.p);
+          ok(['anycard', 'flow=emo', 'flow=rps', 'flow=simon'].every((p) => poff.includes(p)) && !poff.includes('flow=riddle') && !poff.some((p) => /bed=sleep/.test(p)), `/test, Пилот: «только Lab» — ${poff.join(', ')}`);
+          await page.click('[data-group="ed"] [data-mod="mvp"]');
+        } else ok(false, '/test: кнопка «Пилот · /mvp»');
         const off = mvp.filter((x) => x.off).map((x) => x.p);
         ok(['anycard', 'flow=emo', 'flow=rps', 'flow=simon'].every((p) => off.includes(p)) && !off.includes('flow=riddle') && !off.includes('fresh'), `/test, MVP: «только Lab» — ${off.join(', ')}`);
       }

@@ -766,3 +766,8 @@ sleepy: Я так зеваю! Уложишь меня спать?
 caring: Спокойной ночи! Пусть приснятся блёстки.
 sleepy: Сладких снов! До завтра, до завтра!
 whisper: Спокойной ночи... Звёздочки, светите тихо...
+
+# пилот: фирменное действие кнопкой каталога (scenario/actions.ts, config/pilot.ts) — без слов, клип и эффект
+## mirror | clip=idle_glitter_mirror sound=sparkle_swipe
+## skate
+## cocoa

@@ -37,6 +37,9 @@ import { EnergyBudget, defaultPixelRatio, fxNeedsBoost, isMobileDevice } from '.
 import { isPersonaId } from './persona/types';
 import { prepareFlowMemory, runFlow } from './debug/flows';
 import { feature } from './config/edition';
+import { SWITCH_LATER_TEXT, SwitchCooldown, cutRedirect, fxAllowed } from './config/pilot';
+import { track } from './analytics';
+import { startCardPaint } from './card/paint';
 import { NO_SHIFT, fitShift, shiftCss, shiftPoint, unshiftPoint, type ViewShift } from './ui/catalogGroups';
 import { ZONES } from './home/zones';
 import { OrbitPointers, OrbitView, bindOrbitKeys, bindOrbitWheel, isDesktopView, isTouchDevice, noCardCameraOff, showOrbitHint, type ViewPose } from './input/orbit';
@@ -216,7 +219,10 @@ export class App {
       extraItems: () => this.extraItems(),
       onSkipName: () => this.director.dispatch({ type: 'skip_name' }),
       onShakeButton: () => this.input.simulateShake(),
-      onKids: () => this.ui.showKids(true, ASSETS.sberKidsUrl),
+      onKids: () => {
+        track('sberkids_click', { kind: 'open' });
+        this.ui.showKids(true, ASSETS.sberKidsUrl);
+      },
       onMute: (m) => {
         this.audio.setMuted(m);
         this.voice.muted = m;
@@ -269,6 +275,7 @@ export class App {
       listen: (ms, mode) => this.engine.listenFor(ms, mode),
       stopListen: () => this.engine.stopListen(),
     });
+    this.applyEdition();
     await this.setCharacterMode(p.character);
     this.awake?.warm(this.scene); // шейдеры и текстуры сцены пробуждения — заранее (без рывка на «ПУФ»)
     await sfx;
@@ -510,6 +517,57 @@ export class App {
       this.director.action(c.run.action);
     } else this.engine.handleText(c.run.say, 'chip');
   }
+  /**
+   * Срез редакции (config/edition.ts → config/pilot.ts) и воронка (src/analytics): точки входа одним местом.
+   * pilot.catalog — команда вырезанного действия голосом → «Давай лучше …» пузырём + чипы замены;
+   * pilot.switchCooldown — смена кота не чаще раза в 3 мин («Чуть позже!»); pilot.fx — белый список эффектов.
+   */
+  readonly switchCooldown = new SwitchCooldown();
+  private applyEdition() {
+    const d = this.director;
+    const bubble = (text: string) => this.ui.say(text, d.persona.name, d.persona.id, 3500);
+    if (feature('pilot.catalog') || feature('pilot.switchCooldown'))
+      d.intentGate = (h) => {
+        if (feature('pilot.switchCooldown') && h.type === 'change_persona' && !this.switchCooldown.allow(performance.now())) {
+          bubble(SWITCH_LATER_TEXT);
+          d.log(`смена кота: ещё ${Math.ceil(this.switchCooldown.wait(performance.now()) / 1000)} с (пилот, раз в 3 мин)`);
+          return true;
+        }
+        if (!feature('pilot.catalog')) return false;
+        const av = this.available();
+        const r = cutRedirect(d.persona.id, h.type, (id) => av.get(id)?.label);
+        if (!r) return false;
+        d.log(`«${h.type}» — нет в наборе пилота (${r.cut}) → ${r.chips.join(', ')}`);
+        bubble(r.text);
+        this.suggest.prefer(r.chips, performance.now());
+        this.kickSuggest();
+        return true;
+      };
+    if (feature('pilot.switchCooldown'))
+      d.switchGate = () => {
+        const now = performance.now();
+        if (!this.switchCooldown.allow(now)) {
+          bubble(SWITCH_LATER_TEXT);
+          return false;
+        }
+        this.switchCooldown.mark(now);
+        return true;
+      };
+    if (feature('pilot.fx')) d.fxGate = (pid, fx) => fxAllowed(pid, fx);
+    // воронка: игры, имя (только факт), смена кота, карта найдена / потеряна, СберKids
+    d.on('game', (g) => track(g.start ? 'game_start' : 'game_end', { id: g.id }));
+    d.on('named', () => track('named', {}, true));
+    let firstPersona = true;
+    d.on('persona', (id) => {
+      if (!firstPersona) track('cat_switch', { to: id });
+      firstPersona = false;
+    });
+    let lost = 0;
+    this.tracker.onFound(() => track('card_landed', { ms: performance.now() }, true));
+    this.tracker.onLost(() => track('card_lost', { count: ++lost }));
+    if (feature('card.paint')) startCardPaint({ log: (s) => d.log(s) });
+  }
+
   /** «Мой дом» (на карте) / «На карту» (дома) — первым пунктом раздела «Игры» */
   private withHome(secs: ReturnType<typeof buildCatalog>): ReturnType<typeof buildCatalog> {
     const it = feature('home') ? this.home?.catalogItem() : null; // редакция: config/edition.ts
@@ -896,13 +954,29 @@ export class App {
     });
     // долгое нажатие на кота / карту: меню «Пересадить на другую карту» (эффект «к стеклу» — в каталоге, «Чудеса»);
     // трекер не умеет пересаживать — как раньше, эффект на стекле
+    // стекло пальцем (feature glass.gestures, у всех котов): долгое нажатие мимо кота — стекло запотевает и по нему
+    // рисуем пальцем (steam_draw: туман забирает касания, пока не растает); свайп — царапины по стеклу (claws)
+    const glass = () => feature('glass.gestures') && d.state.appeared && !this.home?.active && !d.state.dialog;
     i.on('longpress', (p) => {
       if (d.state.appeared && !this.home?.active && this.ui.pressMenu(p.x, p.y)) return;
+      if (glass() && !p.onCat) {
+        d.activity();
+        this.fx.play('steam_draw');
+        this.audio.play('breath', 0.7);
+        d.log('стекло: запотело — рисуй пальцем (steam_draw)');
+        return;
+      }
       d.interaction('longpress', p);
     });
     i.on('swipe', (s) => {
       // дома: влево/вправо — соседняя комната (кот перебегает), не рисунок на стекле
       if (this.home?.onSwipe(s.dir)) return;
+      if (glass()) {
+        // царапины ребёнка, а кот отвечает своим клипом и репликой на свайп — без своего эффекта поверх
+        this.fx.claws(s.path[0], { x: s.x, y: s.y });
+        this.audio.play('claws_glass', 0.8);
+        d.muteFx(400);
+      }
       d.interaction('swipe', { x: s.x, y: s.y, from: s.path[0], path: s.path });
     });
     i.on('shake', () => {
@@ -949,6 +1023,7 @@ export class App {
 
   /** «Разбудить кота»: всё, что требует жеста в iOS, — синхронно в начале обработчика */
   async wake() {
+    track('onboarding_done', {}, true);
     // аудиосессия iOS — один раз и сразу «с микрофоном», если он будет: потом её никто не переключает
     this.audio.unlock(this.engine.mic.supported);
     this.voice.unlock();
@@ -988,6 +1063,7 @@ export class App {
       // iOS: камера и микрофон одним запросом — второй getUserMedia за микрофоном рвёт видео
       if ('withAudio' in tv) tv.withAudio = this.engine.mic.supported;
       if (typeof tv.startVideo === 'function') await tv.startVideo();
+      track('camera_granted', {}, true);
       this.engine.mic.adopt(tv.audioStream ?? null);
       openMic();
       void sensors.then((ok) => {

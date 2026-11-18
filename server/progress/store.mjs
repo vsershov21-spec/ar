@@ -1,10 +1,13 @@
 /**
  * Хранилище прогресса по устройствам. Документ устройства:
  *   { device, version, createdAt, updatedAt, resetAt, data: { [ключ localStorage]: строка }, sessions: [...] }
- * Два бэкенда с одинаковым интерфейсом (get/put/delete/list/purge):
+ * Два бэкенда с одинаковым интерфейсом (get/put/delete/list/purge; события воронки — addEvent/eventRows/purgeEvents):
  *   sqlite — node:sqlite (Node 22.5+), одна таблица с JSON-документом;
  *   file   — один JSON-файл на устройство, атомарная запись (tmp + fsync + rename).
  * Все операции синхронные: процесс один, гонок нет.
+ *
+ * События воронки (docs/ANALYTICS.md) — только дописываются: { ts, device, edition, name, props } (props — JSON уже
+ * проверенных сервером полей, без персональных данных). sqlite — таблица events, file — events.jsonl.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -46,6 +49,39 @@ class FileStore {
   delete(device) {
     fs.rmSync(this.file(device), { force: true });
   }
+  get eventsFile() {
+    return path.join(path.dirname(this.dir), 'events.jsonl');
+  }
+  addEvent(e) {
+    fs.appendFileSync(this.eventsFile, JSON.stringify(e) + '\n', { mode: 0o640 });
+  }
+  eventRows(since) {
+    let txt = '';
+    try {
+      txt = fs.readFileSync(this.eventsFile, 'utf8');
+    } catch {
+      return [];
+    }
+    const out = [];
+    for (const l of txt.split('\n')) {
+      if (!l) continue;
+      try {
+        const e = JSON.parse(l);
+        if (e.ts >= since) out.push(e);
+      } catch {
+        /* битая строка */
+      }
+    }
+    return out;
+  }
+  purgeEvents(before) {
+    const keep = this.eventRows(before);
+    try {
+      if (fs.existsSync(this.eventsFile)) fs.writeFileSync(this.eventsFile, keep.map((e) => JSON.stringify(e) + '\n').join(''), { mode: 0o640 });
+    } catch {
+      /* ignore */
+    }
+  }
   list() {
     return fs
       .readdirSync(this.dir)
@@ -76,7 +112,12 @@ class SqliteStore {
     this.db = new DatabaseSync(path.join(dir, 'progress.sqlite'));
     this.db.exec(`PRAGMA journal_mode=WAL;
       CREATE TABLE IF NOT EXISTS docs (device TEXT PRIMARY KEY, doc TEXT NOT NULL, updated_at INTEGER NOT NULL);
-      CREATE INDEX IF NOT EXISTS docs_updated ON docs(updated_at);`);
+      CREATE INDEX IF NOT EXISTS docs_updated ON docs(updated_at);
+      CREATE TABLE IF NOT EXISTS events (ts INTEGER NOT NULL, device TEXT NOT NULL, edition TEXT NOT NULL, name TEXT NOT NULL, props TEXT NOT NULL);
+      CREATE INDEX IF NOT EXISTS events_ts ON events(ts);`);
+    this.qEvAdd = this.db.prepare('INSERT INTO events (ts, device, edition, name, props) VALUES (?, ?, ?, ?, ?)');
+    this.qEvRows = this.db.prepare('SELECT ts, device, edition, name, props FROM events WHERE ts >= ?');
+    this.qEvPurge = this.db.prepare('DELETE FROM events WHERE ts < ?');
     this.qGet = this.db.prepare('SELECT doc FROM docs WHERE device = ?');
     this.qPut = this.db.prepare('INSERT INTO docs (device, doc, updated_at) VALUES (?, ?, ?) ON CONFLICT(device) DO UPDATE SET doc = excluded.doc, updated_at = excluded.updated_at');
     this.qDel = this.db.prepare('DELETE FROM docs WHERE device = ?');
@@ -98,6 +139,15 @@ class SqliteStore {
   }
   purge(before) {
     return Number(this.qPurge.run(before).changes ?? 0);
+  }
+  addEvent(e) {
+    this.qEvAdd.run(e.ts, e.device, e.edition, e.name, JSON.stringify(e.props ?? {}));
+  }
+  eventRows(since) {
+    return this.qEvRows.all(since).map((r) => ({ ts: r.ts, device: r.device, edition: r.edition, name: r.name, props: JSON.parse(r.props) }));
+  }
+  purgeEvents(before) {
+    this.qEvPurge.run(before);
   }
   close() {
     this.db.close();

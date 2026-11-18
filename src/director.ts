@@ -33,8 +33,9 @@ import { ASSETS } from './config';
 import { rand } from './core/util';
 import { emotionFor } from './character/emotions';
 import { ACTION_ROUTE, SLEEP_WAKE_MS, isActionId, type ActionId } from './scenario/actions';
+import { track } from './analytics';
 
-export type DirectorEvents = { log: string; phase: string; persona: PersonaId };
+export type DirectorEvents = { log: string; phase: string; persona: PersonaId; game: { id: string; start: boolean }; named: boolean };
 
 export interface DirectorDeps {
   tracker: Tracker;
@@ -197,6 +198,8 @@ export class Director extends Emitter<DirectorEvents> {
       this.exec({ type: 'timer', id: 'outro', ms: 10_000 });
       return;
     }
+    // срез редакции (config/pilot.ts, ставит app.ts): команда вырезанного действия или смена кота раньше срока — съедена
+    if (e.type === 'intent' && this.intentGate?.(e.intent, this.state)) return;
     const prev = this.state;
     // ребёнок ответил на вопрос узла (или раньше, чем кот договорил вопрос): недоговорённый вопрос не звучит
     const dl = prev.dialog;
@@ -205,7 +208,17 @@ export class Director extends Emitter<DirectorEvents> {
       if (this.queue.drop((it) => it.tag === tag)) this.log(`снят недоговорённый вопрос ${tag}`);
     }
     const r = step(this.state, e, this.cfg);
+    // смена кота (экран заклеивается): не чаще, чем разрешает switchGate (пилот — раз в 3 мин)
+    if (r.state.phase === 'switching' && prev.phase !== 'switching' && this.switchGate && !this.switchGate()) {
+      this.log(`смена кота отложена (${e.type})`);
+      return;
+    }
     if (r.state.phase !== this.state.phase) this.emit('phase', r.state.phase);
+    if (!prev.dialog && r.state.dialog) this.emit('game', { id: r.state.dialog.id, start: true });
+    else if (prev.dialog && prev.dialog.id !== r.state.dialog?.id) {
+      this.emit('game', { id: prev.dialog.id, start: false });
+      if (r.state.dialog) this.emit('game', { id: r.state.dialog.id, start: true });
+    }
     this.state = r.state;
     const playing = (p: string) => p === 'play' || p === 'free';
     if (!prev.dialog && r.state.dialog) this.dialogStartedAt = now;
@@ -288,6 +301,20 @@ export class Director extends Emitter<DirectorEvents> {
    * не будит; src/home/bedFlow.ts). Ставит app.ts.
    */
   touchGate: ((kind: string, ctx: { x?: number; y?: number }) => boolean) | null = null;
+  /**
+   * Срез редакции (пилот, config/pilot.ts; ставит app.ts): true — интент съеден снаружи (команда вырезанного действия →
+   * «Давай лучше …», смена кота раньше срока → «Чуть позже!»).
+   */
+  intentGate: ((h: Heard, st: ScenarioState) => boolean) | null = null;
+  /** можно ли сейчас начать смену кота (false — смену не начинаем); ставит app.ts в пилоте */
+  switchGate: (() => boolean) | null = null;
+  /** эффект разрешён у этого кота (пилот: белый список, config/pilot.ts fxAllowed); null — все */
+  fxGate: ((persona: PersonaId, fx: string) => boolean) | null = null;
+  /** до этого момента эффекты реакций не играют (app.ts: свайп ребёнка по стеклу — свои царапины, без эффекта кота) */
+  private muteFxUntil = 0;
+  muteFx(ms: number) {
+    this.muteFxUntil = performance.now() + ms;
+  }
 
   interaction(kind: InteractionKind, ctx: { x?: number; y?: number; from?: { x: number; y: number }; path?: { x: number; y: number }[] } = {}) {
     if (this.touchGate?.(kind, ctx)) return;
@@ -340,6 +367,7 @@ export class Director extends Emitter<DirectorEvents> {
    */
   action(id: ActionId | string) {
     if (!isActionId(id)) return this.log(`нет действия «${id}»`);
+    track('action', { id }); // воронка (src/analytics): id кнопки, без текста
     this.childAct();
     this.coachDone();
     this.activity();
@@ -511,6 +539,8 @@ export class Director extends Emitter<DirectorEvents> {
         break;
       case 'remember':
         saveMemory({ ...a.patch, visits: this.state.visits, lastVisitAt: Date.now() });
+        // аналитика (src/analytics): только факт «назвал имя», само имя — никогда
+        if ('name' in a.patch && a.patch.name) this.emit('named', true);
         break;
       case 'cover_stickers': {
         const p = this.personas.get(a.persona)!;
@@ -984,6 +1014,8 @@ export class Director extends Emitter<DirectorEvents> {
     const d = this.d;
     // заклеивание экрана при смене образа делает команда cover_stickers — второй раз из реплики не нужен
     if (id === 'stickers_cover') return;
+    if (this.fxGate && !this.fxGate(this.persona.id, id)) return this.log(`[fx] ${id} — не в наборе редакции`);
+    if (performance.now() < this.muteFxUntil && id !== 'zzz') return;
     if (id === 'sticker' || id === 'tag_spray') {
       // наклейки не копятся: на стекле не больше трёх, старая улетает
       const own = d.fx.stickers.filter((x) => !x.flying && !x.choice && !x.cover);

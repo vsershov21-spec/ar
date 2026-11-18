@@ -6,6 +6,7 @@ import { App, readParams } from './app';
 import { installCatApi } from './debug/catApi';
 import { perf } from './core/perf';
 import { bootProgress, trackSession } from './progress';
+import { bootAnalytics } from './analytics';
 
 perf.enabled = new URLSearchParams(location.search).has('perf');
 (window as any).__perf = perf;
@@ -14,6 +15,8 @@ showEditionBadge();
 
 // прогресс на сервере по признаку устройства (src/progress, server/progress): до App — ?reset=1 чистит память раньше, чем её прочтут
 bootProgress();
+// воронка пилота (src/analytics, docs/ANALYTICS.md): pilot и lab, ?noanalytics — выкл.
+bootAnalytics();
 const params = readParams();
 const app = new App(document.getElementById('app')!, params);
 (window as any).__app = app;

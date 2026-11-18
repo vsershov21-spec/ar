@@ -23,6 +23,10 @@ export const ACTION_ROUTE = {
   sit: { say: 'sit', text: 'сядь' },
   wave: { say: 'wave', text: 'помаши лапой' },
   sing: { say: 'sing', text: 'спой песенку' },
+  // фирменное характера (feature catalog.signature; реакции skate/cocoa/mirror — content/src/*.lines.txt, только у своего кота)
+  skate: { touch: 'skate' },
+  cocoa: { touch: 'cocoa' },
+  mirror: { touch: 'mirror' },
   // игры
   riddle: { say: 'riddle', text: 'загадай загадку' },
   echo: { say: 'echo_start', text: 'повторяй за мной' },

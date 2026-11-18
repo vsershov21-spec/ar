@@ -6,7 +6,8 @@ import { LineQueue } from '../src/persona/lineQueue';
 import { PERSONA_IDS, type PersonaId } from '../src/persona/types';
 
 const content = loadTestContent();
-const events = [...content.events.keys()];
+// события только с реакцией (клип/эффект без слов: фирменные действия пилота skate/cocoa/mirror) — без реплик
+const events = [...content.events.keys()].filter((ev) => PERSONA_IDS.some((pid) => (content.personas.get(pid)!.lines[ev]?.length ?? 0) > 0));
 
 describe('изоляция характера', () => {
   it('для каждого события и характера — реплика только своего характера', () => {

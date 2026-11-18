@@ -6,6 +6,8 @@
 import type { Persona } from '../persona/types';
 import { ACTION_ROUTE, type ActionId } from '../scenario/actions';
 import { matchIntent } from '../voice/intents';
+import { feature } from '../config/edition';
+import { limitCatalog } from '../config/pilot';
 
 export type SectionId = 'care' | 'tricks' | 'games' | 'emotions' | 'magic' | 'say' | 'more';
 
@@ -44,6 +46,10 @@ const ACT_SECTIONS: { id: Exclude<SectionId, 'say' | 'more'>; title: string; ico
       { id: 'sit', label: 'Сидеть', icon: 'sit' },
       { id: 'wave', label: 'Помаши', icon: 'wave' },
       { id: 'sing', label: 'Песенка', icon: 'sing' },
+      // фирменное характера (feature catalog.signature): у каждого кота — только своё (реакция есть только у него)
+      { id: 'skate', label: 'Скейт', icon: 'skate' },
+      { id: 'cocoa', label: 'Какао', icon: 'home_mug' },
+      { id: 'mirror', label: 'Зеркальце', icon: 'mirror' },
     ],
   },
   {
@@ -132,12 +138,28 @@ export const phraseIntent = (text: string) => {
   return m.intent === 'switch' ? 'change_persona' : m.intent;
 };
 
+/** фирменные действия характера — пункты каталога только при feature('catalog.signature') */
+export const SIGNATURE_ACTIONS: readonly ActionId[] = ['skate', 'cocoa', 'mirror'];
+
+/**
+ * Срез редакции: signature — фирменные действия (catalog.signature), pilot — набор пилота (pilot.catalog:
+ * 8 общих + 2 фирменных, игры, «Другой кот»; «Фразы» и «Эмоции» не показываются — config/pilot.ts).
+ */
+export interface CatalogCut { signature: boolean; pilot: boolean }
+export const editionCut = (): CatalogCut => ({ signature: feature('catalog.signature'), pilot: feature('pilot.catalog') });
+
 /** разделы каталога для характера: только работающие действия, пустые разделы — не показываем */
-export function buildCatalog(p: Persona, env: CatalogEnv): CatalogSection[] {
+export function buildCatalog(p: Persona, env: CatalogEnv, cut: CatalogCut = editionCut()): CatalogSection[] {
+  const out = buildAll(p, env, cut);
+  return cut.pilot ? limitCatalog(p.id, out) : out;
+}
+
+function buildAll(p: Persona, env: CatalogEnv, cut: CatalogCut): CatalogSection[] {
   const out: CatalogSection[] = [];
   for (const s of ACT_SECTIONS) {
     const items: CatalogItem[] = [];
     for (const a of s.items) {
+      if (!cut.signature && SIGNATURE_ACTIONS.includes(a.id)) continue;
       if (!actionWorks(p, a.id, env)) continue;
       let { label, icon } = a;
       const fx = a.byFx ? p.reactions?.[a.byFx.event]?.fx : undefined;

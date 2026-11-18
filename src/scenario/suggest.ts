@@ -62,6 +62,8 @@ export const FIRST_MINUTES_MS = 120_000;
 export const AFTER_GAME_MS = 25_000;
 /** кот обиделся (тычки, тряска) — «Обнять» столько мс */
 export const UPSET_MS = 20_000;
+/** «Давай лучше …» — чипы замены держатся столько */
+export const REDIRECT_MS = 12_000;
 /** подсказка в пузыре: в первые визиты — после короткой паузы, потом — только после долгой тишины */
 export const HINT_FIRST_MS = 8_000;
 export const HINT_LONG_MS = 45_000;
@@ -103,6 +105,13 @@ export class Suggester {
   /** ребёнок что-то сделал кнопкой/чипом/каталогом */
   note(id: string) {
     this.recent = [id, ...this.recent.filter((r) => r !== id)].slice(0, 3);
+  }
+  /** «Давай лучше …» (пилот, config/pilot.ts cutRedirect): эти чипы — первыми на REDIRECT_MS */
+  private preferIds: string[] = [];
+  private preferUntil = -1e9;
+  prefer(ids: string[], now: number) {
+    this.preferIds = ids;
+    this.preferUntil = now + REDIRECT_MS;
   }
   /** кот обиделся/закружился (тычки подряд, сильный тычок, тряска) */
   upset(now: number) {
@@ -164,6 +173,11 @@ export class Suggester {
             ? [say('yes', 'Давай!', 'swap', 'давай'), say('no', 'Не надо', 'no', 'не надо')]
             : [say('yes', 'Да', 'yes', 'да'), say('no', 'Нет', 'no', 'нет')];
       return this.last;
+    }
+    // кот предложил замену вырезанной команде — её чипы
+    if (s.now < this.preferUntil) {
+      const p = this.pick(this.preferIds.map((id) => this.chip(s, id)));
+      if (p.length) return p;
     }
     // кот дремлет — разбудить
     if (s.dozing) return this.pick([this.chip(s, 'pet', 'Разбуди меня')]);

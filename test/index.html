@@ -68,6 +68,7 @@
       <div class="row" data-group="ed">
         <button class="tg" data-mod="lab" aria-pressed="true">Lab · /lab</button>
         <button class="tg" data-mod="mvp">MVP · /</button>
+        <button class="tg" data-mod="pilot">Пилот · /mvp</button>
       </div>
       <div class="lbl">Где кот</div>
       <div class="row" data-group="where">
@@ -98,7 +99,7 @@
       <h3><span class="em">💻</span>Кот на Маке (без камеры)</h3>
       <dl><dt>Что</dt><dd>Кот на фирменном фоне в Safari/Chrome на Mac: без камеры, карты и датчиков. Тянуть мышью — повернуть, колесо или щипок трекпада — приблизить, двойной клик или R — сброс; ← → ↑ ↓, + / −. Клик по коту — тап, Shift + тянуть — погладить.</dd>
         <dt>Ждём</dt><dd>«Позвать кота» — без запроса камеры; кот выходит, вращается и приближается; клики по коту дают реакции, перетаскивание — нет. Микрофон — по кнопке.</dd></dl>
-      <div class="btns"><a class="go" id="mac-lab" href="../lab/?desktop">Lab</a><a class="go light" id="mac-mvp" href="../?from=test&amp;desktop">MVP</a></div>
+      <div class="btns"><a class="go" id="mac-lab" href="../lab/?desktop">Lab</a><a class="go light" id="mac-mvp" href="../?from=test&amp;desktop">MVP</a><a class="go light" id="mac-pilot" href="../mvp/?from=test&amp;desktop">Пилот</a></div>
     </div>
 
     <h2>Сценарий</h2>
@@ -157,7 +158,8 @@
     const root = new URL('../', location.href);
     let edSaved = 'lab';
     try {
-      edSaved = sessionStorage.getItem('test.edition') === 'mvp' ? 'mvp' : 'lab';
+      const v = sessionStorage.getItem('test.edition');
+      edSaved = v === 'mvp' || v === 'pilot' ? v : 'lab';
     } catch {}
     const state = { ed: edSaved, where: '', cat: '', dbg: new Set() };
     for (const b of document.querySelectorAll('[data-group="ed"] .tg')) b.setAttribute('aria-pressed', String(b.dataset.mod === state.ed));
@@ -171,10 +173,11 @@
     const href = (params, own) => {
       const p = [params, ...mods(own)].filter(Boolean);
       if (state.ed === 'lab') return new URL('lab/' + (p.length ? `?${p.join('&')}` : ''), root).href;
-      return new URL(`?${[`${TEST_MARK}=test`, ...p].join('&')}`, root).href;
+      // пилот — /mvp/ (редакция pilot): как MVP, отладочные параметры только с меткой from=test
+      return new URL(`${state.ed === 'pilot' ? 'mvp/' : ''}?${[`${TEST_MARK}=test`, ...p].join('&')}`, root).href;
     };
-    // в MVP ссылка теряет параметры выключенных функций — такую кнопку показываем бледной «только Lab»
-    const mvpOff = (params) => !!params && filterSearch(`${TEST_MARK}=test&${params}`, 'mvp', '').removed.length > 0;
+    // в MVP и пилоте ссылка теряет параметры выключенных функций — такую кнопку показываем бледной «только Lab»
+    const mvpOff = (params) => !!params && filterSearch(`${TEST_MARK}=test&${params}`, state.ed, '').removed.length > 0;
     const cards = document.getElementById('cards');
     for (const [em, title, what, expect, links, own] of FLOWS) {
       const c = document.createElement('article');
@@ -193,11 +196,12 @@
     const refresh = () => {
       for (const a of document.querySelectorAll('a.go[data-params]')) {
         a.href = href(a.dataset.params, !!a.dataset.own);
-        a.classList.toggle('off', state.ed === 'mvp' && mvpOff([a.dataset.params, ...mods(!!a.dataset.own)].filter(Boolean).join('&')));
+        a.classList.toggle('off', state.ed !== 'lab' && mvpOff([a.dataset.params, ...mods(!!a.dataset.own)].filter(Boolean).join('&')));
       }
       document.getElementById('mac-lab').href = new URL('lab/?desktop', root).href;
       document.getElementById('mac-mvp').href = new URL(`?${TEST_MARK}=test&desktop`, root).href;
-      document.getElementById('reset-link').href = new URL(state.ed === 'lab' ? 'lab/?reset=1' : '?reset=1', root).href;
+      document.getElementById('mac-pilot').href = new URL(`mvp/?${TEST_MARK}=test&desktop`, root).href;
+      document.getElementById('reset-link').href = new URL(state.ed === 'lab' ? 'lab/?reset=1' : state.ed === 'pilot' ? 'mvp/?reset=1' : '?reset=1', root).href;
       const m = mods(false);
       document.getElementById('mods-url').textContent = m.length ? `ко всем ссылкам: ${m.map((x) => '?' + x).join(' ')}` : 'модификаторов нет';
     };
@@ -225,12 +229,12 @@
     refresh();
 
     const KEYS = ['sber-ar-cat:v1', 'ar.micMode'];
-    const pre = () => (state.ed === 'lab' ? 'lab:' : ''); // lab хранит ключи с префиксом lab: (docs/EDITIONS.md)
+    const pre = () => (state.ed === 'lab' ? 'lab:' : state.ed === 'pilot' ? 'pilot:' : ''); // lab и пилот — ключи с префиксом (docs/EDITIONS.md)
     const mem = document.getElementById('mem');
     const show = () => {
       let t = '';
       try {
-        t = `${state.ed === 'lab' ? 'Lab' : 'MVP'}\n` + KEYS.map((k) => `${k}: ${localStorage.getItem(pre() + k) ?? '—'}`).join('\n');
+        t = `${state.ed === 'lab' ? 'Lab' : state.ed === 'pilot' ? 'Пилот' : 'MVP'}\n` + KEYS.map((k) => `${k}: ${localStorage.getItem(pre() + k) ?? '—'}`).join('\n');
       } catch {
         t = 'хранилище недоступно (приватный режим?)';
       }
@@ -242,7 +246,7 @@
       try {
         // всё, что кот хранит на телефоне: память сценария, режим микрофона и прочие ключи прототипа (ar.*, sber-ar-cat*)
         for (const k of Object.keys(localStorage)) {
-          const own = pre() ? k.startsWith(pre()) : !k.startsWith('lab:');
+          const own = pre() ? k.startsWith(pre()) : !/^(lab|pilot):/.test(k);
           const kk = pre() && own ? k.slice(pre().length) : k;
           if (own && (KEYS.includes(kk) || /^(ar\.|sber-ar-cat)/.test(kk))) localStorage.removeItem(k);
         }

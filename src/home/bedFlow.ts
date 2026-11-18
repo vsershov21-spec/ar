@@ -22,6 +22,7 @@ import type { Chip } from '../scenario/suggest';
 import { BED, BedMachine, BedOfferRule, OFFER_SHOW_MS, SLEEP_CLIP, TURN_CLIP, TURN_MS, TUCK_STEPS, WAKE_STEPS, bedIntent, daypart, isNight, localDay, morningWake, type BedOffer, type BedStep, type TuckWhy, type WakeWhy } from './bed';
 import { loadMemory, saveMemory } from '../scenario/memory';
 import { playLullaby, type Lullaby } from './lullaby';
+import { track } from '../analytics';
 
 /** то, что BedFlow берёт у HomeMode */
 export interface BedView {
@@ -151,6 +152,7 @@ export class BedFlow {
     const now = this.now || performance.now();
     if (!this.m.tuck(now, why)) return false;
     this.stats.tucks++;
+    track('sleep'); // воронка (src/analytics)
     const h = this.h;
     // реплики кота до этого (зона, предложение) — не поверх «укрой меня»
     h.director.activity();
@@ -183,6 +185,7 @@ export class BedFlow {
     if (this.m.state === 'tucking') this.m.sleepNow(now);
     if (!this.m.wake(now, why)) return false;
     this.stats.wakes++;
+    track('wake'); // воронка (src/analytics)
     this.wakeLine = why === 'external' ? null : why === 'taps' || (!this.morning && slept < SHORT_NAP_MS) ? 'wake_forced' : 'wake_morning';
     this.afterAsleep();
     this.h.director.activity();
@@ -304,6 +307,7 @@ export class BedFlow {
   private startWakeFromTaps() {
     // m.tap уже перевёл автомат в waking — исполнить переход
     this.stats.wakes++;
+    track('wake');
     this.wakeLine = 'wake_forced';
     this.afterAsleep();
     this.enterStep(this.m.step);

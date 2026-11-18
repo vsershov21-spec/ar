@@ -6,6 +6,7 @@
  * Стили и дизайн-токены — styles.css; правила — docs/UI_AUDIT.md, упрощённый экран — docs/UI_AUDIT.md, «Упрощённый экран».
  */
 import { asset } from '../core/util';
+import { track } from '../analytics';
 import { TriedStore, moreSection, type CatalogItem, type CatalogSection, type SectionId } from './actionCatalog';
 import type { Chip } from '../scenario/suggest';
 import { CAT_ICON } from './catalogIcons';
@@ -292,8 +293,14 @@ export class UI {
       if (a === 'terms') this.start.querySelector('.terms')!.classList.remove('hidden');
       if (a === 'terms-close') this.start.querySelector('.terms')!.classList.add('hidden');
       if (a === 'kids') h.onKids();
-      if (a === 'kids-close') this.showKids(false);
-      if (a === 'kids-go') setTimeout(() => this.showKids(false), 300);
+      if (a === 'kids-close') {
+        track('sberkids_click', { kind: 'close' });
+        this.showKids(false);
+      }
+      if (a === 'kids-go') {
+        track('sberkids_click', { kind: 'go' });
+        setTimeout(() => this.showKids(false), 300);
+      }
       if (a === 'shake') h.onShakeButton();
       if (a === 'skip') h.onSkipName();
       if (a === 'cat-close') this.closeCatalog();

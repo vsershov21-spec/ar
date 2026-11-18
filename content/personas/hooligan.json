@@ -683,6 +683,13 @@
     "home_cocoa": {
       "clip": "idle_kind_cocoa"
     },
+    "skate": {
+      "clip": "idle_hooligan_skate",
+      "fx": "skate_sparks",
+      "sound": "skate_grind"
+    },
+    "cocoa": {},
+    "mirror": {},
     "home_ball": {
       "clip": "jump"
     },
@@ -3539,6 +3546,9 @@
         "face": "smirk"
       }
     ],
+    "skate": [],
+    "cocoa": [],
+    "mirror": [],
     "home_ball": [
       {
         "id": "hooligan.home_ball.01",

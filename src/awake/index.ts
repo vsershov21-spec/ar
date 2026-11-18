@@ -21,6 +21,7 @@ import { Salute, type BurstShape } from '../fx/salute';
 import { AwakeAudio } from './awakeAudio';
 import { AwakeScene, AWAKE_COLORS } from './awakeScene';
 import { awakePlan, clamp01, easeOutBack, type AwakeKind, type AwakePlan } from './timeline';
+import { track } from '../analytics';
 
 export { awakePlan } from './timeline';
 export type { AwakeKind } from './timeline';
@@ -167,6 +168,7 @@ export class AwakeController {
   }
 
   private finish() {
+    if (this.run) track('awake_done', {}, true); // воронка (src/analytics): первое пробуждение за сессию
     this.run = null;
     this.d.stage.intro = null;
     this.scene.clear();

@@ -213,3 +213,43 @@ curl -s https://ar.vershov.com/lab/any/deep | grep -o '/lab/assets/main-[^"]*'  
 **Сервис прогресса** принимает поле `edition` (`mvp`|`lab`) — обновить код сервиса (шаг 1 выше и
 `systemctl restart ar-progress`). Старый сервис поле игнорирует, всё остальное работает.
 
+
+## Редакция pilot: https://ar.vershov.com/mvp (docs/EDITIONS.md «Пилот»)
+
+`npm run build` собирает и третью редакцию — `dist/mvp/` (base `/mvp/`, только `index.html` + `assets/`; модели,
+звуки и озвучка — из корня, как у lab). `ar-update` не меняется: `mvp/` едет вместе с `dist/`. Корень `/` — прежний MVP.
+
+Разовая настройка сервера — `scripts/deploy/pilot-setup.sh` (root, в фоне — reload Caddy не рвёт сессию):
+
+```bash
+REF=<коммит>; curl -fsSL https://raw.githubusercontent.com/vsershov21-spec/ar/$REF/scripts/deploy/pilot-setup.sh -o /tmp/pilot-setup.sh \
+  && REF=$REF nohup bash /tmp/pilot-setup.sh >/tmp/pilot-setup.log 2>&1 &
+sleep 25; cat /tmp/pilot-setup.log
+```
+
+Что делает:
+
+1. Обновляет `/opt/ar-progress/{server,store}.mjs` из того же коммита (бэкап рядом, `node --check`, после
+   `systemctl restart ar-progress` — health; не поднялся — откат). Новое: `POST /api/progress/event` (события
+   воронки, таблица `events` в той же sqlite), `GET /api/progress/stats` (токен `PROGRESS_ADMIN_TOKEN`), поле
+   `edition: pilot`; health отвечает `"events":true`.
+2. Caddy — фрагмент на верхнем уровне блока `ar.vershov.com { … }` (как у lab), `caddy validate`, при ошибке — откат:
+
+```caddyfile
+	# редакция pilot (docs/EDITIONS.md «Пилот»)
+	redir /mvp /mvp/ 308
+	@pilot {
+		path /mvp/*
+		not path /mvp/assets/*
+	}
+	rewrite @pilot /mvp/index.html
+	header @pilot Cache-Control "no-cache"
+	@pilotAssets path /mvp/assets/*
+	header @pilotAssets Cache-Control "public, max-age=31536000, immutable"
+```
+
+   `rewrite` выполняется раньше `handle`, поэтому `handle /api/progress/* { reverse_proxy … }` и
+   `handle { try_files {path} /index.html; file_server }` не трогаются (`/api/…` под `@pilot` не попадает).
+3. Проверки: `/mvp/` — `no-cache`; `/mvp` → 308 на `/mvp/`; `/mvp/x/y` отдаёт `index.html` пилота
+   (`/mvp/assets/main-*`); ассеты — `immutable`; `/api/progress/health` — ok и `"events":true`;
+   `/api/progress/stats` без токена — 401.

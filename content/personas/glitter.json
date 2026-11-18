@@ -655,6 +655,12 @@
     "home_cocoa": {
       "clip": "idle_kind_cocoa"
     },
+    "skate": {},
+    "cocoa": {},
+    "mirror": {
+      "clip": "idle_glitter_mirror",
+      "sound": "sparkle_swipe"
+    },
     "home_ball": {
       "clip": "jump"
     },
@@ -3487,6 +3493,9 @@
         "face": "excited"
       }
     ],
+    "skate": [],
+    "cocoa": [],
+    "mirror": [],
     "home_ball": [
       {
         "id": "glitter.home_ball.01",

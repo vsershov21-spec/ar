@@ -1,12 +1,14 @@
 /**
  * Редакции прототипа из одного репозитория и одной ветки main (docs/EDITIONS.md):
  *   mvp — https://ar.vershov.com      — «вылизанный MVP»: только проверенные функции;
- *   lab — https://ar.vershov.com/lab  — всё новое и экспериментальное (новое сначала живёт здесь).
+ *   lab — https://ar.vershov.com/lab  — всё новое и экспериментальное (новое сначала живёт здесь);
+ *   pilot — https://ar.vershov.com/mvp — срез для пилота с детьми (docs/EDITIONS.md, «Пилот»): урезанный каталог,
+ *           2 игры, белый список эффектов, смена кота не чаще раза в 3 мин, аналитика воронки (src/config/pilot.ts).
  *
  * FEATURES — ЕДИНСТВЕННОЕ место, где решается, что входит в MVP. Перевести функцию в MVP = поставить mvp: true
  * (после проверки на iPhone — колонка в docs/EDITIONS.md). Код проверяет функцию в точке входа: feature('games.new').
  *
- * Редакцию задаёт сборка: VITE_EDITION=mvp|lab (npm run build собирает обе, scripts/build/editions.mjs).
+ * Редакцию задаёт сборка: VITE_EDITION=mvp|lab|pilot (npm run build собирает все три, scripts/build/editions.mjs).
  * Без переменной (npm run dev, vitest, QA-стенд `vite build`) — lab: всё включено, как было до редакций.
  *
  * Параметры адреса: в MVP отладочные и экспериментальные параметры (PARAMS) вырезаются из адреса до старта
@@ -14,49 +16,61 @@
  * «Только lab и /test»: ссылки страницы /test в MVP несут метку ?from=test — с ней такие параметры остаются.
  */
 
-export type Edition = 'mvp' | 'lab';
+export type Edition = 'mvp' | 'lab' | 'pilot';
+export const EDITIONS: readonly Edition[] = ['mvp', 'lab', 'pilot'];
 
 const env = (k: string): string | undefined => (import.meta as unknown as { env?: Record<string, string | undefined> }).env?.[k];
 
-export const parseEdition = (v: string | undefined | null): Edition => (v === 'mvp' ? 'mvp' : 'lab');
+export const parseEdition = (v: string | undefined | null): Edition => (v === 'mvp' ? 'mvp' : v === 'pilot' ? 'pilot' : 'lab');
 export const EDITION: Edition = parseEdition(env('VITE_EDITION'));
 export const IS_LAB = EDITION === 'lab';
+export const IS_PILOT = EDITION === 'pilot';
 
 export interface FeatureSpec {
   mvp: boolean;
   lab: boolean;
+  /** пилот /mvp (docs/EDITIONS.md, «Пилот») */
+  pilot: boolean;
   /** что это и где точка входа */
   note: string;
 }
 
 export const FEATURES = {
   // ── ядро MVP (точек проверки нет — без них прототипа нет; в таблице — для полноты решения продакта) ──
-  'intro.2screens': { mvp: true, lab: true, note: 'интро: 2 экрана онбординга + разрешения (ui.ts)' },
-  'card.sber': { mvp: true, lab: true, note: 'карта Сбера: узнавание по содержимому (tracker/card)' },
-  'card.landing': { mvp: true, lab: true, note: 'посадка кота на карту и удержание (cardTracker, stage)' },
-  'ui.variantA': { mvp: true, lab: true, note: 'интерфейс, вариант А: три нижние кнопки, каталог, чипы' },
-  meet: { mvp: true, lab: true, note: 'знакомство: имя, первая встреча (dialogs intro)' },
-  'play.free': { mvp: true, lab: true, note: 'свободная игра и каталог «Что умеет кот» (actionCatalog)' },
-  'games.base': { mvp: true, lab: true, note: 'загадка и повторялка (dialogs riddle, echo)' },
-  'silence.doze': { mvp: true, lab: true, note: 'лестница тишины и дрёма (director)' },
-  'cat.switch': { mvp: true, lab: true, note: 'смена кота: «Другой кот», встряска' },
+  'intro.2screens': { mvp: true, lab: true, pilot: true, note: 'интро: 2 экрана онбординга + разрешения (ui.ts)' },
+  'card.sber': { mvp: true, lab: true, pilot: true, note: 'карта Сбера: узнавание по содержимому (tracker/card)' },
+  'card.landing': { mvp: true, lab: true, pilot: true, note: 'посадка кота на карту и удержание (cardTracker, stage)' },
+  'ui.variantA': { mvp: true, lab: true, pilot: true, note: 'интерфейс, вариант А: три нижние кнопки, каталог, чипы' },
+  meet: { mvp: true, lab: true, pilot: true, note: 'знакомство: имя, первая встреча (dialogs intro)' },
+  'play.free': { mvp: true, lab: true, pilot: true, note: 'свободная игра и каталог «Что умеет кот» (actionCatalog)' },
+  'games.base': { mvp: true, lab: true, pilot: true, note: 'загадка и повторялка (dialogs riddle, echo)' },
+  'silence.doze': { mvp: true, lab: true, pilot: true, note: 'лестница тишины и дрёма (director)' },
+  'cat.switch': { mvp: true, lab: true, pilot: true, note: 'смена кота: «Другой кот», встряска' },
   // ── новое, уже в MVP (точка проверки есть) ──
-  home: { mvp: true, lab: true, note: 'мир кота, базовый: пункт «Мой дом» и комната (app.ts withHome / src/home)' },
-  awake: { mvp: true, lab: true, note: 'пробуждение-катсцена и салют при находке карты (app.ts → src/awake, fx/salute)' },
-  'progress.server': { mvp: true, lab: true, note: 'прогресс на сервере по id устройства (progress/index.ts bootProgress)' },
-  'catalog.sheet': { mvp: true, lab: true, note: 'каталог на телефоне — лист снизу: вкладки-группы и сетка 4 в ряд, кот сдвигается над листом (ui.ts openSheet, ui/catalogGroups.ts)' },
-  'desktop.panel': { mvp: true, lab: true, note: 'десктоп-панель умений и «Тест» справа (ui/deskPanel.ts); только ?desktop на устройстве без касания и окне ≥ 900 px' },
+  home: { mvp: true, lab: true, pilot: true, note: 'мир кота, базовый: пункт «Мой дом» и комната (app.ts withHome / src/home)' },
+  awake: { mvp: true, lab: true, pilot: true, note: 'пробуждение-катсцена и салют при находке карты (app.ts → src/awake, fx/salute)' },
+  'progress.server': { mvp: true, lab: true, pilot: true, note: 'прогресс на сервере по id устройства (progress/index.ts bootProgress)' },
+  'catalog.sheet': { mvp: true, lab: true, pilot: true, note: 'каталог на телефоне — лист снизу: вкладки-группы и сетка 4 в ряд, кот сдвигается над листом (ui.ts openSheet, ui/catalogGroups.ts)' },
+  'desktop.panel': { mvp: true, lab: true, pilot: true, note: 'десктоп-панель умений и «Тест» справа (ui/deskPanel.ts); только ?desktop на устройстве без касания и окне ≥ 900 px' },
+  // ── пилот /mvp (src/config/pilot.ts — наборы и лимиты; в lab — всё как было, кроме новых функций) ──
+  'catalog.signature': { mvp: false, lab: true, pilot: true, note: 'фирменные действия характера в каталоге: Хулиган — скейт, Добряк — какао, Блёстка — зеркальце (scenario/actions.ts skate/cocoa/mirror)' },
+  'pilot.catalog': { mvp: false, lab: false, pilot: true, note: 'каталог пилота: 8 общих + 2 фирменных действия на кота, «Другой кот», мир, микрофон; «Фразы» и «Эмоции» скрыты; голосовые команды вырезанных действий → «давай лучше …» (config/pilot.ts)' },
+  'pilot.fx': { mvp: false, lab: false, pilot: true, note: 'белый список эффектов на кота (config/pilot.ts PILOT_FX) — director.runFx' },
+  'pilot.switchCooldown': { mvp: false, lab: false, pilot: true, note: 'смена кота не чаще раза в 3 мин, иначе «Чуть позже!» (config/pilot.ts SwitchCooldown, director.switchGate)' },
+  'glass.gestures': { mvp: false, lab: true, pilot: true, note: 'стекло пальцем у всех котов: свайп — царапины (claws + claws_glass), долгое нажатие мимо кота — стекло запотевает, рисуем пальцем (steam_draw) — app.ts bindInput' },
+  analytics: { mvp: false, lab: true, pilot: true, note: 'воронка: события sendBeacon → POST /api/progress/event (src/analytics, docs/ANALYTICS.md); ?noanalytics — выкл.' },
+  'card.paint': { mvp: false, lab: true, pilot: true, note: 'раскраска карты — следующий этап; пока только флаг и пустая точка входа (src/card/paint.ts)' },
   // ── только lab ──
-  'games.new': { mvp: false, lab: true, note: 'мини-игры «Угадай рожицу», «Камень-ножницы», «Делай как я» (emo/rps/simon): persona/content.ts убирает их диалоги' },
-  'stickers.pack': { mvp: false, lab: true, note: 'новый пак наклеек СберКота и коллекция (fx/stickerPack, fxLayer)' },
-  'home.bed': { mvp: false, lab: true, note: 'кровать в спальне «Мира кота»: уложить спать, сон, разбудить, время суток (src/home/bedFlow.ts; homeMode.ts — точка входа)' },
-  'anims.new': { mvp: false, lab: true, note: 'новые анимации по мере генерации (точка входа — у агента анимаций)' },
-  'anims.meshy': { mvp: false, lab: true, note: 'клипы Meshy Text-to-Motion из /models/anims/meshy/manifest.json поверх anims_v1 (character/meshyClips.ts; GlbCharacter.load — точка входа); ?meshy=0 — без них' },
-  'debug.flows': { mvp: false, lab: true, note: 'тестовые флоу и ускорения ?flow=… (src/debug/flows.ts); в MVP — только со страницы /test (?from=test)' },
-  'tracker.nocard': { mvp: false, lab: true, note: '?nocard — кот на столе без карты; в MVP — только со страницы /test' },
-  'card.anycard': { mvp: false, lab: true, note: '?anycard — кот садится на любой прямоугольник (без проверки «это карта Сбера»)' },
-  'card.grabExperimental': { mvp: false, lab: true, note: '?grab=bitmap|frame — экспериментальная подача кадра в воркер (cardTracker); ?grab=main остаётся' },
-  'model.custom': { mvp: false, lab: true, note: '?glb=путь — своя модель вместо кота' },
+  'games.new': { mvp: false, lab: true, pilot: false, note: 'мини-игры «Угадай рожицу», «Камень-ножницы», «Делай как я» (emo/rps/simon): persona/content.ts убирает их диалоги' },
+  'stickers.pack': { mvp: false, lab: true, pilot: false, note: 'новый пак наклеек СберКота и коллекция (fx/stickerPack, fxLayer)' },
+  'home.bed': { mvp: false, lab: true, pilot: true, note: 'кровать в спальне «Мира кота»: уложить спать, сон, разбудить, время суток (src/home/bedFlow.ts; homeMode.ts — точка входа)' },
+  'anims.new': { mvp: false, lab: true, pilot: false, note: 'новые анимации по мере генерации (точка входа — у агента анимаций)' },
+  'anims.meshy': { mvp: false, lab: true, pilot: false, note: 'клипы Meshy Text-to-Motion из /models/anims/meshy/manifest.json поверх anims_v1 (character/meshyClips.ts; GlbCharacter.load — точка входа); ?meshy=0 — без них' },
+  'debug.flows': { mvp: false, lab: true, pilot: false, note: 'тестовые флоу и ускорения ?flow=… (src/debug/flows.ts); в MVP — только со страницы /test (?from=test)' },
+  'tracker.nocard': { mvp: false, lab: true, pilot: false, note: '?nocard — кот на столе без карты; в MVP — только со страницы /test' },
+  'card.anycard': { mvp: false, lab: true, pilot: false, note: '?anycard — кот садится на любой прямоугольник (без проверки «это карта Сбера»)' },
+  'card.grabExperimental': { mvp: false, lab: true, pilot: false, note: '?grab=bitmap|frame — экспериментальная подача кадра в воркер (cardTracker); ?grab=main остаётся' },
+  'model.custom': { mvp: false, lab: true, pilot: false, note: '?glb=путь — своя модель вместо кота' },
 } as const satisfies Record<string, FeatureSpec>;
 
 export type FeatureId = keyof typeof FEATURES;
@@ -81,7 +95,7 @@ export const PARAMS: Record<string, { feature: FeatureId; test?: boolean; keep?:
   dur: { feature: 'debug.flows', test: true },
   rate: { feature: 'debug.flows', test: true },
   zone: { feature: 'debug.flows', test: true }, // ?flow=home&zone=kitchen (src/home)
-  bed: { feature: 'home.bed' }, // ?flow=home&zone=bedroom&bed=sleep|wake|night|morning (src/home/bedFlow.ts) — кровать только в lab
+  bed: { feature: 'home.bed' }, // ?flow=home&zone=bedroom&bed=sleep|wake|night|morning (src/home/bedFlow.ts) — кровать в lab и пилоте
   hour: { feature: 'home.bed' }, // &hour=21 — местный час для кровати (утро, тихий час, вечер)
   nocard: { feature: 'tracker.nocard', test: true },
   desktop: { feature: 'tracker.nocard', test: true }, // ?desktop = ?nocard=off + вращение мышью (src/input/orbit.ts)
@@ -103,7 +117,7 @@ export const TEST_MARK = 'from';
 export function fromTestPage(search: string, referrer = ''): boolean {
   if (new URLSearchParams(search).get(TEST_MARK) === 'test') return true;
   try {
-    return !!referrer && /^\/(lab\/)?test(\/|$)/.test(new URL(referrer).pathname);
+    return !!referrer && /^\/((lab|mvp)\/)?test(\/|$)/.test(new URL(referrer).pathname);
   } catch {
     return false;
   }

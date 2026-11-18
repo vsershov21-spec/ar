@@ -36,5 +36,8 @@ export const CAT_ICON: Record<string, string> = {
   stop: F('<rect x="5" y="5" width="14" height="14" rx="3.5"/>'),
   yes: S('<path d="M4.5 12.5l5 5L19.5 6.5"/>', 2.8),
   no: S('<path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/>', 2.8),
+  /** фирменные действия пилота: скейт Хулигана, зеркальце Блёстки (какао — home_mug из home/icons.ts) */
+  skate: S('<path d="M3 13.5h18" stroke-width="2.6"/><path d="M4.5 13.5c0-1.2.8-2 2-2h11c1.2 0 2 .8 2 2" fill="currentColor" fill-opacity=".18"/><circle cx="7.5" cy="17.5" r="1.8" fill="currentColor"/><circle cx="16.5" cy="17.5" r="1.8" fill="currentColor"/>'),
+  mirror: S('<ellipse cx="12" cy="9" rx="5.5" ry="6.2" fill="currentColor" fill-opacity=".18"/><path d="M12 15.2V21M9.5 21h5"/><path d="M9.6 6.8c.6-1 1.5-1.5 2.4-1.5" stroke-width="1.6"/>'),
   gear: S('<circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v2.6M12 18.6v2.6M2.8 12h2.6M18.6 12h2.6M5.5 5.5l1.9 1.9M16.6 16.6l1.9 1.9M5.5 18.5l1.9-1.9M16.6 7.4l1.9-1.9"/>'),
 };

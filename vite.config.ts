@@ -18,19 +18,22 @@ function pages(dir = 'test', out: Record<string, string> = { main: 'index.html' 
 //   mvp — dist/      (base BASE_PATH ?? './', public/ копируется, сжатые модели кладутся в dist/models/opt);
 //   lab — dist/lab/  (AR_BUILD_LAB=1: base '/lab/', только index.html, public/ НЕ копируется и модели не кладутся —
 //                     ассеты из корня: VITE_ASSET_BASE='/', src/core/util.ts asset()).
+//   pilot — dist/mvp/ (AR_SUB_DIR=mvp: base '/mvp/', как lab — только index.html, ассеты из корня).
 // Просто `vite build` (CI, QA-стенд) — одна сборка в dist/, редакция — VITE_EDITION (без неё lab), как раньше.
-const LAB_DIR = process.env.AR_BUILD_LAB === '1';
+// Подпапка редакции: AR_SUB_DIR=lab|mvp (AR_BUILD_LAB=1 — старое имя для lab), её base — SUB_BASE (LAB_BASE).
+const SUB = process.env.AR_SUB_DIR || (process.env.AR_BUILD_LAB === '1' ? 'lab' : '');
+const LAB_DIR = !!SUB;
 
 // BASE_PATH задаёт подпуть для GitHub Pages: BASE_PATH=/ar-proto/ npm run build
 // По умолчанию './' — относительные пути, работает и в корне домена, и в подпапке.
 export default defineConfig({
-  base: LAB_DIR ? (process.env.LAB_BASE ?? '/lab/') : (process.env.BASE_PATH ?? './'),
+  base: LAB_DIR ? (process.env.SUB_BASE ?? process.env.LAB_BASE ?? `/${SUB}/`) : (process.env.BASE_PATH ?? './'),
   publicDir: LAB_DIR ? false : 'public',
   plugins: [modelOpt({ emit: !LAB_DIR })],
   build: {
     target: 'es2020',
     chunkSizeWarningLimit: 6000,
-    outDir: LAB_DIR ? 'dist/lab' : 'dist',
+    outDir: LAB_DIR ? `dist/${SUB}` : 'dist',
     emptyOutDir: !LAB_DIR,
     rollupOptions: { input: LAB_DIR ? { main: 'index.html' } : pages() },
   },
