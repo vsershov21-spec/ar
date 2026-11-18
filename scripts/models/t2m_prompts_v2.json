@@ -105,7 +105,12 @@
    "start": "стойка idle",
    "end": "стойка idle",
    "replaces": "`poke_head` (5 с вместо 1.0 с)",
-   "trigger": "тап по голове (tap_cat_head), кнопка «Почесать» до появления scratch_enjoy"
+   "trigger": "тап по голове (tap_cat_head), кнопка «Почесать» до появления scratch_enjoy",
+   "meshy": {
+    "prompt": "Starts standing upright facing forward with arms relaxed at the sides. In the first half second the character ducks the head down sharply with the shoulders raised, then bounces back up; then returns to the same relaxed standing pose and holds still, in place, no turning.",
+    "duration": 2.0,
+    "mode": "prime"
+   }
   },
   "poke_cheek": {
    "priority": "P0",
@@ -115,7 +120,12 @@
    "start": "стойка idle",
    "end": "стойка idle",
    "replaces": "`poke_cheek` (5 с вместо 0.9 с)",
-   "trigger": "тап по щеке (tap_cat_cheek), кнопка «Щёчка»"
+   "trigger": "тап по щеке (tap_cat_cheek), кнопка «Щёчка»",
+   "meshy": {
+    "prompt": "Starts standing upright facing forward with arms relaxed at the sides. Quickly tilts the head to its left with a small shoulder shrug as if lightly tapped on the right cheek, then snaps back to center; then returns to the same relaxed standing pose and holds still, in place, no turning.",
+    "duration": 2.0,
+    "mode": "prime"
+   }
   },
   "poke_belly": {
    "priority": "P0",
@@ -125,7 +135,12 @@
    "start": "стойка idle",
    "end": "стойка idle",
    "replaces": "`poke_belly` (5 с вместо 1.2 с)",
-   "trigger": "тап по животу (tap_cat_belly), кнопка «Щекотка»"
+   "trigger": "тап по животу (tap_cat_belly), кнопка «Щекотка»",
+   "meshy": {
+    "prompt": "Starts standing upright facing forward with arms relaxed at the sides. Quickly folds forward at the waist with both hands pressed to the belly, two short giggling shoulder bounces, then straightens up; feet stay planted; then returns to the same relaxed standing pose and holds still, in place, no turning.",
+    "duration": 2.0,
+    "mode": "prime"
+   }
   },
   "poke_paw": {
    "priority": "P0",
@@ -135,7 +150,12 @@
    "start": "стойка idle",
    "end": "стойка idle",
    "replaces": "`poke_paw` (5 с вместо 0.9 с)",
-   "trigger": "тап по лапе (tap_cat_paw), кнопка «Лапка»"
+   "trigger": "тап по лапе (tap_cat_paw), кнопка «Лапка»",
+   "meshy": {
+    "prompt": "Starts standing upright facing forward with arms relaxed at the sides. Quickly yanks the right hand back to the chest, shakes the hand twice, then lowers it; feet stay planted; then returns to the same relaxed standing pose and holds still, in place, no turning.",
+    "duration": 2.0,
+    "mode": "prime"
+   }
   },
   "poke_tail": {
    "priority": "P0",
@@ -145,7 +165,12 @@
    "start": "стойка idle",
    "end": "стойка idle",
    "replaces": "`poke_tail` (5 с вместо 1.0 с)",
-   "trigger": "тап по хвосту (tap_cat_tail)"
+   "trigger": "тап по хвосту (tap_cat_tail)",
+   "meshy": {
+    "prompt": "Starts standing upright facing forward with arms relaxed at the sides. Does a small startled hop on the spot with arms flung out to the sides, glances back over the right shoulder with the head only, then looks forward again; then returns to the same relaxed standing pose and holds still, in place, no turning.",
+    "duration": 2.0,
+    "mode": "prime"
+   }
   },
   "appear_jump_in": {
    "priority": "P0",
@@ -155,7 +180,12 @@
    "start": "присед глубоко (корень ≈0,10 роста), лапы у груди — «внутри карты»",
    "end": "стойка idle",
    "replaces": "`jump_down` (прыжок сверху вниз, 3,7 с)",
-   "trigger": "intro, card_found (director `appear`)"
+   "trigger": "intro, card_found (director `appear`)",
+   "meshy": {
+    "prompt": "Starts in a deep crouch with hands close to the chest. Springs straight up with both arms raised, lands softly on the same spot with bent knees, gives a quick shoulder shake and stands up proudly. Ends standing upright facing forward, arms relaxed, in place, no turning.",
+    "duration": 2.0,
+    "mode": "prime"
+   }
   },
   "dive_out": {
    "priority": "P0",
@@ -165,7 +195,12 @@
    "start": "стойка idle",
    "end": "глубокий присед/«нырок» вниз головой — кот уходит в карту (дальше прячет код)",
    "replaces": "`dive` (нырок вперёд 2,7 с) и `run` в director `goodbye`",
-   "trigger": "goodbye, outro (кот ныряет в карту)"
+   "trigger": "goodbye, outro (кот ныряет в карту)",
+   "meshy": {
+    "prompt": "Starts standing upright facing forward with arms relaxed at the sides. Waves the right hand goodbye once, crouches, hops up and dives head first straight down with both arms together above the head, ending low in a deep crouch with the head down. In place, no turning.",
+    "duration": 2.0,
+    "mode": "prime"
+   }
   },
   "turn_step": {
    "priority": "P0",
@@ -175,7 +210,12 @@
    "start": "стойка idle",
    "end": "стойка idle",
    "replaces": "нет клипа: поворот к зрителю/к цели идёт программно в idle — лапы «едут»",
-   "trigger": "stage.turn: |угол| > 25° (к зрителю, перед ходьбой)"
+   "trigger": "stage.turn: |угол| > 25° (к зрителю, перед ходьбой)",
+   "meshy": {
+    "prompt": "Steps in place with small quick steps, lifting the feet alternately a little, body and head facing straight forward, arms relaxed at the sides. Seamless loop, no forward travel, no turning.",
+    "duration": 2.0,
+    "mode": "prime"
+   }
   },
   "fall_asleep": {
    "priority": "P0",
@@ -185,7 +225,12 @@
    "start": "стойка idle",
    "end": "клубок лёжа на боку (как `sleep_loop`)",
    "replaces": "переход idle → `sleep_loop` за 0,45 с (корень 0,24→0,07)",
-   "trigger": "sleep (кнопка «Усыпи», лестница тишины → дрёма), затем петля sleep_loop"
+   "trigger": "sleep (кнопка «Усыпи», лестница тишины → дрёма), затем петля sleep_loop",
+   "meshy": {
+    "prompt": "Starts standing upright facing forward with arms relaxed at the sides. Yawns with one hand over the mouth, slowly kneels down, lies down on its right side and curls up with the knees pulled in and hands tucked under the chin, then stays still asleep. In place.",
+    "duration": 2.5,
+    "mode": "prime"
+   }
   },
   "wake_up": {
    "priority": "P0",
@@ -195,7 +240,12 @@
    "start": "клубок лёжа на боку (как `sleep_loop`)",
    "end": "стойка idle",
    "replaces": "`wake_startle` (начинается стоя)",
-   "trigger": "wake_up (касание/голос во сне)"
+   "trigger": "wake_up (касание/голос во сне)",
+   "meshy": {
+    "prompt": "Starts lying curled up on its right side asleep. Lifts the head, sits up rubbing one eye with the hand, stands up and does a short stretch with both arms up, then lowers the arms and stands upright facing forward, relaxed, in place.",
+    "duration": 2.0,
+    "mode": "prime"
+   }
   },
   "treat_eat_hooligan": {
    "priority": "P0",
@@ -205,7 +255,12 @@
    "start": "стойка idle",
    "end": "стойка idle",
    "replaces": "кнопка «Угостить» играет `celebrate` (прыжок радости)",
-   "trigger": "treat (кнопка «Угостить»)"
+   "trigger": "treat (кнопка «Угостить»)",
+   "meshy": {
+    "prompt": "Starts standing upright facing forward with arms relaxed at the sides. Tosses something small up with the right hand, catches it at the mouth, chews with a cocky nod and raises the right hand in a thumbs-up approval; then returns to the same relaxed standing pose and holds still, in place, no turning.",
+    "duration": 2.5,
+    "mode": "prime"
+   }
   },
   "treat_eat_kind": {
    "priority": "P0",
@@ -215,7 +270,12 @@
    "start": "стойка idle",
    "end": "стойка idle",
    "replaces": "кнопка «Угостить» играет `celebrate` (прыжок радости)",
-   "trigger": "treat (кнопка «Угостить»)"
+   "trigger": "treat (кнопка «Угостить»)",
+   "meshy": {
+    "prompt": "Starts standing upright facing forward with arms relaxed at the sides. Brings both hands together in front of the mouth as if holding a small snack, takes a bite, chews happily rocking the head, then pats the belly with one hand; then returns to the same relaxed standing pose and holds still, in place, no turning.",
+    "duration": 2.5,
+    "mode": "prime"
+   }
   },
   "treat_eat_glitter": {
    "priority": "P0",
@@ -225,7 +285,12 @@
    "start": "стойка idle",
    "end": "стойка idle",
    "replaces": "кнопка «Угостить» играет `celebrate` (прыжок радости)",
-   "trigger": "treat (кнопка «Угостить»)"
+   "trigger": "treat (кнопка «Угостить»)",
+   "meshy": {
+    "prompt": "Starts standing upright facing forward with arms relaxed at the sides. Delicately lifts a tiny snack to the mouth with the right hand, nibbles it, presses the left hand to the cheek in delight and does a small happy bounce on the toes; then returns to the same relaxed standing pose and holds still, in place, no turning.",
+    "duration": 2.5,
+    "mode": "prime"
+   }
   },
   "scratch_enjoy": {
    "priority": "P0",
@@ -235,7 +300,12 @@
    "start": "стойка idle",
    "end": "стойка idle",
    "replaces": "кнопка «Почесать» играет тычок `poke_head`",
-   "trigger": "кнопка «Почесать» (новое событие scratch вместо tap_cat_head)"
+   "trigger": "кнопка «Почесать» (новое событие scratch вместо tap_cat_head)",
+   "meshy": {
+    "prompt": "Starts standing upright facing forward with arms relaxed at the sides. Leans the head to the side and up as if being scratched, rubs the head slowly side to side, shoulders relaxed, one knee bounces happily three times; then returns to the same relaxed standing pose and holds still, in place, no turning.",
+    "duration": 2.0,
+    "mode": "prime"
+   }
   },
   "surprise_trick_hooligan": {
    "priority": "P0",
@@ -245,7 +315,12 @@
    "start": "стойка idle",
    "end": "стойка idle",
    "replaces": "кнопка «Удиви» играет `surprised` (кот сам пугается)",
-   "trigger": "surprise (кнопка «Удиви»)"
+   "trigger": "surprise (кнопка «Удиви»)",
+   "meshy": {
+    "prompt": "Starts standing upright facing forward with arms relaxed at the sides. Hides both hands behind the back, then whips them out pointing both hands forward with a confident lean back; then returns to the same relaxed standing pose and holds still, in place, no turning.",
+    "duration": 2.0,
+    "mode": "prime"
+   }
   },
   "surprise_trick_kind": {
    "priority": "P0",
@@ -255,7 +330,12 @@
    "start": "стойка idle",
    "end": "стойка idle",
    "replaces": "кнопка «Удиви» играет `surprised` (кот сам пугается)",
-   "trigger": "surprise (кнопка «Удиви»)"
+   "trigger": "surprise (кнопка «Удиви»)",
+   "meshy": {
+    "prompt": "Starts standing upright facing forward with arms relaxed at the sides. Hides both hands behind the back, then slowly brings them forward cupped together at chest height as if offering a gift, holds them out; then returns to the same relaxed standing pose and holds still, in place, no turning.",
+    "duration": 2.0,
+    "mode": "prime"
+   }
   },
   "surprise_trick_glitter": {
    "priority": "P0",
@@ -265,7 +345,12 @@
    "start": "стойка idle",
    "end": "стойка idle",
    "replaces": "кнопка «Удиви» играет `surprised` (кот сам пугается)",
-   "trigger": "surprise (кнопка «Удиви»)"
+   "trigger": "surprise (кнопка «Удиви»)",
+   "meshy": {
+    "prompt": "Starts standing upright facing forward with arms relaxed at the sides. Rises on the toes, sways the hips side to side, then throws both arms wide open with jazz hands in a ta-da pose and holds it briefly; then returns to the same relaxed standing pose and holds still, in place, no turning.",
+    "duration": 2.0,
+    "mode": "prime"
+   }
   },
   "tease_hooligan": {
    "priority": "P0",
@@ -275,7 +360,12 @@
    "start": "стойка idle",
    "end": "стойка idle",
    "replaces": "кнопка «Подразни» играет `offended` (16,6 с) / `shy`",
-   "trigger": "tease (кнопка «Подразни»)"
+   "trigger": "tease (кнопка «Подразни»)",
+   "meshy": {
+    "prompt": "Starts standing upright facing forward with arms relaxed at the sides. Puts the right hand at the nose and wiggles the fingers teasingly, bouncing from foot to foot on the spot; then returns to the same relaxed standing pose and holds still, in place, no turning.",
+    "duration": 2.0,
+    "mode": "prime"
+   }
   },
   "tease_kind": {
    "priority": "P0",
@@ -285,7 +375,12 @@
    "start": "стойка idle",
    "end": "стойка idle",
    "replaces": "кнопка «Подразни» играет `offended` (16,6 с) / `shy`",
-   "trigger": "tease (кнопка «Подразни»)"
+   "trigger": "tease (кнопка «Подразни»)",
+   "meshy": {
+    "prompt": "Starts standing upright facing forward with arms relaxed at the sides. Holds both open hands next to the head and waggles them teasingly, then covers the mouth with one hand and giggles shyly with the shoulders; then returns to the same relaxed standing pose and holds still, in place, no turning.",
+    "duration": 2.0,
+    "mode": "prime"
+   }
   },
   "tease_glitter": {
    "priority": "P0",
@@ -295,7 +390,12 @@
    "start": "стойка idle",
    "end": "стойка idle",
    "replaces": "кнопка «Подразни» играет `offended` (16,6 с) / `shy`",
-   "trigger": "tease (кнопка «Подразни»)"
+   "trigger": "tease (кнопка «Подразни»)",
+   "meshy": {
+    "prompt": "Starts standing upright facing forward with arms relaxed at the sides. Lifts the chin up haughtily and turns the head away to the left with a little flick, then peeks back forward with a sly sideways glance; the body keeps facing forward; then returns to the same relaxed standing pose and holds still, in place, no turning.",
+    "duration": 2.0,
+    "mode": "prime"
+   }
   },
   "sad_sigh": {
    "priority": "P0",
@@ -305,7 +405,12 @@
    "start": "стойка idle",
    "end": "стойка idle",
    "replaces": "игра emo «грустный» = `ears_back` (additive) — тело стоит в idle",
-   "trigger": "emo_is_sad; также реплики с emotion sad"
+   "trigger": "emo_is_sad; также реплики с emotion sad",
+   "meshy": {
+    "prompt": "Starts standing upright facing forward with arms relaxed at the sides. Slowly drops the shoulders and looks down, lets out a big heavy sigh with the chest sinking, scuffs the right foot on the floor once, then lifts the head a little; then returns to the same relaxed standing pose and holds still, in place, no turning.",
+    "duration": 2.5,
+    "mode": "prime"
+   }
   },
   "rps_throw": {
    "priority": "P0",
@@ -315,7 +420,12 @@
    "start": "стойка idle",
    "end": "правая лапа вытянута вперёд на уровне груди, держит 0,5 с",
    "replaces": "показ «камень/ножницы/бумага» = `proud` (руки в боки)",
-   "trigger": "rps_go → rps_is_rock|paper|scissors"
+   "trigger": "rps_go → rps_is_rock|paper|scissors",
+   "meshy": {
+    "prompt": "Starts standing upright facing forward with arms relaxed at the sides. Shakes the right fist up and down three times in front of the chest, then thrusts the right hand straight forward at chest height and holds it there for half a second, then lowers it; then returns to the same relaxed standing pose and holds still, in place, no turning.",
+    "duration": 2.0,
+    "mode": "prime"
+   }
   },
   "sit_down": {
    "priority": "P0",
@@ -325,7 +435,12 @@
    "start": "стойка idle",
    "end": "сидит на полу (поза `sit_idle` v2)",
    "replaces": "`sit` (6,9 с, кот сидит с первого кадра)",
-   "trigger": "sit («сядь», игра «Повтори движение»)"
+   "trigger": "sit («сядь», игра «Повтори движение»)",
+   "meshy": {
+    "prompt": "Starts standing upright facing forward with arms relaxed at the sides. Bends the knees and sits down on the floor, legs stretched forward, hands resting on the knees, and stays seated still. In place, no turning.",
+    "duration": 2.0,
+    "mode": "prime"
+   }
   },
   "sit_idle": {
    "priority": "P0",
@@ -335,7 +450,12 @@
    "start": "сидит на полу (поза `sit_idle` v2)",
    "end": "сидит на полу (поза `sit_idle` v2)",
    "replaces": "алиас `standing_relax` (стоит)",
-   "trigger": "после sit_down, пока ребёнок не скажет «встань»/не коснётся"
+   "trigger": "после sit_down, пока ребёнок не скажет «встань»/не коснётся",
+   "meshy": {
+    "prompt": "Sits on the floor with the legs stretched forward and hands resting on the knees, swings the feet alternately and gently sways the head side to side. Seamless loop, stays seated, no turning.",
+    "duration": 3.0,
+    "mode": "prime"
+   }
   },
   "stand_up": {
    "priority": "P0",
@@ -345,7 +465,12 @@
    "start": "сидит на полу (поза `sit_idle` v2)",
    "end": "стойка idle",
    "replaces": "`stand_up` (встаёт с пола, не из позы sit)",
-   "trigger": "выход из sit_idle"
+   "trigger": "выход из sit_idle",
+   "meshy": {
+    "prompt": "Starts sitting on the floor with the legs stretched forward and hands on the knees. Pulls the feet in, pushes up with the hands and stands up briskly, ending upright facing forward with arms relaxed at the sides, in place, no turning.",
+    "duration": 2.0,
+    "mode": "prime"
+   }
   },
   "wave": {
    "priority": "P0",
@@ -355,7 +480,12 @@
    "start": "стойка idle",
    "end": "стойка idle",
    "replaces": "пресет `greet_01` (шаг на месте — лапы скользят, pop 14)",
-   "trigger": "hello, wave, game_bye, simon_is_wave и ещё 25 реакций"
+   "trigger": "hello, wave, game_bye, simon_is_wave и ещё 25 реакций",
+   "meshy": {
+    "prompt": "Starts standing upright facing forward with arms relaxed at the sides. Raises the right hand above the head and waves it side to side three times, feet staying planted; then returns to the same relaxed standing pose and holds still, in place, no turning.",
+    "duration": 2.0,
+    "mode": "prime"
+   }
   },
   "offended": {
    "priority": "P0",
@@ -365,7 +495,12 @@
    "start": "стойка idle",
    "end": "стойка idle",
    "replaces": "пресет `fold_arms` (16,6 с)",
-   "trigger": "tease (Х,Б до вариантов), rude, poke_combo, emo_is_angry"
+   "trigger": "tease (Х,Б до вариантов), rude, poke_combo, emo_is_angry",
+   "meshy": {
+    "prompt": "Starts standing upright facing forward with arms relaxed at the sides. Crosses the arms over the chest, turns the head away to the left with the chin up and a huff, then peeks back forward out of the corner of the eye; the body keeps facing forward; then returns to the same relaxed standing pose and holds still, in place, no turning.",
+    "duration": 2.5,
+    "mode": "prime"
+   }
   },
   "walk": {
    "priority": "P1",
@@ -375,7 +510,12 @@
    "start": "стойка idle",
    "end": "стойка idle",
    "replaces": "пресет `walk` 2,3 с (скольжение на старте)",
-   "trigger": "walk_to (тап по карте)"
+   "trigger": "walk_to (тап по карте)",
+   "meshy": {
+    "prompt": "Walks in place with a bouncy cheerful stride, arms swinging, head facing forward. Seamless walk cycle, no forward travel, no turning.",
+    "duration": 2.0,
+    "mode": "prime"
+   }
   },
   "run": {
    "priority": "P1",
@@ -385,7 +525,12 @@
    "start": "стойка idle",
    "end": "стойка idle",
    "replaces": "пресет `run` (шум jit 49)",
-   "trigger": "walk_far"
+   "trigger": "walk_far",
+   "meshy": {
+    "prompt": "Runs in place with quick light steps, arms pumping, leaning slightly forward. Seamless run cycle, no forward travel, no turning.",
+    "duration": 2.0,
+    "mode": "prime"
+   }
   },
   "jump": {
    "priority": "P1",
@@ -395,7 +540,12 @@
    "start": "стойка idle",
    "end": "стойка idle",
    "replaces": "`jump` 4,6 с",
-   "trigger": "jump, simon_is_jump, blow_stickers"
+   "trigger": "jump, simon_is_jump, blow_stickers",
+   "meshy": {
+    "prompt": "Starts standing upright facing forward with arms relaxed at the sides. Bends the knees and springs straight up with both arms raised, lands softly on the same spot; then returns to the same relaxed standing pose and holds still, in place, no turning.",
+    "duration": 2.0,
+    "mode": "prime"
+   }
   },
   "flip": {
    "priority": "P1",
@@ -405,7 +555,12 @@
    "start": "стойка idle",
    "end": "стойка idle",
    "replaces": "`flip` 4,3 с, скольжение на приземлении",
-   "trigger": "flip, double_tap, simon_is_flip"
+   "trigger": "flip, double_tap, simon_is_flip",
+   "meshy": {
+    "prompt": "Starts standing upright facing forward with arms relaxed at the sides. Crouches, jumps and does a backflip on the spot, lands on the same spot and opens the arms in a ta-da pose; then returns to the same relaxed standing pose and holds still, in place, no turning.",
+    "duration": 2.0,
+    "mode": "prime"
+   }
   },
   "flinch": {
    "priority": "P1",
@@ -415,7 +570,12 @@
    "start": "стойка idle",
    "end": "стойка idle",
    "replaces": "пресет `frightened` 3,4 с с подскоком",
-   "trigger": "poke_hard"
+   "trigger": "poke_hard",
+   "meshy": {
+    "prompt": "Starts standing upright facing forward with arms relaxed at the sides. Recoils backward with the upper body, hands pulled up to the chest for a moment, feet stay planted; then returns to the same relaxed standing pose and holds still, in place, no turning.",
+    "duration": 2.0,
+    "mode": "prime"
+   }
   },
   "knock_glass": {
    "priority": "P1",
@@ -425,7 +585,12 @@
    "start": "стойка idle",
    "end": "стойка idle",
    "replaces": "`knock_glass` 4,7 с, pop 27",
-   "trigger": "tap_screen"
+   "trigger": "tap_screen",
+   "meshy": {
+    "prompt": "Starts standing upright facing forward with arms relaxed at the sides. Leans forward and knocks twice with the right knuckles on an invisible window in front of the face; then returns to the same relaxed standing pose and holds still, in place, no turning.",
+    "duration": 2.0,
+    "mode": "prime"
+   }
   },
   "listen": {
    "priority": "P1",
@@ -435,7 +600,12 @@
    "start": "стойка idle",
    "end": "стойка idle",
    "replaces": "алиас `agree` (кивает)",
-   "trigger": "ask_name, echo_start, unknown, *_more — ожидание ответа"
+   "trigger": "ask_name, echo_start, unknown, *_more — ожидание ответа",
+   "meshy": {
+    "prompt": "Stands facing forward, tilts the head to one side and holds the right hand cupped behind the ear as if listening closely, nodding slightly. Seamless loop, in place, no turning.",
+    "duration": 2.0,
+    "mode": "prime"
+   }
   },
   "comfort": {
    "priority": "P1",
@@ -445,7 +615,12 @@
    "start": "стойка idle",
    "end": "стойка idle",
    "replaces": "алиас `hug` (обнимает себя)",
-   "trigger": "sad, scared (диалог поддержки)"
+   "trigger": "sad, scared (диалог поддержки)",
+   "meshy": {
+    "prompt": "Starts standing upright facing forward with arms relaxed at the sides. Leans gently forward, places the right palm flat on an invisible window in front at chest height and nods softly twice; then returns to the same relaxed standing pose and holds still, in place, no turning.",
+    "duration": 3.0,
+    "mode": "prime"
+   }
   },
   "dizzy": {
    "priority": "P1",
@@ -455,7 +630,12 @@
    "start": "стойка idle",
    "end": "стойка idle",
    "replaces": "`dizzy` вялый (p95 1,0)",
-   "trigger": "shake, spam"
+   "trigger": "shake, spam",
+   "meshy": {
+    "prompt": "Starts standing upright facing forward with arms relaxed at the sides. Sways the upper body in wobbly circles with knees buckling, almost loses balance, then shakes the head hard to recover; then returns to the same relaxed standing pose and holds still, in place, no turning.",
+    "duration": 2.0,
+    "mode": "prime"
+   }
   },
   "snowglobe_shake": {
    "priority": "P1",
@@ -465,7 +645,12 @@
    "start": "стойка idle",
    "end": "стойка idle",
    "replaces": "`snowglobe_shake` (2,2 с пустого начала, почти неподвижен)",
-   "trigger": "shake (Блёстка)"
+   "trigger": "shake (Блёстка)",
+   "meshy": {
+    "prompt": "Starts standing upright facing forward with arms relaxed at the sides. Holds a ball-sized object in both hands at chest height, shakes it up and down vigorously four times, then raises it to eye level and gazes at it; then returns to the same relaxed standing pose and holds still, in place, no turning.",
+    "duration": 2.0,
+    "mode": "prime"
+   }
   },
   "idle_glitter_twirl": {
    "priority": "P1",
@@ -475,7 +660,12 @@
    "start": "стойка idle",
    "end": "стойка idle",
    "replaces": "алиас `dance_03` (12 с танца)",
-   "trigger": "idle Блёстки, swipe"
+   "trigger": "idle Блёстки, swipe",
+   "meshy": {
+    "prompt": "Starts standing upright facing forward with arms relaxed at the sides. Rises on the toes and does one full pirouette in place with arms curved overhead, finishing facing forward with one hand under the chin; then returns to the same relaxed standing pose and holds still, in place, no turning.",
+    "duration": 2.5,
+    "mode": "prime"
+   }
   },
   "idle_hooligan_headphones": {
    "priority": "P1",
@@ -485,7 +675,12 @@
    "start": "стойка idle",
    "end": "стойка idle",
    "replaces": "одноразовое «надеть наушники» в петле",
-   "trigger": "idle Хулигана"
+   "trigger": "idle Хулигана",
+   "meshy": {
+    "prompt": "Stands facing forward nodding the head to a beat, taps the right foot and flicks the left hand in rhythm, right hand resting on the chest. Seamless loop, in place, no turning.",
+    "duration": 4.0,
+    "mode": "prime"
+   }
   },
   "hug_receive_hooligan": {
    "priority": "P1",
@@ -495,7 +690,12 @@
    "start": "стойка idle",
    "end": "стойка idle",
    "replaces": "«Обнять» у Хулигана = `purr_stroke`",
-   "trigger": "stroke_long / кнопка «Обнять» (Хулиган)"
+   "trigger": "stroke_long / кнопка «Обнять» (Хулиган)",
+   "meshy": {
+    "prompt": "Starts standing upright facing forward with arms relaxed at the sides. Shrugs, opens the arms, gives a quick hug forward with two pats, then scratches the back of the head awkwardly; then returns to the same relaxed standing pose and holds still, in place, no turning.",
+    "duration": 2.5,
+    "mode": "prime"
+   }
   },
   "hug_receive_glitter": {
    "priority": "P1",
@@ -505,7 +705,12 @@
    "start": "стойка idle",
    "end": "стойка idle",
    "replaces": "«Обнять» у Блёстки = `purr_stroke`",
-   "trigger": "stroke_long / кнопка «Обнять» (Блёстка)"
+   "trigger": "stroke_long / кнопка «Обнять» (Блёстка)",
+   "meshy": {
+    "prompt": "Starts standing upright facing forward with arms relaxed at the sides. Clasps both hands to the cheeks, then opens the arms and hugs forward warmly, swaying side to side on the toes; then returns to the same relaxed standing pose and holds still, in place, no turning.",
+    "duration": 2.5,
+    "mode": "prime"
+   }
   },
   "celebrate": {
    "priority": "P1",
@@ -515,7 +720,12 @@
    "start": "стойка idle",
    "end": "стойка idle",
    "replaces": "`celebrate` 4,8 с, pop 16 (39 реакций)",
-   "trigger": "yes, nice_name, riddle_right, treat (до treat_eat), …"
+   "trigger": "yes, nice_name, riddle_right, treat (до treat_eat), …",
+   "meshy": {
+    "prompt": "Starts standing upright facing forward with arms relaxed at the sides. Jumps up with both fists in the air, lands and pumps one fist down with a big yes; then returns to the same relaxed standing pose and holds still, in place, no turning.",
+    "duration": 2.0,
+    "mode": "prime"
+   }
   },
   "sticker_slap": {
    "priority": "P1",
@@ -525,7 +735,12 @@
    "start": "стойка idle",
    "end": "стойка idle",
    "replaces": "`sticker_slap` 5 с для серии шлепков",
-   "trigger": "switch_start, stickers (серия)"
+   "trigger": "switch_start, stickers (серия)",
+   "meshy": {
+    "prompt": "Starts standing upright facing forward with arms relaxed at the sides. Quickly slaps the right palm flat forward onto an invisible window at chest height, once; then returns to the same relaxed standing pose and holds still, in place, no turning.",
+    "duration": 2.0,
+    "mode": "prime"
+   }
   },
   "sing": {
    "priority": "P1",
@@ -535,7 +750,12 @@
    "start": "стойка idle",
    "end": "стойка idle",
    "replaces": "пресет `sing_01` 15,5 с",
-   "trigger": "sing"
+   "trigger": "sing",
+   "meshy": {
+    "prompt": "Stands facing forward singing into an invisible microphone held in the right hand near the mouth, sways side to side and spreads the left arm dramatically. Seamless loop, in place, no turning.",
+    "duration": 4.0,
+    "mode": "prime"
+   }
   },
   "idle_kind_cocoa": {
    "priority": "P1",
@@ -545,7 +765,12 @@
    "start": "стойка idle",
    "end": "стойка idle",
    "replaces": "`idle_kind_cocoa` (кружка не наклоняется, появляется из воздуха)",
-   "trigger": "idle Добряка, silence"
+   "trigger": "idle Добряка, silence",
+   "meshy": {
+    "prompt": "Starts standing upright facing forward with arms relaxed at the sides. Brings both hands together at chest height as if holding a mug, raises it to the mouth, blows on it, tilts it for a slow sip, sighs happily and lowers the hands; then returns to the same relaxed standing pose and holds still, in place, no turning.",
+    "duration": 4.0,
+    "mode": "prime"
+   }
   },
   "idle_glitter_mirror": {
    "priority": "P1",
@@ -555,7 +780,12 @@
    "start": "стойка idle",
    "end": "стойка idle",
    "replaces": "`idle_glitter_mirror` (зеркальце висит весь клип)",
-   "trigger": "idle Блёстки, silence"
+   "trigger": "idle Блёстки, silence",
+   "meshy": {
+    "prompt": "Starts standing upright facing forward with arms relaxed at the sides. Lifts a small hand mirror in the left hand to the face, fixes the hair on top of the head with the right hand, turns the head left and right admiring itself, then lowers the mirror; then returns to the same relaxed standing pose and holds still, in place, no turning.",
+    "duration": 3.5,
+    "mode": "prime"
+   }
   },
   "skate_ride": {
    "priority": "P1",
@@ -565,7 +795,12 @@
    "start": "стойка idle",
    "end": "стойка idle",
    "replaces": "`idle_hooligan_skate` (скейт невидим, ноги дрожат)",
-   "trigger": "idle Хулигана"
+   "trigger": "idle Хулигана",
+   "meshy": {
+    "prompt": "Stands sideways-balanced with knees bent and arms out as if riding a skateboard, pushes once with the right foot, glides balancing with small sways, then stands up straight facing forward. In place, no forward travel.",
+    "duration": 4.0,
+    "mode": "prime"
+   }
   },
   "skate_ollie": {
    "priority": "P2",
@@ -956,7 +1191,12 @@
    "end": "на коленях и передних лапах на матрасе (= первый кадр lie_down_side)",
    "replaces": "нет (опора jump + путь сцены)",
    "trigger": "«Уложить спать» после walk_to_bedside",
-   "root": "сцена: дуга сбоку от пола у длинного края к sleep_spot (вверх 0,38 роста, вглубь 0,5, вершина +0,3); в клипе на месте"
+   "root": "сцена: дуга сбоку от пола у длинного края к sleep_spot (вверх 0,38 роста, вглубь 0,5, вершина +0,3); в клипе на месте",
+   "meshy": {
+    "prompt": "Starts standing upright facing forward with arms relaxed at the sides. Puts both hands up on a knee-high platform in front, climbs up onto it one knee after the other and ends kneeling on all fours on top, then turns the head to the right. Stays in place, body keeps facing forward.",
+    "duration": 2.0,
+    "mode": "prime"
+   }
   },
   "lie_down_side": {
    "priority": "P0",
@@ -967,7 +1207,12 @@
    "end": "лёжа на левом боку, голова вправо (+X) на подушке, живот к зрителю (= первый кадр sleep_loop_bed)",
    "replaces": "нет (опора sleep_loop + крен сцены)",
    "trigger": "второй шаг «уложить»",
-   "root": "на месте, таз 0,24 → 0,14 над уровнем старта"
+   "root": "на месте, таз 0,24 → 0,14 над уровнем старта",
+   "meshy": {
+    "prompt": "Starts kneeling on all fours facing forward. Slowly lowers onto the left elbow and rolls onto the left side, head toward its left, belly toward the front, pulls the knees up and tucks the hands to the chest, then lies still. In place.",
+    "duration": 2.0,
+    "mode": "prime"
+   }
   },
   "sleep_loop_bed": {
    "priority": "P0",
@@ -978,7 +1223,12 @@
    "end": "она же (бесшовно)",
    "replaces": "нет (опора sleep_loop)",
    "trigger": "спит в кровати под одеялом",
-   "root": "на месте"
+   "root": "на месте",
+   "meshy": {
+    "prompt": "Lies curled up on the left side, head resting toward its left, knees pulled up, hands tucked to the chest, sleeping and breathing slowly with the chest rising and falling. Seamless loop, stays lying in place.",
+    "duration": 4.0,
+    "mode": "prime"
+   }
   },
   "turn_over_sleep": {
    "priority": "P0",
@@ -989,7 +1239,12 @@
    "end": "поза sleep_loop_bed",
    "replaces": "нет (опора sleep_loop + покачивание корня)",
    "trigger": "тап по спящему (второй тап серии), реплика asleep_murmur",
-   "root": "на месте"
+   "root": "на месте",
+   "meshy": {
+    "prompt": "Starts lying curled up asleep on the left side. Stirs, rolls halfway onto the back with a lazy wave of one hand, then rolls back onto the left side, tucks the hands to the chest and settles still again. In place.",
+    "duration": 2.0,
+    "mode": "prime"
+   }
   },
   "wake_stretch_in_bed": {
    "priority": "P0",
@@ -1000,7 +1255,12 @@
    "end": "сидит на краю матраса лицом к зрителю, ноги свешены (= первый кадр hop_out_of_bed)",
    "replaces": "нет (опора wake_startle)",
    "trigger": "после того как сцена откинула одеяло к изножью (3 тапа, «Разбудить», голос, шторка)",
-   "root": "на месте, таз 0,14 → 0,2"
+   "root": "на месте, таз 0,14 → 0,2",
+   "meshy": {
+    "prompt": "Starts lying curled up on the left side. Stretches both arms over the head and the legs out long, yawns with one hand over the mouth, then sits up facing forward with the lower legs hanging down over a ledge and hands resting beside the hips. In place.",
+    "duration": 2.0,
+    "mode": "prime"
+   }
   },
   "hop_out_of_bed": {
    "priority": "P0",
@@ -1011,7 +1271,12 @@
    "end": "стойка idle на полу у кровати лицом к зрителю, потом сцена ведёт на место сбоку",
    "replaces": "нет (опора jump + путь сцены)",
    "trigger": "последний шаг пробуждения",
-   "root": "сцена: вбок с края матраса на пол у кровати (вниз 0,38, к зрителю 0,35, вершина +0,25); в клипе на месте"
+   "root": "сцена: вбок с края матраса на пол у кровати (вниз 0,38, к зрителю 0,35, вершина +0,25); в клипе на месте",
+   "meshy": {
+    "prompt": "Starts sitting on a knee-high ledge facing forward with the lower legs hanging down and hands beside the hips. Pushes off with both hands, hops down forward to the floor, lands softly with bent knees and stands up upright facing forward with arms relaxed, in place.",
+    "duration": 2.0,
+    "mode": "prime"
+   }
   },
   "walk_to_bedside": {
    "priority": "P1",
@@ -1022,7 +1287,12 @@
    "end": "стойка спиной к зрителю у длинного края",
    "replaces": "по желанию; опора walk + путь сцены",
    "trigger": "первый шаг «уложить»",
-   "root": "сцена: вдоль кровати к длинному краю и поворот к ней; в клипе на месте"
+   "root": "сцена: вдоль кровати к длинному краю и поворот к ней; в клипе на месте",
+   "meshy": {
+    "prompt": "Walks slowly in place with small shuffling steps, head slightly lowered, sleepy, arms relaxed, rubs one eye with the right hand once. Seamless loop, no forward travel, no turning.",
+    "duration": 2.0,
+    "mode": "prime"
+   }
   }
  },
  "props": {
@@ -1186,5 +1456,6 @@
    "size": 0.17,
    "prompt": null
   }
- }
+ },
+ "meshy": "Meshy Text-to-Motion (scripts/meshy/motion-run.sh, docs/animations/MESHY.md): specs[id].meshy = {prompt ≤400, duration 2–10 шаг 0,5 = durationS ТЗ вверх до 0,5 и не меньше 2, mode}. Промпты — только движение тела одного персонажа, на месте, без хвоста/ушей/лица; старт/финиш — стойка, кроме цепочек сна и сидения."
 }

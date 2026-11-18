@@ -406,6 +406,23 @@ export class DeskPanel {
         this.note(`эмоция ${f}`);
       }, `content/face.json: ${f}`);
 
+    // клипы Meshy (lab, feature anims.meshy): что пришло из /models/anims/meshy/manifest.json
+    if (feature('anims.meshy')) {
+      row = sec('Клипы Meshy');
+      const ext = (app.character as unknown as { externalClips?: { id: string; dur: number; src: string }[] }).externalClips ?? [];
+      if (!ext.length) {
+        const e = document.createElement('span');
+        e.className = 'dp-note';
+        e.textContent = 'нет (нет manifest.json, ещё грузятся или ?meshy=0)';
+        row.appendChild(e);
+      }
+      for (const c of ext)
+        btn(row, `${c.id} · ${c.dur} с`, () => {
+          app.character.play(c.id);
+          this.note(`клип Meshy ${c.id}`);
+        }, `${c.src}; play('${c.id}')`);
+    }
+
     // события и реплики: поиск
     const s = document.createElement('section');
     s.className = 'dp-sec';

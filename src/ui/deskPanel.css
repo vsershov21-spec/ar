@@ -85,3 +85,6 @@
 .dp-log .mute { color: #ff9d8f; }
 .dp-log .test { color: #8fd3ff; }
 /* при панели — подсказка про мышь и пузырь остаются в области кота (#app сужен) */
+
+/* пояснение в строке кнопок «Теста» (клипы Meshy: пусто) */
+.dp-note { font-size: 12px; opacity: 0.6; padding: 4px 2px; }

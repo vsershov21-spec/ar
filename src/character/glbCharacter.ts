@@ -18,6 +18,8 @@ import { FaceLife } from './faceLife';
 import { ClipState } from './clipState';
 import { clipDef, FALLBACK_CLIPS } from './clips';
 import { prepareClipsAsync, type ClipPrepInfo } from './animPrep';
+import { loadMeshyClips, meshyWanted, skelFrom, type Skel } from './meshyClips';
+import { feature } from '../config/edition';
 import { AnimBlender } from './animBlend';
 import { TailRig, type TailOutput } from './tailRig';
 import { PropRig } from './props';
@@ -258,6 +260,8 @@ export class GlbCharacter implements Character {
     model.scale.setScalar(k);
     model.position.set(-((box.min.x + box.max.x) / 2) * k, -box.min.y * k, -((box.min.z + box.max.z) / 2) * k);
     this.inner.add(model);
+    // поза покоя/привязки скелета — до миксера (перенос внешних клипов Meshy, meshyClips.ts)
+    this.skel = skelFrom(model);
     // мех по силуэту (оболочки) — если стадия body_detail положила в GLB меш BD_FurShell
     buildFurShells(model);
 
@@ -318,6 +322,8 @@ export class GlbCharacter implements Character {
       // одноразовые клипы играют до конца движения, а не по ориентиру каталога
       this.actions.forEach((a, id) => this.clips.realDuration.set(id, this.anim?.realDuration(a) ?? a.getClip().duration));
     }
+    // клипы Meshy (lab): лениво, после того как кот уже стоит; ?meshy=0 — без них
+    if (this.mixer && meshyWanted(feature('anims.meshy'))) void this.loadMeshy();
     this.setFaceObj('usual');
     this.furTone.attach(model);
     this.mouthRig = MouthRig.find(model);
@@ -405,6 +411,54 @@ export class GlbCharacter implements Character {
       this.procedural.add(d.id);
     }
   }
+  /** скелет модели в позе привязки (для переноса внешних клипов) */
+  skel: Skel | null = null;
+  /** внешние клипы (Meshy), уже зарегистрированные под id ТЗ — для вкладки «Тест» */
+  readonly externalClips: { id: string; dur: number; src: string }[] = [];
+
+  private async loadMeshy() {
+    try {
+      await loadMeshyClips(this, {
+        fetchJson: async (u) => {
+          const r = await fetch(asset(u));
+          return r.ok ? r.json() : null;
+        },
+        loadGlb: async (u) => {
+          const r = await fetch(asset(u));
+          if (!r.ok) throw new Error(`${u}: ${r.status}`);
+          return makeGltfLoader().parseAsync(await r.arrayBuffer(), asset(u).replace(/[^/]*$/, ''));
+        },
+        log: (m) => console.info(m),
+      });
+    } catch (e) {
+      console.warn('[meshy] клипы не загрузились', e);
+    }
+  }
+
+  /**
+   * Внешний клип (уже на наших костях) под id каталога: animPrep (обрезка, швы, высота корня, темп) и регистрация.
+   * Своё имя важнее всего: заменяет и клип-опору (fallback), и псевдоним, и старый клип anims_v1 с тем же id.
+   */
+  async addExternalClip(id: string, clip: THREE.AnimationClip, loop: boolean, src: string) {
+    if (!this.mixer || !this.model) return;
+    clip.name = id;
+    const info = await prepareClipsAsync(this.model, this.inner, [clip], {
+      isLoop: () => loop || !!clipDef(id)?.loop,
+      keepSpeed: (n) => /dance|run|jump|flip|dive|fall|tumble|celebrate|cheer/.test(n),
+    });
+    if (!this.mixer) return; // кота сменили, пока готовили
+    info.forEach((v, k) => this.animInfo.set(k, v));
+    const action = this.mixer.clipAction(clip);
+    this.actions.set(id, action);
+    this.aliased.delete(id);
+    this.procedural.delete(id);
+    this.clips.realDuration.set(id, this.anim?.realDuration(action) ?? clip.duration);
+    const i = this.externalClips.findIndex((e) => e.id === id);
+    const rec = { id, dur: +clip.duration.toFixed(2), src };
+    if (i >= 0) this.externalClips[i] = rec;
+    else this.externalClips.push(rec);
+  }
+
   /** id клипов, которые сейчас играют опорой (настоящего клипа в GLB нет) — для сцены и debug */
   readonly procedural = new Set<string>();
   /**

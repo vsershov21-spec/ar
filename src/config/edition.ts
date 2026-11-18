@@ -51,6 +51,7 @@ export const FEATURES = {
   'stickers.pack': { mvp: false, lab: true, note: 'новый пак наклеек СберКота и коллекция (fx/stickerPack, fxLayer)' },
   'home.bed': { mvp: false, lab: true, note: 'кровать в спальне «Мира кота»: уложить спать, сон, разбудить, время суток (src/home/bedFlow.ts; homeMode.ts — точка входа)' },
   'anims.new': { mvp: false, lab: true, note: 'новые анимации по мере генерации (точка входа — у агента анимаций)' },
+  'anims.meshy': { mvp: false, lab: true, note: 'клипы Meshy Text-to-Motion из /models/anims/meshy/manifest.json поверх anims_v1 (character/meshyClips.ts; GlbCharacter.load — точка входа); ?meshy=0 — без них' },
   'debug.flows': { mvp: false, lab: true, note: 'тестовые флоу и ускорения ?flow=… (src/debug/flows.ts); в MVP — только со страницы /test (?from=test)' },
   'tracker.nocard': { mvp: false, lab: true, note: '?nocard — кот на столе без карты; в MVP — только со страницы /test' },
   'card.anycard': { mvp: false, lab: true, note: '?anycard — кот садится на любой прямоугольник (без проверки «это карта Сбера»)' },
@@ -87,6 +88,7 @@ export const PARAMS: Record<string, { feature: FeatureId; test?: boolean; keep?:
   anycard: { feature: 'card.anycard' },
   grab: { feature: 'card.grabExperimental', keep: ['main'] },
   glb: { feature: 'model.custom' },
+  meshy: { feature: 'anims.meshy' }, // ?meshy=0 — lab без клипов Meshy (сравнить с опорами)
 };
 
 /**
