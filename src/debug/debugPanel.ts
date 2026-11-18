@@ -6,6 +6,7 @@ import type { App } from '../app';
 import { perf } from '../core/perf';
 import { debugTabs, onDebugTab, type DebugTab, type DebugUi } from './tabs';
 import { registerBuiltinTabs } from './builtinTabs';
+import { EDITION } from '../config/edition';
 
 const css = `
 .dbg { position: fixed; z-index: 50; right: 0; top: 0; bottom: 0; width: min(320px, 82vw); background: rgba(10,14,18,.88); color: #dfe; font: 12px/1.3 ui-monospace, Menlo, monospace;
@@ -60,7 +61,7 @@ export class DebugPanel {
     document.body.appendChild(el);
     const tog = document.createElement('button');
     tog.className = 'dbg-toggle';
-    tog.innerHTML = '<b>DBG</b><span>—</span>';
+    tog.innerHTML = `<b>DBG·${EDITION.toUpperCase()}</b><span>—</span>`; // редакция сборки (config/edition.ts)
     tog.setAttribute('aria-label', 'Отладка');
     tog.onclick = () => el.classList.toggle('closed');
     document.body.appendChild(tog);

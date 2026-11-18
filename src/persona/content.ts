@@ -9,6 +9,7 @@ import { PERSONA_IDS } from './types';
 import type { DialogsFile } from '../scenario/dialogs';
 import type { IntentDef } from '../scenario/intentMatch';
 import { normalizeName } from '../scenario/names';
+import { feature, NEW_GAMES } from '../config/edition';
 
 export interface FaceFile { presets: FacePreset[]; emotionToFace: Record<string, string> }
 
@@ -78,11 +79,26 @@ export async function loadContent(): Promise<ContentBundle> {
   return makeBundle({
     personas,
     events: events as RawContent['events'],
-    dialogs: dialogs as DialogsFile,
+    dialogs: editionDialogs(dialogs as DialogsFile),
     intents: intents as RawContent['intents'],
     face: face as FaceFile,
     names,
   });
+}
+
+/**
+ * Редакция (src/config/edition.ts): выключенные новые мини-игры (games.new: emo/rps/simon) убираются из диалогов —
+ * без триггера их нет ни в каталоге, ни в чипах, ни голосом; без узла offer.<игра> кот их не предлагает.
+ */
+export function editionDialogs(f: DialogsFile, on = feature('games.new')): DialogsFile {
+  if (on) return f;
+  const off = new Set<string>(NEW_GAMES);
+  const dialogs = Object.fromEntries(Object.entries(f.dialogs).filter(([id]) => !off.has(id)));
+  const offer = dialogs.offer;
+  if (offer) dialogs.offer = { ...offer, nodes: Object.fromEntries(Object.entries(offer.nodes).filter(([n]) => !off.has(n))) };
+  const triggers = Object.fromEntries(Object.entries(f.triggers).filter(([, t]) => !off.has(t.split(':')[0])));
+  const games = f.games ? Object.fromEntries(Object.entries(f.games).filter(([id]) => !off.has(id))) : f.games;
+  return { ...f, dialogs, triggers, ...(games ? { games } : {}) };
 }
 
 /** Подстановка {name}, {answer} и т.п. */

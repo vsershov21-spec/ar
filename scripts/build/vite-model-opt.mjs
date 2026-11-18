@@ -8,7 +8,8 @@ import { optimizeModels } from './model-opt.mjs';
 /** какие модели сжимаем: персонажи и реквизит (библиотека движений anims_v1.glb уже meshopt — без изменений) */
 const PICK = (rel) => /^models\/(props\/)?[\w.-]+\.glb$/.test(rel) && !/^models\/(anims_|character\.glb)/.test(rel);
 
-export function modelOpt() {
+/** emit: false — только карта путей (сборка lab, docs/EDITIONS.md: сжатые модели уже лежат в dist/models/opt от mvp) */
+export function modelOpt({ emit = true } = {}) {
   let results = [];
   let enabled = process.env.AR_MODEL_OPT !== '0';
   return {
@@ -40,11 +41,12 @@ export function modelOpt() {
         }
         for (const r of results) if (r.data && r.optBytes < r.bytes * 1.15) map[r.rel] = r.optRel;
         const before = results.reduce((a, r) => a + r.bytes, 0), after = results.reduce((a, r) => a + (map[r.rel] ? r.optBytes : r.bytes), 0);
-        if (results.length) console.log(`model-opt: ${results.length} моделей, ${(before / 1048576).toFixed(1)} → ${(after / 1048576).toFixed(1)} МБ за ${((Date.now() - t0) / 1000).toFixed(1)} с`);
+        if (results.length) console.log(`model-opt${emit ? '' : ' (без файлов: только карта)'}: ${results.length} моделей, ${(before / 1048576).toFixed(1)} → ${(after / 1048576).toFixed(1)} МБ за ${((Date.now() - t0) / 1000).toFixed(1)} с`);
       }
       return { define: { __MODEL_OPT__: JSON.stringify(map) } };
     },
     generateBundle() {
+      if (!emit) return;
       for (const r of results) if (r.data && r.optBytes < r.bytes * 1.15) this.emitFile({ type: 'asset', fileName: r.optRel, source: r.data });
     },
   };

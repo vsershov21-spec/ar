@@ -4,8 +4,12 @@
  * восстанавливаем из другого. Никакого фингерпринтинга браузера (модель, экран, шрифты и т. п. не используются):
  * очистили и то и другое — это новое устройство.
  */
+import { STORAGE_PREFIX } from '../config/edition';
+
 export const DEVICE_KEY = 'ar.device';
-const COOKIE = 'ar_device';
+/** cookie редакции: lab — свой id устройства (`lab_ar_device`), ключ localStorage lab и так с префиксом (config/edition.ts) */
+export const cookieName = (prefix = STORAGE_PREFIX) => (prefix ? prefix.replace(/[^a-z0-9]/gi, '') + '_' : '') + 'ar_device';
+const COOKIE = cookieName();
 const RE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
 export const isDeviceId = (s: unknown): s is string => typeof s === 'string' && RE.test(s);
@@ -30,7 +34,7 @@ export interface CookieJar {
 
 function readCookie(jar: CookieJar | null): string | null {
   try {
-    const m = jar?.cookie.match(/(?:^|;\s*)ar_device=([^;]+)/);
+    const m = jar?.cookie.match(new RegExp(`(?:^|;\\s*)${COOKIE}=([^;]+)`));
     return m ? decodeURIComponent(m[1]) : null;
   } catch {
     return null;

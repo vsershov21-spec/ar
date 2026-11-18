@@ -7,6 +7,7 @@
  */
 import { ProgressSync } from './sync';
 import { deviceCode, getDeviceId, safeStorage } from './device';
+import { EDITION, feature } from '../config/edition';
 
 export interface ProgressHandle {
   device: string;
@@ -30,9 +31,10 @@ export function bootProgress(log?: (s: string) => void): ProgressHandle {
   const device = getDeviceId(storage);
   handle = { device, code: deviceCode(device), sync: null };
   (window as any).__progress = handle;
-  if (!storage || q.get('progress') === '0' || env('VITE_PROGRESS') === '0') return handle;
+  // редакция без серверного прогресса (config/edition.ts, progress.server) — только localStorage
+  if (!storage || !feature('progress.server') || q.get('progress') === '0' || env('VITE_PROGRESS') === '0') return handle;
 
-  const sync = new ProgressSync({ device, storage, sendName: sendNameAllowed(), log: log ?? ((s) => console.info(s)) });
+  const sync = new ProgressSync({ device, storage, sendName: sendNameAllowed(), edition: EDITION, log: log ?? ((s) => console.info(s)) });
   handle.sync = sync;
   if (q.get('reset') === '1') {
     sync.markReset();

@@ -49,6 +49,8 @@
     a.go.light, button.go.light { color: var(--green-t); background: linear-gradient(180deg, #fff 0%, #f1f6f3 100%); box-shadow: 0 5px 0 #c5d6cc, 0 10px 18px rgba(0,0,0,.1); }
     a.go.teal { background: linear-gradient(180deg, #13808f, #0b5e6b); box-shadow: inset 0 2px 0 rgba(255,255,255,.25), 0 5px 0 #073f48, 0 10px 18px rgba(7,63,72,.3); }
     button.go.danger { background: linear-gradient(180deg, #ff7a6b, #e5483a); box-shadow: inset 0 2px 0 rgba(255,255,255,.3), 0 5px 0 #a8291e, 0 10px 18px rgba(168,41,30,.25); }
+    a.go.off { opacity: .4; filter: grayscale(1); pointer-events: none; }
+    a.go.off::after { content: ' · только Lab'; font-weight: 600; font-size: 12px; }
     a.go:active, button.go:active { transform: translateY(3px); box-shadow: 0 2px 0 var(--green-d); }
     pre { background: #f4f8f6; border-radius: 12px; padding: 10px; font-size: 12px; white-space: pre-wrap; word-break: break-all; margin: 10px 0 0; }
     footer { text-align: center; color: var(--ink-2); font-size: 12px; margin: 24px 16px 0; }
@@ -62,6 +64,11 @@
   </header>
   <main>
     <section class="mods" aria-label="Модификаторы ко всем ссылкам">
+      <div class="lbl">Редакция (docs/EDITIONS.md)</div>
+      <div class="row" data-group="ed">
+        <button class="tg" data-mod="lab" aria-pressed="true">Lab · /lab</button>
+        <button class="tg" data-mod="mvp">MVP · /</button>
+      </div>
       <div class="lbl">Где кот</div>
       <div class="row" data-group="where">
         <button class="tg" data-mod="" aria-pressed="true">На карте Сбера</button>
@@ -113,6 +120,8 @@
     mountProgressReset(document.getElementById('progress'));
   </script>
   <script type="module">
+    // редакции: ссылки ведут в /lab/ или в MVP (/?from=test — с меткой MVP оставляет ?flow и ?nocard), src/config/edition.ts
+    import { filterSearch, TEST_MARK } from '../src/config/edition.ts';
     // флоу: [эмодзи, заголовок, что проверяем, ожидание, [[подпись, параметры, стиль?]…], карта не нужна?]
     const FLOWS = [
       ['👋', 'Знакомство с нуля', 'Первый визит: поздравление → «как тебя зовут?» → имя → «я — …» → обучалка «погладь меня».', 'Все шаги голосом, касания во время знакомства — без слов; в конце три кнопки внизу и подсказка.', [['С нуля', 'fresh']]],
@@ -135,8 +144,13 @@
       ['🛠️', 'Отладка', 'Лог режиссёра, замеры кадра, карта без камеры.', '?debug — панель и лог («тишина 30 с → offer»); ?perf — window.__perf.report(); tracker=debug — нарисованная карта.', [['?debug', 'debug', 'teal'], ['?perf', 'perf', 'teal'], ['Карта без камеры', 'tracker=debug', 'teal']]],
     ];
 
-    const base = new URL('../', location.href);
-    const state = { where: '', cat: '', dbg: new Set() };
+    const root = new URL('../', location.href);
+    let edSaved = 'lab';
+    try {
+      edSaved = sessionStorage.getItem('test.edition') === 'mvp' ? 'mvp' : 'lab';
+    } catch {}
+    const state = { ed: edSaved, where: '', cat: '', dbg: new Set() };
+    for (const b of document.querySelectorAll('[data-group="ed"] .tg')) b.setAttribute('aria-pressed', String(b.dataset.mod === state.ed));
     const mods = (noCardOk) => {
       const p = [];
       if (state.where && !noCardOk) p.push(state.where);
@@ -146,8 +160,11 @@
     };
     const href = (params, own) => {
       const p = [params, ...mods(own)].filter(Boolean);
-      return new URL(p.length ? `?${p.join('&')}` : '', base).href;
+      if (state.ed === 'lab') return new URL('lab/' + (p.length ? `?${p.join('&')}` : ''), root).href;
+      return new URL(`?${[`${TEST_MARK}=test`, ...p].join('&')}`, root).href;
     };
+    // в MVP ссылка теряет параметры выключенных функций — такую кнопку показываем бледной «только Lab»
+    const mvpOff = (params) => !!params && filterSearch(`${TEST_MARK}=test&${params}`, 'mvp', '').removed.length > 0;
     const cards = document.getElementById('cards');
     for (const [em, title, what, expect, links, own] of FLOWS) {
       const c = document.createElement('article');
@@ -164,7 +181,11 @@
       cards.appendChild(c);
     }
     const refresh = () => {
-      for (const a of document.querySelectorAll('a.go[data-params]')) a.href = href(a.dataset.params, !!a.dataset.own);
+      for (const a of document.querySelectorAll('a.go[data-params]')) {
+        a.href = href(a.dataset.params, !!a.dataset.own);
+        a.classList.toggle('off', state.ed === 'mvp' && mvpOff([a.dataset.params, ...mods(!!a.dataset.own)].filter(Boolean).join('&')));
+      }
+      document.getElementById('reset-link').href = new URL(state.ed === 'lab' ? 'lab/?reset=1' : '?reset=1', root).href;
       const m = mods(false);
       document.getElementById('mods-url').textContent = m.length ? `ко всем ссылкам: ${m.map((x) => '?' + x).join(' ')}` : 'модификаторов нет';
     };
@@ -180,6 +201,11 @@
         } else {
           for (const x of g.querySelectorAll('.tg')) x.setAttribute('aria-pressed', String(x === b));
           state[g.dataset.group] = b.dataset.mod;
+          if (g.dataset.group === 'ed') {
+            try {
+              sessionStorage.setItem('test.edition', b.dataset.mod);
+            } catch {}
+          }
         }
         refresh();
       });
@@ -187,11 +213,12 @@
     refresh();
 
     const KEYS = ['sber-ar-cat:v1', 'ar.micMode'];
+    const pre = () => (state.ed === 'lab' ? 'lab:' : ''); // lab хранит ключи с префиксом lab: (docs/EDITIONS.md)
     const mem = document.getElementById('mem');
     const show = () => {
       let t = '';
       try {
-        t = KEYS.map((k) => `${k}: ${localStorage.getItem(k) ?? '—'}`).join('\n');
+        t = `${state.ed === 'lab' ? 'Lab' : 'MVP'}\n` + KEYS.map((k) => `${k}: ${localStorage.getItem(pre() + k) ?? '—'}`).join('\n');
       } catch {
         t = 'хранилище недоступно (приватный режим?)';
       }
@@ -202,7 +229,11 @@
     document.getElementById('wipe').addEventListener('click', () => {
       try {
         // всё, что кот хранит на телефоне: память сценария, режим микрофона и прочие ключи прототипа (ar.*, sber-ar-cat*)
-        for (const k of Object.keys(localStorage)) if (KEYS.includes(k) || /^(ar\.|sber-ar-cat)/.test(k)) localStorage.removeItem(k);
+        for (const k of Object.keys(localStorage)) {
+          const own = pre() ? k.startsWith(pre()) : !k.startsWith('lab:');
+          const kk = pre() && own ? k.slice(pre().length) : k;
+          if (own && (KEYS.includes(kk) || /^(ar\.|sber-ar-cat)/.test(kk))) localStorage.removeItem(k);
+        }
       } catch {}
       show();
       mem.textContent = 'Память очищена ✓\n' + mem.textContent;

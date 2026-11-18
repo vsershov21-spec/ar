@@ -35,6 +35,8 @@ export interface SyncOptions {
   endpoint?: string;
   /** false — имя ребёнка (поле name в sber-ar-cat:v1) на сервер не отправляется */
   sendName?: boolean;
+  /** редакция (mvp | lab, src/config/edition.ts): уходит на сервер полем edition в записи прогресса и в начале сессии */
+  edition?: string;
   timeoutMs?: number;
   pollMs?: number;
   debounceMs?: number;
@@ -69,7 +71,7 @@ export class ProgressSync {
   /** разрешается не позже timeoutMs после start() */
   ready: Promise<SyncState> = Promise.resolve('idle');
 
-  private o: Required<Omit<SyncOptions, 'beacon' | 'log'>> & Pick<SyncOptions, 'beacon' | 'log'>;
+  private o: Required<Omit<SyncOptions, 'beacon' | 'log' | 'edition'>> & Pick<SyncOptions, 'beacon' | 'log' | 'edition'>;
   private loaded = false;
   private readyDone = false;
   private dirtySince = 0;
@@ -93,6 +95,10 @@ export class ProgressSync {
       maxWaitMs: 15000,
       ...opts,
     } as ProgressSync['o'];
+  }
+
+  private ed() {
+    return this.o.edition ? { edition: this.o.edition } : {};
   }
 
   get url() {
@@ -228,7 +234,7 @@ export class ProgressSync {
     const meta = this.readMeta();
     this.inflight = (async () => {
       try {
-        const r = await this.req('PUT', JSON.stringify({ data: d, resetAt: meta?.r ?? null }), 8000);
+        const r = await this.req('PUT', JSON.stringify({ data: d, resetAt: meta?.r ?? null, ...this.ed() }), 8000);
         if (r.status === 409) {
           const doc = (await r.json()) as ServerDoc;
           this.clearLocal();
@@ -261,7 +267,7 @@ export class ProgressSync {
       const d = this.diff();
       if (Object.keys(d).length) {
         const meta = this.readMeta()!;
-        if (this.beacon(this.url, JSON.stringify({ data: d, resetAt: meta.r }))) {
+        if (this.beacon(this.url, JSON.stringify({ data: d, resetAt: meta.r, ...this.ed() }))) {
           const s = { ...meta.s };
           for (const [k, v] of Object.entries(d)) if (v === null) delete s[k];
           else s[k] = v;
@@ -277,7 +283,7 @@ export class ProgressSync {
   sessionStart(cat: string | null) {
     this.sessionId = Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
     this.events = [];
-    void this.req('POST', JSON.stringify({ type: 'start', id: this.sessionId, cat }), 5000, '/session').catch(() => {});
+    void this.req('POST', JSON.stringify({ type: 'start', id: this.sessionId, cat, ...this.ed() }), 5000, '/session').catch(() => {});
   }
 
   /** короткое событие сессии ('phase:play', 'cat:kind'); повтор подряд не пишем, не больше 80 */

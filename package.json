@@ -4,7 +4,8 @@
   "description": "Веб-AR прототип: кот в детской карте",
   "scripts": {
     "dev": "vite",
-    "build": "node scripts/voice/pull-server-voice.mjs && vite build && node scripts/voice/attach-extra.mjs",
+    "build": "node scripts/voice/pull-server-voice.mjs && node scripts/build/editions.mjs && node scripts/voice/attach-extra.mjs",
+    "check:editions": "node scripts/build/check-editions.mjs",
     "preview": "vite preview --port 4173 --strictPort",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",

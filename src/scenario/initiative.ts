@@ -7,6 +7,8 @@
  *  - после любой реплики кота — afterCatMs; после реплики-вопроса — afterQuestionMs (ждём ответ дольше);
  *  - идёт диалог, кот говорит, очередь занята, пауза поддержки — нельзя.
  */
+import { feature, NEW_GAMES } from '../config/edition';
+
 export interface InitiativeOpts {
   minGapMs: number;
   jitterMs: number;
@@ -83,7 +85,9 @@ export const IDLE_PLAN: readonly { at: number; step: IdleStep }[] = [
   { at: 110_000, step: 'doze' },
 ];
 /** что кот предлагает сам — по кругу (узлы диалога offer в content/dialogs.json) */
-export const OFFERS = ['riddle', 'rps', 'echo', 'emo', 'dance', 'simon'] as const;
+const ALL_OFFERS = ['riddle', 'rps', 'echo', 'emo', 'dance', 'simon'] as const;
+/** редакция без новых мини-игр (src/config/edition.ts, games.new) — кот их не предлагает */
+export const OFFERS: readonly (typeof ALL_OFFERS)[number][] = feature('games.new') ? ALL_OFFERS : ALL_OFFERS.filter((o) => !(NEW_GAMES as readonly string[]).includes(o));
 
 export class IdleLadder {
   private since: number;

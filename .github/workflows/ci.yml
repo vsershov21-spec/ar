@@ -18,3 +18,5 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+      # две редакции (docs/EDITIONS.md): dist/ и dist/lab/, ассеты lab из корня, выключенные в MVP функции
+      - run: npm run check:editions

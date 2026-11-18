@@ -175,3 +175,41 @@ curl -s https://ar.vershov.com/api/progress/health
 
 Локально: `PROGRESS_DATA=/tmp/progress PROGRESS_ORIGINS=http://localhost:5173 node server/progress/server.mjs` и `npm run dev`
 (в vite настроен прокси `/api/progress` → 8787). Тесты — `tests/progress/`.
+
+## Редакция lab: https://ar.vershov.com/lab (docs/EDITIONS.md)
+
+`npm run build` собирает две редакции: `dist/` (MVP, как раньше) и `dist/lab/` (lab: `index.html` + `assets/`, base
+`/lab/`). Тяжёлые ассеты lab берёт из корня (`/models`, `/voice`, `/sounds`, Vosk) — в `dist/lab` их нет. **Скрипт
+сервиса `ar-update` не меняется**: он вызывает `npm run build` и публикует весь `dist/` — `lab/` едет вместе с ним.
+
+Без правки Caddy lab уже открывается: `file_server` отдаёт `/lab/` → `dist/lab/index.html` (и `/lab` → `/lab/`).
+Правка нужна для двух вещей: `index.html` lab — без кэша (иначе телефоны держат старую версию), и SPA-фолбэк
+`/lab/*` → `/lab/index.html` (а не на главную MVP). **Продакт вносит под root** — в блок `ar.vershov.com { … }`,
+рядом с остальными директивами (до `file_server`; порядок внутри блока Caddy расставит сам):
+
+```caddyfile
+	# редакция lab (docs/EDITIONS.md): та же статика dist/, подпапка lab/
+	redir /lab /lab/ 308
+	@lab {
+		path /lab/*
+		not path /lab/assets/*
+	}
+	rewrite @lab /lab/index.html
+	header @lab Cache-Control "no-cache"
+	@labAssets path /lab/assets/*
+	header @labAssets Cache-Control "public, max-age=31536000, immutable"
+```
+
+```bash
+sudo nano /etc/caddy/Caddyfile
+sudo caddy validate --config /etc/caddy/Caddyfile && sudo systemctl reload caddy
+curl -sI https://ar.vershov.com/lab/ | grep -i cache-control      # no-cache
+curl -s https://ar.vershov.com/lab/any/deep | grep -o '/lab/assets/main-[^"]*'   # lab, не главная
+```
+
+`rewrite` идёт раньше `try_files`, поэтому если в блоке уже стоит SPA-запасной путь на `/index.html`, `/lab/*` на
+главную MVP не уйдёт. `/api/progress/*` не затрагивается.
+
+**Сервис прогресса** принимает поле `edition` (`mvp`|`lab`) — обновить код сервиса (шаг 1 выше и
+`systemctl restart ar-progress`). Старый сервис поле игнорирует, всё остальное работает.
+

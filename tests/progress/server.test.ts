@@ -30,6 +30,20 @@ for (const kind of ['file', 'sqlite'] as const) {
 
     it('хранилище нужного типа', () => expect(p.store.kind).toBe(kind));
 
+    it('редакция (docs/EDITIONS.md): поле edition сохраняется (mvp | lab), чужое значение игнорируется', async () => {
+      let j = await (await req('PUT', `/api/progress/${DEV}`, { data: { 'ar.micMode': 'ptt' }, edition: 'lab' })).json();
+      expect(j.edition).toBe('lab');
+      j = await (await req('PUT', `/api/progress/${DEV}`, { data: { 'ar.micMode': 'auto' }, edition: 'evil<script>' })).json();
+      expect(j.edition).toBe('lab');
+      await req('POST', `/api/progress/${DEV}/session`, { type: 'start', id: 's1', cat: 'kind', edition: 'mvp' });
+      j = await (await req('GET', `/api/progress/${DEV}`)).json();
+      expect(j.edition).toBe('mvp');
+      const s = await (await req('GET', `/api/progress/${DEV}/sessions`)).json();
+      expect(s.sessions[0].edition).toBe('mvp');
+      const a = await (await req('GET', `/api/progress/admin/code/0F8FAD`, undefined, { Authorization: `Bearer ${TOKEN}` })).json();
+      expect(a.devices[0].edition).toBe('mvp');
+    });
+
     it('GET неизвестного устройства — пустой документ', async () => {
       const r = await req('GET', `/api/progress/${DEV}`);
       expect(r.status).toBe(200);

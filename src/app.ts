@@ -35,6 +35,7 @@ import { setGlRenderer } from './core/glRenderer';
 import { EnergyBudget, defaultPixelRatio, fxNeedsBoost, isMobileDevice } from './core/energy';
 import { isPersonaId } from './persona/types';
 import { prepareFlowMemory, runFlow } from './debug/flows';
+import { feature } from './config/edition';
 
 export type CharacterMode = 'sprite' | 'rig' | 'glb';
 export type TrackerKind = 'card' | 'mindar' | 'debug' | '8thwall' | 'webxr' | 'nocard';
@@ -471,7 +472,7 @@ export class App {
   }
   /** «Мой дом» (на карте) / «На карту» (дома) — первым пунктом раздела «Игры» */
   private withHome(secs: ReturnType<typeof buildCatalog>): ReturnType<typeof buildCatalog> {
-    const it = this.home?.catalogItem();
+    const it = feature('home') ? this.home?.catalogItem() : null; // редакция: config/edition.ts
     if (!it) return secs;
     const item: CatalogItem = { ...it, run: { ui: 'home' } };
     const g = secs.find((s) => s.id === 'games');

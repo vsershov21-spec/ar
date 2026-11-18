@@ -1,3 +1,6 @@
+// редакция (docs/EDITIONS.md) — первым импортом: свои ключи localStorage в lab, без отладочных параметров в MVP
+import './config/boot';
+import { EDITION, showEditionBadge } from './config/edition';
 import './ui/styles.css';
 import { App, readParams } from './app';
 import { installCatApi } from './debug/catApi';
@@ -6,6 +9,8 @@ import { bootProgress, trackSession } from './progress';
 
 perf.enabled = new URLSearchParams(location.search).has('perf');
 (window as any).__perf = perf;
+(window as any).__edition = EDITION;
+showEditionBadge();
 
 // прогресс на сервере по признаку устройства (src/progress, server/progress): до App — ?reset=1 чистит память раньше, чем её прочтут
 bootProgress();

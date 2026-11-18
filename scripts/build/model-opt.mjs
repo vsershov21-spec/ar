@@ -87,6 +87,10 @@ function cacheDir() {
  * Сжать список файлов параллельно (worker_threads; кодер Basis — однопоточный wasm).
  * files: [{ rel: 'models/kind_v1.glb', abs }] → [{ rel, optRel, bytes, optBytes, cached, log, error? }]
  */
+// память процесса: две сборки подряд (mvp + lab, scripts/build/editions.mjs) не сжимают модель дважды, даже если
+// дискового кэша нет. На globalThis — vite заново загружает конфиг (и этот модуль) на каждую сборку.
+const MEMO = (globalThis.__arModelOptMemo ??= new Map());
+
 export async function optimizeModels(files, { log = console.log } = {}) {
   const dir = cacheDir();
   const results = [];
@@ -98,7 +102,10 @@ export async function optimizeModels(files, { log = console.log } = {}) {
     const r = { rel: f.rel, optRel: path.posix.join(path.posix.dirname(f.rel), 'opt', `${name}.${key.slice(0, 10)}.glb`), bytes: buf.length, key, cached: false, log: [] };
     results.push(r);
     const cached = dir && path.join(dir, key + '.glb');
-    if (cached && fs.existsSync(cached)) {
+    if (MEMO.has(key)) {
+      r.data = MEMO.get(key);
+      r.cached = true;
+    } else if (cached && fs.existsSync(cached)) {
       r.data = fs.readFileSync(cached);
       r.cached = true;
     } else todo.push({ r, buf, cached });
@@ -137,6 +144,7 @@ export async function optimizeModels(files, { log = console.log } = {}) {
     }),
   );
   for (const r of results) {
+    if (r.data) MEMO.set(r.key, r.data);
     if (r.error) log(`model-opt: ${r.rel} — не сжата (${r.error}), остаётся исходная`);
     else {
       r.optBytes = r.data.length;

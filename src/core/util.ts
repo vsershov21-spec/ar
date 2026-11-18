@@ -8,5 +8,10 @@ export const easeOutBack = (t: number) => {
   return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
 };
 export const easeInOut = (t: number) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
-/** Путь к ассету с учётом base (vite) — чтобы работало на GitHub Pages в подпапке. */
-export const asset = (p: string) => import.meta.env.BASE_URL + p.replace(/^\//, '');
+/**
+ * Путь к ассету из public/ (модели, озвучка, Vosk, звуки, видео…) с учётом base (vite) — чтобы работало в подпапке.
+ * Редакция lab (/lab/, docs/EDITIONS.md): html/js/css — под base '/lab/', а тяжёлые ассеты — общие из корня сайта:
+ * сборка lab задаёт VITE_ASSET_BASE='/' и не копирует public/ (scripts/build/editions.mjs).
+ */
+const ASSET_BASE: string = import.meta.env.VITE_ASSET_BASE || import.meta.env.BASE_URL;
+export const asset = (p: string) => ASSET_BASE + p.replace(/^\//, '');

@@ -14,15 +14,25 @@ function pages(dir = 'test', out: Record<string, string> = { main: 'index.html' 
   return out;
 }
 
+// Редакции (docs/EDITIONS.md): npm run build → scripts/build/editions.mjs собирает обе подряд:
+//   mvp — dist/      (base BASE_PATH ?? './', public/ копируется, сжатые модели кладутся в dist/models/opt);
+//   lab — dist/lab/  (AR_BUILD_LAB=1: base '/lab/', только index.html, public/ НЕ копируется и модели не кладутся —
+//                     ассеты из корня: VITE_ASSET_BASE='/', src/core/util.ts asset()).
+// Просто `vite build` (CI, QA-стенд) — одна сборка в dist/, редакция — VITE_EDITION (без неё lab), как раньше.
+const LAB_DIR = process.env.AR_BUILD_LAB === '1';
+
 // BASE_PATH задаёт подпуть для GitHub Pages: BASE_PATH=/ar-proto/ npm run build
 // По умолчанию './' — относительные пути, работает и в корне домена, и в подпапке.
 export default defineConfig({
-  base: process.env.BASE_PATH ?? './',
-  plugins: [modelOpt()],
+  base: LAB_DIR ? (process.env.LAB_BASE ?? '/lab/') : (process.env.BASE_PATH ?? './'),
+  publicDir: LAB_DIR ? false : 'public',
+  plugins: [modelOpt({ emit: !LAB_DIR })],
   build: {
     target: 'es2020',
     chunkSizeWarningLimit: 6000,
-    rollupOptions: { input: pages() },
+    outDir: LAB_DIR ? 'dist/lab' : 'dist',
+    emptyOutDir: !LAB_DIR,
+    rollupOptions: { input: LAB_DIR ? { main: 'index.html' } : pages() },
   },
   // dev: сервис прогресса локально — node server/progress/server.mjs (PROGRESS_DATA=/tmp/p PROGRESS_ORIGINS=http://localhost:5173)
   server: { host: true, proxy: { '/api/progress': 'http://127.0.0.1:8787' } },

@@ -5,6 +5,7 @@
  *
  *   GET    /api/progress/:device             → { device, code, version, updatedAt, resetAt, data, exists }
  *   PUT    /api/progress/:device             { data: { key: string | null } } → merge по ключам (null — удалить), version+1
+ *                                            (+ edition?: "mvp" | "lab" — редакция клиента, docs/EDITIONS.md; хранится в документе)
  *   POST   /api/progress/:device             то же, что PUT (для navigator.sendBeacon)
  *   DELETE /api/progress/:device[?all=1]     сброс прогресса (all=1 — и историю сессий); остаётся отметка resetAt
  *   GET    /api/progress/:device/sessions    → { sessions: [{ id, startedAt, endedAt, cat, events }] }, новые сверху
@@ -33,6 +34,7 @@ export const LIMITS = {
 const KEY_RE = /^[A-Za-z0-9_.:-]{1,64}$/;
 const SESSION_RE = /^[A-Za-z0-9-]{1,40}$/;
 const CAT_RE = /^[a-z_]{1,24}$/;
+const EDITION_RE = /^(mvp|lab)$/;
 const CODE_RE = /^[0-9A-F]{6}$/;
 const DAY = 86_400_000;
 
@@ -86,7 +88,11 @@ export async function createProgressServer(opts = {}) {
   };
   const pub = (doc, device) => {
     const d = doc ?? empty(device);
-    return { device: d.device, code: deviceCode(d.device), version: d.version, createdAt: d.createdAt, updatedAt: d.updatedAt, resetAt: d.resetAt ?? null, data: d.data ?? {}, exists: !!doc };
+    return { device: d.device, code: deviceCode(d.device), version: d.version, createdAt: d.createdAt, updatedAt: d.updatedAt, resetAt: d.resetAt ?? null, data: d.data ?? {}, exists: !!doc, edition: d.edition ?? null };
+  };
+  // редакция клиента (mvp | lab, src/config/edition.ts): последняя присланная; у lab и mvp разные id устройства
+  const setEdition = (doc, b) => {
+    if (b && typeof b.edition === 'string' && EDITION_RE.test(b.edition)) doc.edition = b.edition;
   };
   const touch = (doc) => {
     doc.version = (doc.version ?? 0) + 1;
@@ -111,6 +117,7 @@ export async function createProgressServer(opts = {}) {
     if (Object.keys(data).length > LIMITS.keys) throw new HttpError(413, 'too many keys');
     if (Buffer.byteLength(JSON.stringify(data)) > LIMITS.dataBytes) throw new HttpError(413, 'progress > 16 KB');
     doc.data = data;
+    setEdition(doc, body);
     return pub(touch(doc));
   }
 
@@ -137,6 +144,8 @@ export async function createProgressServer(opts = {}) {
       while (list.length > LIMITS.sessions) list.shift();
     }
     if (typeof b.cat === 'string' && CAT_RE.test(b.cat)) s.cat = b.cat;
+    if (b.type === 'start') setEdition(doc, b);
+    if (typeof b.edition === 'string' && EDITION_RE.test(b.edition)) s.edition = b.edition;
     if (Array.isArray(b.events)) {
       for (const e of b.events.slice(0, LIMITS.eventsPerSession)) if (typeof e === 'string' && e) s.events.push(clean(e));
       if (s.events.length > LIMITS.eventsPerSession) s.events.splice(0, s.events.length - LIMITS.eventsPerSession);
@@ -209,7 +218,7 @@ export async function createProgressServer(opts = {}) {
       if (m === 'GET') {
         return [200, { code, devices: list.map((d) => {
           const doc = store.get(d);
-          return { code, updatedAt: doc?.updatedAt, version: doc?.version, resetAt: doc?.resetAt ?? null, keys: Object.keys(doc?.data ?? {}), sessions: doc?.sessions?.length ?? 0 };
+          return { code, edition: doc?.edition ?? null, updatedAt: doc?.updatedAt, version: doc?.version, resetAt: doc?.resetAt ?? null, keys: Object.keys(doc?.data ?? {}), sessions: doc?.sessions?.length ?? 0 };
         }) }];
       }
       if (m === 'DELETE') {
