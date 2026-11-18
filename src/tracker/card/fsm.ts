@@ -43,6 +43,8 @@ export interface Obs {
   kind?: Kind;
   /** после посадки: 5+ проверок подряд «под котом не карта» */
   postNotCard?: boolean;
+  /** есть намёк на знак Сбера (false — по форме не садим: чужая карта, у которой не поймали чип) */
+  maybeSber?: boolean;
 }
 
 export interface FsmEvent {
@@ -136,7 +138,9 @@ export class CardFsm {
     // SEARCH / CANDIDATE / LOST
     if (!o.found) {
       if (s === 'candidate') {
-        this.stableMs = Math.max(0, this.stableMs - dt);
+        // одиночный пропуск (кадр ведения с низкой оценкой, смаз) стабильность не отнимает — только серия: иначе
+        // на тёмном столе «детект / пропуск / детект…» обнулял прогресс и кот не садился никогда (стресс-набор)
+        if (this.missRun >= 2) this.stableMs = Math.max(0, this.stableMs - dt);
         if (o.t - this.seenAt > CAND_MISS_MS && this.missRun >= 3) this.go(this.everLocked ? 'lost' : 'search', o.t, 'кандидат пропал');
       }
       this.updateProgress(o, o.t);
@@ -149,7 +153,7 @@ export class CardFsm {
     const kind = this.verify ? o.kind ?? 'checking' : 'sber';
     if (kind === 'checking' && this.stableMs >= STABLE_MS * 0.5) this.checkingSince ||= o.t;
     else if (kind !== 'checking') this.checkingSince = 0;
-    const patient = kind === 'checking' && this.checkingSince > 0 && o.t - this.checkingSince >= CHECK_PATIENCE_MS;
+    const patient = kind === 'checking' && o.maybeSber !== false && this.checkingSince > 0 && o.t - this.checkingSince >= CHECK_PATIENCE_MS;
     this.updateProgress(o, o.t, kind);
     if (this.stableMs >= STABLE_MS && (kind === 'sber' || patient)) {
       this.verified = kind === 'sber';

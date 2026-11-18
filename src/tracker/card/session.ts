@@ -179,7 +179,9 @@ export class CardSession {
     } else {
       this.quadSpeed *= 0.7;
       // карта пропала надолго — нумерацию забываем (через 8 с — orientRef)
-      if (f.state !== 'locked') this.prevQuad = null;
+      // (одиночный отброшенный кадр нумерацию и «дрожание» не сбрасывает: иначе при чередовании «поиск / ведение
+      // с плохой позой» дрожание всегда = 1 и кот не садился — стресс-набор, тёмный стол)
+      if (f.state !== 'locked' && now - this.lastQuadT > 500) this.prevQuad = null;
     }
     // размер карты — от короткой стороны кадра (в портрете карта ограничена шириной)
     const L = Math.min(this.w, this.h);
@@ -200,6 +202,7 @@ export class CardSession {
       still: !(angSpeed > 0.6),
       kind,
       postNotCard: !!r.ver?.postNotCard,
+      maybeSber: r.ver ? r.ver.maybeSber : undefined,
     });
     if (f.state === 'search' && before !== 'search' && f.log.at(-1)?.why.startsWith('переверификация')) {
       step.reset = true;

@@ -63,7 +63,7 @@ export function stressScenario(name: string, tex: Tex | null, c: Cond, table: Ta
   for (let i = 0; i < 3; i++) R();
   const ph = R() * 6;
   const drift = c.drift ?? 1.5;
-  const base: SynthOptions = { tilt: 35, yaw: 0, dist: cm(25), bg: table, noise: 2.5, seed, tableOnPlane: table !== 'gloss', tex: tex ?? undefined, shape, ...c.o };
+  const base: SynthOptions = { tilt: 35, yaw: 0, dist: cm(25), bg: table, noise: 2.5, seed, tableOnPlane: false, tex: tex ?? undefined, shape, ...c.o };
   const rot = (t: number): [number, number, number] => [
     0.15 * Math.sin(t * 47 + ph) + 0.1 * Math.sin(t * 71) + drift * Math.sin(t * 0.9 + ph),
     0.2 * Math.sin(t * 53 + 1) + drift * 1.3 * Math.sin(t * 0.7 + 2 * ph),
@@ -181,7 +181,7 @@ describe.skipIf(!on)('стресс-набор трекера карты', () => 
           negs.push({ item: f, group: 'картинка на карте (чужой дизайн)', tex: await loadTex(NEG_DIR + '/' + f) });
         }
       }
-      const nc = QUICK ? [CONDS[0], CONDS[2]] : [CONDS[0], CONDS[2], CONDS[6], CONDS[10], CONDS[13]];
+      const nc = QUICK ? [CONDS[0], CONDS[2]] : process.env.NEG_CONDS ? process.env.NEG_CONDS.split(',').map((i) => CONDS[+i]) : [CONDS[0], CONDS[2], CONDS[6], CONDS[10], CONDS[13]];
       for (const [ni, ng] of negs.entries())
         for (const [ci, c] of nc.entries()) {
           if (!mine()) continue;

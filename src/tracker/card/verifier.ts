@@ -33,9 +33,16 @@ export interface VerifyReport {
   ms: number;
   /** номер известного дизайна, если отпечаток совпал в этой проверке (−1 — нет) */
   design?: number;
+  /**
+   * Есть хоть намёк на Сбер (знак ≥ 0,3 хотя бы в одной проверке окна): только тогда машина состояний может
+   * посадить кота «по форме» после терпения. Без намёка (чужая карта без пойманного чипа) — не садим.
+   */
+  maybeSber?: boolean;
 }
 
 const PRE_MS = 80;
+/** «намёк на знак Сбера» для посадки по форме */
+const MAYBE_LOGO = 0.3;
 const POST_MS = 1000;
 
 export class CardVerifier {
@@ -72,7 +79,7 @@ export class CardVerifier {
     const locked = det.locked;
     if (locked && !this.wasLocked) this.post.reset();
     this.wasLocked = locked;
-    const rep: VerifyReport = { state: this.ev.state, postNotCard: false, line: this.line, checked: false, ms: 0 };
+    const rep: VerifyReport = { state: this.ev.state, postNotCard: false, line: this.line, checked: false, ms: 0, maybeSber: this.ev.counts().maxLogo >= MAYBE_LOGO };
     const q = r.quad;
     if (!q) {
       // карта пропала надолго — начинаем заново
@@ -127,6 +134,7 @@ export class CardVerifier {
     this.line = `${locked ? 'post' : this.ev.state} n${c.n} s${c.sber} c${c.chip} b${c.back} · ${fmtFeatures(v)} · ${crop ? 'crop' : 'lo'} ${v.f.px.toFixed(0)}px ${v.ms.toFixed(1)}мс`;
     rep.state = this.ev.state;
     rep.design = v.f.designHit ? v.f.designId : -1;
+    rep.maybeSber = this.ev.counts().maxLogo >= MAYBE_LOGO;
     rep.line = this.line;
     rep.ms = performance.now() - t0;
     return rep;

@@ -122,4 +122,21 @@ describe('машина состояний трекера карты', () => {
     f.animate(1 / 60);
     expect(f.shown).toBeGreaterThan(up - 0.02);
   });
+
+  it('чередование «кадр поиска / пропуск» (тёмный стол) — посадка всё равно наступает', () => {
+    const f = new CardFsm(true);
+    let k = 0;
+    run(f, 0, 1500, (t) => (k++ % 2 ? miss(t) : good(t)));
+    expect(f.state).toBe('locked');
+  });
+
+  it('по форме (терпение) — только при намёке на знак Сбера: чужая карта без чипа не сажает кота', () => {
+    const a = new CardFsm(true);
+    run(a, 0, CHECK_PATIENCE_MS + 1500, (t) => good(t, { kind: 'checking', maybeSber: false }));
+    expect(a.state).toBe('candidate');
+    const b = new CardFsm(true);
+    run(b, 0, CHECK_PATIENCE_MS + 1500, (t) => good(t, { kind: 'checking', maybeSber: true }));
+    expect(b.state).toBe('locked');
+    expect(b.verified).toBe(false);
+  });
 });
