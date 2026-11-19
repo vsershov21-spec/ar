@@ -21,16 +21,16 @@ P=/opt/ar-progress
 PB="$P/bak.$(date +%s)"; mkdir -p "$PB"; cp -a "$P"/server.mjs "$P"/store.mjs "$PB"/ 2>/dev/null
 okp=1
 for f in server.mjs store.mjs; do
-  if curl -fsSL "$RAW/server/progress/$f" -o "$P/$f.new"; then :; else echo "curl $f FAIL"; okp=0; fi
+  if curl -fsSL "$RAW/server/progress/$f" -o "$P/new.$f"; then :; else echo "curl $f FAIL"; okp=0; fi
 done
-if [ "$okp" = 1 ] && node --check "$P/server.mjs.new" && node --check "$P/store.mjs.new"; then
-  mv "$P/server.mjs.new" "$P/server.mjs"; mv "$P/store.mjs.new" "$P/store.mjs"
+if [ "$okp" = 1 ] && node --check "$P/new.server.mjs" && node --check "$P/new.store.mjs"; then
+  mv "$P/new.server.mjs" "$P/server.mjs"; mv "$P/new.store.mjs" "$P/store.mjs"
   systemctl restart ar-progress; sleep 2
   if ! curl -fs http://127.0.0.1:8787/api/progress/health >/dev/null; then
     echo "PROGRESS: не поднялся — откатил на $PB"; cp -a "$PB"/server.mjs "$PB"/store.mjs "$P"/; systemctl restart ar-progress; sleep 2
   fi
 else
-  echo "PROGRESS: код не обновлён (скачивание или node --check) — оставил прежний"; rm -f "$P"/*.new
+  echo "PROGRESS: код не обновлён (скачивание или node --check) — оставил прежний"; rm -f "$P"/new.*.mjs
 fi
 echo "PROGRESS local: $(curl -s http://127.0.0.1:8787/api/progress/health)"
 

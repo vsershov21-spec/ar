@@ -17,7 +17,7 @@ install -d -m 700 /opt/ar-auto /var/lib/ar-auto
 for f in ar-auto.sh ar-auto.mjs ar-auto.service ar-auto.timer; do
   curl -fsSL "$RAW/scripts/automation/$f" -o "/opt/ar-auto/$f.new"
 done
-node --check /opt/ar-auto/ar-auto.mjs.new
+cp /opt/ar-auto/ar-auto.mjs.new /opt/ar-auto/check.mjs && node --check /opt/ar-auto/check.mjs && rm -f /opt/ar-auto/check.mjs
 for f in ar-auto.sh ar-auto.mjs ar-auto.service ar-auto.timer; do mv -f "/opt/ar-auto/$f.new" "/opt/ar-auto/$f"; done
 chmod 700 /opt/ar-auto/ar-auto.sh
 printf 'PATH=%q\n' "$PATH" > /opt/ar-auto/runtime.env
