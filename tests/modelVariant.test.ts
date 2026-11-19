@@ -4,12 +4,14 @@ import { filterSearch } from '../src/config/edition';
 import { FurTone } from '../src/character/furTone';
 
 describe('поколение моделей котов: v1 по умолчанию, v2 — ?models=v2 (lab и /test)', () => {
-  it('без параметра — v1 и исходные пути, коллайдеров модельщика нет', () => {
+  it('без параметра — v1 и исходные пути, прокси v1 рядом с моделью', () => {
     expect(modelsVariant('')).toBe('v1');
     expect(modelsVariant('?models=v1')).toBe('v1');
     expect(variantGlb('models/kind_v1.glb', 'v1')).toBe('models/kind_v1.glb');
-    expect(collidersUrl('models/kind_v1.glb')).toBeNull();
-    expect(collidersUrl('models/hooligan_v1.glb')).toBeNull();
+    // v1 — свои прокси (scripts/models/colliders.py по v1 GLB), чужая модель — без файла
+    expect(collidersUrl('models/kind_v1.glb')).toBe('models/kind_v1_colliders.json');
+    expect(collidersUrl('models/hooligan_v1.glb')).toBe('models/hooligan_v1_colliders.json');
+    expect(collidersUrl('models/character.glb')).toBeNull();
   });
   it('?models=v2 — у каждого кота основа ближе к рефам персонажа: Блёстка — v2, Хулиган и Добряк — p1 (v1 + глаза)', () => {
     expect(modelsVariant('?nocard=off&models=v2')).toBe('v2');

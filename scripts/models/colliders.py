@@ -58,7 +58,10 @@ def ring(X, n=8):
     cx, cy = -sol[0] / 2, -sol[1] / 2
     R = np.sqrt(max(cx * cx + cy * cy - sol[2], 1e-8))
     cc = c + cx * e1 + cy * e2
-    tube = np.percentile(np.abs(np.linalg.norm(L - [cx, cy], axis=1) - R), 90) + np.percentile(np.abs((X - c) @ nrm), 90) * 0.5
+    # толщина трубки — 90-й перцентиль расстояния вершин до окружности в 3D (раньше: в плоскости + ½ разброса по нормали —
+    # тоньше вязаного шарфа v1 на ~1,3 см: лапа у подбородка уходила в шарф, docs/qa/hands)
+    hgt = (X - c) @ nrm
+    tube = np.percentile(np.hypot(np.linalg.norm(L - [cx, cy], axis=1) - R, hgt - np.median(hgt)), 90)
     pts = [cc + R * (np.cos(a) * e1 + np.sin(a) * e2) for a in np.linspace(0, 2 * np.pi, n + 1)]
     return cc, nrm, R, tube, pts
 
@@ -152,6 +155,35 @@ def main():
         bp = np.array(hp['band'])
         for k in range(len(bp) - 1):
             cap_(f'headphones_band_{k}', 'Neck', bp[k], bp[k + 1], hp['band_r'] + PAD_HP, mesh='Headphones_Hooligan')
+    elif (lab[used] == PHONES).sum() > 200:
+        # v1 (наушники запечены в сетку тела, детали нет): по вершинам с меткой «наушники» (цвет альбедо) — чашки спереди
+        # по бокам шеи (капсулы по своей оси) + дуга-кольцо вокруг шеи (цепочка капсул по окружности наименьших квадратов)
+        X = P[used & (lab == PHONES)]
+        cc, nrm, R, _tube, _pts = ring(X, 12)
+        zc = np.median(X[:, 2])
+        cupm = (np.abs(X[:, 0]) > 0.075) & (X[:, 2] > zc)
+        for s_, nm_ in ((1, 'L'), (-1, 'R')):
+            cup = X[cupm & (X[:, 0] * s_ > 0)]
+            if len(cup) > 40:
+                a_, b_, r = capsule(cup, 92)
+                cap_(f'headphones_cup_{nm_}', 'Neck', a_, b_, r + PAD_HP)
+        # дуга — цепочка капсул по средней линии: вершины вне чашек по углу вокруг центра кольца (12 секторов) → центр
+        # сектора; толщина — 90-й перцентиль расстояния вершин до своего отрезка (окружность была бы толще самой дуги)
+        e1 = np.cross(nrm, [1.0, 0, 0]); e1 /= np.linalg.norm(e1); e2 = np.cross(nrm, e1)
+        B = X[~cupm]
+        ang = np.arctan2((B - cc) @ e2, (B - cc) @ e1)
+        nb = 12
+        sec = np.floor((ang + np.pi) / (2 * np.pi) * nb).astype(int) % nb
+        mids = [B[sec == k].mean(0) if (sec == k).sum() > 8 else None for k in range(nb)]
+        for k in range(nb):
+            a_, b_ = mids[k], mids[(k + 1) % nb]
+            if a_ is None or b_ is None:
+                continue
+            Y = B[(sec == k) | (sec == (k + 1) % nb)]
+            ab = b_ - a_
+            t = np.clip(((Y - a_) @ ab) / max(ab @ ab, 1e-12), 0, 1)
+            dist = np.linalg.norm(Y - (a_ + t[:, None] * ab), axis=1)
+            cap_(f'headphones_band_{k}', 'Neck', a_, b_, float(np.percentile(dist, 90)) + PAD_HP)
     if (lab[used] == SCARF).sum() > 50:
         X = P[used & (lab == SCARF)]
         nk = X[X[:, 1] > np.percentile(X[:, 1], 45)]

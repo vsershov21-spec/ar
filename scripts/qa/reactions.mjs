@@ -8,7 +8,11 @@
 //   node scripts/qa/reactions.mjs --tag before       — имя прогона (до/после): bench-out/reactions/<tag>.json
 //   node scripts/qa/reactions.mjs --cats kind --only act_pet,zone_head --no-sheets
 //   node scripts/qa/reactions.mjs --report before,after — только отчёт из двух сохранённых прогонов (до → после)
-//   node scripts/qa/reactions.mjs --params collide=legacy — добавить параметры в адрес (коррекция рук как до 18.11)
+//   node scripts/qa/reactions.mjs --params collide=legacy — добавить параметры в адрес (коррекция рук как до 18.11;
+//                                                         collide=axis — как до 19.11: кисть по осям, замер по поверхности)
+//   node scripts/qa/reactions.mjs --params models=v2 --tag v2_after — модели v2 (?models=v2)
+//   node scripts/qa/reactions.mjs --report v1_before,v1_after --also "v1_before,v1_after,v1_axis;v2_before,v2_after,v2_axis"
+//                                                       — отчёт + разделы пар прогонов (проникновение и щелчки до → после)
 //   node scripts/qa/reactions.mjs --meshy DIR — отдавать /models/anims/meshy/* из DIR (клипы Meshy локально; scripts/qa/meshy-check.mjs)
 //
 // Как устроено: Chrome headless (swiftshader), ?from=test&nocard=off&debug — кот на столе без камеры. Время в странице
@@ -41,8 +45,11 @@ const ONLY = arg('--only', '') ? arg('--only').split(',') : null;
 const SHEET = !flag('--no-sheets');
 const PARAMS_EXTRA = arg('--params', '');
 const MESHY_DIR = arg('--meshy', '') ? path.resolve(arg('--meshy')) : '';
-/** порог проникновения руки/ноги в тело или одежду после коррекции BodyCollider, мм на карте — больше = «плохо» */
-const PEN_BAD_MM = 2;
+/**
+ * порог проникновения руки/ноги в тело или одежду после коррекции BodyCollider, мм на карте — больше = «плохо» (19.11:
+ * кисть и предплечье у головы меряются по точкам поверхности лапы, цель ≤ 1 мм)
+ */
+const PEN_BAD_MM = 1;
 const log = (...a) => console.log(`[rx ${new Date().toISOString().slice(11, 19)}]`, ...a);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 fs.mkdirSync(OUT, { recursive: true });
@@ -472,7 +479,91 @@ export function analyze(r, durs = {}, cuts = null) {
 
 // ───────────── отчёт ─────────────
 const V = { ok: 'ok', tol: 'терпимо', bad: '**плохо**' };
-function renderReport(runs) {
+function alsoSection(runs) {
+  const [b, a, x] = runs; // до, после, (до коррекции по поверхности: ?collide=axis — тот же замер, коррекция по осям)
+  const L = ['', `## Вторая пара прогонов: \`${b.tag}\` → \`${a.tag}\`${x ? ` (и \`${x.tag}\`)` : ''} — проникновение и щелчки`, ''];
+  L.push(`«до» — \`${b.tag}\` (${b.at})${x ? `, «оси»: \`${x.tag}\` (${x.at}) — новая сборка с ?collide=axis: коррекция по осям, как до 19.11, а замер — по точкам поверхности (что было видно)` : ''}, «после» — \`${a.tag}\` (${a.at}). В ячейке: проникновение мм (самая глубокая пара) · щелчок рад/с.`);
+  L.push('');
+  const cats = a.cats.map((c) => c.cat);
+  const ids = [...new Set(a.cats.flatMap((c) => c.results.map((r) => r.id)))];
+  const A = (run, cat, id) => {
+    const c = run?.cats.find((q) => q.cat === cat);
+    const r = c?.results.find((q) => q.id === id);
+    return r ? analyze(r, c.durs, run.cuts) : null;
+  };
+  L.push(`| действие | ${cats.map((c) => `${c}: до${x ? ' · оси' : ''} → после`).join(' | ')} |`);
+  L.push(`|---|${cats.map(() => '---').join('|')}|`);
+  const worst = { b: 0, x: 0, a: 0, popB: 0, popA: 0, newPops: [] };
+  for (const id of ids) {
+    const cells = cats.map((cat) => {
+      const pa = A(a, cat, id), pb = A(b, cat, id), px = x ? A(x, cat, id) : null;
+      if (!pa) return '—';
+      worst.a = Math.max(worst.a, pa.penMM);
+      worst.popA = Math.max(worst.popA, pa.pop);
+      if (pb) {
+        worst.b = Math.max(worst.b, pb.penMM);
+        worst.popB = Math.max(worst.popB, pb.pop);
+        if (pa.pop > 15 && pb.pop <= 15) worst.newPops.push(`${cat} ${id} ${pa.pop}`);
+      }
+      if (px) worst.x = Math.max(worst.x, px.penMM);
+      const mark = pa.penMM > PEN_BAD_MM ? '**' : '';
+      return `${pb ? pb.penMM : '—'}${px ? ` · ${px.penMM}` : ''} → ${mark}${pa.penMM}${mark}${pa.penMM > 0.5 ? ` (${pa.penPair})` : ''} · щ ${pb ? pb.pop : '—'} → ${pa.pop}`;
+    });
+    L.push(`| ${LABEL[id] ?? id} | ${cells.join(' | ')} |`);
+  }
+  L.push('');
+  L.push(`Максимум: проникновение ${worst.b}${x ? ` · ${worst.x}` : ''} → **${worst.a} мм**; щелчок ${worst.popB} → ${worst.popA} рад/с; новых щелчков > 15 рад/с: ${worst.newPops.length ? worst.newPops.join(', ') : 'нет'}.`);
+  L.push('');
+  return L;
+}
+
+/**
+ * Руки у головы крупно (tools/hands-probe.mjs → bench-out/hands): 8 клипов «лапы к лицу/ушам/шее» подряд 30 к/с, клип как
+ * есть / «до» (кисть по осям, прокси как были) / «после»; сетка против сетки — scripts/models/penetration.py --pose-json
+ * (bench-out/hands/tri_<v>_<кот>.md); время коррекции на кадр.
+ */
+function handsSection() {
+  const dir = path.join(root, 'bench-out/hands');
+  const f = path.join(dir, 'summary.json');
+  if (!fs.existsSync(f)) return [];
+  const S = JSON.parse(fs.readFileSync(f, 'utf8'));
+  const L = ['', '## Руки у головы и одежды крупно (`tools/hands-probe.mjs`): до → после', ''];
+  L.push('8 клипов, где лапы у лица/ушей/шеи/наушников, подряд 30 к/с (как в приложении: сглаживание и тёплый старт), каждый кот и обе модели. Замер — по точкам поверхности руки (мм на карте): **как есть** — клип без коррекции, **до** — коррекция 18.11–19.11 (кисть по осям; прокси v1 — из меша, v2 — json), **после** — точки поверхности + контакт (прокси v1 — `public/models/<кот>_v1_colliders.json`). В ячейке: максимум за клип мм (доля кадров > 1 мм). Листы худших кадров — [docs/qa/hands/](hands/) (`<v>_<кот>_<клип>.png`: клип как есть | до | после, анфас и профиль).');
+  L.push('');
+  const models = [...new Set(S.map((x) => x.v))];
+  const cats = [...new Set(S.map((x) => x.cat))];
+  const clips = [...new Set(S.map((x) => x.clip))];
+  const cell = (x) => (x ? `${x.raw} / ${x.before} (${Math.round(x.over1Before * 100)} %) → **${x.after}** (${Math.round(x.over1After * 100)} %)` : '—');
+  for (const v of models) {
+    L.push(`### ${v === 'v1' ? 'v1 (по умолчанию)' : 'v2 (?models=v2)'} — как есть / до → после, мм`);
+    L.push('');
+    L.push(`| клип | ${cats.join(' | ')} |`);
+    L.push(`|---|${cats.map(() => '---').join('|')}|`);
+    for (const c of clips) L.push(`| ${c} | ${cats.map((cat) => cell(S.find((x) => x.v === v && x.cat === cat && x.clip === c))).join(' | ')} |`);
+    const all = S.filter((x) => x.v === v);
+    const mx = (k) => Math.max(...all.map((x) => x[k]));
+    const share = (k) => (all.reduce((a, x) => a + x[k] * x.frames, 0) / all.reduce((a, x) => a + x.frames, 0)) * 100;
+    L.push('');
+    L.push(`Итого ${v}: максимум ${mx('raw')} / ${mx('before')} → **${mx('after')} мм**; кадров > 1 мм: до ${share('over1Before').toFixed(0)} % → после **${share('over1After').toFixed(1)} %**.`);
+    // сетка против сетки (penetration.py)
+    const tri = cats.map((cat) => {
+      const t = path.join(dir, `tri_${v}_${cat}.md`);
+      const m = fs.existsSync(t) && fs.readFileSync(t, 'utf8').match(/до \*\*(\d+)\*\*, после \*\*(\d+)\*\*/);
+      return m ? `${cat} ${m[1]} → ${m[2]}` : null;
+    }).filter(Boolean);
+    if (tri.length) L.push(`Сетка против сетки (пары треугольников рука ↔ голова/уши/наушники/кепка/капюшон/шарф/бант, 12 кадров на клип, \`scripts/models/penetration.py --pose-json\`): ${tri.join('; ')}.`);
+    const perf = cats.map((cat) => {
+      const read = (n) => (fs.existsSync(path.join(dir, n)) ? JSON.parse(fs.readFileSync(path.join(dir, n), 'utf8')).perf : null);
+      const p1 = read(`${v}_${cat}.json`), p4 = read(`${v}_${cat}_x4.json`);
+      return p1 ? `${cat} ${p1.oldMs} → ${p1.newMs} мс (покой ${p1.idleMs})${p4 ? `, ЦП ×4: ${p4.oldMs} → ${p4.newMs} (покой ${p4.idleMs})` : ''}` : null;
+    }).filter(Boolean);
+    if (perf.length) L.push(`Время коррекции на кадр (headless Chrome, среднее по этим клипам — руки у головы почти весь клип; «ЦП ×4» — CDP-замедление, класс телефона): ${perf.join('; ')}.`);
+    L.push('');
+  }
+  return L;
+}
+
+function renderReport(runs, also = null) {
   const [cur, prev] = runs; // runs[0] — последний прогон, runs[1] — «до» (если есть)
   const cats = cur.cats.map((c) => c.cat);
   const ids = [...new Set(cur.cats.flatMap((c) => c.results.map((r) => r.id)))];
@@ -498,7 +589,7 @@ function renderReport(runs) {
   L.push('- **отклик, мс** — от касания/кнопки до первого видимого ответа: тело (ключевая кость повернулась ≥ 0,12 рад от позы в момент события), лицо (вес мимики ≥ 0,25) или эффект; в скобках — тело. Цель ≤ 150 мс.');
   L.push('- **щелчок, рад/с** — пик угловой скорости костей тела в 0,3 с после смены клипа (стык смешивания). ≤ 10,5 ok (инерциальный переход AnimBlender рассчитан на пик ≈ 10 рад/с: быстрая реакция без «телепорта»), ≤ 15 терпимо.');
   L.push('- **лапы, мм** — скольжение опорной лапы по плоскости опоры (лапа ниже 4 мм над опорой два кадра подряд), в масштабе кота на карте (рост кота ≈ 0,9 карты ≈ 77 мм); провал — самая низкая лапа ниже опоры; парение — медиана самой низкой лапы в спокойных клипах.');
-  L.push(`- **проникновение, мм** — самая глубокая точка руки (плечо, локоть, предплечье, кисть, кончик лапы) или голени/колена внутри прокси тела и одежды (торс, шея, голова, кепка/наушники/шарф/бант/юбка, уши, бёдра/голени другой ноги) после коррекции BodyCollider, мм на карте; > ${PEN_BAD_MM} мм — «плохо».`);
+  L.push(`- **проникновение, мм** — самая глубокая точка руки или голени/колена внутри прокси тела и одежды (торс, шея, голова, кепка/наушники/шарф/бант/юбка, уши, бёдра/голени другой ноги) после коррекции BodyCollider, мм на карте; > ${PEN_BAD_MM} мм — «плохо». Кисть и предплечье у головы и одежды на ней — по точкам поверхности лапы (16 + 10 на руку, со скином, как видно), о торс/бёдра и плечо/локоть — по точкам на осях костей.`);
   L.push('- **заглушка** — клип играет опорой/псевдонимом (docs/animations/INVENTORY.md: «заглушка»), **обрыв** — реакцию сменили раньше 55 % её длины без нового действия, **драка** — два разных клипа реакции за 400 мс без нового действия, **покой** — кот вернулся в idle к концу записи.');
   L.push('- **лицо** — эмоция/пресет в первые 1,5 с против ожидаемого семейства (FACE_OK в стенде).');
   L.push('');
@@ -523,7 +614,7 @@ function renderReport(runs) {
   if (cur.cats.some((c) => c.results.some((r) => r.frames?.some((f) => f.penMM !== undefined)))) {
     L.push(`## Проникновение (руки/ноги сквозь тело и одежду), мм — порог «плохо» > ${PEN_BAD_MM} мм`);
     L.push('');
-    L.push(`Глубина самой глубокой пары «часть тела : прокси» за сценарий после коррекции (BodyCollider.measurePairs, прокси: торс, шея, голова, одежда, уши, бёдра/голени)${prev ? `; «было» — прогон \`${prev.tag}\`` : ''}.`);
+    L.push(`Глубина самой глубокой пары «часть тела : прокси» за сценарий после коррекции (BodyCollider.measurePairs: кисть/предплечье у головы — точки поверхности, прочее — точки на осях; прокси: торс, шея, голова, одежда, уши, бёдра/голени)${prev ? `; «было» — прогон \`${prev.tag}\`` : ''}.`);
     L.push('');
     L.push(`| действие | ${cats.join(' | ')} |`);
     L.push(`|---|${cats.map(() => '---').join('|')}|`);
@@ -553,6 +644,9 @@ function renderReport(runs) {
     }
     L.push('');
   }
+  // вторая пара прогонов (--also before,after[,axis]): другие модели (?models=v2) — проникновение и щелчки до → после
+  for (const g of also ?? []) L.push(...alsoSection(g));
+  L.push(...handsSection());
   // что исправлено и какие клипы нужны от Meshy — ручной раздел (docs/animations/REACTIONS_FIXES.md)
   const notes = path.join(root, 'docs/animations/REACTIONS_FIXES.md');
   if (fs.existsSync(notes)) L.push('', fs.readFileSync(notes, 'utf8').trim());
@@ -564,7 +658,9 @@ async function main() {
   if (flag('--report')) {
     const tags = arg('--report').split(',');
     const runs = tags.reverse().map((t) => JSON.parse(fs.readFileSync(path.join(OUT, `${t}.json`), 'utf8')));
-    fs.writeFileSync(REPORT, renderReport(runs));
+    // --also "a,b[,c];d,e[,f]" — несколько пар прогонов
+    const also = arg('--also', '') ? arg('--also').split(';').map((g) => g.split(',').map((t) => JSON.parse(fs.readFileSync(path.join(OUT, `${t}.json`), 'utf8')))) : null;
+    fs.writeFileSync(REPORT, renderReport(runs, also));
     log(`отчёт: ${path.relative(root, REPORT)}`);
     return;
   }

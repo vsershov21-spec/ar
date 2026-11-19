@@ -352,9 +352,10 @@ export class GlbCharacter implements Character {
     if (this.eyes) console.info('[glb] 3D-глаза');
     this.collider = new BodyCollider(this.object, (n) => this.bones.get(n) ?? model.getObjectByName('mixamorig' + n) ?? undefined);
     if (this.personaId) this.collider.setPersona(this.personaId);
-    // ?collide=legacy — коррекция рук как до 18.11 (сравнение на стенде), ?collide=0 — без коррекции
+    // ?collide=legacy — коррекция рук как до 18.11, ?collide=axis — как до 19.11 (кисть по осям; сравнение на стенде), ?collide=0 — без коррекции
     const cm = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('collide') : null;
     this.collider.legacy = cm === 'legacy';
+    this.collider.axis = cm === 'axis';
     this.collider.enabled = cm !== '0';
     console.info('[glb] объёмы тела', this.collider.build(model));
     // прокси одежды от модельщика (public/models/v2/<кот>_colliders.json, docs/animations/COLLISION.md): есть — главнее
@@ -556,9 +557,9 @@ export class GlbCharacter implements Character {
     return { mm: worst.depth * CAT_MM, pair: worst.pair };
   }
 
-  /** коллайдеры модельщика рядом с моделью v2 (models/v2/hooligan_v2.glb → models/v2/hooligan_colliders.json); у v1 их нет */
+  /** прокси рядом с моделью: v2 — models/v2/<кот>_colliders.json (модельщик), v1 — models/<кот>_v1_colliders.json (colliders.py по v1) */
   private async loadColliders(model: THREE.Object3D, restSnap: [THREE.Object3D, THREE.Quaternion, THREE.Vector3][]) {
-    // только у моделей v2 (геометрия и прокси связаны); v1 — прокси из меша (как на 841b373), без запроса
+    // свои у котов v1 и v2 (геометрия и прокси связаны); чужая модель — прокси из меша (build без json), без запроса
     const u = collidersUrl(this.url);
     if (!u) return;
     try {
@@ -897,6 +898,8 @@ export class GlbCharacter implements Character {
     }
     // руки и голени — из тела и одежды (bodyCollide.ts): после клипа, взгляда головы и поправок сцены (кровать) —
     // иначе поправка позы (потягивание лёжа) или поворот головы вносили руку обратно в тело
+    // клип-контакт (закрыть уши, плакать, почесать, наушники…): лапы ложатся на поверхность, а не тонут
+    this.collider?.setClip(cs.cur.id, this.actions.get(cs.cur.id)?.getClip().name);
     this.collider?.apply(dt);
     // раскраска карты: присед, наклон, лапа с баллончиком / кистью к точке на карте — после клипа и тела; реквизит — следом
     const ik = this.toolIK;

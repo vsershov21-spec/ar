@@ -1,0 +1,134 @@
+<!doctype html><html><head><meta charset="utf-8"><title>hands probe</title></head>
+<body style="margin:0;background:#20242c"><script type="module">
+// Руки у головы/наушников: «до» (коррекция 18.11–19.11 — кисть по осям костей, прокси как были: v1 — из меша, v2 — json)
+// против «после» (точки поверхности кисти/предплечья + контакт, прокси json, src/character/bodyCollide.ts).
+// Замер обоих — по точкам поверхности (measurePairs нового коллайдера), позы — для scripts/models/penetration.py --pose-json
+// (сетка против сетки), кадры — для листов docs/qa/hands (tools/hands-probe.mjs).
+// ?p=hooligan&m=/models/hooligan_v1.glb&clips=cover_ears,cry&frames=12&shots=1
+import * as THREE from 'three';
+const { GlbCharacter } = await import('../src/character/glbCharacter.ts');
+const { BodyCollider, CAT_MM, worstPair } = await import('../src/character/bodyCollide.ts');
+const q = new URLSearchParams(location.search);
+const persona = q.get('p') || 'hooligan';
+const murl = q.get('m') || `/models/${persona}_v1.glb`;
+const v2 = /\/v2\//.test(murl);
+const ch = new GlbCharacter(murl, '/models/anims_v1.glb');
+await ch.load();
+ch.setPersona?.({ id: persona });
+const model = ch.model;
+const boneFn = (n) => ch.bones.get(n) ?? model.getObjectByName('mixamorig' + n) ?? undefined;
+// «до»: как было — v1 без файла (прокси из меша + запасы), v2 — json модельщика; кисть по осям
+const old = new BodyCollider(ch.object, boneFn);
+old.setPersona(persona);
+old.axis = true;
+let oldJson = null;
+if (v2) oldJson = await (await fetch(murl.replace(/_v2\.glb$/, '_colliders.json'))).json();
+old.build(model, oldJson);
+// «после»: коллайдер персонажа (json грузится асинхронно после load)
+for (let i = 0; i < 100 && ch.collider.source !== 'json'; i++) await new Promise((r) => setTimeout(r, 100));
+const col = ch.collider;
+const bones = [];
+model.traverse((o) => { if (o.isBone) bones.push(o); });
+const snap = () => Object.fromEntries(bones.map((b) => [b.name, { r: b.quaternion.toArray().map((x) => +x.toFixed(6)), t: b.position.toArray().map((x) => +x.toFixed(6)) }]));
+const restore = (s) => { for (const b of bones) { const v = s[b.name]; b.quaternion.fromArray(v.r); b.position.fromArray(v.t); } model.updateMatrixWorld(true); };
+const mm = (pairs) => { const w = worstPair(pairs); return { mm: +(w.depth * CAT_MM).toFixed(2), pair: w.pair }; };
+const handPairs = (pairs) => Object.fromEntries(Object.entries(pairs).filter(([k]) => /^[LR](Hand|ForeArm|Elbow|UpperArm)/.test(k)));
+// сцена для кадров листа
+const W = 360, H = 360;
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setSize(W, H);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color('#2a2f3a');
+scene.add(new THREE.HemisphereLight(0xffffff, 0x444455, 1.6));
+const dl = new THREE.DirectionalLight(0xffffff, 1.6); dl.position.set(1, 2, 3); scene.add(dl);
+scene.add(ch.object);
+const cam = new THREE.PerspectiveCamera(30, W / H, 0.01, 100);
+const box0 = new THREE.Box3().setFromObject(ch.object);
+const H0 = box0.max.y - box0.min.y;
+// крупно: середина между головой и кистью худшей стороны, с её стороны (анфас ¾ и профиль)
+const shot = (view, side) => {
+  model.updateMatrixWorld(true);
+  const head = boneFn('Head').getWorldPosition(new THREE.Vector3());
+  const hand = boneFn((side === 'R' ? 'Right' : 'Left') + 'Hand').getWorldPosition(new THREE.Vector3());
+  const h = H0;
+  const c = head.clone().lerp(hand, 0.5);
+  // модель смотрит в +Z; левая сторона кота — +X
+  const sx = side === 'R' ? -1 : 1;
+  const yaw = (view === 'side' ? 1.25 : 0.4) * sx;
+  cam.position.copy(c).add(new THREE.Vector3(Math.sin(yaw), 0.12, Math.cos(yaw)).multiplyScalar(0.95 * h));
+  cam.lookAt(c);
+  renderer.render(scene, cam);
+  return renderer.domElement.toDataURL('image/png');
+};
+const out = { cat: persona, model: murl, proxies: col.proxies.map((p) => p.name), oldProxies: old.proxies.map((p) => p.name), samples: col.samples.length, clips: {}, perf: {} };
+const frames = +(q.get('frames') || 12);
+const wantShots = q.get('shots') !== '0';
+const clipList = (q.get('clips') || 'scratch,poke_head,think,laugh_02,cover_ears,poke_cheek,cry,idle_hooligan_headphones').split(',');
+let tNew = 0, tOld = 0, nT = 0;
+// клип подряд 30 к/с, как в приложении (сглаживание и тёплый старт коррекции): на каждом кадре — клип как есть, «до»
+// (old: кисть по осям) и «после»; замер обоих — по точкам поверхности; 12 кадров равномерно — позы для penetration.py
+for (const id of clipList) {
+  const act = ch.actions?.get(id);
+  if (!act) { out.clips[id] = null; continue; }
+  const clip = act.getClip();
+  const rest = snap();
+  const mx = new THREE.AnimationMixer(model);
+  const a = mx.clipAction(clip); a.play();
+  col.setClip(id, clip.name);
+  col.reset(); old.reset();
+  const n = Math.max(30, Math.round(clip.duration * 30));
+  const keep = new Set(Array.from({ length: frames }, (_, i) => Math.floor(((i + 0.5) * n) / frames)));
+  const res = [];
+  let worst = null;
+  for (let i = 0; i < n; i++) {
+    const t = i / 30;
+    mx.setTime(t);
+    model.updateMatrixWorld(true);
+    const raw = snap();
+    const pRaw = col.measurePairs();
+    let t0 = performance.now(); old.apply(1 / 30); tOld += performance.now() - t0;
+    const before = snap();
+    const pOld = col.measurePairs();
+    restore(raw);
+    t0 = performance.now(); col.apply(1 / 30); tNew += performance.now() - t0;
+    nT++;
+    const after = snap();
+    const pNew = col.measurePairs();
+    const f = { t: +t.toFixed(3), mmRaw: mm(handPairs(pRaw)), mmBefore: mm(handPairs(pOld)), mmAfter: mm(handPairs(pNew)) };
+    if (keep.has(i)) res.push({ ...f, raw, before, after, pairs: pNew, pairsBefore: pOld, pairsRaw: pRaw });
+    else res.push(f);
+    if (!worst || f.mmBefore.mm > worst.f.mmBefore.mm) worst = { f, raw, before, after, i };
+  }
+  // худший кадр «до» — кадры листа (анфас и профиль): клип как есть / до / после
+  if (wantShots && worst) {
+    const side = (worst.f.mmBefore.pair || worst.f.mmRaw.pair || 'L')[0];
+    const shots = {};
+    for (const [k, pose] of [['raw', worst.raw], ['before', worst.before], ['after', worst.after]]) { restore(pose); shots[k] = [shot('front', side), shot('side', side)]; }
+    const r = res[worst.i];
+    Object.assign(r, { raw: worst.raw, before: worst.before, after: worst.after, shots, worst: true });
+  }
+  a.stop(); mx.uncacheRoot(model);
+  restore(rest);
+  out.clips[id] = res;
+}
+// покой (idle без касаний): цена «ничего не задето»
+{
+  const act = ch.actions?.get('idle');
+  if (act) {
+    const mx = new THREE.AnimationMixer(model); const a = mx.clipAction(act.getClip()); a.play();
+    col.setClip('idle'); col.reset();
+    let t = 0; const n = 300;
+    for (let i = 0; i < n; i++) { mx.setTime(i / 30); model.updateMatrixWorld(true); const t0 = performance.now(); col.apply(1 / 30); t += performance.now() - t0; }
+    out.perf.idleMs = +(t / n).toFixed(4);
+    a.stop(); mx.uncacheRoot(model);
+  }
+}
+out.perf.newMs = +(tNew / nT).toFixed(4);
+out.perf.oldMs = +(tOld / nT).toFixed(4);
+out.perf.frames = nT;
+window.__poses = out;
+window.__ch = ch; window.__col = col; window.__old = old; window.__THREE = THREE;
+window.__ready = true;
+</script></body></html>

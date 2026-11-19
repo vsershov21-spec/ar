@@ -2,12 +2,11 @@
  * Поколение моделей котов. По умолчанию во всех редакциях — v1 (вид как на 841b373: модели bb768e9 и мех/тон/лицо тех
  * же значений). v2 — только ?models=v2: в lab и со страницы /test (PARAMS models → feature model.v2).
  *
- * ?models=v2 — у каждого кота своя основа, та, что ближе к рефам персонажа (design/cut/<кот>, docs/models/persona_*):
- *   • Блёстка — v2 (c686be3: форма головы по рефам, фатин, одежда отдельными мешами, коллайдеры модельщика);
- *   • Хулиган и Добряк — p1: геометрия v1 (голова и наушники ближе к рефам, чем у v2) + глаза по рефам
- *     (scripts/models/persona_tune.py: веко открыто, подводка) → models/v2/<кот>_p1.glb; прокси — из меша, как у v1.
- * ?models=v2h — геометрия v2 у всех трёх (для сравнения). Мех, тон и лицо при v2/v2h берут значения v2
- * (furShell, furTone, faceWrinkles, glbCharacter PERSONA_FACE).
+/**
+ * прокси столкновений к модели (docs/animations/COLLISION.md): геометрия v2 — от модельщика (models/v2/kind_v2.glb →
+ * models/v2/kind_colliders.json), v1 — посчитаны тем же scripts/models/colliders.py по v1 GLB (models/kind_v1.glb →
+ * models/kind_v1_colliders.json); p1 и чужая модель (?glb=…) — null (прокси из меша в рантайме)
+ */
  */
 export type ModelsVariant = 'v1' | 'v2' | 'v2h';
 
@@ -31,8 +30,18 @@ export function variantGlb(p: string, variant: ModelsVariant = modelsVariant()):
   return `${m[1]}models/v2/${m[2]}_${base}.glb`;
 }
 
+<<<<<<< HEAD
 /** коллайдеры модельщика к модели: только у геометрии v2 (models/v2/kind_v2.glb → models/v2/kind_colliders.json); v1 и p1 — null */
+=======
+/**
+ * прокси столкновений к модели (docs/animations/COLLISION.md): v2 — от модельщика (models/v2/kind_v2.glb →
+ * models/v2/kind_colliders.json), v1 — посчитаны тем же scripts/models/colliders.py по v1 GLB (models/kind_v1.glb →
+ * models/kind_v1_colliders.json); чужая модель (?glb=…) — null (прокси из меша в рантайме)
+ */
+>>>>>>> 1d90412 (Руки у головы — по поверхности лапы: точки скина кисти/предплечья/плеча, контакт вместо проникновения, прокси v1)
 export function collidersUrl(glb: string): string | null {
   const m = glb.match(/^(.*\/)?([a-z]+)_v2\.glb$/i);
-  return m && /(^|\/)v2\/$/.test(m[1] ?? '') ? `${m[1]}${m[2]}_colliders.json` : null;
+  if (m && /(^|\/)v2\/$/.test(m[1] ?? '')) return `${m[1]}${m[2]}_colliders.json`;
+  const m1 = glb.match(/^(.*\/)?(hooligan|kind|glitter)_v1\.glb$/);
+  return m1 ? `${m1[1] ?? ''}${m1[2]}_v1_colliders.json` : null;
 }
