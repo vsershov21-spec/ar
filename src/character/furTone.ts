@@ -28,6 +28,13 @@ export interface FurToneParams {
   face?: number;
   /** густота тёмных бровей 0..1 */
   brow?: number;
+  /** цвет носа (sRGB); по умолчанию — лососевый v1 / приглушённый v2 */
+  nose?: [number, number, number];
+  /**
+   * тон одежды в альбедо (одежда запечена в общую текстуру с мехом): тексели в радиусе r от src (sRGB) → dst
+   * с сохранением рисунка (контраст k). Блёстка — без (её вид не трогаем).
+   */
+  cloth?: { src: [number, number, number]; r: number; dst: [number, number, number]; k: number };
 }
 
 const S = (r: number, g: number, b: number): [number, number, number] => [r / 255, g / 255, b / 255];
@@ -40,13 +47,23 @@ export const FUR_TONE: Record<string, FurToneParams> = {
 };
 
 /**
- * Модели v2 (?models=v2): мех на тон светлее, морда светлее и шире по силе — у v2 голова шире, короче пряди и плотнее
- * карточки, при тех же значениях кот в приложении темнее и «грязнее» v1.
+ * Модели v2 (?models=v2): Блёстка — мех на тон светлее, морда светлее и шире по силе (у v2 голова шире, короче пряди и
+ * плотнее карточки, при тех же значениях кот темнее и «грязнее» v1). Хулиган и Добряк — по рефам персонажей
+ * design/cut/<кот> (модели models/v2/<кот>_p1.glb на основе v1 и models/v2/<кот>_v2.glb при ?models=v2h).
  */
 export const FUR_TONE_V2: Record<string, FurToneParams> = {
   glitter: { ...FUR_TONE.glitter, dst: S(152, 158, 184), white: S(222, 226, 238), face: 0.72 },
-  hooligan: { ...FUR_TONE.hooligan, dst: S(143, 150, 173), white: S(222, 226, 234), face: 0.95 },
-  kind: { ...FUR_TONE.kind, dst: S(149, 156, 181), white: S(228, 231, 240), face: 0.95 },
+  // ?models=v2, 19.11 — по рефам персонажей design/cut/<кот>/turn: мех лавандово-голубой (щёки ≈ 134,146,174), морда
+  // лишь чуть светлее и с розоватым оттенком (≈ 190,183,192), брови едва заметны, рисунок шерсти мягче
+  // нос — маленький розовый (≈ 226,150,160), кепка Хулигана — мягкий салатовый, шарф и сапожки Добряка — персиковые
+  hooligan: {
+    src: S(118, 131, 174), dst: S(130, 142, 172), contrast: 0.6, desat: 0.06, white: S(196, 196, 216), face: 0.45, brow: 0.42,
+    nose: S(222, 146, 158), cloth: { src: S(128, 210, 46), r: 0.3, dst: S(150, 200, 92), k: 0.75 },
+  },
+  kind: {
+    src: S(120, 132, 172), dst: S(134, 144, 180), contrast: 0.6, desat: 0.1, white: S(200, 199, 222), face: 0.42, brow: 0.18,
+    nose: S(222, 146, 158), cloth: { src: S(220, 142, 126), r: 0.26, dst: S(228, 172, 155), k: 0.7 },
+  },
 };
 
 /** точки лица в координатах покоя тела (extras.marks узла Brows) */
@@ -74,6 +91,11 @@ export class FurTone {
     uFtEyeL: { value: new THREE.Vector3() },
     uFtEyeR: { value: new THREE.Vector3() },
     uFtBrow: { value: FUR_TONE.kind.brow ?? 0 },
+    /** цвет носа (rgb) и доля замены (w; 0 — встроенный тон шейдера, как было) */
+    uFtNoseC: { value: new THREE.Vector4(0, 0, 0, 0) },
+    /** одежда: src (rgb) + радиус, dst (rgb) + контраст; радиус 0 — выкл. */
+    uFtClS: { value: new THREE.Vector4(0, 0, 0, 0) },
+    uFtClD: { value: new THREE.Vector4(0, 0, 0, 1) },
   };
   private done = new WeakSet<THREE.Material>();
 
@@ -86,6 +108,11 @@ export class FurTone {
     const w = p.white ?? p.dst;
     this.uniforms.uFtWhite.value.set(w[0], w[1], w[2], p.face ?? 0);
     this.uniforms.uFtBrow.value = p.brow ?? 0;
+    if (p.nose) this.uniforms.uFtNoseC.value.set(p.nose[0], p.nose[1], p.nose[2], 1);
+    else this.uniforms.uFtNoseC.value.set(0, 0, 0, 0);
+    const c = p.cloth;
+    this.uniforms.uFtClS.value.set(c?.src[0] ?? 0, c?.src[1] ?? 0, c?.src[2] ?? 0, c?.r ?? 0);
+    this.uniforms.uFtClD.value.set(c?.dst[0] ?? 0, c?.dst[1] ?? 0, c?.dst[2] ?? 0, c?.k ?? 1);
   }
 
   /** все меховые материалы модели (после buildFurShells — оболочки и карточки тоже) */
@@ -134,7 +161,7 @@ export class FurTone {
       }
       sh.fragmentShader =
         (spatial ? '#define FT_SPATIAL\nvarying vec3 vFtP;\n' : '') +
-        'uniform vec3 uFtSrc; uniform vec3 uFtDst; uniform vec2 uFtK; uniform float uFtOn; uniform vec4 uFtWhite; uniform vec4 uFtNose; uniform vec3 uFtEyeL; uniform vec3 uFtEyeR; uniform float uFtBrow;\n' +
+        'uniform vec3 uFtSrc; uniform vec3 uFtDst; uniform vec2 uFtK; uniform float uFtOn; uniform vec4 uFtWhite; uniform vec4 uFtNose; uniform vec3 uFtEyeL; uniform vec3 uFtEyeR; uniform float uFtBrow; uniform vec4 uFtNoseC; uniform vec4 uFtClS; uniform vec4 uFtClD;\n' +
         'float ftEll(vec3 p, vec3 c, vec3 r) { vec3 q = (p - c) / r; return 1.0 - smoothstep(0.55, 1.0, length(q)); }\n' +
         sh.fragmentShader.replace(
           '#include <color_fragment>',
@@ -178,16 +205,24 @@ export class FurTone {
       ftC = mix(ftC, vec3(0.36, 0.37, 0.44) + (ftS - uFtSrc) * 0.3, brow * uFtBrow);
       // уши выше макушки — розовые, ниже — нос лососевый
       float ear = smoothstep(0.35, 0.6, (p.y - uFtEyeL.y) / D);
-      ftP = mix(${nose}, vec3(0.92, 0.55, 0.63) + (ftS - vec3(0.6, 0.38, 0.45)) * 0.6, ear);
+      vec3 ftNs = ${nose};
+      ftNs = mix(ftNs, uFtNoseC.rgb + (ftS - vec3(0.6, 0.38, 0.45)) * 0.3, uFtNoseC.w);
+      ftP = mix(ftNs, vec3(0.92, 0.55, 0.63) + (ftS - vec3(0.6, 0.38, 0.45)) * 0.6, ear);
     }
 #endif
     ftC = mix(ftC, ftP, ftN);
     diffuseColor.rgb = mix(diffuseColor.rgb, pow(clamp(ftC, 0.0, 1.0), vec3(2.2)), max(ftM, ftN * 0.85));
+    // одежда в общей текстуре (кепка, шарф, сапожки): тон по рефам персонажа; мех и нос не задевает (другой цвет)
+    if (uFtClS.w > 0.0) {
+      float ftCl = (1.0 - smoothstep(0.55 * uFtClS.w, uFtClS.w, length(ftS - uFtClS.rgb))) * (1.0 - ftM) * (1.0 - ftN);
+      vec3 ftCc = uFtClD.rgb + (ftS - uFtClS.rgb) * uFtClD.w;
+      diffuseColor.rgb = mix(diffuseColor.rgb, pow(clamp(ftCc, 0.0, 1.0), vec3(2.2)), ftCl);
+    }
   }`,
         );
     };
     const prevKey = m.customProgramCacheKey?.bind(m);
-    m.customProgramCacheKey = () => (prevKey ? prevKey() : '') + (spatial ? '|fur-tone-v2s' : '|fur-tone-v2') + (v2 ? '|m2' : '');
+    m.customProgramCacheKey = () => (prevKey ? prevKey() : '') + (spatial ? '|fur-tone-v3s' : '|fur-tone-v3') + (v2 ? '|m2' : '');
     m.needsUpdate = true;
   }
 }

@@ -1,0 +1,72 @@
+<!doctype html><html><head><meta charset="utf-8"><title>persona shot</title>
+<style>html,body{margin:0;background:#ececee}canvas{display:block}</style></head>
+<body><script type="module">
+// Кот «как в приложении» для сравнения с рефами персонажей design/cut/<p>/turn (tools/persona-shot.mjs):
+// свет приложения (полусфера 2.2 + направленный 1.6), взгляд и голова — на камеру (как в приложении), моргания и
+// микромимика выключены, idle в покое. Виды: pilot — во весь рост сверху (≈ кадр пилота, камера над столом 30°),
+// front / tq — во весь рост почти горизонтально (как рефы), face — лицо крупно, faceup — лицо сверху (пилот).
+// ?p=kind&m=/models/kind_v1.glb&v=pilot,front,tq,face&w=300&h=440&fur=3 [&models=v2 — рантайм-значения v2]
+import * as THREE from 'three';
+let seed = 12345; Math.random = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+const { GlbCharacter } = await import('../src/character/glbCharacter.ts');
+const q = new URLSearchParams(location.search);
+const persona = q.get('p') || 'kind';
+const url = q.get('m') || `/models/${persona}_v1.glb`;
+const views = (q.get('v') || 'pilot,front,tq,face').split(',');
+const W = +(q.get('w') || 300), H = +(q.get('h') || 440);
+const r = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+(await import('../src/core/glRenderer.ts')).setGlRenderer(r);
+r.setPixelRatio(+(q.get('dpr') || 1)); r.setSize(views.length * W, H); r.setScissorTest(true); document.body.appendChild(r.domElement);
+r.outputColorSpace = THREE.SRGBColorSpace;
+const sc = new THREE.Scene(); sc.background = new THREE.Color(q.get('bg') ? '#' + q.get('bg') : 0xececee);
+sc.add(new THREE.HemisphereLight(0xffffff, 0x8899aa, 2.2));
+const dl = new THREE.DirectionalLight(0xffffff, 1.6); dl.position.set(0.5, 1, 1); sc.add(dl);
+const ch = new GlbCharacter(url, '/models/anims_v1.glb');
+await ch.load();
+ch.setPersona?.({ id: persona });
+ch.clips?.setIdles?.(['idle'], persona);
+sc.add(ch.object);
+if (q.get('hide')) ch.object.traverse((o) => { if (new RegExp(q.get('hide')).test(o.name)) o.visible = false; });
+ch.play?.('idle');
+if (ch.faceMix) ch.faceMix.nextBlink = 1e9;
+if (ch.life) ch.life.nextMicro = 1e9;
+// без взглядов в сторону и микросаккад: глаза ровно на камеру
+if (ch.eyes) { ch.eyes.awayT = 1e9; ch.eyes.sacT = 1e9; }
+const bone = (n) => { let b = null; ch.object.traverse((o) => { if (!b && o.name.replace(/^mixamorig:?/, '') === n) b = o; }); return b; };
+const cam = new THREE.PerspectiveCamera(22, W / H, 0.01, 50);
+for (let k = 0; k < 20; k++) ch.update(1 / 30, cam);
+ch.object.updateMatrixWorld(true);
+const box = new THREE.Box3();
+ch.object.traverse((o) => { if (o.isSkinnedMesh && o.visible && !/^BD_Fur/.test(o.name)) box.expandByObject(o, true); });
+const size = box.getSize(new THREE.Vector3()), ctr = box.getCenter(new THREE.Vector3());
+const hp = bone('Head').getWorldPosition(new THREE.Vector3()), tp = bone('HeadTop_End').getWorldPosition(new THREE.Vector3());
+function look(target, yawDeg, pitchDeg, dist, fov = 22) {
+  const y = yawDeg * Math.PI / 180, p = pitchDeg * Math.PI / 180;
+  cam.fov = fov; cam.aspect = W / H; cam.updateProjectionMatrix();
+  cam.position.set(target.x + Math.sin(y) * Math.cos(p) * dist, target.y + Math.sin(p) * dist, target.z + Math.cos(y) * Math.cos(p) * dist);
+  cam.lookAt(target);
+}
+const fullD = (fov) => (size.y * 1.12) / 2 / Math.tan((fov * Math.PI) / 360);
+function setView(v) {
+  const fc = hp.clone().lerp(tp, 0.45);
+  if (v === 'pilot') look(ctr, 0, 30, fullD(40) * 1.05, 40);
+  else if (v === 'front') look(ctr, 0, 3, fullD(22), 22);
+  else if (v === 'tq') look(ctr, -35, 3, fullD(22), 22);
+  else if (v === 'face') look(fc, 0, 4, hp.distanceTo(tp) * +(q.get('fz') || 14));
+  else if (v === 'faceup') look(fc, 0, 28, hp.distanceTo(tp) * +(q.get('fz') || 14));
+  else if (v === 'face34') look(fc, -30, 4, hp.distanceTo(tp) * +(q.get('fz') || 14));
+}
+const tgt = new THREE.Vector3();
+views.forEach((v, i) => {
+  setView(v);
+  // взгляд на камеру, но из дальней точки по тому же лучу: в упор (лицо крупно) глаза не сводит к носу
+  tgt.copy(cam.position).sub(fc0()).setLength(3).add(fc0());
+  ch.lookAt(tgt.clone());
+  for (let k = 0; k < 45; k++) { ch.update(1 / 30, cam); setView(v); }
+  const x = i * W;
+  r.setViewport(x, 0, W, H); r.setScissor(x, 0, W, H); r.render(sc, cam);
+});
+function fc0() { return hp.clone().lerp(tp, 0.45); }
+window.__info = { size: size.toArray() };
+window.__ready = true;
+</script></body></html>

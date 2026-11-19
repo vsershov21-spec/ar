@@ -11,10 +11,22 @@ describe('поколение моделей котов: v1 по умолчани
     expect(collidersUrl('models/kind_v1.glb')).toBeNull();
     expect(collidersUrl('models/hooligan_v1.glb')).toBeNull();
   });
-  it('?models=v2 — модели и коллайдеры из public/models/v2', () => {
+  it('?models=v2 — у каждого кота основа ближе к рефам персонажа: Блёстка — v2, Хулиган и Добряк — p1 (v1 + глаза)', () => {
     expect(modelsVariant('?nocard=off&models=v2')).toBe('v2');
+    const g = variantGlb('models/glitter_v1.glb', 'v2');
+    expect(g).toBe('models/v2/glitter_v2.glb');
+    expect(collidersUrl(g)).toBe('models/v2/glitter_colliders.json');
+    for (const c of ['hooligan', 'kind']) {
+      const p = variantGlb(`models/${c}_v1.glb`, 'v2');
+      expect(p).toBe(`models/v2/${c}_p1.glb`);
+      // геометрия v1 — прокси из меша, коллайдеры модельщика (под v2) не подходят
+      expect(collidersUrl(p)).toBeNull();
+    }
+  });
+  it('?models=v2h — геометрия v2 у всех трёх с коллайдерами модельщика', () => {
+    expect(modelsVariant('?models=v2h')).toBe('v2h');
     for (const c of ['hooligan', 'kind', 'glitter']) {
-      const g = variantGlb(`models/${c}_v1.glb`, 'v2');
+      const g = variantGlb(`models/${c}_v1.glb`, 'v2h');
       expect(g).toBe(`models/v2/${c}_v2.glb`);
       expect(collidersUrl(g)).toBe(`models/v2/${c}_colliders.json`);
     }
