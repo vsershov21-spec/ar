@@ -4,7 +4,7 @@
 // Снимает каждого кота дважды — ED (по умолчанию pilot) без параметра (v1, по умолчанию) и с ?models=v2 — и кладёт
 //   <outdir>/v1_<кот>.png, <outdir>/v2_<кот>.png и склейку <outdir>/v2b_app_<кот>.png (слева v1, справа v2).
 // env: ED=pilot|lab|mvp, VARIANTS=v1,v2 (какие снимать), HOME_SHOT=1 — ещё кухня «Мира кота» (<outdir>/v1_kitchen_<кот>.png …),
-//      Q — доп. query, CHROME.
+//      Q — доп. query, CHROME, BASE — адрес vite dev вместо dist/.
 import fs from 'node:fs';
 import path from 'node:path';
 import http from 'node:http';
@@ -38,8 +38,9 @@ const srv = http.createServer((req, res) => {
   res.writeHead(200, { 'Content-Type': TYPES[path.extname(f)] ?? 'application/octet-stream' });
   fs.createReadStream(f).pipe(res);
 });
-await new Promise((r) => srv.listen(0, '127.0.0.1', r));
-const base = `http://127.0.0.1:${srv.address().port}`;
+// BASE=http://localhost:4190 — вместо dist/ взять запущенный vite dev (редакция lab, модели без сжатия)
+if (!process.env.BASE) await new Promise((r) => srv.listen(0, '127.0.0.1', r));
+const base = process.env.BASE ?? `http://127.0.0.1:${srv.address().port}`;
 const browser = await puppeteer.launch({
   executablePath: process.env.CHROME || '/usr/bin/google-chrome',
   headless: true,
@@ -114,7 +115,7 @@ async function sideBySide(files, labels, outFile) {
   const comp = [];
   files.forEach((f, i) => {
     comp.push({ input: f, left: i * W, top: 0 });
-    comp.push({ input: label(labels[i]), left: i * W, top: 0 });
+    comp.push({ input: label(labels[i]), left: i * W, top: H - 90 });
   });
   await sharp({ create: { width: W * files.length, height: H, channels: 3, background: '#000' } }).composite(comp).png({ palette: true, quality: 90, effort: 8 }).toFile(outFile);
 }
@@ -128,4 +129,4 @@ for (const cat of cats) {
   }
 }
 await browser.close();
-srv.close();
+if (srv.listening) srv.close();

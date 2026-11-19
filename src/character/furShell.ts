@@ -178,12 +178,13 @@ const FUR_V1: FurLook = {
   cardFacing: [1.0, 0.45, 0.55],
 };
 export const FUR_V2: FurLook = {
-  key: 'v2a',
+  key: 'v2b',
   floor: 'vec3(0.15, 0.165, 0.22)',
   rad1: '0.52 * (1.0 - 0.7 * h) * (0.85 + 0.3 * r1.z) * step(h, 0.55 + 0.5 * r1.x)',
   rad2: '0.46 * (1.0 - 0.75 * h) * step(h, 0.4 + 0.45 * r2.x)',
-  cardTip: 0.7,
-  cardFacing: [0.95, 0.4, 0.5],
+  // v2b: кончики тают слабее (светлые кончики — это яркость меха; 0.7 и «в лоб» 0.4 делали кота темнее v1)
+  cardTip: 0.4,
+  cardFacing: [1.0, 0.45, 0.55],
 };
 const furLook = () => (modelsV2() ? FUR_V2 : FUR_V1);
 const glf = (x: number) => (Number.isInteger(x) ? x.toFixed(1) : String(x));

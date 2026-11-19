@@ -22,8 +22,15 @@ from glb_io import Glb, raster_uv
 from mesh_parts import weld, label_parts, PHONES
 from penetration import tri_pairs_intersect
 
-SEG = 24          # сегментов по окружности чашки
-BAND_N, BAND_S = 34, 8  # дуга: сечений, сторон трубки
+SEG = 28          # сегментов по окружности чашки
+BAND_N, BAND_S = 34, 10  # дуга: сечений, сторон трубки
+# v2b (19.11): «детские» накладные наушники, лежащие на капюшоне (рефы design/refs, design/sheets): чашки крупнее и
+# толще, смотрят вперёд-наружу (не вбок), дуга — толстая мягкая лента. v2 — чашки R 0.041, дуга 0.013: в приложении
+# читались тонким кольцом.
+CUP_R = (1.22, 0.05)      # множитель радиуса старой чашки, предел
+CUP_D = (1.35, 0.03, 0.042)  # множитель толщины, пределы
+CUP_FWD = 0.55            # наклон оси чашки вперёд (0 — по нормали старой поверхности, 1 — прямо вперёд)
+BAND_R, BAND_FLAT = 0.019, 0.62  # полуширина ленты дуги и её сплющенность (толщина = R·flat)
 SHELL = [0.2, 0.74, 0.68, 1.0]   # sRGB → в glTF линейный множитель ниже
 PAD = [0.13, 0.14, 0.16, 1.0]
 
@@ -91,7 +98,8 @@ def tube(path, r, sides=BAND_S):
         u = np.cross(t, up); u /= max(np.linalg.norm(u), 1e-9); v = np.cross(u, t)
         for k in range(sides):
             a = 2 * np.pi * k / sides
-            V.append(p + (u * np.cos(a) * 1.0 + v * np.sin(a) * 0.7) * r)  # плоская лента-дуга
+            # лента: широкая по высоте (прилегает к шее/капюшону), тонкая наружу — как дуга настоящих наушников на шее
+            V.append(p + (u * np.cos(a) * BAND_FLAT + v * np.sin(a) * 1.0) * r)
     V = np.array(V); F = []
     for i in range(len(path) - 1):
         for k in range(sides):
@@ -141,7 +149,10 @@ def main():
         hh = (Xc - c) @ ax
         c = c + ax * np.percentile(hh, 10)
         D = np.percentile(hh, 95) - np.percentile(hh, 10)
-        side.append(dict(s=s, c=c, ax=ax, R=min(R, 0.05), D=float(np.clip(D, 0.022, 0.034))))
+        # ось — вперёд-наружу: чашка лежит на капюшоне «лицом» к зрителю, как у настоящих наушников на шее
+        ax2 = ax * (1 - CUP_FWD) + np.array([0.35 * s, 0.12, 1.0]) / np.linalg.norm([0.35, 0.12, 1.0]) * CUP_FWD
+        ax2 /= np.linalg.norm(ax2)
+        side.append(dict(s=s, c=c, ax=ax2, ax0=ax, R=min(R * CUP_R[0], CUP_R[1]), D=float(np.clip(D * CUP_D[0], CUP_D[1], CUP_D[2]))))
     band = X0[(X0[:, 2] < 0.08) & (X0[:, 1] > np.percentile(X0[:, 1], 40))]
     yb = np.median(band[:, 1])
     bc = np.array([0.0, yb, (band[:, 2].max() + band[:, 2].min()) / 2 - 0.01])
@@ -154,8 +165,8 @@ def main():
     from mesh_parts import tri_colors, hsv
     vol = np.zeros(len(P), bool)
     for sd in side:
-        q = P - sd['c']; h_ = q @ sd['ax']; r_ = np.linalg.norm(q - h_[:, None] * sd['ax'], axis=1)
-        vol |= (r_ < sd['R'] + 0.014) & (h_ > -0.045) & (h_ < sd['D'] + 0.012)
+        q = P - sd['c']; h_ = q @ sd['ax0']; r_ = np.linalg.norm(q - h_[:, None] * sd['ax0'], axis=1)
+        vol |= (r_ < sd['R'] / CUP_R[0] + 0.014) & (h_ > -0.045) & (h_ < sd['D'] / CUP_D[0] + 0.012)
     tb = cKDTree(band)
     db, _ = tb.query(P)
     vol |= db < 0.011
@@ -173,8 +184,8 @@ def main():
     # амбушюры у Tripo окрашены почти как мех (голубовато-белые) — внутри объёма чашки берём и их (кроме белой груди у центра)
     cupv = np.zeros(len(P), bool)
     for sd in side:
-        q = P - sd['c']; h_ = q @ sd['ax']; r_ = np.linalg.norm(q - h_[:, None] * sd['ax'], axis=1)
-        cupv |= (r_ < sd['R'] + 0.01) & (h_ > -0.045) & (h_ < sd['D'] + 0.008)
+        q = P - sd['c']; h_ = q @ sd['ax0']; r_ = np.linalg.norm(q - h_[:, None] * sd['ax0'], axis=1)
+        cupv |= (r_ < sd['R'] / CUP_R[0] + 0.01) & (h_ > -0.045) & (h_ < sd['D'] / CUP_D[0] + 0.008)
     ph = ph | (vol & ~dark & ~((headw > 0.7) & (P[:, 1] > yb + 0.012)) & (teal | grayc | ph | (cupv & (np.abs(P[:, 0]) > 0.05))))
     # подрастить на 1 кольцо (края старых чашек)
     for _ in range(1):
@@ -196,6 +207,19 @@ def main():
     nbs = [np.unique(nb[v]) for v in idx]
     for _ in range(400):
         Q[idx] = np.array([Q[n_].mean(0) for n_ in nbs])
+    # класс поверхности под старыми наушниками (мех 1 / худи 0) — гармонически от краёв мембраны, как и форма:
+    # граница «мех/худи» проходит гладкой линией, без островков чужого цвета (v2: светлые лоскуты на худи, тёмные на меху)
+    from mesh_parts import BODY as _BODY
+    labw = np.zeros(nW, np.int64); labw[wl] = lab
+    fcl = (labw == _BODY).astype(np.float64)
+    isb = np.zeros(nW, bool)
+    for n_ in nbs:
+        isb[n_] = True
+    isb &= ~phw
+    fcl[idx] = 0.5
+    for _ in range(600):
+        fcl[idx] = np.array([fcl[n_].mean() for n_ in nbs])
+    furv = fcl[wl]
     P1 = Q[wl]
     moved = np.linalg.norm(P1 - P, axis=1)
     print(f'  мембрана: {phw.sum()} вершин, сдвиг ≤ {moved.max() * 1000:.0f} мм')
@@ -213,9 +237,32 @@ def main():
     pos, _, tid = raster_uv(P1, N2, UV, I[tri_ph], S)
     m = tid >= 0
     src_v = np.where(~ph & (np.linalg.norm(P - bc, axis=1) < 0.3))[0]
-    col = img[np.clip((UV[src_v, 1] % 1) * S, 0, S - 1).astype(int), np.clip((UV[src_v, 0] % 1) * S, 0, S - 1).astype(int)]
-    _, q = cKDTree(P1[src_v]).query(pos[m], k=4)
-    img[m] = col[q].mean(1).astype(np.uint8)
+    col = img[np.clip((UV[src_v, 1] % 1) * S, 0, S - 1).astype(int), np.clip((UV[src_v, 0] % 1) * S, 0, S - 1).astype(int)].astype(np.float64)
+    # v2b: класс соседей (худи / мех) — большинством из 16 ближайших, цвет — медиана своего класса (не смесь тёмного
+    # худи и светлого меха: в v2 «грязные» серые пятна у ключиц); худи — общий тон худи рядом, без шума
+    from mesh_parts import HOODIE
+    cls = (lab[src_v] == HOODIE).astype(np.int64)
+    # класс текселя — поле furv в ближайших вершинах старой детали (обратные расстояния)
+    phv = np.where(ph)[0]
+    dd, qv = cKDTree(P1[phv]).query(pos[m], k=4)
+    wv = 1 / np.maximum(dd, 1e-5)
+    hood = (furv[phv][qv] * wv).sum(1) / wv.sum(1) < 0.5
+    _, q = cKDTree(P1[src_v]).query(pos[m], k=24)
+    hood_col = np.median(col[cls == 1], axis=0) if (cls == 1).any() else col.mean(0)
+    fur_all = col[cls == 0]
+    out = np.empty((m.sum(), 3))
+    for k_, (qq, hd) in enumerate(zip(q, hood)):
+        same = qq[cls[qq] == int(hd)]
+        out[k_] = np.median(col[same], axis=0) if len(same) >= 3 else (hood_col if hd else np.median(fur_all, axis=0))
+    out[hood] = hood_col
+    img[m] = np.clip(out, 0, 255).astype(np.uint8)
+    # мягко: размытие перекрашенных текселей (нормированная свёртка внутри маски) — без зерна по UV-островам
+    from scipy import ndimage as _nd
+    fm = m.astype(np.float64)
+    for ch in range(3):
+        a_ = img[..., ch].astype(np.float64) * fm
+        bl_ = _nd.gaussian_filter(a_, 2.5) / np.maximum(_nd.gaussian_filter(fm, 2.5), 1e-6)
+        img[..., ch][m] = np.clip(bl_[m], 0, 255).astype(np.uint8)
     # остатки бирюзы на краях островов UV (тексели вне растра треугольников): в окрестности — цветом ближайшего не-бирюзового
     from scipy import ndimage
     near_ = ndimage.binary_dilation(m, iterations=8)
@@ -240,7 +287,10 @@ def main():
             (Vs, Fs), (Vp, Fp) = cup(sd['c'], sd['ax'], sd['R'], sd['D'])
             parts_s.append((Vs, Fs)); parts_p.append((Vp, Fp))
             _, u, v = frame(sd['ax'])
-            tops.append(sd['c'] + sd['ax'] * sd['D'] * 0.55 + np.array([0, 1.0, 0]) * (sd['R'] + 0.002))
+            # крепление дуги — край чашки сверху-сзади (к шее), а не макушка чашки: дуга лежит на капюшоне, а не под подбородком
+            wdir = np.array([0, 0.75, 0]) + np.array([sd['s'] * 0.25, 0, -0.62])
+            wdir = wdir - sd['ax'] * (wdir @ sd['ax']); wdir /= np.linalg.norm(wdir)
+            tops.append(sd['c'] + sd['ax'] * sd['D'] * 0.45 + wdir * (sd['R'] * 0.92))
         # дуга: от верха левой чашки назад вокруг шеи к правой (эллипс в наклонной плоскости через верхи чашек)
         aL = np.arctan2((tops[0][2] - bc[2]) / (bz * band_scale), (tops[0][0] - bc[0]) / (bx * band_scale))
         aR = np.arctan2((tops[1][2] - bc[2]) / (bz * band_scale), (tops[1][0] - bc[0]) / (bx * band_scale))
@@ -256,7 +306,7 @@ def main():
             along = pr_ @ d_
             perp = np.linalg.norm(pr_ - along[:, None] * d_, axis=1)
             sel = perp < 0.015
-            rr.append((along[sel].max() if sel.any() else 0.0) + 0.013 + 0.003)
+            rr.append((along[sel].max() if sel.any() else 0.0) + BAND_R * BAND_FLAT + 0.003)
         rr = np.maximum.accumulate(np.array(rr)) * 0 + np.array(rr)
         from scipy.ndimage import uniform_filter1d as _uf
         rr = _uf(np.array(rr), 5, mode='nearest') * band_scale
@@ -268,7 +318,7 @@ def main():
         wgt = np.sin(np.linspace(0, np.pi, BAND_N))
         path[:, 1] = (1 - wgt) * np.interp(np.linspace(0, 1, BAND_N), [0, 1], [tops[0][1], tops[1][1]]) + wgt * (yb + 0.004)
         path[0], path[-1] = tops[0], tops[1]
-        Vb, Fb = tube(path, 0.013)
+        Vb, Fb = tube(path, BAND_R)
         parts_s.append((Vb, Fb))
         return parts_s, parts_p, path
 
@@ -278,7 +328,7 @@ def main():
             n += len(tri_pairs_intersect(V, F, P1, Ib))
         return n
     scale = 1.0
-    for it in range(30):
+    for it in range(60):
         ps, pp, path = build(side, scale)
         hc = [hits([ps[k], pp[k]]) for k in range(2)]
         hb = hits([ps[2]])
@@ -342,7 +392,7 @@ def main():
     j['nodes'].append({'name': 'Headphones_Hooligan', 'mesh': len(j['meshes']) - 1, 'skin': j['nodes'][bnode]['skin'],
                        'extras': {'headphones': {'cups': [{'c': [round(float(x), 5) for x in sd['c']], 'axis': [round(float(x), 5) for x in sd['ax']],
                                                            'r': round(sd['R'], 5), 'depth': round(sd['D'], 5)} for sd in side],
-                                                 'band': [[round(float(x), 5) for x in p] for p in path[::3]], 'band_r': 0.013}}})
+                                                 'band': [[round(float(x), 5) for x in p] for p in path[::3]], 'band_r': BAND_R}}})
     parent = next((n for n in j['nodes'] if bnode in n.get('children', [])), None)
     (parent['children'] if parent is not None else j['scenes'][0]['nodes']).append(len(j['nodes']) - 1)
     g.save(dst)

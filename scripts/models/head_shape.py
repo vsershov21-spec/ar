@@ -25,9 +25,10 @@ from glb_io import Glb
 # доли межглазья D; k — общий множитель (--k)
 PRM = {
     #            щёки  баки  череп-шир  череп-низ  морда-вперёд  подушки  нос   глаз  глаз-вниз
-    'hooligan': dict(jowl=0.105, burn=0.075, crw=0.05, crh=0.07, muz=0.055, pad=0.035, nose=0.46, eye=0.19, eyed=0.03),
-    'kind': dict(jowl=0.105, burn=0.075, crw=0.05, crh=0.07, muz=0.055, pad=0.035, nose=0.46, eye=0.18, eyed=0.03),
-    'glitter': dict(jowl=0.10, burn=0.07, crw=0.05, crh=0.06, muz=0.05, pad=0.03, nose=0.4, eye=0.13, eyed=0.022),
+    # v2b (19.11): глаза ×0.95 от v1 (было ×0.81–0.88 — в приложении «сонные», хмурые), чуть ниже — вдвое меньше
+    'hooligan': dict(jowl=0.105, burn=0.075, crw=0.05, crh=0.07, muz=0.055, pad=0.035, nose=0.46, eye=0.05, eyed=0.015),
+    'kind': dict(jowl=0.105, burn=0.075, crw=0.05, crh=0.07, muz=0.055, pad=0.035, nose=0.46, eye=0.05, eyed=0.015),
+    'glitter': dict(jowl=0.10, burn=0.07, crw=0.05, crh=0.06, muz=0.05, pad=0.03, nose=0.4, eye=0.05, eyed=0.011),
 }
 
 

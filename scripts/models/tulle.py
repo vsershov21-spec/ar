@@ -132,7 +132,9 @@ def main():
                     _, q = tree.query(p)
                     vi = sv[q]
                     U.append(UV[vi]); JJ.append(J[vi]); WW.append(Wt[vi])
-                    COL.append([1, 1, 1, (0.86 - 0.36 * t) * (0.9 if L == LAYERS - 1 else 0.72)])
+                    # v2b: альфа ровнее и мягче (v2: 0.86→0.5 × 0.9/0.72 — плотный у пояса, «шум» из текстуры),
+                    # цвет — ровный тон юбки, к подолу чуть светлее
+                    COL.append([0.93 + 0.07 * t, 0.93 + 0.07 * t, 0.93 + 0.07 * t, (0.74 - 0.18 * t) * (0.9 if L == LAYERS - 1 else 0.72)])
             for si in range(NS - 1):
                 for k in range(NT):
                     a0 = base + si * NT + k; a1 = base + si * NT + (k + 1) % NT
@@ -217,10 +219,24 @@ def main():
              'WEIGHTS_0': wq}
     j['accessors'][attrs['COLOR_0']]['normalized'] = True
     bm = j['materials'][b['material']]
+    # v2b: без текстуры — UV «от ближайшей вершины» юбки Tripo на трёх прозрачных слоях давали серую рябь (рюши и тени
+    # запечены в альбедо); фатин — ровный цвет юбки (медиана текселей юбки, чуть светлее), градиент и альфа — в COLOR_0
+    from glb_io import raster_uv as _ruv
+    ti_ = j['textures'][bm['pbrMetallicRoughness']['baseColorTexture']['index']]['source']
+    im_ = np.asarray(g.image(ti_).convert('RGB')).astype(np.float64)
+    S_ = im_.shape[0]
+    tc = im_[np.clip((UV[sv, 1] % 1) * S_, 0, S_ - 1).astype(int), np.clip((UV[sv, 0] % 1) * S_, 0, S_ - 1).astype(int)]
+    lum_ = tc @ np.array([0.299, 0.587, 0.114])
+    base_c = np.median(tc[lum_ > np.percentile(lum_, 40)], axis=0) / 255
+    lin = lambda c: np.where(c <= 0.04045, c / 12.92, ((c + 0.055) / 1.055) ** 2.4)
+    # насыщеннее к мятному тону рефа (медиана текселей серее: в тени рюш) — иначе в приложении фатин читается серым мешком
+    g_ = base_c.mean()
+    base_c = np.clip(g_ + (base_c - g_) * 2.2, 0, 1) * 0.6 + np.array([0.62, 0.86, 0.8]) * 0.4
+    bcf = np.clip(lin(np.clip(base_c * 1.04 + 0.02, 0, 1)), 0, 1)
+    print(f'  фатин: цвет юбки {np.round(base_c * 255).astype(int)} → baseColorFactor {np.round(bcf, 3)}')
     mat = {'name': 'BD_Tulle_mat', 'alphaMode': 'BLEND', 'doubleSided': True,
-           'pbrMetallicRoughness': {'baseColorTexture': dict(bm['pbrMetallicRoughness']['baseColorTexture']),
-                                    'baseColorFactor': [1.3, 1.32, 1.28, 1], 'metallicFactor': 0, 'roughnessFactor': 0.6},
-           'emissiveFactor': [0.06, 0.08, 0.07]}
+           'pbrMetallicRoughness': {'baseColorFactor': [float(bcf[0]), float(bcf[1]), float(bcf[2]), 1], 'metallicFactor': 0, 'roughnessFactor': 0.7},
+           'emissiveFactor': [float(x) * 0.12 for x in bcf]}
     prim = {'attributes': attrs, 'indices': g.add_acc(F.ravel(), 5123, 'SCALAR', 34963)}
     old = next((n for n in j['nodes'] if n.get('extras', {}).get('tulle')), None)
     if old is not None:  # повторный прогон (после untangle): тот же меш и материал, старые данные — пустые

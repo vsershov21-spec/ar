@@ -39,6 +39,16 @@ export const FUR_TONE: Record<string, FurToneParams> = {
   kind: { src: S(120, 132, 172), dst: S(144, 151, 176), contrast: 0.78, desat: 0.26, white: S(220, 223, 232), face: 0.85, brow: 0.7 },
 };
 
+/**
+ * Модели v2 (?models=v2): мех на тон светлее, морда светлее и шире по силе — у v2 голова шире, короче пряди и плотнее
+ * карточки, при тех же значениях кот в приложении темнее и «грязнее» v1.
+ */
+export const FUR_TONE_V2: Record<string, FurToneParams> = {
+  glitter: { ...FUR_TONE.glitter, dst: S(152, 158, 184), white: S(222, 226, 238), face: 0.72 },
+  hooligan: { ...FUR_TONE.hooligan, dst: S(143, 150, 173), white: S(222, 226, 234), face: 0.95 },
+  kind: { ...FUR_TONE.kind, dst: S(149, 156, 181), white: S(228, 231, 240), face: 0.95 },
+};
+
 /** точки лица в координатах покоя тела (extras.marks узла Brows) */
 interface Marks {
   nose: number[];
@@ -68,7 +78,8 @@ export class FurTone {
   private done = new WeakSet<THREE.Material>();
 
   setPersona(id: string) {
-    const p = FUR_TONE[id] ?? FUR_TONE.kind;
+    const T = modelsV2() ? FUR_TONE_V2 : FUR_TONE;
+    const p = T[id] ?? T.kind;
     this.uniforms.uFtSrc.value.set(...p.src);
     this.uniforms.uFtDst.value.set(...p.dst);
     this.uniforms.uFtK.value.set(p.contrast, p.desat);

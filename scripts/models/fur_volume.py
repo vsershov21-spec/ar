@@ -21,7 +21,8 @@ from glb_io import Glb
 
 HEAD_LEN = {'hooligan': 0.0115, 'kind': 0.0125, 'glitter': 0.011}
 # верхнее веко в покое (eyeRig: доля закрытия) — тяжёлое веко рефов: Хулиган «с ленцой», Добряк мягче, Блёстка открытая
-REST_UP = {'hooligan': 0.4, 'kind': 0.34, 'glitter': 0.22}
+# веко в покое: v1 (0.3 / 0.27 / 0.17) + 0.05 — v2 с 0.4 / 0.34 / 0.22 выглядел сонным и хмурым
+REST_UP = {'hooligan': 0.35, 'kind': 0.32, 'glitter': 0.22}
 CHEEK_K = {'hooligan': 1.55, 'kind': 1.6, 'glitter': 1.45}
 
 
