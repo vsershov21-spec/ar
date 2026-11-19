@@ -118,6 +118,12 @@ export class Stage {
   private walkTarget: THREE.Vector2 | null = null;
   private walkYaw: number | null = null;
   private onArrive: (() => void) | null = null;
+  /** шаг назад (раскраска: «отошёл посмотреть») — идёт спиной вперёд, лицом к цели */
+  private walkBack = false;
+  /** скорость текущей прогулки, если задана (раскраска — короткий быстрый шаг между точками у края) */
+  private walkSpeedNow: number | null = null;
+  /** стоя — лицом к этой точке карты, а не к зрителю (раскраска: кот смотрит туда, где рисует); null — к зрителю */
+  faceTo: THREE.Vector2 | null = null;
   constrainToCard = true;
 
   constructor(scene: THREE.Scene, private tracker: Tracker, public cfg: StageConfig) {
@@ -194,12 +200,18 @@ export class Stage {
     return out;
   }
 
-  /** дойти до точки (в координатах карты). Возвращает false, если уже на месте */
-  walkTo(p: THREE.Vector2, onArrive?: () => void): boolean {
-    const t = this.clampTarget(p);
+  /**
+   * Дойти до точки (в координатах карты). Возвращает false, если уже на месте.
+   * opts.free — можно встать за краем карты (на стол рядом, до 0,2 ширины): раскраска — кот рисует, стоя у края;
+   * opts.back — спиной вперёд (лицом против хода); opts.speed — своя скорость, ширин карты в секунду.
+   */
+  walkTo(p: THREE.Vector2, onArrive?: () => void, opts: { free?: boolean; back?: boolean; speed?: number } = {}): boolean {
+    const t = opts.free ? new THREE.Vector2(clamp(p.x, -0.7, 0.7), clamp(p.y, -0.5 / this.tracker.aspect - 0.2, 0.5 / this.tracker.aspect + 0.2)) : this.clampTarget(p);
     if (t.distanceTo(this.pos) < 0.04) return false;
     this.walkTarget = t;
     this.onArrive = onArrive ?? null;
+    this.walkBack = !!opts.back;
+    this.walkSpeedNow = opts.speed ?? null;
     return true;
   }
 
@@ -212,6 +224,8 @@ export class Stage {
     this.walkTarget = null;
     this.walkYaw = null;
     this.onArrive = null;
+    this.walkBack = false;
+    this.walkSpeedNow = null;
   }
 
   setCharacter(ch: Character) {
@@ -252,10 +266,11 @@ export class Stage {
     const camLocal = this.camera.getWorldPosition(this.tmpA).applyMatrix4(this.aInv.copy(aw).invert());
     const dx = camLocal.x - this.pos.x, dy = camLocal.y - this.pos.y;
     // после поворота на +90° по X «вперёд» кота (+Z модели) смотрит в -Y карты
-    const targetYaw = this.walkYaw ?? (c.yawFollow ? Math.atan2(dx, -dy) : 0);
+    const f = this.faceTo;
+    const targetYaw = this.walkYaw ?? (f ? Math.atan2(f.x - this.pos.x, -(f.y - this.pos.y)) : c.yawFollow ? Math.atan2(dx, -dy) : 0);
     let d = targetYaw - this.yaw;
     d = Math.atan2(Math.sin(d), Math.cos(d));
-    this.turn(d, dt, this.walkYaw !== null);
+    this.turn(d, dt, this.walkYaw !== null || !!f);
     const local = this.m2.compose(
       this.tmpB.set(this.pos.x, this.pos.y, c.footZ),
       this.q3.setFromEuler(this.e1.set(Math.PI / 2, this.yaw, 0, 'XYZ')),
@@ -273,7 +288,7 @@ export class Stage {
   turnErr = 0;
   private turn(d: number, dt: number, walking: boolean) {
     if (!(dt > 0)) return;
-    this.turnErr = walking || !this.yawChase ? 0 : Math.abs(d);
+    this.turnErr = walking || !this.yawChase || this.faceTo ? 0 : Math.abs(d);
     dt = Math.min(dt, 0.1);
     if (walking) this.yawChase = true;
     else {
@@ -311,14 +326,16 @@ export class Stage {
       const d = this.v2.copy(this.walkTarget).sub(this.pos);
       const len = d.length();
       // направление движения в координатах карты → yaw (вперёд кота = -Y карты при yaw=0)
-      this.walkYaw = Math.atan2(d.x, -d.y);
+      this.walkYaw = Math.atan2(d.x, -d.y) + (this.walkBack ? Math.PI : 0);
       // шагает, когда уже почти развернулся по ходу (не едет боком/задом)
       const err = Math.abs(Math.atan2(Math.sin(this.walkYaw - this.yaw), Math.cos(this.walkYaw - this.yaw)));
-      const step = this.cfg.walkSpeed * dt * clamp((Math.cos(err) - 0.2) / 0.7, 0.15, 1);
+      const step = (this.walkSpeedNow ?? this.cfg.walkSpeed) * dt * clamp((Math.cos(err) - 0.2) / 0.7, 0.15, 1);
       if (len <= step) {
         this.pos.copy(this.walkTarget);
         this.walkTarget = null;
         this.walkYaw = null;
+        this.walkBack = false;
+        this.walkSpeedNow = null;
         const cb = this.onArrive;
         this.onArrive = null;
         cb?.();
@@ -358,7 +375,7 @@ export class Stage {
     if (this.character) {
       this.character.object.userData.tilt = this.cfg.billboardTilt * (1 - this.t);
       // скорость шага в ростах кота в секунду — 3D-кот подгоняет под неё темп клипа ходьбы
-      this.character.object.userData.moveSpeed = this.walkTarget ? this.cfg.walkSpeed / Math.max(0.01, this.cfg.height) : 0;
+      this.character.object.userData.moveSpeed = this.walkTarget ? (this.walkSpeedNow ?? this.cfg.walkSpeed) / Math.max(0.01, this.cfg.height) : 0;
     }
 
     // тень: под лапами, пропадает у стекла

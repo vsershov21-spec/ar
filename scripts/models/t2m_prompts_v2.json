@@ -1331,6 +1331,66 @@
     "mode": "prime"
    }
   },
+  "spray_shake": {
+   "priority": "P1",
+   "group": "Раскраска карты",
+   "durationS": 2.0,
+   "loop": true,
+   "start": "стойка idle",
+   "end": "= старт (петля)",
+   "replaces": "опора idle_breathe + IK-тряска лапы",
+   "trigger": "code:card.paint — Хулиган перед тем, как брызгать (src/card/paint.ts, шаг shake)",
+   "meshy": {
+    "prompt": "Stands upright facing forward, right forearm raised in front of the chest with the fist closed as if gripping a spray can, shaking the fist up and down quickly and vigorously in a tight rhythm, elbow bent, left arm relaxed at the side, slight knee bounce, head nodding to the rhythm. Feet stay planted. Seamless loop, in place, no turning.",
+    "duration": 2.0,
+    "mode": "prime"
+   }
+  },
+  "spray_low_sweep": {
+   "priority": "P1",
+   "group": "Раскраска карты",
+   "durationS": 2.0,
+   "loop": true,
+   "start": "присед",
+   "end": "= старт (петля)",
+   "replaces": "paint_spray стоя / idle_breathe + присед и IK",
+   "trigger": "code:card.paint — Хулиган брызгает по карте перед собой (шаги crouch / stroke)",
+   "meshy": {
+    "prompt": "Squats low with knees bent and back leaning forward, right arm extended forward and down toward the floor just in front of the feet as if spraying a can, sweeping the right fist slowly left and right in wide flat arcs close to the ground; left hand resting on the left knee for balance, head looking down following the right hand. Feet stay planted. Seamless loop, in place, no turning.",
+    "duration": 2.0,
+    "mode": "prime"
+   }
+  },
+  "admire_artwork": {
+   "priority": "P1",
+   "group": "Раскраска карты",
+   "durationS": 2.0,
+   "loop": false,
+   "start": "стойка idle",
+   "end": "стойка idle",
+   "replaces": "think",
+   "trigger": "code:card.paint — отошёл на шаг и смотрит на рисунок (шаг admire)",
+   "meshy": {
+    "prompt": "Starts standing upright facing forward with arms relaxed at the sides. Takes a small step back, looks down at the floor in front, tilts the head to one side and raises the left hand to the chin as if judging a drawing, then nods twice approvingly with a small satisfied bounce; then returns to the same relaxed standing pose and holds still, in place, no turning.",
+    "duration": 2.0,
+    "mode": "prime"
+   }
+  },
+  "brush_dip_stroke": {
+   "priority": "P1",
+   "group": "Раскраска карты",
+   "durationS": 2.0,
+   "loop": true,
+   "start": "стойка idle (наклон)",
+   "end": "= старт (петля)",
+   "replaces": "idle_breathe + IK кисти в банку",
+   "trigger": "code:card.paint — Добряк и Блёстка макают кисть в банку у края карты (шаг dip)",
+   "meshy": {
+    "prompt": "Bends forward from the hips and lowers the right hand to a small pot on the floor just in front of the right foot as if dipping a paintbrush, dips twice with small up-and-down motions, taps the hand lightly against an imaginary rim, then straightens up holding the right hand in front of the chest; left arm out to the side. Feet stay planted. Seamless loop, in place, no turning.",
+    "duration": 2.0,
+    "mode": "prime"
+   }
+  },
   "press_glass": {
    "priority": "P1",
    "group": "Стекло",

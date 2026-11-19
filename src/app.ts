@@ -1211,6 +1211,7 @@ export class App {
     this.director.update(dt);
     perf.section('character');
     this.character.update(dt, this.stage.camera);
+    this.paint?.lateUpdate(); // раскраска: краска — по соплу в позе этого кадра
     perf.section('fx');
     this.fx.update(dt);
     this.fx.draw();

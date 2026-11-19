@@ -411,6 +411,10 @@ export const RIG_CLIPS: Record<string, ClipFn> = {
   // раскраска карты (src/card/paint.ts): опоры, пока нет своих клипов
   paint_brush: breathDraw,
   paint_spray: scratch,
+  spray_shake: (k, t) => RIG_CLIPS.snowglobe_shake(k, t),
+  spray_low_sweep: scratch,
+  admire_artwork: (k, t) => RIG_CLIPS.think(k, t),
+  brush_dip_stroke: breathDraw,
   hug_screen: (k, t) => {
     const lean = win(k, 0.05, 0.9, 0.15), wrap = win(k, 0.2, 0.85, 0.15);
     return { b: { Spine1: [0.3 * lean, 0, 0], LeftArm: [-1.4 * wrap, 0, 0.9 * lean - 0.5 * wrap], RightArm: [-1.4 * wrap, 0, -0.9 * lean + 0.5 * wrap], LeftForeArm: [-0.6 * wrap, 0, 0], RightForeArm: [-0.6 * wrap, 0, 0], Head: [0.1 * lean, 0, 0.45 * wrap + 0.05 * S(t * 2)] }, root: { z: 0.18 * lean }, lids: 0.9 * wrap };

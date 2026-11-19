@@ -7,9 +7,11 @@
 import { describe, it, expect, vi } from 'vitest';
 import * as THREE from 'three';
 import {
-  OFFER_FIRST_MS, OFFER_PLAY_MS, PAINT_KEY, PAINT_STYLE, PaintOfferRule, erasePaint, findSwatch, headFromCat, loadPaint, paintBlocked, paintCatalogItems,
-  paintRows, savePaint, strokeCoverage, rng,
+  OFFER_FIRST_MS, OFFER_PLAY_MS, PAINT_KEY, PAINT_STYLE, PaintOfferRule, erasePaint, findSwatch, loadPaint, paintBlocked, paintCatalogItems,
+  savePaint, rng, choreograph, baseCoverage, nozzleHit, sprayRadius, canvasToCard, cardToUv, pointAt, paintSpots, ART_SPAN, type Step,
 } from '../src/card/paintPlan';
+import { ART_LAYERS, artStrokes } from '../src/card/paintArt';
+import { PropRig } from '../src/character/props';
 import { CardPaint, type CardPaintHost } from '../src/card/paint';
 import { CARD_ASPECT } from '../src/config';
 import { PERSONA_IDS } from '../src/persona/types';
@@ -78,17 +80,168 @@ describe('где можно рисовать: только кот на захв�
   ])('%j → %s', (patch, want) => expect(paintBlocked({ ...ok, ...patch })).toBe(want));
 });
 
+const W = 1024, H = 646;
+const planFor = (id: 'hooligan' | 'kind' | 'glitter', seed = 20261118) => {
+  const st = PAINT_STYLE[id];
+  return choreograph(artStrokes(W, H, st.pattern, st.swatches[0], st.swatches.slice(1), seed), W, H, CARD_ASPECT, st.tool);
+};
+const firstIdx = (steps: Step[], f: (s: Step) => boolean) => steps.findIndex(f);
+const phaseIdx = (steps: Step[], ph: string) => firstIdx(steps, (s) => s.k === 'stroke' && s.s.phase === ph);
+
 describe('мазок закрывает карту целиком (номер и имя не видны на скриншоте)', () => {
-  it('три ряда змейкой с перекрытием, неровный край кисти тоже не открывает карту', () => {
-    expect(strokeCoverage(CARD_ASPECT, 60, 0)).toBe(1);
-    expect(strokeCoverage(CARD_ASPECT, 60, 0.12)).toBe(1);
-    const { rows } = paintRows(CARD_ASPECT);
-    expect(rows.map((r) => r.dir)).toEqual([1, -1, 1]);
+  it('фон широкими рядами закрывает всю карту, неровный край штампа тоже не открывает её — у всех котов и зёрен', () => {
+    for (const id of PERSONA_IDS)
+      for (const seed of [1, 99, 20261118]) {
+        const c = planFor(id, seed);
+        expect(baseCoverage(c, CARD_ASPECT, 60, 0), `${id}/${seed}`).toBe(1);
+        expect(baseCoverage(c, CARD_ASPECT, 60, 0.12), `${id}/${seed}`).toBe(1);
+      }
   });
-  it('кончик кисти дотягивается до края карты, когда кот у края', () => {
-    expect(headFromCat(0.36)).toBeGreaterThan(0.5);
-    expect(headFromCat(-0.36)).toBeLessThan(-0.5);
-    expect(headFromCat(0)).toBe(0);
+  it('у каждого слоя рисунка есть мазок, который его открывает; фон — первый слой', () => {
+    for (const id of PERSONA_IDS) {
+      const st = PAINT_STYLE[id];
+      const c = planFor(id);
+      const opened = new Set([...c.steps.flatMap((s) => (s.k === 'stroke' ? [s.s.layer] : [])), ...c.drips.map((d) => d.s.layer)]);
+      expect([...opened].sort(), id).toEqual([...ART_LAYERS[st.pattern]].sort());
+      expect(ART_LAYERS[st.pattern][0]).toBe('bg');
+    }
+  });
+  it('холст ↔ карта: углы холста — за краем карты (рисунок шире на 2 %)', () => {
+    const tl = canvasToCard(0, 0, W, H, CARD_ASPECT), br = canvasToCard(W, H, W, H, CARD_ASPECT);
+    expect(tl.x).toBeCloseTo(-ART_SPAN / 2, 6);
+    expect(tl.y).toBeCloseTo(ART_SPAN / CARD_ASPECT / 2, 6);
+    expect(br.x).toBeGreaterThan(0.5);
+    expect(br.y).toBeLessThan(-0.5 / CARD_ASPECT);
+    const uv = cardToUv(canvasToCard(300, 200, W, H, CARD_ASPECT), CARD_ASPECT);
+    expect(uv.u * W).toBeCloseTo(300, 6);
+    expect(uv.v * H).toBeCloseTo(200, 6);
+  });
+});
+
+describe('хореография: как настоящее граффити / рисунок кистью', () => {
+  it('Хулиган: трясёт баллончик → тег и обводка → фон → заливка → кляксы; отошёл, посмотрел → звёзды и стрелки последними', () => {
+    const { steps, drips } = planFor('hooligan');
+    const shake = firstIdx(steps, (s) => s.k === 'shake');
+    const outline = phaseIdx(steps, 'outline'), base = phaseIdx(steps, 'base'), fill = phaseIdx(steps, 'fill'), splat = phaseIdx(steps, 'splat');
+    const admire = firstIdx(steps, (s) => s.k === 'admire'), star = phaseIdx(steps, 'star'), flourish = phaseIdx(steps, 'flourish');
+    expect(shake).toBeGreaterThanOrEqual(0);
+    expect(shake).toBeLessThan(outline);
+    expect(outline).toBeLessThan(base);
+    expect(base).toBeLessThan(fill);
+    expect(fill).toBeLessThan(splat);
+    expect(admire).toBeGreaterThan(splat);
+    expect(star).toBeGreaterThan(admire);
+    expect(flourish).toBeGreaterThan(star);
+    expect(steps[steps.length - 1].k).toBe('show');
+    // перед второй половиной — снова трясёт
+    expect(steps.filter((s) => s.k === 'shake')).toHaveLength(2);
+    // потёки стекают сами — после заливки / фона своей половины, с задержкой
+    expect(drips.length).toBeGreaterThan(5);
+    for (const d of drips) {
+      expect(d.delay).toBeGreaterThan(0.2);
+      const at = steps[d.after];
+      expect(at.k === 'stroke' && ['base', 'fill', 'splat', 'outline'].includes(at.s.phase)).toBe(true);
+      expect(d.s.pts[1].y).toBeLessThan(d.s.pts[0].y); // вниз по картинке
+    }
+  });
+  it('Добряк и Блёстка: макают кисть → волнистый фон → штампы → точки; большое сердце / звезда — после «посмотрел»', () => {
+    for (const id of ['kind', 'glitter'] as const) {
+      const { steps } = planFor(id);
+      const dip = firstIdx(steps, (s) => s.k === 'dip'), base = phaseIdx(steps, 'base'), item = phaseIdx(steps, 'item'), dab = phaseIdx(steps, 'dab');
+      const admire = firstIdx(steps, (s) => s.k === 'admire'), flourish = phaseIdx(steps, 'flourish');
+      expect(dip).toBeGreaterThanOrEqual(0);
+      expect(dip).toBeLessThan(base);
+      expect(base).toBeLessThan(item);
+      expect(item).toBeLessThan(dab);
+      expect(flourish).toBeGreaterThan(admire);
+      // волна: у мазка фона кисти y меняется вдоль ряда
+      const b = steps[base];
+      if (b.k !== 'stroke') throw new Error('base');
+      const ys = new Set(b.s.pts.slice(0, 8).map((p) => p.y.toFixed(3)));
+      expect(ys.size).toBeGreaterThan(3);
+    }
+  });
+  it('кот не идёт через карту: 2–3 точки у краёв (на столе рядом с картой), шаг назад — спиной', () => {
+    for (const id of PERSONA_IDS) {
+      const { steps } = planFor(id);
+      const walks = steps.filter((s): s is Extract<Step, { k: 'walk' }> => s.k === 'walk');
+      const spots = new Set(walks.filter((w) => !w.back).map((w) => `${w.to.x.toFixed(2)},${w.to.y.toFixed(2)}`));
+      expect(spots.size).toBeGreaterThanOrEqual(2);
+      expect(spots.size).toBeLessThanOrEqual(5);
+      expect(walks.some((w) => w.to.y > 0.5 / CARD_ASPECT && Math.abs(w.to.x) < 0.1)).toBe(true);
+      for (const w of walks) expect(Math.abs(w.to.x) > 0.5 || Math.abs(w.to.y) > 0.5 / CARD_ASPECT).toBe(true); // на столе у края
+      // путь между точками не идёт через карту: соседние точки — по одну сторону карты или через дальний край
+      let prev = { x: 0, y: -0.1 };
+      for (const w of walks.slice(1)) {
+        const from = prev, to = w.to;
+        prev = to;
+        if (Math.abs(from.x) > 0.5 && Math.abs(to.x) > 0.5) expect(Math.sign(from.x)).toBe(Math.sign(to.x));
+      }
+      expect(walks.some((w) => w.back)).toBe(true);
+    }
+    expect(paintSpots(CARD_ASPECT).L.x).toBeLessThan(0);
+  });
+  it('время мазков: у всех мазков длительность > 0, пути — по скорости инструмента; вся раскраска 10–18 с', () => {
+    for (const id of PERSONA_IDS) {
+      const c = planFor(id);
+      for (const s of c.steps) if (s.k === 'stroke') {
+        expect(s.s.dur).toBeGreaterThan(0.05);
+        expect(s.gap).toBeGreaterThanOrEqual(0.05);
+        expect(s.gap).toBeLessThanOrEqual(0.26);
+      }
+      for (const d of c.drips) expect(d.s.dur).toBeGreaterThanOrEqual(0.5);
+      expect(c.total, id).toBeGreaterThan(10);
+      expect(c.total, id).toBeLessThan(18);
+    }
+  });
+  it('точка на пути по доле длины', () => {
+    const pts = [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 1 }];
+    expect(pointAt(pts, 0)).toEqual({ x: 0, y: 0 });
+    expect(pointAt(pts, 0.25)).toEqual({ x: 0.5, y: 0 });
+    expect(pointAt(pts, 0.75)).toEqual({ x: 1, y: 0.5 });
+    expect(pointAt(pts, 1)).toEqual({ x: 1, y: 1 });
+  });
+});
+
+describe('сопло → карта: краска там, куда смотрит сопло', () => {
+  it('луч сопла пересекает плоскость карты; вверх / вдоль карты — мимо', () => {
+    const h = nozzleHit({ x: 0.1, y: 0.4, z: 0.3 }, { x: 0, y: -1, z: -1 })!;
+    expect(h.x).toBeCloseTo(0.1, 6);
+    expect(h.y).toBeCloseTo(0.1, 6);
+    expect(h.dist).toBeCloseTo(Math.hypot(0.3, 0.3), 6);
+    expect(nozzleHit({ x: 0, y: 0, z: 0.3 }, { x: 0, y: 1, z: 0.2 })).toBeNull();
+    expect(nozzleHit({ x: 0, y: 0, z: 0.3 }, { x: 1, y: 0, z: 0 })).toBeNull();
+    // дальше — шире пятно, но не меньше радиуса мазка и не больше 1,6 радиуса
+    expect(sprayRadius(0.05, 0.1)).toBeGreaterThanOrEqual(0.05);
+    expect(sprayRadius(0.05, 0.6)).toBeGreaterThan(sprayRadius(0.05, 0.2));
+    expect(sprayRadius(0.05, 5)).toBeCloseTo(0.08, 6);
+  });
+  it('PropRig.aim: баллончик и кисть повёрнуты так, что луч сопла (кончика) проходит через точку прицела', async () => {
+    for (const id of ['paint_spray', 'paint_brush']) {
+      const root = new THREE.Group();
+      root.scale.setScalar(1.1);
+      root.position.set(0.2, 0.4, 0);
+      const hand = new THREE.Object3D();
+      hand.position.set(-0.2, 0.55, 0.25);
+      root.add(hand);
+      const rig = new PropRig(async () => new THREE.Object3D(), () => hand, root);
+      root.updateMatrixWorld(true);
+      rig.hold(id, '#ff00ff');
+      await new Promise((r) => setTimeout(r, 0));
+      for (const target of [new THREE.Vector3(0.1, 0, 0.6), new THREE.Vector3(-0.3, 0, 0.9), new THREE.Vector3(0.4, 0, 0.3)]) {
+        rig.aim(target.clone().applyMatrix4(root.matrixWorld), 1);
+        rig.update('idle');
+        const t = rig.tip()!;
+        expect(t, id).not.toBeNull();
+        // ближайшая точка луча к цели
+        const w = target.clone().applyMatrix4(root.matrixWorld);
+        const k = w.clone().sub(t.o).dot(t.d);
+        expect(k, id).toBeGreaterThan(0);
+        expect(t.o.clone().addScaledVector(t.d, k).distanceTo(w), id).toBeLessThan(0.005);
+      }
+      rig.aim(null);
+      rig.update('idle');
+    }
   });
 });
 
@@ -241,17 +394,17 @@ describe('CardPaint: вход только на карте, полный про�
     expect(p.start(2, 99)).toBe(true);
     expect(t.character.holdProp).toHaveBeenCalledWith('paint_brush', PAINT_STYLE.kind.swatches[2].main);
     let s = 0;
-    while (p.painting && s < 30) {
+    while (p.painting && s < 40) {
       p.update(0.05);
       s += 0.05;
     }
     expect(p.painting).toBe(false);
-    // кот стоит на месте (walkTo — false): мазок идёт по времени, 5–8 с
-    expect(s).toBeGreaterThan(5);
-    expect(s).toBeLessThan(8.5);
+    // кот стоит на месте (walkTo — false): мазки идут по времени, 10–18 с
+    expect(s).toBeGreaterThan(9);
+    expect(s).toBeLessThan(18);
     expect(p.progress).toBe(1);
     expect(t.character.holdProp).toHaveBeenLastCalledWith(null);
-    expect(t.character.play).toHaveBeenCalledWith('celebrate');
+    expect(t.character.play).toHaveBeenCalledWith('celebrate', { force: true });
     expect(t.director.showLine).toHaveBeenCalledWith('paint_done');
     expect(loadPaint(store)).toEqual({ pattern: 'hearts', color: 'sky', seed: 99 });
     const again = new CardPaint(host({ storage: store }).h);

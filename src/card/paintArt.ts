@@ -6,10 +6,43 @@
  *   stars (Блёстка)    — сияние: голографический перелив, блёстки-пыль, звёзды с градиентом и свечением, искорки.
  * Основной цвет — выбранный кружок, акценты — два других цвета той же палитры.
  * Холст целиком непрозрачный внутри скруглённого прямоугольника карты: номер и имя на карте не видны.
+ *
+ * Слои (ART_LAYERS): каждый элемент рисунка — на своём слое (фон, обводка, заливка, брызги, потёки, звёзды…), и
+ * каждый элемент оставляет мазок (ArtStroke: путь в пикселях холста, радиус, порядок) — по нему кот проявляет слой
+ * (src/card/paint.ts: маска слоя открывается там, куда попадает сопло баллончика / кончик кисти). Один и тот же
+ * код рисует и всё сразу (drawPattern — миниатюры, сохранённый рисунок), и по слоям (drawLayers), и только мазки
+ * без холста (artStrokes — план раскраски, тесты).
  */
 import { rng, type PatternId, type Swatch } from './paintPlan';
 
 type G = CanvasRenderingContext2D;
+
+/** слои рисунка снизу вверх */
+export const ART_LAYERS: Record<PatternId, readonly string[]> = {
+  graffiti: ['bg', 'splat', 'line', 'fill', 'outline', 'drip', 'star'],
+  hearts: ['bg', 'item', 'confetti'],
+  stars: ['bg', 'star', 'twinkle'],
+};
+
+/**
+ * Этап раскраски, к которому относится мазок:
+ *   outline — тег и обводка кусков (Хулиган рисует их первыми), fill — заливка, splat — кляксы-брызги,
+ *   drip — потёк (стекает сам, после заливки), star — звёзды и блики (последними), flourish — последний штрих после
+ *   «отошёл и посмотрел»; item — сердечко / звезда (штамп кончиком кисти), dab — мелкие точки и конфетти.
+ */
+export type StrokePhase = 'outline' | 'fill' | 'splat' | 'drip' | 'star' | 'flourish' | 'item' | 'dab';
+/** path — вести по пути; burst — пшик в точку (радиус растёт); drip — стекает вниз сам */
+export type StrokeKind = 'path' | 'burst' | 'drip';
+
+export interface ArtStroke {
+  layer: string;
+  phase: StrokePhase;
+  kind: StrokeKind;
+  /** путь в пикселях холста W×H (у burst — одна точка) */
+  pts: [number, number][];
+  /** радиус штампа маски, px холста */
+  r: number;
+}
 
 // ───────────── цвет ─────────────
 
@@ -123,11 +156,44 @@ export function cardClip(g: G, W: number, H: number) {
   g.roundRect(0, 0, W, H, W * 0.04);
 }
 
+
+/** точки гладкой кляксы (те же кривые, что blobPath) — путь обводки */
+function blobPolyline(pts: { x: number; y: number }[], per = 5): [number, number][] {
+  const n = pts.length, out: [number, number][] = [];
+  for (let i = 0; i <= n; i++) {
+    const p0 = pts[(i - 1 + n) % n], p1 = pts[i % n], p2 = pts[(i + 1) % n], p3 = pts[(i + 2) % n];
+    const c1x = p1.x + (p2.x - p0.x) / 6, c1y = p1.y + (p2.y - p0.y) / 6, c2x = p2.x - (p3.x - p1.x) / 6, c2y = p2.y - (p3.y - p1.y) / 6;
+    if (i === n) break;
+    for (let k = 0; k < per; k++) {
+      const t = k / per, u = 1 - t;
+      out.push([u * u * u * p1.x + 3 * u * u * t * c1x + 3 * u * t * t * c2x + t * t * t * p2.x, u * u * u * p1.y + 3 * u * u * t * c1y + 3 * u * t * t * c2y + t * t * t * p2.y]);
+    }
+  }
+  out.push([...out[0]] as [number, number]);
+  return out;
+}
+
+/** змейка по прямоугольнику (заливка куска): rows рядов, слева направо и обратно */
+export function zigzag(cx: number, cy: number, rx: number, ry: number, rows: number): [number, number][] {
+  const out: [number, number][] = [];
+  for (let i = 0; i < rows; i++) {
+    const y = cy - ry + (rows > 1 ? (i / (rows - 1)) * ry * 2 : ry);
+    const a: [number, number] = [cx - rx, y], b: [number, number] = [cx + rx, y];
+    if (i % 2) out.push(b, a);
+    else out.push(a, b);
+  }
+  return out;
+}
+
+type Layer = (id: string) => G;
+type Sink = (s: ArtStroke) => void;
+
 // ───────────── Хулиган: граффити ─────────────
 
-function graffiti(g: G, W: number, H: number, main: string, acc: [string, string], R: () => number) {
+function graffiti(L: Layer, S: Sink, W: number, H: number, main: string, acc: [string, string], R: () => number) {
   const ink = '#1E1236';
   const [a1, a2] = acc;
+  let g = L('bg');
   // стена: основной цвет с переходом в акцент по диагонали
   const bg = g.createLinearGradient(0, 0, W, H);
   bg.addColorStop(0, lighten(main, 0.08));
@@ -154,14 +220,17 @@ function graffiti(g: G, W: number, H: number, main: string, acc: [string, string
   }
 
   // кляксы-брызги
+  g = L('splat');
   for (let i = 0; i < 4; i++) {
     const x = R() * W, y = R() * H, r = (0.035 + R() * 0.05) * W;
     const c = [a2, '#ffffff', a1, ink, a2][i];
     g.fillStyle = c;
     blobPath(g, blobPoints(R, x, y, r, r, 12, 0.35));
     g.fill();
+    let far = r;
     for (let k = 0; k < 10; k++) {
       const a = R() * Math.PI * 2, d = r * (1.2 + R() * 1.4), s = r * (0.07 + R() * 0.16);
+      far = Math.max(far, d + s);
       g.beginPath();
       g.arc(x + Math.cos(a) * d, y + Math.sin(a) * d, s, 0, Math.PI * 2);
       g.fill();
@@ -174,9 +243,11 @@ function graffiti(g: G, W: number, H: number, main: string, acc: [string, string
       g.lineTo(x + Math.cos(a) * d * 0.8, y + Math.sin(a) * d * 0.8);
       g.stroke();
     }
+    S({ layer: 'splat', phase: 'splat', kind: 'burst', pts: [[x, y]], r: far * 1.05 });
   }
 
   // закорючки-теги (петли, без букв) и стрелки
+  g = L('line');
   g.lineCap = 'round';
   g.lineJoin = 'round';
   for (let i = 0; i < 2; i++) {
@@ -186,19 +257,23 @@ function graffiti(g: G, W: number, H: number, main: string, acc: [string, string
     g.strokeStyle = col;
     g.lineWidth = W * 0.006;
     g.beginPath();
+    const path: [number, number][] = [];
     for (let k = 0; k <= 120; k++) {
       const t = k / 120, ang = t * loops * Math.PI * 2;
       const x = x0 + t * len + Math.cos(ang) * amp * 0.7, y = y0 + Math.sin(ang) * amp - t * amp * 0.8;
       if (k) g.lineTo(x, y);
       else g.moveTo(x, y);
+      if (k % 3 === 0) path.push([x, y]);
     }
     g.stroke();
+    S({ layer: 'line', phase: 'outline', kind: 'path', pts: path, r: W * 0.012 });
   }
   for (let i = 0; i < 2; i++) {
     const x0 = W * (0.1 + R() * 0.5), y0 = H * (0.2 + R() * 0.6), x1 = x0 + W * (0.2 + R() * 0.15), y1 = y0 + (R() - 0.5) * H * 0.4;
     const cx = (x0 + x1) / 2, cy = Math.min(y0, y1) - H * 0.18;
     const col = i ? a1 : '#ffffff';
     const w = W * 0.018;
+    const a = Math.atan2(y1 - cy, x1 - cx), hl = W * 0.045;
     for (const [c, lw] of [[ink, w + 9], [col, w]] as const) {
       g.strokeStyle = c;
       g.lineWidth = lw;
@@ -207,13 +282,20 @@ function graffiti(g: G, W: number, H: number, main: string, acc: [string, string
       g.quadraticCurveTo(cx, cy, x1, y1);
       g.stroke();
       // наконечник
-      const a = Math.atan2(y1 - cy, x1 - cx), hl = W * 0.045;
       g.beginPath();
       g.moveTo(x1 + Math.cos(a - 2.5) * hl, y1 + Math.sin(a - 2.5) * hl);
       g.lineTo(x1 + Math.cos(a) * hl * 0.35, y1 + Math.sin(a) * hl * 0.35);
       g.lineTo(x1 + Math.cos(a + 2.5) * hl, y1 + Math.sin(a + 2.5) * hl);
       g.stroke();
     }
+    const path: [number, number][] = [];
+    for (let k = 0; k <= 14; k++) {
+      const t = k / 14, u = 1 - t;
+      path.push([u * u * x0 + 2 * u * t * cx + t * t * x1, u * u * y0 + 2 * u * t * cy + t * t * y1]);
+    }
+    // наконечник — «галочкой»
+    path.push([x1 + Math.cos(a - 2.5) * hl, y1 + Math.sin(a - 2.5) * hl], [x1, y1], [x1 + Math.cos(a + 2.5) * hl, y1 + Math.sin(a + 2.5) * hl]);
+    S({ layer: 'line', phase: 'flourish', kind: 'path', pts: path, r: (w + 9) * 0.95 });
   }
 
   // «пузырьковые» куски граффити без букв: кляксы с тенью, толстой обводкой и бликом, потёки снизу
@@ -221,6 +303,7 @@ function graffiti(g: G, W: number, H: number, main: string, acc: [string, string
   pieces.forEach((p, i) => {
     const fill = [a1, a2, lighten(main, 0.65)][i % 3];
     const pts = blobPoints(R, p.x, p.y, p.r * 1.25, p.r * 0.8, 9, 0.22, R() * Math.PI);
+    g = L('fill');
     // тень-объём (3D-эффект граффити)
     g.save();
     g.translate(p.r * 0.12, p.r * 0.14);
@@ -234,10 +317,6 @@ function graffiti(g: G, W: number, H: number, main: string, acc: [string, string
     fg.addColorStop(1, fill);
     g.fillStyle = fg;
     g.fill();
-    g.lineWidth = Math.max(8, p.r * 0.09);
-    g.strokeStyle = ink;
-    g.lineJoin = 'round';
-    g.stroke();
     // внутренний светлый контур — как у бабл-граффити
     g.save();
     g.translate(p.x, p.y);
@@ -259,7 +338,18 @@ function graffiti(g: G, W: number, H: number, main: string, acc: [string, string
     g.beginPath();
     g.arc(p.x + p.r * 0.18, p.y - p.r * 0.5, p.r * 0.05, 0, Math.PI * 2);
     g.fill();
+    // обводка — отдельным слоем: её Хулиган рисует первой
+    g = L('outline');
+    const lw = Math.max(8, p.r * 0.09);
+    blobPath(g, pts);
+    g.lineWidth = lw;
+    g.strokeStyle = ink;
+    g.lineJoin = 'round';
+    g.stroke();
+    S({ layer: 'outline', phase: 'outline', kind: 'path', pts: blobPolyline(pts), r: lw * 1.3 + 4 });
+    S({ layer: 'fill', phase: 'fill', kind: 'path', pts: zigzag(p.x + p.r * 0.06, p.y + p.r * 0.07, p.r * 1.25, p.r * 0.78, 4), r: p.r * 0.42 });
     // потёки краски снизу
+    g = L('drip');
     for (let k = 0; k < 3; k++) {
       const dx = p.x + (R() - 0.5) * p.r * 1.6, len = p.r * (0.35 + R() * 0.6), w = p.r * (0.08 + R() * 0.06);
       const y0 = p.y + p.r * 0.55;
@@ -274,10 +364,12 @@ function graffiti(g: G, W: number, H: number, main: string, acc: [string, string
       g.closePath();
       g.fill();
       g.stroke();
+      S({ layer: 'drip', phase: 'drip', kind: 'drip', pts: [[dx, y0 - w], [dx, y0 + len + w * 1.3]], r: w * 1.7 + 3 });
     }
   });
 
   // звёзды с толстой обводкой
+  g = L('star');
   const stars = scatter(R, W, H, 6, () => (0.03 + R() * 0.04) * W, 1.1, W * 0.04);
   for (const s of stars) {
     starPath(g, s.x, s.y, s.r, s.r * 0.48, 5, (R() - 0.5) * 0.6);
@@ -286,6 +378,7 @@ function graffiti(g: G, W: number, H: number, main: string, acc: [string, string
     g.lineWidth = Math.max(4, s.r * 0.14);
     g.strokeStyle = ink;
     g.stroke();
+    S({ layer: 'star', phase: 'star', kind: 'burst', pts: [[s.x, s.y]], r: s.r * 1.3 });
   }
   // крестики-блики
   g.strokeStyle = '#fff';
@@ -298,8 +391,10 @@ function graffiti(g: G, W: number, H: number, main: string, acc: [string, string
     g.moveTo(x, y - s);
     g.lineTo(x, y + s);
     g.stroke();
+    S({ layer: 'star', phase: 'star', kind: 'burst', pts: [[x, y]], r: s * 1.5 });
   }
   // потёки с верхнего края — краска стекает
+  g = L('drip');
   for (let i = 0; i < 6; i++) {
     const x = R() * W, len = H * (0.03 + R() * 0.09), w = W * (0.005 + R() * 0.006);
     g.fillStyle = [a1, a2, ink][i % 3];
@@ -307,14 +402,16 @@ function graffiti(g: G, W: number, H: number, main: string, acc: [string, string
     g.beginPath();
     g.arc(x, len, w * 1.25, 0, Math.PI * 2);
     g.fill();
+    S({ layer: 'drip', phase: 'drip', kind: 'drip', pts: [[x, 0], [x, len + w * 1.6]], r: w * 2 + 3 });
   }
 }
 
 // ───────────── Добряк: сердечки и пузыри ─────────────
 
-function hearts(g: G, W: number, H: number, main: string, acc: [string, string], R: () => number) {
+function hearts(L: Layer, S: Sink, W: number, H: number, main: string, acc: [string, string], R: () => number) {
   const [a1, a2] = acc;
   const line = darken(main, 0.45);
+  let g = L('bg');
   const bg = g.createLinearGradient(0, 0, 0, H);
   bg.addColorStop(0, lighten(main, 0.55));
   bg.addColorStop(1, lighten(main, 0.12));
@@ -340,8 +437,11 @@ function hearts(g: G, W: number, H: number, main: string, acc: [string, string],
       g.fill();
     }
 
+  g = L('item');
   const items = scatter(R, W, H, 16, (i) => (i < 3 ? 0.11 - i * 0.012 : i < 9 ? 0.06 + R() * 0.02 : 0.035 + R() * 0.015) * W, 1.05, W * 0.03);
   items.forEach((it, i) => {
+    // первое (самое большое, с мордочкой) — последний штрих: кот отошёл, посмотрел и дорисовал
+    S({ layer: 'item', phase: i === 0 ? 'flourish' : 'item', kind: 'burst', pts: [[it.x, it.y]], r: it.r * 1.25 });
     if (i % 3 === 2) return bubble(g, it.x, it.y, it.r * 0.9, [a1, a2, main], R);
     const fill = [main, a1, a2, '#ffffff', darken(main, 0.08)][i % 5];
     const rot = (R() - 0.5) * 0.7;
@@ -395,6 +495,7 @@ function hearts(g: G, W: number, H: number, main: string, acc: [string, string],
     g.restore();
   });
   // конфетти: маленькие сердечки и точки
+  g = L('confetti');
   for (let i = 0; i < 26; i++) {
     const x = R() * W, y = R() * H, s = W * (0.012 + R() * 0.014);
     g.fillStyle = [a1, a2, '#ffffff', darken(main, 0.2)][i % 4];
@@ -406,6 +507,7 @@ function hearts(g: G, W: number, H: number, main: string, acc: [string, string],
       g.arc(x, y, s * 0.4, 0, Math.PI * 2);
       g.fill();
     }
+    S({ layer: 'confetti', phase: 'dab', kind: 'burst', pts: [[x, y]], r: s * 1.4 });
   }
 }
 
@@ -441,8 +543,9 @@ function bubble(g: G, x: number, y: number, r: number, cols: string[], R: () => 
 
 // ───────────── Блёстка: звёзды и блёстки ─────────────
 
-function stars(g: G, W: number, H: number, main: string, acc: [string, string], R: () => number) {
+function stars(L: Layer, S: Sink, W: number, H: number, main: string, acc: [string, string], R: () => number) {
   const [a1, a2] = acc;
+  let g = L('bg');
   const bg = g.createLinearGradient(0, H, W, 0);
   bg.addColorStop(0, darken(main, 0.38));
   bg.addColorStop(0.5, main);
@@ -477,8 +580,10 @@ function stars(g: G, W: number, H: number, main: string, acc: [string, string], 
     g.fill();
   }
   // звёзды
+  g = L('star');
   const ss = scatter(R, W, H, 9, (i) => (i < 2 ? 0.1 : i < 5 ? 0.065 : 0.04) * W * (0.9 + R() * 0.2), 1.05, W * 0.09);
   ss.forEach((s, i) => {
+    S({ layer: 'star', phase: i === 0 ? 'flourish' : 'item', kind: 'burst', pts: [[s.x, s.y]], r: s.r * 1.45 });
     const rot = (R() - 0.5) * 0.7;
     const c = [a1, '#ffffff', a2, lighten(main, 0.6)][i % 4];
     g.save();
@@ -503,6 +608,7 @@ function stars(g: G, W: number, H: number, main: string, acc: [string, string], 
     g.fill();
   });
   // искорки со свечением
+  g = L('twinkle');
   for (let i = 0; i < 16; i++) {
     const x = R() * W, y = R() * H, r = W * (0.012 + R() * R() * 0.045);
     g.save();
@@ -512,33 +618,74 @@ function stars(g: G, W: number, H: number, main: string, acc: [string, string], 
     twinklePath(g, x, y, r, R() * 0.3);
     g.fill();
     g.restore();
+    S({ layer: 'twinkle', phase: 'dab', kind: 'burst', pts: [[x, y]], r: r * 1.5 });
   }
   // колечки
   g.strokeStyle = 'rgba(255,255,255,.7)';
   for (let i = 0; i < 8; i++) {
     g.lineWidth = 2 + R() * 2;
+    const x = R() * W, y = R() * H, r = W * (0.006 + R() * 0.01);
     g.beginPath();
-    g.arc(R() * W, R() * H, W * (0.006 + R() * 0.01), 0, Math.PI * 2);
+    g.arc(x, y, r, 0, Math.PI * 2);
     g.stroke();
+    S({ layer: 'twinkle', phase: 'dab', kind: 'burst', pts: [[x, y]], r: r * 1.6 + 4 });
   }
 }
 
 const ART: Record<PatternId, typeof graffiti> = { graffiti, hearts, stars };
 
-/** нарисовать рисунок на g в прямоугольнике W×H (скруглённый, непрозрачный) */
+const accOf = (others: Swatch[]): [string, string] => [others[0]?.main ?? '#ffffff', others[1]?.main ?? '#ffffff'];
+
+/** нарисовать рисунок на g в прямоугольнике W×H (скруглённый, непрозрачный) — все слои сразу */
 export function drawPattern(g: G, W: number, H: number, pattern: PatternId, swatch: Swatch, others: Swatch[], seed: number) {
   const R = rng(seed);
   g.save();
   g.clearRect(0, 0, W, H);
   cardClip(g, W, H);
   g.clip();
-  ART[pattern](g, W, H, swatch.main, [others[0]?.main ?? '#ffffff', others[1]?.main ?? '#ffffff'], R);
-  // тонкий светлый кант по краю — карта «в рамке»
+  ART[pattern](() => g, () => undefined, W, H, swatch.main, accOf(others), R);
+  frame(g, W, H);
+  g.restore();
+}
+
+/** тонкий светлый кант по краю — карта «в рамке» */
+function frame(g: G, W: number, H: number) {
   g.strokeStyle = 'rgba(255,255,255,.55)';
   g.lineWidth = Math.max(2, W * 0.006);
   cardClip(g, W, H);
   g.stroke();
-  g.restore();
+}
+
+/**
+ * По слоям: ctx(id) — холст слоя (каждый W×H, очищен). Тот же рисунок, что drawPattern, если сложить слои по порядку
+ * ART_LAYERS. Возвращает мазки элементов в порядке рисования.
+ */
+export function drawLayers(ctx: (id: string) => G | null, W: number, H: number, pattern: PatternId, swatch: Swatch, others: Swatch[], seed: number): ArtStroke[] {
+  const R = rng(seed);
+  const out: ArtStroke[] = [];
+  const seen = new Map<string, G>();
+  const nil = nullCtx();
+  const L = (id: string) => {
+    let g = seen.get(id);
+    if (!g) {
+      g = ctx(id) ?? nil;
+      g.save();
+      g.clearRect(0, 0, W, H);
+      cardClip(g, W, H);
+      g.clip();
+      seen.set(id, g);
+    }
+    return g;
+  };
+  ART[pattern](L, (s) => out.push(s), W, H, swatch.main, accOf(others), R);
+  frame(L('bg'), W, H);
+  seen.forEach((g) => g.restore());
+  return out;
+}
+
+/** только мазки (без холста): план раскраски и тесты — те же точки, что у нарисованного рисунка */
+export function artStrokes(W: number, H: number, pattern: PatternId, swatch: Swatch, others: Swatch[], seed: number): ArtStroke[] {
+  return drawLayers(() => null, W, H, pattern, swatch, others, seed);
 }
 
 /** холст рисунка (в браузере) */
@@ -549,4 +696,14 @@ export function patternCanvas(W: number, H: number, pattern: PatternId, swatch: 
   const g = c.getContext('2d');
   if (g) drawPattern(g, W, H, pattern, swatch, others, seed);
   return c;
+}
+
+/** контекст-пустышка: все вызовы рисования — no-op (градиенты — с addColorStop) */
+function nullCtx(): G {
+  const grad = { addColorStop: () => undefined };
+  const fn = () => undefined;
+  return new Proxy({} as G, {
+    get: (_t, k) => (k === 'createLinearGradient' || k === 'createRadialGradient' || k === 'createPattern' ? () => grad : fn),
+    set: () => true,
+  });
 }

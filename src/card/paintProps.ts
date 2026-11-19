@@ -34,6 +34,8 @@ export function makeBrush(): THREE.Object3D {
   const paint = mat(0xff4fa8, { roughness: 0.3 });
   paint.name = 'paint';
   g.add(part(bristle, paint, 0.65));
+  // кончик щетины: ось +Y (character/props.ts PropRig.tip / aim)
+  g.add(tip(0, 0.99, 0, [0, 1, 0], [0, 0, 1]));
   return g;
 }
 
@@ -57,5 +59,46 @@ export function makeSpray(): THREE.Object3D {
   nozzle.rotation.x = Math.PI / 2;
   nozzle.position.z = 0.08;
   g.add(nozzle);
+  // сопло: краска идёт по +Z колпачка
+  g.add(tip(0, 0.92, 0.11, [0, 0, 1], [0, 1, 0]));
+  return g;
+}
+
+/** метка сопла / кончика: dir — куда идёт краска, up — «верх» инструмента (для наведения) */
+function tip(x: number, y: number, z: number, dir: [number, number, number], up: [number, number, number]) {
+  const t = new THREE.Object3D();
+  t.name = 'tip';
+  t.position.set(x, y, z);
+  t.userData.dir = dir;
+  t.userData.up = up;
+  return t;
+}
+
+/**
+ * Банка краски (Добряк, Блёстка макают кисть): стоит на столе у дальнего края карты. Высота ≈ 0,09 ширины карты,
+ * краска сверху — цвет выбранного кружка. Корень — дно, ось +Z — вверх (плоскость карты XY).
+ */
+export function makePaintPot(color: string, glitter = false): THREE.Object3D {
+  const g = new THREE.Group();
+  g.name = 'paint-pot';
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.045, 0.08, 24, 1, true), mat(0xf4f6fa, { roughness: 0.35, metalness: 0.4, side: THREE.DoubleSide }));
+  body.rotation.x = Math.PI / 2;
+  body.position.z = 0.04;
+  g.add(body);
+  const band = new THREE.Mesh(new THREE.CylinderGeometry(0.0505, 0.0485, 0.03, 24, 1, true), mat(color, { roughness: 0.4 }));
+  band.rotation.x = Math.PI / 2;
+  band.position.z = 0.035;
+  g.add(band);
+  const rim = new THREE.Mesh(new THREE.TorusGeometry(0.05, 0.004, 8, 28), mat(0xc9ced6, { metalness: 0.7, roughness: 0.3 }));
+  rim.position.z = 0.08;
+  g.add(rim);
+  const top = new THREE.Mesh(new THREE.CircleGeometry(0.048, 24), mat(color, { roughness: glitter ? 0.15 : 0.25, metalness: glitter ? 0.6 : 0, emissive: glitter ? color : 0x000000, emissiveIntensity: glitter ? 0.25 : 0 }));
+  top.name = 'paint';
+  top.position.z = 0.072;
+  g.add(top);
+  const bottom = new THREE.Mesh(new THREE.CircleGeometry(0.045, 24), mat(0xc9ced6));
+  bottom.rotation.x = Math.PI;
+  bottom.position.z = 0.001;
+  g.add(bottom);
   return g;
 }

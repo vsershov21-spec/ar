@@ -354,6 +354,8 @@ export class Director extends Emitter<DirectorEvents> {
    * «Давай лучше …», смена кота раньше срока → «Чуть позже!»).
    */
   intentGate: ((h: Heard, st: ScenarioState) => boolean) | null = null;
+  /** тело кота занято (раскраска карты: присел и рисует) — реплики и реакции не меняют клип тела, только лицо и звук */
+  bodyBusy: (() => boolean) | null = null;
   /** можно ли сейчас начать смену кота (false — смену не начинаем); ставит app.ts в пилоте */
   switchGate: (() => boolean) | null = null;
   /** эффект разрешён у этого кота (пилот: белый список, config/pilot.ts fxAllowed); null — все */
@@ -938,7 +940,7 @@ export class Director extends Emitter<DirectorEvents> {
     if (pk.event === 'meet_skills') this.startCoach();
     const prevClip = this.character.currentClip;
     // покой — и вариант покоя (idle_look_around…): кот начинает «говорить» телом
-    const talk = /^idle/.test(prevClip) && !this.d.stage.walking;
+    const talk = /^idle/.test(prevClip) && !this.d.stage.walking && !this.bodyBusy?.();
     if (talk) this.character.play('talk', { loop: true });
     const v = p.voice;
     const req: SpeakRequest & { lineId: string; piperVoice: string; pitchSemitones: number; emotion: string } = {
@@ -1044,7 +1046,7 @@ export class Director extends Emitter<DirectorEvents> {
     const now = performance.now();
     // тапы чаще TAP_CLIP_HOLD_MS — клип прошлого тапа доигрывает (а не 5 смен позы за 0,3 с)
     const held = v.tap && now - this.lastTapClipAt < TAP_CLIP_HOLD_MS;
-    if (clip && !d.stage.walking && !held) {
+    if (clip && !d.stage.walking && !held && !this.bodyBusy?.()) {
       this.playChained(clip);
       if (v.tap) this.lastTapClipAt = now;
       this.guardLoop(clip);

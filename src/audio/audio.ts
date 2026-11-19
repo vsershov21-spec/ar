@@ -160,6 +160,16 @@ export class Audio {
     this.howl.rate(1 + (Math.random() * 2 - 1) * j, id);
   }
 
+  /** вход для синтеза Web Audio (шипение баллончика, src/card/paintSound.ts): громкость sfx и приглушение; выкл. звук — null */
+  synthOut(volume = 1): GainNode | null {
+    const ctx = this.ctx;
+    if (!ctx || this.muted) return null;
+    const out = ctx.createGain();
+    out.gain.value = volume * this.volume.sfx * this.duckK;
+    out.connect((Howler as any).masterGain ?? ctx.destination);
+    return out;
+  }
+
   /**
    * Фанфары «та-да-да-дам!» (~1,2 с) — когда кот впервые выскочил из карты. Синтез Web Audio (файла в спрайте нет):
    * «медные» пилы через фильтр, восходящее арпеджио до-ми-соль и аккорд до мажор, сверху — звёздочки.

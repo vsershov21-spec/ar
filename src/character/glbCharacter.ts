@@ -23,6 +23,7 @@ import { feature } from '../config/edition';
 import { AnimBlender } from './animBlend';
 import { TailRig, type TailOutput } from './tailRig';
 import { PropRig } from './props';
+import { ToolIK, type AimRequest } from './toolIK';
 import { BodyCollider, CAT_MM, worstPair, type CollidersJson } from './bodyCollide';
 import { FootPin } from './footPin';
 import { buildFurShells } from './furShell';
@@ -35,7 +36,7 @@ import { MouthRig } from './mouthRig';
 import { personaMeta } from './personaMeta';
 import type { AnchorName } from '../fx/core';
 
-const BONES = ['Hips', 'Spine', 'Spine1', 'Spine2', 'Neck', 'Head', 'LeftArm', 'RightArm', 'LeftForeArm', 'RightForeArm', 'LeftHand', 'RightHand', 'LeftUpLeg', 'RightUpLeg', 'LeftFoot', 'RightFoot', 'LeftShoulder', 'RightShoulder', 'Jaw', 'Tail1', 'Tail2', 'Tail3', 'Tail4', 'LeftEar1', 'RightEar1', 'LeftEye', 'RightEye'];
+const BONES = ['Hips', 'Spine', 'Spine1', 'Spine2', 'Neck', 'Head', 'LeftArm', 'RightArm', 'LeftForeArm', 'RightForeArm', 'LeftHand', 'RightHand', 'LeftUpLeg', 'RightUpLeg', 'LeftLeg', 'RightLeg', 'LeftFoot', 'RightFoot', 'LeftShoulder', 'RightShoulder', 'Jaw', 'Tail1', 'Tail2', 'Tail3', 'Tail4', 'LeftEar1', 'RightEar1', 'LeftEye', 'RightEye'];
 
 /** кость → зона касания (ближайшая к точке попадания) */
 const BONE_ZONE: Record<string, TouchZone> = {
@@ -710,6 +711,15 @@ export class GlbCharacter implements Character {
     this.props?.hold(id, tint);
   }
 
+  /** раскраска карты: присед, наклон, лапа с инструментом к точке (toolIK.ts) */
+  readonly toolIK = new ToolIK();
+  aimTool(r: AimRequest | null) {
+    this.toolIK.set(r);
+  }
+  toolRay() {
+    return this.props?.tip() ?? null;
+  }
+
   reach(target: { dx: number; dy: number } | null) {
     if (target) this.eyes?.glanceAt(target.dx, target.dy);
   }
@@ -847,7 +857,6 @@ export class GlbCharacter implements Character {
       }
     }
     this.applyTailEars(dt, ears, facePresetId);
-    this.props?.update(this.clips.cur.id);
     this.bones.get('LeftEye')?.scale.setScalar(pupils);
     this.bones.get('RightEye')?.scale.setScalar(pupils);
 
@@ -889,6 +898,11 @@ export class GlbCharacter implements Character {
     // руки и голени — из тела и одежды (bodyCollide.ts): после клипа, взгляда головы и поправок сцены (кровать) —
     // иначе поправка позы (потягивание лёжа) или поворот головы вносили руку обратно в тело
     this.collider?.apply(dt);
+    // раскраска карты: присед, наклон, лапа с баллончиком / кистью к точке на карте — после клипа и тела; реквизит — следом
+    const ik = this.toolIK;
+    if (ik.mode !== 'off' || ik.weight > 0.002 || ik.crouch > 0.002) ik.apply(dt, { bones: this.bones, object: this.object, inner: this.inner, axes: this.modelAxes(), rot: (b, a, ang) => this.rotWorld(b, a, ang) });
+    this.props?.aim(ik.aimW > 0.01 ? ik.aimPoint : null, ik.aimW);
+    this.props?.update(this.clips.cur.id);
     // глаза — после головы: взгляд на зрителя (или на точку lookAt), веки, зрачки
     if (this.eyes) {
       const tgt = this.look ?? camera.getWorldPosition(this.gazeV);

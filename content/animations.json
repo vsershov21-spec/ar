@@ -800,6 +800,83 @@
       }
     },
     {
+      "id": "spray_shake",
+      "durationS": 2.0,
+      "loop": true,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 150,
+      "persona": "hooligan",
+      "priority": "P1",
+      "usedBy": [
+        "code:card.paint"
+      ],
+      "fallback": "snowglobe_shake",
+      "notes": "Раскраска карты (Хулиган): трясёт баллончик в правой лапе у груди перед тем, как брызгать (и перед второй половиной карты). Звон шарика — синтез (src/card/paintSound.ts). Нет клипа — idle_breathe + IK-тряска лапы (character/toolIK.ts shake).",
+      "meshy": {
+        "loop": true,
+        "blendInMs": 150
+      }
+    },
+    {
+      "id": "spray_low_sweep",
+      "durationS": 2.0,
+      "loop": true,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 250,
+      "persona": "hooligan",
+      "priority": "P1",
+      "usedBy": [
+        "code:card.paint"
+      ],
+      "fallback": "lean_in",
+      "notes": "Раскраска карты (Хулиган): присел у края карты, брызгает по полу перед собой широкими дугами, левая лапа на колене. Поверх — IK лапы к точке на карте. Нет клипа — paint_spray (Meshy) или idle_breathe + присед и IK.",
+      "meshy": {
+        "loop": true,
+        "blendInMs": 200
+      }
+    },
+    {
+      "id": "admire_artwork",
+      "durationS": 2.0,
+      "loop": false,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 200,
+      "persona": "all",
+      "priority": "P1",
+      "usedBy": [
+        "code:card.paint"
+      ],
+      "fallback": "think",
+      "notes": "Раскраска карты: отошёл на шаг, смотрит на рисунок, склоняет голову, лапа к подбородку, довольный кивок. Нет клипа — think.",
+      "meshy": {
+        "loop": false,
+        "blendInMs": 200,
+        "blendOutMs": 300
+      }
+    },
+    {
+      "id": "brush_dip_stroke",
+      "durationS": 2.0,
+      "loop": true,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 200,
+      "persona": "all",
+      "priority": "P1",
+      "usedBy": [
+        "code:card.paint"
+      ],
+      "fallback": "breath_draw",
+      "notes": "Раскраска карты (Добряк, Блёстка): наклоняется и макает кисть в банку на полу справа, стряхивает лишнее о край, выпрямляется. Нет клипа — idle_breathe + IK кисти в банку.",
+      "meshy": {
+        "loop": true,
+        "blendInMs": 200
+      }
+    },
+    {
       "id": "wave",
       "durationS": 1.2,
       "loop": false,

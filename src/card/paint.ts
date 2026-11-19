@@ -5,13 +5,24 @@
  * минуту; чипы «Раскрась! / Не сейчас»), пункт каталога «Раскрасить карту» (вкладка «Образ»), голос «раскрась /
  * нарисуй на карте». Только когда кот стоит на карте (AR, карта захвачена); дома или без карты — «Сначала покажи мне карту».
  * Выбор: лист с тремя кружками палитры кота (миниатюра рисунка) и «Не надо».
- * Рисование: поверх плоскости карты (чуть выше, без z-fight) — сетка размером с карту, рисунок кота (paintArt.ts) под
- * маской; маска проявляется змейкой из трёх рядов (paintPlan.ts paintRows) за 5–8 с, кончик мазка — у лапы кота, который
- * идёт по карте с кистью (Хулиган — с баллончиком; реквизит PropRig.hold), на концах рядов — клип paint_brush /
- * paint_spray (опоры breath_draw / scratch_glass до Meshy). Брызги, капли и блёстки — частицы на плоскости карты.
- * Финиш: «Та-да!» (paint_done) и маленький салют. Рисунок остаётся на сессию и возвращается на следующем визите
- * (память {pattern, color, seed}: sber-ar-cat:paint → прогресс на сервере), виден сразу при посадке на карту.
- * Новый рисунок закрывает старый; «Стереть рисунок» — в каталоге. Рисунок непрозрачный: номер карты и имя не видны.
+ *
+ * Рисование — как настоящее граффити / рисунок кистью (paintPlan.ts choreograph):
+ *   Хулиган: берёт баллончик → трясёт (звон шарика, 0,8 с) → встаёт у дальнего края карты, приседает и брызгает:
+ *     краска летит из сопла конусом брызг, рисунок проявляется ровно там, куда попадает луч сопла (каждый кадр — по
+ *     реальному положению сопла после позы, а не рядами); элементы по очереди — тег и обводка, фон и заливка, кляксы,
+ *     потёки стекают сами после заливки; переходит ко второй половине (снова трясёт) → отходит, смотрит → звёзды
+ *     «пшик-пшик» и стрелки — последний штрих → показывает баллончик, «Та-да!». Шипение — громче и выше на быстром
+ *     движении.
+ *   Добряк / Блёстка: макают кисть в банку у края карты → волнистые широкие мазки фона по пути кончика кисти →
+ *     сердечки / звёзды штампом, где кисть касается карты → точки-конфетти → отошёл, посмотрел → большое сердце /
+ *     звезда последним → показывает.
+ * Поза: клипы Meshy paint_spray / spray_shake / spray_low_sweep / admire_artwork / paint_brush / brush_dip_stroke,
+ * если пришли; поверх — character/toolIK.ts (присед, наклон, лапа к точке), а баллончик / кисть наводит PropRig.aim.
+ * Нет клипов — та же поза на опорах (idle, snowglobe_shake, think, proud) + IK: всё равно видно, что рисует.
+ * Рисунок — слоями (paintArt.ts ART_LAYERS), у каждого своя маска; маски открывает штамп баллончика (мягкий край
+ * и крап за краем) или кисти. Финиш: все маски целиком — номер карты и имя не видны (privacy), слои сливаются в один.
+ * Рисунок остаётся на сессию и возвращается на следующем визите (память {pattern, color, seed}: sber-ar-cat:paint →
+ * прогресс на сервере), виден сразу при посадке на карту. Новый рисунок закрывает старый; «Стереть рисунок» — в каталоге.
  *
  * Данные карты не читаются и не сохраняются: рисунок строится только из зерна и цвета.
  * Аналитика: paint_offer, paint_start{color}, paint_done, paint_erase. Отладка: ?flow=paint[&swatch=0..2], вкладка «Тест».
@@ -20,6 +31,7 @@ import * as THREE from 'three';
 import type { Tracker } from '../tracker/types';
 import type { Stage } from '../stage';
 import type { Character } from '../character/types';
+import type { AimMode, AimRequest } from '../character/toolIK';
 import type { Director } from '../director';
 import type { UI } from '../ui/ui';
 import type { Audio } from '../audio/audio';
@@ -27,10 +39,13 @@ import type { Chip } from '../scenario/suggest';
 import type { PersonaId } from '../persona/types';
 import { track } from '../analytics';
 import { Salute, type BurstShape } from '../fx/salute';
-import { drawPattern, patternCanvas } from './paintArt';
+import { ART_LAYERS, drawLayers, patternCanvas } from './paintArt';
+import { makePaintPot } from './paintProps';
+import { ToolSound, rattle } from './paintSound';
 import {
-  OFFER_SHOW_MS, PAINT_STYLE, PaintOfferRule, catWaypoints, erasePaint, findSwatch, headFromCat, loadPaint, paintBlocked, paintCatalogItems, paintRows, savePaint,
-  type PaintRow, type PaintStyle, type PaintWhere, type SavedPaint, type Swatch,
+  ART_SPAN, DOT_HOLD, OFFER_SHOW_MS, PAINT_STYLE, PaintOfferRule, cardToUv, choreograph, erasePaint, findSwatch, loadPaint, nozzleHit, paintBlocked,
+  paintCatalogItems, pathLen, pointAt, savePaint, sprayRadius,
+  type Choreo, type PaintStyle, type PaintWhere, type PlanStroke, type Pt, type SavedPaint, type Step, type Swatch,
 } from './paintPlan';
 
 export interface CardPaintHost {
@@ -56,53 +71,78 @@ export function startCardPaint(h: CardPaintHost): CardPaint {
 }
 
 /** игры, после которых кот предлагает раскрасить карту */
+
+/** игры, после которых кот предлагает раскрасить карту */
 const GAMES = new Set(['riddle', 'echo', 'emo', 'rps', 'simon']);
 const TEX_W = 1024, TEX_H = 646;
 const MASK_W = 512, MASK_H = 323;
-/** ряд: не дольше (кот застрял — мазок идёт по времени) */
-const ROW_MAX_S = 1.9;
-/** разворот на конце ряда: клип «рисует», мазок доходит до края */
-const TURN_S = 0.6;
-const WALK_IN_MAX_S = 2.2;
-const FILL_S = 0.35;
-const REACH = 0.36;
-const SPAN = 1.12;
+/** скорость короткого шага между точками у края карты (ширин карты в секунду) */
+const WALK_SPEED = 1.0;
+const BACK_SPEED = 0.42;
+/** после конца мазка сопло ещё мгновение брызгает: поза отстаёт от цели на кадр, хвост мазка не теряется */
+const TAIL_S = 0.06;
+/** кисть «касается» карты, если кончик ниже (ширин карты) */
+const BRUSH_TOUCH = 0.14;
 
-type Phase = 'walkIn' | 'row' | 'turn' | 'fill' | 'home';
+interface Drip {
+  s: PlanStroke;
+  at: number;
+  t: number;
+  last: Pt | null;
+}
+
 interface Run {
   style: PaintStyle;
   swatch: Swatch;
   others: Swatch[];
   saved: SavedPaint;
-  rows: PaintRow[];
-  radius: number;
-  half: number;
-  way: { x: number; y: number }[][];
-  row: number;
-  phase: Phase;
+  plan: Choreo;
+  /** индекс шага и время в нём */
+  i: number;
   t: number;
+  begun: boolean;
   /** всего с начала */
   total: number;
-  head: number;
-  lastStamp: number | null;
+  /** куда смотрит сопло (карта) */
+  P: Pt;
+  /** откуда шёл перевод сопла к мазку */
+  from: Pt;
+  /** последняя точка, куда попала краска */
+  last: Pt | null;
+  tail: number;
+  drips: Drip[];
+  dripsLive: Drip[];
+  mode: AimMode;
+  crouch: number;
   actT: number;
+  /** IK-вес лапы (клип Meshy двигает лапу сам — меньше) */
+  ikW: number;
 }
 
 const norm = (s: string) => s.toLowerCase().replace(/ё/g, 'е').replace(/[^\p{L} ]/gu, ' ').replace(/\s+/g, ' ').trim();
 const YES = /^(да|давай|ага|хочу|конечно|угу|ок|окей|раскрась|раскрашивай)( |$)/;
 const NO = /^(нет|не надо|не хочу|неа|потом|не сейчас|не)( |$)/;
 
+interface PaintLayer {
+  id: string;
+  canvas: HTMLCanvasElement;
+  mask: HTMLCanvasElement;
+  mg: CanvasRenderingContext2D | null;
+  map: THREE.CanvasTexture;
+  maskTex: THREE.CanvasTexture;
+  mesh: THREE.Mesh;
+  dirty: boolean;
+}
+
 export class CardPaint {
   readonly offer = new PaintOfferRule();
   saved: SavedPaint | null;
   private readonly storage: Pick<Storage, 'getItem' | 'setItem' | 'removeItem'> | null;
   private group = new THREE.Group();
-  private overlay: THREE.Mesh | null = null;
+  private layers: PaintLayer[] = [];
   private under: THREE.Mesh | null = null;
-  private patCanvas: HTMLCanvasElement | null = null;
-  private maskCanvas: HTMLCanvasElement | null = null;
-  private maskG: CanvasRenderingContext2D | null = null;
-  private maskTex: THREE.CanvasTexture | null = null;
+  private pot: THREE.Object3D | null = null;
+  private potK = 0;
   private fade = 0;
   private erasing = false;
   private run: Run | null = null;
@@ -112,16 +152,25 @@ export class CardPaint {
   private offerCheckT = 0;
   private salute: Salute | null = null;
   private sparks: PaintParticles;
+  private mist: PaintParticles;
+  private sound: ToolSound | null = null;
   /** QA и снимки: прогресс текущей раскраски 0…1 */
   progress = 0;
+  /** QA: шаг хореографии, точка прицела и попадания краски (карта), промах сопла */
+  qa = { step: '', aim: { x: 0, y: 0 }, hit: null as Pt | null, miss: 0, spraying: false, sprayFrames: 0 };
+  private tmpV = new THREE.Vector3();
+  private tmpW = new THREE.Vector3();
+  /** мазок этого кадра: краска считается после позы кота (lateUpdate) */
+  private pending: { s: PlanStroke; on: boolean; dt: number; k: number } | null = null;
 
   constructor(private h: CardPaintHost) {
     this.storage = h.storage === undefined ? safeStorage() : h.storage;
     this.saved = loadPaint(this.storage);
     this.group.name = 'card-paint';
     h.tracker.anchor.add(this.group);
-    this.sparks = new PaintParticles();
-    this.group.add(this.sparks.points);
+    this.sparks = new PaintParticles(480, 0.022);
+    this.mist = new PaintParticles(140, 0.07, 0.6);
+    this.group.add(this.sparks.points, this.mist.points);
     if (this.saved) this.showSaved(this.saved);
     const d = h.director;
     d.on('phase', (ph) => {
@@ -131,6 +180,9 @@ export class CardPaint {
       if (!g.start && GAMES.has(g.id)) this.offer.gameEnd();
     });
     // голос: «раскрась карту»; «да / нет» на предложение кота и на лист цветов
+    // присел с баллончиком — реплики не ставят «говорящую» позу
+    const busyPrev = d.bodyBusy;
+    d.bodyBusy = () => !!this.run || (busyPrev ? busyPrev() : false);
     const prev = d.intentGate;
     d.intentGate = (heard, st) => this.onIntent(heard.type, heard.text ?? '') || (prev ? prev(heard, st) : false);
     // карта ушла посреди раскраски — дорисовываем сразу (кот не висит с кистью над пустотой)
@@ -143,7 +195,7 @@ export class CardPaint {
 
   /** идёт раскраска или салют — энергобюджет «действие» (app.ts) */
   get busy() {
-    return !!this.run || !!this.salute?.active || this.sparks.active;
+    return !!this.run || !!this.salute?.active || this.sparks.active || this.mist.active;
   }
   get painting() {
     return !!this.run;
@@ -328,152 +380,338 @@ export class CardPaint {
     const others = style.swatches.filter((s) => s !== swatch);
     const saved: SavedPaint = { pattern: style.pattern, color: swatch.id, seed: seed >>> 0 };
     // старый рисунок остаётся под новым, пока новый не закроет карту
-    if (this.overlay && this.saved && !this.erasing) this.keepUnder();
-    this.buildOverlay(saved, swatch, others, 0);
-    const { rows, radius, half } = paintRows(this.h.tracker.aspect);
+    if (this.layers.length && this.saved && !this.erasing) this.keepUnder();
+    const art = this.buildLayers(saved, swatch, others, 0);
+    const aspect = this.h.tracker.aspect;
+    const plan = choreograph(art, TEX_W, TEX_H, aspect, style.tool, WALK_SPEED);
+    const ch = this.h.character();
+    const meshyArm = ch?.clipSource?.(style.tool === 'spray' ? 'paint_spray' : 'paint_brush') === 'meshy';
     this.run = {
-      style, swatch, others, saved, rows, radius, half, way: catWaypoints(this.h.tracker.aspect, REACH),
-      row: 0, phase: 'walkIn', t: 0, total: 0, head: -rows[0].dir * (SPAN / 2), lastStamp: null, actT: 0,
+      style, swatch, others, saved, plan, i: 0, t: 0, begun: false, total: 0,
+      P: { x: 0, y: 0 }, from: { x: 0, y: 0 }, last: null, tail: 0,
+      drips: plan.drips.map((d) => ({ s: d.s, at: -1, t: 0, last: null })), dripsLive: [],
+      mode: 'carry', crouch: 0, actT: 0, ikW: meshyArm ? 0.85 : 1,
     };
     this.progress = 0;
     this.erasing = false;
     this.offer.done();
     track('paint_start', { color: swatch.id });
-    this.h.log(`раскраска: ${style.pattern} / ${swatch.id}, зерно ${saved.seed}`);
-    this.h.character()?.holdProp?.(style.clip, swatch.main);
+    this.h.log(`раскраска: ${style.pattern} / ${swatch.id}, зерно ${saved.seed}, ${plan.steps.length} шагов ≈ ${plan.total.toFixed(1)} с${meshyArm ? ', клип Meshy' : ''}`);
+    ch?.holdProp?.(style.clip, swatch.main);
     this.h.audio.play('pop_appear', 0.4);
+    this.sound?.dispose();
+    this.sound = new ToolSound((v) => this.h.audio.synthOut?.(v) ?? null, style.tool, style.tool === 'spray' ? 0.55 : 0.4);
+    if (style.tool === 'brush') this.placePot(plan.pot, swatch.main, style.pattern === 'stars');
     this.line('paint_start');
     this.quiet(performance.now());
-    this.walkTo(this.run.way[0][0]);
     this.h.kickSuggest();
     return true;
   }
 
-  /** пройти по карте; дошёл раньше, чем кончился ряд, — стоит и рисует (клип кисти), а не шагает на месте */
-  private walkTo(p: { x: number; y: number }, paintOnArrive = true): boolean {
-    const arrive = () => {
-      const r = this.run;
-      if (r && paintOnArrive) this.h.character()?.play(r.style.clip, { loop: true });
-    };
-    if (this.h.stage.walkTo(new THREE.Vector2(p.x, p.y), arrive)) {
-      this.h.character()?.play('walk', { loop: true });
-      return true;
-    }
-    return false;
+  private world(p: Pt, z = 0, out = this.tmpV): THREE.Vector3 {
+    return this.h.tracker.anchor.localToWorld(out.set(p.x, p.y, z));
   }
 
-  private rowStart(r: Run) {
-    r.phase = 'row';
+  private aim(r: Run, mode: AimMode, crouch: number, z = 0) {
+    r.mode = mode;
+    r.crouch = crouch;
+    const req: AimRequest = { mode, crouch, tool: r.style.tool, weight: r.ikW, target: mode === 'aim' || mode === 'dip' ? this.world(r.P, z).clone() : null };
+    this.h.character()?.aimTool?.(req);
+  }
+
+  /** клип id, если пришёл настоящий (Meshy), иначе опора */
+  private clipOr(id: string, fallback: string): string {
+    return this.h.character()?.clipSource?.(id) === 'meshy' ? id : fallback;
+  }
+
+  /** клип художника — сразу (force): «номер» в защищённом окне (жвачка, idle-трюк) не держит кота */
+  private play(clip: string, loop = true) {
+    this.h.character()?.play(clip, { loop, force: true });
+  }
+
+  private stepName(s: Step | undefined) {
+    return s ? (s.k === 'stroke' ? `stroke:${s.s.phase}` : s.k) : 'done';
+  }
+
+  /** начало шага */
+  private begin(r: Run, s: Step) {
+    const st = this.h.stage, ch = this.h.character(), tool = r.style.tool;
     r.t = 0;
-    const row = r.rows[r.row];
-    r.head = -row.dir * (SPAN / 2);
-    r.lastStamp = null;
-    if (!this.walkTo(r.way[r.row][1])) this.h.character()?.play(r.style.clip, { loop: true });
-    // звук инструмента на каждом ряду
-    const a = this.h.audio;
-    if (r.style.tool === 'spray') a.play('steam', 0.42);
-    else a.play('whoosh', 0.3);
-    if (r.style.pattern === 'stars') a.play('sparkle_trail', 0.4);
+    r.begun = true;
+    this.qa.step = this.stepName(s);
+    switch (s.k) {
+      case 'shake': {
+        st.faceTo = null;
+        const real = ch?.clipSource?.('spray_shake') === 'meshy';
+        this.play(real ? 'spray_shake' : 'idle_breathe');
+        r.mode = 'shake';
+        ch?.aimTool?.({ mode: 'shake', crouch: 0, weight: real ? 0.35 : 1 });
+        rattle((v) => this.h.audio.synthOut?.(v) ?? null, s.dur);
+        if (!this.h.audio.synthOut) this.h.audio.play('shake_1', 0.5);
+        break;
+      }
+      case 'dip': {
+        this.play(this.clipOr('brush_dip_stroke', 'idle_breathe'));
+        r.P = { ...this.h.stage.pos, ...this.potPoint() };
+        this.aim(r, 'dip', 0.6, 0.06);
+        break;
+      }
+      case 'walk': {
+        st.faceTo = null;
+        this.aim(r, 'carry', 0);
+        ch?.lookAt?.(null);
+        const ok = st.walkTo(new THREE.Vector2(s.to.x, s.to.y), undefined, { free: true, back: s.back, speed: s.back ? BACK_SPEED : WALK_SPEED });
+        if (ok) this.play('walk');
+        else r.t = 99;
+        break;
+      }
+      case 'crouch': {
+        if (s.on) {
+          // сопло — сразу на начало ближайшего мазка
+          const next = r.plan.steps.slice(r.i + 1).find((x) => x.k === 'stroke');
+          if (next && next.k === 'stroke') r.P = { ...next.s.pts[0] };
+          this.play(tool === 'spray' ? this.clipOr('spray_low_sweep', this.clipOr('paint_spray', 'idle_breathe')) : this.clipOr('paint_brush', 'idle_breathe'));
+          this.aim(r, 'aim', 1);
+        } else {
+          this.sound?.set(false);
+          this.aim(r, 'carry', 0);
+        }
+        break;
+      }
+      case 'stroke':
+        r.from = { ...r.P };
+        if (r.mode !== 'aim') this.aim(r, 'aim', 1);
+        break;
+      case 'admire': {
+        this.sound?.set(false);
+        this.aim(r, 'carry', 0);
+        st.faceTo = new THREE.Vector2(s.at.x, s.at.y);
+        ch?.lookAt?.(this.world(s.at).clone());
+        this.play(this.clipOr('admire_artwork', 'think'), false);
+        break;
+      }
+      case 'show': {
+        this.sound?.set(false);
+        st.faceTo = null;
+        ch?.lookAt?.(null);
+        this.aim(r, 'raise', 0);
+        this.play('proud', false);
+        this.h.audio.play('whoosh', 0.25);
+        break;
+      }
+    }
+  }
+
+  /** шаг идёт; true — закончен */
+  private tick(r: Run, s: Step, dt: number): boolean {
+    const st = this.h.stage;
+    switch (s.k) {
+      case 'shake':
+      case 'admire':
+      case 'show':
+      case 'crouch':
+        if (s.k === 'crouch' && s.on) this.aim(r, 'aim', 1);
+        return r.t >= s.dur;
+      case 'dip': {
+        // кисть в банку и обратно — два раза; Блёстка — искры из банки
+        const k = r.t / s.dur, dipZ = 0.075 - 0.05 * Math.max(0, Math.sin(k * Math.PI * 4));
+        const pp = this.potPoint();
+        r.P = pp;
+        this.aim(r, 'dip', 0.6, dipZ);
+        if (Math.sin(k * Math.PI * 4) > 0.95 && (r.actT * 10) % 1 < 0.5) this.h.audio.play('gum_splat', 0.12);
+        if (r.style.pattern === 'stars') this.sparks.emitAt(pp.x, pp.y, 0.08, dt, [r.swatch.main, '#ffffff', '#FFE38A'], 2, 30);
+        if (r.t >= s.dur) {
+          r.P = { x: st.pos.x * 0.6, y: st.pos.y - 0.25 };
+          return true;
+        }
+        return false;
+      }
+      case 'walk': {
+        const done = !st.walking || r.t > s.max;
+        if (done) {
+          if (st.walking) st.cancelWalk();
+          st.faceTo = new THREE.Vector2(s.face.x, s.face.y);
+          this.play('idle_breathe');
+        }
+        return done;
+      }
+      case 'stroke':
+        return this.strokeTick(r, s.s, s.gap, dt);
+    }
+  }
+
+  /** мазок: сопло переводится к началу (краска не идёт), потом ведёт по пути; краска — там, куда попал луч сопла */
+  private strokeTick(r: Run, s: PlanStroke, gap: number, dt: number): boolean {
+    const t = r.t;
+    let on = false;
+    if (t < gap) {
+      const k = t / gap, e = k * k * (3 - 2 * k);
+      r.P = { x: r.from.x + (s.pts[0].x - r.from.x) * e, y: r.from.y + (s.pts[0].y - r.from.y) * e };
+      // хвост прошлого мазка: поза отстаёт на кадр
+      on = r.tail > 0;
+      r.tail -= dt;
+    } else {
+      const k = Math.min(1, (t - gap) / s.dur);
+      if (s.kind === 'burst') {
+        // пшик в точку: сопло чуть кружит — пятно растёт
+        const a = k * Math.PI * 5, rr = s.r * 0.25 * k;
+        r.P = { x: s.pts[0].x + Math.cos(a) * rr, y: s.pts[0].y + Math.sin(a) * rr };
+      } else if (s.dots) {
+        // пунктир: у каждой точки — остановка DOT_HOLD
+        const n = s.pts.length, move = Math.max(1e-3, s.dur - n * DOT_HOLD);
+        const tt = k * s.dur, total = Math.max(1e-6, pathLen(s.pts));
+        let acc = 0, done = false;
+        for (let i = 0; i < n && !done; i++) {
+          if (tt <= acc + DOT_HOLD) {
+            r.P = { ...s.pts[i] };
+            on = true;
+            done = true;
+            break;
+          }
+          acc += DOT_HOLD;
+          if (i < n - 1) {
+            const seg = Math.hypot(s.pts[i + 1].x - s.pts[i].x, s.pts[i + 1].y - s.pts[i].y);
+            const segT = (seg / total) * move;
+            if (tt <= acc + segT) {
+              const q = (tt - acc) / segT;
+              r.P = { x: s.pts[i].x + (s.pts[i + 1].x - s.pts[i].x) * q, y: s.pts[i].y + (s.pts[i + 1].y - s.pts[i].y) * q };
+              done = true;
+              break;
+            }
+            acc += segT;
+          }
+        }
+        if (!done) r.P = { ...s.pts[n - 1] };
+      } else r.P = pointAt(s.pts, k, { x: 0, y: 0 });
+      if (!s.dots) on = true;
+      r.tail = TAIL_S;
+    }
+    this.aim(r, 'aim', 1);
+    // краска — после позы кота в этом кадре (lateUpdate: сопло там, где его нарисуют)
+    this.pending = { s, on, dt, k: t >= gap ? Math.min(1, (t - gap) / s.dur) : 0 };
+    return t >= gap + s.dur;
+  }
+
+  /**
+   * Краска: луч сопла (кончика кисти) из позы прошлого кадра → точка на карте; штампы маски слоя от прошлой точки до
+   * этой; брызги конусом из сопла; шипение по скорости.
+   */
+  private spray(r: Run, s: PlanStroke, on: boolean, dt: number, k: number) {
+    const ch = this.h.character();
+    const ray = ch?.toolRay?.() ?? null;
+    let H: Pt | null = null, N: THREE.Vector3 | null = null, dist = 0.2;
+    if (ray) {
+      const a = this.h.tracker.anchor;
+      a.updateWorldMatrix(true, false);
+      N = a.worldToLocal(this.tmpW.copy(ray.o));
+      const d = a.worldToLocal(this.tmpV.copy(ray.o).add(ray.d)).sub(N);
+      const hit = nozzleHit(N, d);
+      if (hit) {
+        H = { x: hit.x, y: hit.y };
+        dist = hit.dist;
+        // кисть красит, только когда кончик у карты
+        if (r.style.tool === 'brush' && N.z > BRUSH_TOUCH) on = false;
+      }
+    } else {
+      // без 3D-кота (спрайт, заглушка): краска там, куда целимся, сопло — у лапы
+      H = { ...r.P };
+      const p = this.h.stage.pos;
+      N = this.tmpW.set(p.x + (r.P.x - p.x) * 0.45, p.y + (r.P.y - p.y) * 0.45, r.style.tool === 'spray' ? 0.3 : 0.04);
+      dist = Math.hypot(N.x - H.x, N.y - H.y, N.z);
+    }
+    this.qa.aim = { ...r.P };
+    this.qa.hit = H;
+    this.qa.miss = H ? Math.hypot(H.x - r.P.x, H.y - r.P.y) : 1;
+    this.qa.spraying = on && !!H;
+    if (!on || !H) {
+      r.last = null;
+      this.sound?.set(false);
+      return;
+    }
+    this.qa.sprayFrames++;
+    const spray = r.style.tool === 'spray';
+    const rad = s.kind === 'burst' ? s.r * (spray ? 0.45 + 0.55 * k : 0.3 + 0.7 * Math.sqrt(k)) : spray ? sprayRadius(s.r, dist) : s.r;
+    const from = r.last ?? H;
+    const speed = r.last ? Math.hypot(H.x - r.last.x, H.y - r.last.y) / Math.max(1e-3, dt) : 0;
+    const L = this.layers.find((l) => l.id === s.layer) ?? this.layers[0];
+    if (L) this.stampLine(L, from, H, rad, spray ? 'spray' : s.kind === 'burst' ? 'dab' : 'brush', s.phase === 'base' ? 1 : 0.8);
+    r.last = H;
+    this.sound?.set(true, s.kind === 'burst' ? 0.6 : speed);
+    // брызги
+    const cols = [r.swatch.main, r.swatch.main, r.swatch.main, ...r.others.map((o) => o.main), '#ffffff'];
+    if (spray && N) this.sparks.cone(N, H, rad, dt, cols, this.mist);
+    else if (r.style.pattern === 'stars') this.sparks.emitAt(H.x, H.y, 0.01, dt, ['#ffffff', '#FFE38A', r.swatch.main], 2, 34);
+    else this.sparks.emitAt(H.x, H.y, 0.01, dt, cols, 1, 14);
+    if (s.kind === 'burst' && k < 0.2 && !spray) this.h.audio.play(r.style.pattern === 'stars' ? 'glitter' : 'pop_appear', 0.14);
+  }
+
+  /** потёки: стекают сами, кот уже рисует дальше */
+  private drips(r: Run, dt: number) {
+    for (const d of r.drips) {
+      if (d.at < 0) {
+        const p = r.plan.drips[r.drips.indexOf(d)];
+        if (r.i > p.after) d.at = r.total + p.delay;
+        continue;
+      }
+      if (d.t < 0 || r.total < d.at) continue;
+      d.t += dt;
+      const k = Math.min(1, d.t / d.s.dur);
+      // стекает с замедлением, как краска
+      const e = 1 - (1 - k) * (1 - k);
+      const P = pointAt(d.s.pts, e, { x: 0, y: 0 });
+      const L = this.layers.find((l) => l.id === d.s.layer);
+      if (L) this.stampLine(L, d.last ?? P, P, d.s.r, 'drip', 1);
+      d.last = P;
+      if (k >= 1) d.t = -1;
+    }
   }
 
   private step(r: Run, dt: number) {
+    this.qa.spraying = false;
     r.t += dt;
     r.total += dt;
-    const st = this.h.stage;
-    const row = r.rows[r.row];
-    if (r.phase === 'walkIn') {
-      if (!st.walking || r.t > WALK_IN_MAX_S) this.rowStart(r);
-      return;
+    const steps = r.plan.steps;
+    let s = steps[r.i];
+    if (s && !r.begun) this.begin(r, s);
+    if (s && this.tick(r, s, dt)) {
+      r.i++;
+      r.begun = false;
+      s = steps[r.i];
+      if (s) this.begin(r, s);
     }
-    if (r.phase === 'row') {
-      const fromCat = headFromCat(st.pos.x, REACH);
-      const byTime = -row.dir * (SPAN / 2) + row.dir * SPAN * Math.min(1, r.t / ROW_MAX_S);
-      const want = row.dir > 0 ? Math.max(r.head, fromCat, byTime) : Math.min(r.head, fromCat, byTime);
-      this.paintTo(r, want, dt);
-      // ряд кончился: кисть у края карты (кот дошёл) или по времени (кот застрял / не ходит)
-      if (row.dir * r.head >= 0.5 || r.t > ROW_MAX_S) {
-        r.phase = 'turn';
-        r.t = 0;
-        if (!st.walking) this.h.character()?.play(r.style.clip, { loop: true });
-        if (r.style.tool === 'spray') this.h.audio.play('gum_splat', 0.3);
-        this.sparks.burst(r);
-      }
-      return;
+    // голова — туда, где рисует (кроме «показывает» и ходьбы)
+    if (s && (s.k === 'stroke' || (s.k === 'crouch' && s.on) || s.k === 'dip')) this.h.character()?.lookAt?.(this.world(r.P).clone());
+    if (!this.late && this.pending) {
+      const p = this.pending;
+      this.pending = null;
+      this.spray(r, p.s, p.on, p.dt, p.k);
     }
-    if (r.phase === 'turn') {
-      const edge = row.dir * (SPAN / 2);
-      const k = Math.min(1, r.t / (TURN_S * 0.8));
-      this.paintTo(r, r.head + (edge - r.head) * k, dt);
-      if (r.t >= TURN_S) {
-        if (r.row < r.rows.length - 1) {
-          r.row++;
-          this.rowStart(r);
-        } else {
-          r.phase = 'fill';
-          r.t = 0;
-        }
-      }
-      return;
-    }
-    if (r.phase === 'fill') {
-      // добираем огрехи по краям — карта закрыта целиком
-      const g = this.maskG;
-      if (g) {
-        g.globalAlpha = Math.min(1, (dt / FILL_S) * 1.6);
-        g.fillStyle = '#fff';
-        g.fillRect(0, 0, MASK_W, MASK_H);
-        g.globalAlpha = 1;
-        this.maskTex!.needsUpdate = true;
-      }
-      if (r.t >= FILL_S) {
-        this.fullMask();
-        r.phase = 'home';
-        r.t = 0;
-        // кот отходит к краю карты и показывает рисунок («Та-да!»), а не стоит посередине на нём
-        const last = r.rows[r.rows.length - 1];
-        if (!this.walkTo({ x: last.dir * 0.3, y: Math.min(st.cfg.footY, -0.12) }, false)) r.t = 99;
-      }
-      return;
-    }
-    if (r.phase === 'home' && (!st.walking || r.t > 2)) this.finish(r);
+    this.drips(r, dt);
+    this.progress = Math.max(this.progress, Math.min(0.99, r.total / Math.max(1, r.plan.total)));
+    if (!s) this.finish(r);
   }
 
-  /** довести мазок ряда до x (штампы кистью или баллончиком по маске) */
-  private paintTo(r: Run, x: number, dt: number) {
-    const g = this.maskG;
-    const row = r.rows[r.row];
-    if (g && this.maskTex) {
-      const from = r.lastStamp ?? r.head - row.dir * 0.02;
-      const rpx = (r.radius / (r.half * 2)) * MASK_H;
-      const stepX = (rpx * 0.22) / MASK_W;
-      if (Math.abs(x - from) > 1e-4 || r.lastStamp === null) {
-        const n = Math.max(1, Math.ceil(Math.abs(x - from) / stepX));
-        for (let i = 1; i <= n; i++) {
-          const cx = from + ((x - from) * i) / n;
-          const wob = Math.sin(cx * 11 + r.row * 1.7) * 0.1 + Math.sin(cx * 23 + r.row) * 0.05;
-          const cy = row.y + wob * r.radius;
-          stamp(g, (cx + 0.5) * MASK_W, ((r.half - cy) / (r.half * 2)) * MASK_H, rpx, r.style.tool);
-        }
-        this.maskTex.needsUpdate = true;
-      }
-    }
-    r.lastStamp = x;
-    r.head = x;
-    // кончик мазка — источник брызг/капель/блёсток
-    this.sparks.emit(r, x, row.y, dt);
-    const along = row.dir > 0 ? (x + SPAN / 2) / SPAN : (SPAN / 2 - x) / SPAN;
-    this.progress = Math.max(this.progress, Math.min(1, (r.row + Math.max(0, Math.min(1, along))) / r.rows.length));
+  private release() {
+    const ch = this.h.character();
+    ch?.aimTool?.(null);
+    ch?.holdProp?.(null);
+    ch?.lookAt?.(null);
+    this.h.stage.faceTo = null;
+    this.sound?.dispose();
+    this.sound = null;
   }
 
   private finish(r: Run) {
     this.run = null;
     this.progress = 1;
-    this.fullMask();
+    this.qa.step = 'done';
+    this.completeLayers();
     this.dropUnder();
     this.commit(r.saved);
+    this.release();
+    this.potK = -1;
     const ch = this.h.character();
-    ch?.holdProp?.(null);
-    ch?.play('celebrate');
+    ch?.play('celebrate', { force: true });
     this.h.audio.play('chime', 0.7);
     this.celebrate(r);
     this.line('paint_done');
@@ -489,13 +727,14 @@ export class CardPaint {
     if (!r) return;
     this.run = null;
     this.progress = 1;
-    this.fullMask();
+    this.qa.step = 'done';
+    this.completeLayers();
     this.dropUnder();
     this.commit(r.saved);
     this.h.stage.cancelWalk();
-    const ch = this.h.character();
-    ch?.holdProp?.(null);
-    ch?.play('idle');
+    this.release();
+    this.removePot();
+    this.h.character()?.play('idle');
     track('paint_done', {});
     this.h.log(`раскраска: дорисовано сразу (${why})`);
     this.h.kickSuggest();
@@ -530,10 +769,46 @@ export class CardPaint {
     this.salute.start({ size: 'small', shapes: shapes[r.style.pattern], colors: [r.swatch.main, ...r.others.map((o) => o.main), '#FFFFFF'], crackle: r.style.pattern === 'stars' ? 0.8 : 0.3 });
   }
 
+  // ───────────── банка краски (кисть) ─────────────
+
+  private placePot(p: Pt, color: string, glitter: boolean) {
+    this.removePot();
+    this.pot = makePaintPot(color, glitter);
+    this.pot.position.set(p.x, p.y, 0);
+    this.pot.scale.setScalar(0.001);
+    this.potK = 0.001;
+    this.group.add(this.pot);
+  }
+  private potPoint(): Pt {
+    const p = this.pot?.position;
+    return p ? { x: p.x, y: p.y } : { x: 0, y: 0.45 };
+  }
+  private removePot() {
+    if (!this.pot) return;
+    this.pot.removeFromParent();
+    this.pot.traverse((o) => {
+      const m = o as THREE.Mesh;
+      m.geometry?.dispose();
+      (m.material as THREE.Material | undefined)?.dispose?.();
+    });
+    this.pot = null;
+    this.potK = 0;
+  }
+  private potTick(dt: number) {
+    if (!this.pot) return;
+    if (this.potK >= 0) this.potK = Math.min(1, this.potK + dt / 0.3);
+    else this.potK -= dt / 0.35;
+    const k = this.potK >= 0 ? this.potK : 1 + this.potK;
+    if (k <= 0.001) return this.removePot();
+    // появление с перелётом, уход — сжимается
+    const e = this.potK >= 0 ? 1 + Math.sin(k * Math.PI) * 0.18 * (1 - k) : k;
+    this.pot.scale.setScalar(Math.max(0.001, e * Math.min(1, k * 1.4)));
+  }
+
   /** «Стереть рисунок» (каталог) */
   erase(): boolean {
     if (this.run) return false;
-    if (!this.saved && !this.overlay) return false;
+    if (!this.saved && !this.layers.length) return false;
     erasePaint(this.storage);
     this.saved = null;
     this.erasing = true;
@@ -551,67 +826,130 @@ export class CardPaint {
     else this.request('flow');
   }
 
-  // ───────────── сетка на карте ─────────────
+
+  // ───────────── слои рисунка на карте ─────────────
 
   private showSaved(s: SavedPaint) {
     const f = findSwatch(s.pattern, s.color);
-    if (f) this.buildOverlay(s, f.swatch, f.others, 1);
+    if (f) {
+      this.buildLayers(s, f.swatch, f.others, 1);
+      this.flatten();
+    }
   }
 
-  private buildOverlay(s: SavedPaint, swatch: Swatch, others: Swatch[], reveal: 0 | 1) {
-    if (typeof document === 'undefined') return;
+  /**
+   * Слои рисунка (ART_LAYERS) — каждый своей сеткой поверх карты (чуть выше, без z-fight) со своей маской.
+   * reveal 1 — сразу целиком (сохранённый рисунок). Возвращает мазки элементов (для хореографии).
+   */
+  private buildLayers(s: SavedPaint, swatch: Swatch, others: Swatch[], reveal: 0 | 1) {
+    this.disposeLayers();
+    if (typeof document === 'undefined') return drawLayers(() => null, TEX_W, TEX_H, s.pattern, swatch, others, s.seed);
     const aspect = this.h.tracker.aspect;
-    if (!this.patCanvas) {
-      this.patCanvas = document.createElement('canvas');
-      this.patCanvas.width = TEX_W;
-      this.patCanvas.height = TEX_H;
-      this.maskCanvas = document.createElement('canvas');
-      this.maskCanvas.width = MASK_W;
-      this.maskCanvas.height = MASK_H;
-      this.maskG = this.maskCanvas.getContext('2d');
-    }
-    const g = this.patCanvas.getContext('2d');
-    if (g) drawPattern(g, TEX_W, TEX_H, s.pattern, swatch, others, s.seed);
-    if (this.maskG) {
-      this.maskG.fillStyle = reveal ? '#fff' : '#000';
-      this.maskG.fillRect(0, 0, MASK_W, MASK_H);
-    }
-    if (!this.overlay) {
-      const map = new THREE.CanvasTexture(this.patCanvas);
+    const ids = ART_LAYERS[s.pattern];
+    const geo = new THREE.PlaneGeometry(ART_SPAN, ART_SPAN / aspect);
+    const made = new Map<string, PaintLayer>();
+    ids.forEach((id, i) => {
+      const canvas = document.createElement('canvas');
+      canvas.width = TEX_W;
+      canvas.height = TEX_H;
+      const mask = document.createElement('canvas');
+      mask.width = MASK_W;
+      mask.height = MASK_H;
+      const mg = mask.getContext('2d');
+      if (mg) {
+        mg.fillStyle = reveal ? '#fff' : '#000';
+        mg.fillRect(0, 0, MASK_W, MASK_H);
+      }
+      const map = new THREE.CanvasTexture(canvas);
       map.colorSpace = THREE.SRGBColorSpace;
       map.anisotropy = 4;
-      this.maskTex = new THREE.CanvasTexture(this.maskCanvas!);
-      const mat = new THREE.MeshBasicMaterial({ map, alphaMap: this.maskTex, transparent: true, depthWrite: false, toneMapped: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
-      // чуть больше карты: дрожание трекера не открывает край карты
-      this.overlay = new THREE.Mesh(new THREE.PlaneGeometry(1.02, 1.02 / aspect), mat);
-      this.overlay.name = 'card-paint-overlay';
-      this.overlay.position.z = 0.0015;
-      this.overlay.renderOrder = -0.5;
-      this.group.add(this.overlay);
-    } else (this.overlay.material as THREE.MeshBasicMaterial).map!.needsUpdate = true;
-    this.maskTex!.needsUpdate = true;
+      const maskTex = new THREE.CanvasTexture(mask);
+      const mat = new THREE.MeshBasicMaterial({
+        map, alphaMap: maskTex, transparent: true, depthWrite: false, toneMapped: false, polygonOffset: true, polygonOffsetFactor: -2 - i, polygonOffsetUnits: -2 - i,
+      });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.name = `card-paint-${id}`;
+      mesh.position.z = 0.0015 + i * 0.0002;
+      mesh.renderOrder = -0.5 + i * 0.01;
+      this.group.add(mesh);
+      const L: PaintLayer = { id, canvas, mask, mg, map, maskTex, mesh, dirty: true };
+      made.set(id, L);
+      this.layers.push(L);
+    });
+    const art = drawLayers((id) => made.get(id)?.canvas.getContext('2d') ?? null, TEX_W, TEX_H, s.pattern, swatch, others, s.seed);
+    for (const L of this.layers) {
+      L.map.needsUpdate = true;
+      L.maskTex.needsUpdate = true;
+    }
+    return art;
   }
 
-  private fullMask() {
-    if (!this.maskG) return;
-    this.maskG.globalAlpha = 1;
-    this.maskG.fillStyle = '#fff';
-    this.maskG.fillRect(0, 0, MASK_W, MASK_H);
-    this.maskTex!.needsUpdate = true;
+  /** штампы маски слоя от a до b (точки карты): баллончик — мягкое пятно и крап, кисть — плотный мазок с волосками */
+  private stampLine(L: PaintLayer, a: Pt, b: Pt, r: number, tool: 'spray' | 'brush' | 'dab' | 'drip', alpha: number) {
+    const g = L.mg;
+    if (!g) return;
+    const aspect = this.h.tracker.aspect;
+    const ua = cardToUv(a, aspect), ub = cardToUv(b, aspect);
+    const rpx = Math.max(1.5, (r / ART_SPAN) * MASK_W);
+    const ax = ua.u * MASK_W, ay = ua.v * MASK_H, bx = ub.u * MASK_W, by = ub.v * MASK_H;
+    const d = Math.hypot(bx - ax, by - ay);
+    const n = Math.max(1, Math.ceil(d / (rpx * (tool === 'spray' ? 0.3 : 0.22))));
+    for (let i = 1; i <= n; i++) stamp(g, ax + ((bx - ax) * i) / n, ay + ((by - ay) * i) / n, rpx, tool, alpha);
+    L.dirty = true;
+  }
+
+  /** все маски — целиком: рисунок закрывает карту (номер и имя не видны) */
+  private completeLayers() {
+    for (const L of this.layers) {
+      if (L.mg) {
+        L.mg.globalAlpha = 1;
+        L.mg.fillStyle = '#fff';
+        L.mg.fillRect(0, 0, MASK_W, MASK_H);
+      }
+      L.maskTex.needsUpdate = true;
+    }
+    this.flatten();
+  }
+
+  /** слить слои в один (готовый рисунок): меньше памяти и текстур */
+  private flatten() {
+    if (this.layers.length < 2) return;
+    const [bg, ...rest] = this.layers;
+    const g = bg.canvas.getContext('2d');
+    if (g) for (const L of rest) g.drawImage(L.canvas, 0, 0);
+    bg.map.needsUpdate = true;
+    for (const L of rest) this.disposeLayer(L, false);
+    this.layers = [bg];
+  }
+
+  private disposeLayer(L: PaintLayer, geo: boolean) {
+    L.mesh.removeFromParent();
+    L.map.dispose();
+    L.maskTex.dispose();
+    (L.mesh.material as THREE.Material).dispose();
+    if (geo) L.mesh.geometry.dispose();
+  }
+  private disposeLayers() {
+    const geo = this.layers[0]?.mesh.geometry;
+    for (const L of this.layers) this.disposeLayer(L, false);
+    if (geo && geo !== this.under?.geometry) geo.dispose();
+    this.layers = [];
   }
 
   /** старый рисунок — копией под новым (новый проявляется поверх) */
   private keepUnder() {
     this.dropUnder();
-    if (!this.patCanvas || !this.overlay) return;
+    const top = this.layers[0];
+    if (!top) return;
     const c = document.createElement('canvas');
     c.width = TEX_W;
     c.height = TEX_H;
-    c.getContext('2d')?.drawImage(this.patCanvas, 0, 0);
+    const g = c.getContext('2d');
+    if (g) for (const L of this.layers) g.drawImage(L.canvas, 0, 0);
     const map = new THREE.CanvasTexture(c);
     map.colorSpace = THREE.SRGBColorSpace;
     const m = new THREE.MeshBasicMaterial({ map, transparent: true, depthWrite: false, toneMapped: false, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
-    this.under = new THREE.Mesh(this.overlay.geometry, m);
+    this.under = new THREE.Mesh(new THREE.PlaneGeometry(ART_SPAN, ART_SPAN / this.h.tracker.aspect), m);
     this.under.position.z = 0.001;
     this.under.renderOrder = -0.6;
     this.group.add(this.under);
@@ -622,6 +960,7 @@ export class CardPaint {
     const m = this.under.material as THREE.MeshBasicMaterial;
     m.map?.dispose();
     m.dispose();
+    this.under.geometry.dispose();
     this.under = null;
   }
 
@@ -648,24 +987,43 @@ export class CardPaint {
         this.quiet(now);
       }
     }
-    // видимость: рисунок на карте, пока карта в кадре (дома — нет)
-    const want = !!this.overlay && !this.erasing && this.h.tracker.isTracking && !home?.inRoom;
-    this.fade = Math.max(0, Math.min(1, this.fade + (want ? dt / 0.25 : -dt / (this.erasing ? 0.6 : 0.2))));
-    if (this.overlay) {
-      (this.overlay.material as THREE.MeshBasicMaterial).opacity = this.fade;
-      this.overlay.visible = this.fade > 0.001;
-      if (this.under) {
-        (this.under.material as THREE.MeshBasicMaterial).opacity = this.fade;
-        this.under.visible = this.overlay.visible;
+    for (const L of this.layers)
+      if (L.dirty) {
+        L.dirty = false;
+        L.maskTex.needsUpdate = true;
       }
-      if (this.erasing && this.fade <= 0) this.removeOverlay();
+    // видимость: рисунок на карте, пока карта в кадре (дома — нет)
+    const want = this.layers.length > 0 && !this.erasing && this.h.tracker.isTracking && !home?.inRoom;
+    this.fade = Math.max(0, Math.min(1, this.fade + (want ? dt / 0.25 : -dt / (this.erasing ? 0.6 : 0.2))));
+    for (const L of this.layers) {
+      (L.mesh.material as THREE.MeshBasicMaterial).opacity = this.fade;
+      L.mesh.visible = this.fade > 0.001;
     }
+    if (this.under) {
+      (this.under.material as THREE.MeshBasicMaterial).opacity = this.fade;
+      this.under.visible = this.fade > 0.001;
+    }
+    if (this.erasing && this.fade <= 0) this.removeOverlay();
+    this.potTick(dt);
     this.sparks.update(dt);
+    this.mist.update(dt);
     if (this.salute?.active) {
       this.salute.update(dt);
       this.salute.draw();
     }
   }
+
+  /**
+   * После позы кота (app.ts: после character.update): луч сопла этого кадра → краска на карту. Без вызова (тесты,
+   * старый цикл) — краска идёт со следующего update по позе прошлого кадра.
+   */
+  lateUpdate() {
+    this.late = true;
+    const r = this.run, p = this.pending;
+    this.pending = null;
+    if (r && p) this.spray(r, p.s, p.on, p.dt, p.k);
+  }
+  private late = false;
 
   resize(w: number, h: number) {
     this.salute?.resize(w, h);
@@ -674,18 +1032,7 @@ export class CardPaint {
   private removeOverlay() {
     this.erasing = false;
     this.dropUnder();
-    if (!this.overlay) return;
-    this.overlay.removeFromParent();
-    const m = this.overlay.material as THREE.MeshBasicMaterial;
-    m.map?.dispose();
-    m.alphaMap?.dispose();
-    m.dispose();
-    this.overlay.geometry.dispose();
-    this.overlay = null;
-    this.patCanvas = null;
-    this.maskCanvas = null;
-    this.maskG = null;
-    this.maskTex = null;
+    this.disposeLayers();
   }
 
   private quiet(now: number) {
@@ -706,29 +1053,36 @@ export class CardPaint {
   }
 }
 
-// ───────────── мазок по маске ─────────────
+// ───────────── штамп маски ─────────────
 
-/** штамп маски: кисть — плотный край с волосками, баллончик — мягкий край и крап за ним */
-function stamp(g: CanvasRenderingContext2D, u: number, v: number, r: number, tool: 'spray' | 'brush') {
+/**
+ * Штамп маски (белое — краска видна): spray — мягкое пятно (ядро плотнее, край тает) и крап брызг за краем: от
+ * прохода к проходу краска «набирается»; brush — плотный круг с волосками по краю; dab — штамп кончиком кисти
+ * (ровный круг); drip — потёк (плотный узкий).
+ */
+function stamp(g: CanvasRenderingContext2D, u: number, v: number, r: number, tool: 'spray' | 'brush' | 'dab' | 'drip', alpha: number) {
   if (tool === 'spray') {
-    const gr = g.createRadialGradient(u, v, r * 0.55, u, v, r * 1.12);
-    gr.addColorStop(0, 'rgba(255,255,255,1)');
+    const gr = g.createRadialGradient(u, v, r * 0.2, u, v, r * 1.15);
+    gr.addColorStop(0, `rgba(255,255,255,${0.62 * alpha})`);
+    gr.addColorStop(0.55, `rgba(255,255,255,${0.42 * alpha})`);
     gr.addColorStop(1, 'rgba(255,255,255,0)');
     g.fillStyle = gr;
     g.beginPath();
-    g.arc(u, v, r * 1.12, 0, Math.PI * 2);
+    g.arc(u, v, r * 1.15, 0, Math.PI * 2);
     g.fill();
-    g.fillStyle = '#fff';
-    for (let i = 0; i < 6; i++) {
-      const a = Math.random() * Math.PI * 2, d = r * (1 + Math.random() * 0.35);
-      g.fillRect(u + Math.cos(a) * d, v + Math.sin(a) * d, 1.6, 1.6);
+    // крап за краем — overspray
+    g.fillStyle = 'rgba(255,255,255,.85)';
+    for (let i = 0; i < 7; i++) {
+      const a = Math.random() * Math.PI * 2, d = r * (0.9 + Math.random() * 0.9), s = 0.8 + Math.random() * 1.4;
+      g.fillRect(u + Math.cos(a) * d, v + Math.sin(a) * d, s, s);
     }
     return;
   }
   g.fillStyle = '#fff';
   g.beginPath();
-  g.arc(u, v, r * (0.96 + Math.random() * 0.06), 0, Math.PI * 2);
+  g.arc(u, v, r * (tool === 'brush' ? 0.96 + Math.random() * 0.06 : 1), 0, Math.PI * 2);
   g.fill();
+  if (tool !== 'brush') return;
   // волоски кисти — неровный край мазка
   g.strokeStyle = 'rgba(255,255,255,.9)';
   g.lineWidth = 1.4;
@@ -741,27 +1095,34 @@ function stamp(g: CanvasRenderingContext2D, u: number, v: number, r: number, too
   }
 }
 
-// ───────────── частицы: брызги, капли, блёстки ─────────────
+// ───────────── частицы: конус брызг, туман, капли, блёстки ─────────────
 
-const MAX_P = 160;
+/** kind: 0 — капля брызг летит из сопла на карту; 1 — капля краски (падает); 2 — блёстка; 3 — туман (висит, тает) */
 class PaintParticles {
   readonly points: THREE.Points;
-  private pos = new Float32Array(MAX_P * 3);
-  private col = new Float32Array(MAX_P * 4);
-  private vel = new Float32Array(MAX_P * 3);
-  private life = new Float32Array(MAX_P);
-  private age = new Float32Array(MAX_P);
-  private kind = new Uint8Array(MAX_P);
-  private base = new Float32Array(MAX_P * 3);
+  private pos: Float32Array;
+  private col: Float32Array;
+  private vel: Float32Array;
+  private life: Float32Array;
+  private age: Float32Array;
+  private kind: Uint8Array;
+  private base: Float32Array;
   private cursor = 0;
   private acc = 0;
   private c = new THREE.Color();
 
-  constructor() {
+  constructor(private max: number, size: number, private alphaK = 1) {
+    this.pos = new Float32Array(max * 3);
+    this.col = new Float32Array(max * 4);
+    this.vel = new Float32Array(max * 3);
+    this.life = new Float32Array(max);
+    this.age = new Float32Array(max);
+    this.kind = new Uint8Array(max);
+    this.base = new Float32Array(max * 3);
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(this.pos, 3).setUsage(THREE.DynamicDrawUsage));
     geo.setAttribute('color', new THREE.BufferAttribute(this.col, 4).setUsage(THREE.DynamicDrawUsage));
-    const mat = new THREE.PointsMaterial({ size: 0.03, sizeAttenuation: true, vertexColors: true, transparent: true, depthWrite: false, map: dotTexture(), alphaTest: 0.01 });
+    const mat = new THREE.PointsMaterial({ size, sizeAttenuation: true, vertexColors: true, transparent: true, depthWrite: false, map: dotTexture(), alphaTest: 0.01 });
     this.points = new THREE.Points(geo, mat);
     this.points.name = 'card-paint-sparks';
     this.points.frustumCulled = false;
@@ -773,9 +1134,9 @@ class PaintParticles {
     return this.points.visible;
   }
 
-  private spawn(x: number, y: number, z: number, vx: number, vy: number, vz: number, life: number, color: string, kind: number) {
+  spawn(x: number, y: number, z: number, vx: number, vy: number, vz: number, life: number, color: string, kind: number) {
     const i = this.cursor;
-    this.cursor = (this.cursor + 1) % MAX_P;
+    this.cursor = (this.cursor + 1) % this.max;
     this.pos[i * 3] = x;
     this.pos[i * 3 + 1] = y;
     this.pos[i * 3 + 2] = z;
@@ -789,40 +1150,42 @@ class PaintParticles {
     this.life[i] = life;
     this.age[i] = 0;
     this.kind[i] = kind;
+    this.points.visible = true;
   }
 
-  /** у кончика мазка: баллончик — облачко краски, кисть — капли, звёзды — блёстки */
-  emit(r: Run, x: number, y: number, dt: number) {
-    this.acc += Math.min(dt, 0.1) * (r.style.tool === 'spray' ? 70 : 26);
-    const cols = [r.swatch.main, r.swatch.main, ...r.others.map((o) => o.main), '#ffffff'];
+  /** конус брызг из сопла N (координаты карты, z — высота) в пятно радиуса r вокруг H; туман — в mist */
+  cone(N: { x: number; y: number; z: number }, H: Pt, r: number, dt: number, cols: string[], mist: PaintParticles) {
+    this.acc += Math.min(dt, 0.1) * 340;
     while (this.acc >= 1) {
       this.acc--;
+      const a = Math.random() * Math.PI * 2, d = Math.sqrt(Math.random()) * r * 1.05;
+      const tx = H.x + Math.cos(a) * d, ty = H.y + Math.sin(a) * d;
+      const tt = 0.09 + Math.random() * 0.08;
       const col = cols[Math.floor(Math.random() * cols.length)];
-      const a = Math.random() * Math.PI * 2, d = Math.random() * r.radius * 0.8;
-      const px = x + Math.cos(a) * d, py = y + Math.sin(a) * d;
-      if (r.style.tool === 'spray') this.spawn(px, py, 0.05 + Math.random() * 0.08, (Math.random() - 0.5) * 0.25, (Math.random() - 0.5) * 0.25, -0.15, 0.35 + Math.random() * 0.3, col, 0);
-      else if (r.style.pattern === 'stars') this.spawn(px, py, 0.01, (Math.random() - 0.5) * 0.08, (Math.random() - 0.5) * 0.08, 0.12 + Math.random() * 0.12, 0.6 + Math.random() * 0.5, Math.random() < 0.5 ? '#ffffff' : '#FFE38A', 2);
-      else this.spawn(px, py, 0.01, (Math.random() - 0.5) * 0.3, (Math.random() - 0.5) * 0.3, 0.25 + Math.random() * 0.25, 0.9, col, 1);
+      this.spawn(N.x, N.y, N.z, (tx - N.x) / tt, (ty - N.y) / tt, (0.002 - N.z) / tt, tt, col, 0);
+      if (Math.random() < 0.22) {
+        const b = Math.random() * Math.PI * 2, e = r * (0.4 + Math.random() * 0.9);
+        mist.spawn(H.x + Math.cos(b) * e, H.y + Math.sin(b) * e, 0.006 + Math.random() * 0.025, Math.cos(b) * 0.06, Math.sin(b) * 0.06, 0.02, 0.3 + Math.random() * 0.35, col, 3);
+      }
     }
-    this.points.visible = true;
   }
 
-  /** конец ряда: всплеск */
-  burst(r: Run) {
-    const row = r.rows[r.row];
-    const x = row.dir * 0.42, y = row.y;
-    const cols = [r.swatch.main, ...r.others.map((o) => o.main), '#ffffff'];
-    for (let i = 0; i < 22; i++) {
-      const a = Math.random() * Math.PI * 2, s = 0.15 + Math.random() * 0.35;
-      this.spawn(x, y, 0.02, Math.cos(a) * s, Math.sin(a) * s, 0.3 + Math.random() * 0.4, 0.9, cols[i % cols.length], r.style.pattern === 'stars' ? 2 : 1);
+  /** у точки карты: капли (1) или блёстки (2), rate в секунду */
+  emitAt(x: number, y: number, z: number, dt: number, cols: string[], kind: 1 | 2, rate: number) {
+    this.acc += Math.min(dt, 0.1) * rate;
+    while (this.acc >= 1) {
+      this.acc--;
+      const a = Math.random() * Math.PI * 2, d = Math.random() * 0.03;
+      const col = cols[Math.floor(Math.random() * cols.length)];
+      if (kind === 2) this.spawn(x + Math.cos(a) * d, y + Math.sin(a) * d, z, (Math.random() - 0.5) * 0.08, (Math.random() - 0.5) * 0.08, 0.1 + Math.random() * 0.14, 0.5 + Math.random() * 0.5, col, 2);
+      else this.spawn(x + Math.cos(a) * d, y + Math.sin(a) * d, z + 0.01, Math.cos(a) * 0.2, Math.sin(a) * 0.2, 0.22 + Math.random() * 0.2, 0.6, col, 1);
     }
-    this.points.visible = true;
   }
 
   update(dt: number) {
     if (!this.points.visible) return;
     let live = 0;
-    for (let i = 0; i < MAX_P; i++) {
+    for (let i = 0; i < this.max; i++) {
       if (this.life[i] <= 0) {
         this.col[i * 4 + 3] = 0;
         continue;
@@ -838,19 +1201,21 @@ class PaintParticles {
       const j = i * 3;
       const kind = this.kind[i];
       if (kind === 1) this.vel[j + 2] -= 1.6 * dt; // капли падают на карту
-      if (kind === 0) {
-        this.vel[j] *= 0.9;
-        this.vel[j + 1] *= 0.9;
+      if (kind === 3) {
+        this.vel[j] *= 0.94;
+        this.vel[j + 1] *= 0.94;
       }
       this.pos[j] += this.vel[j] * dt;
       this.pos[j + 1] += this.vel[j + 1] * dt;
       this.pos[j + 2] = Math.max(0.003, this.pos[j + 2] + this.vel[j + 2] * dt);
       if (kind === 1 && this.pos[j + 2] <= 0.003) this.life[i] = Math.min(this.life[i], this.age[i] + 0.15);
       const tw = kind === 2 ? 0.55 + 0.45 * Math.sin(this.age[i] * 28 + i) : 1;
+      // капля брызг ярче в полёте, туман — мягкий подъём и угасание
+      const a = kind === 3 ? Math.sin(Math.PI * k) * 0.55 : kind === 0 ? 0.95 : (1 - k) * tw;
       this.col[i * 4] = this.base[j];
       this.col[i * 4 + 1] = this.base[j + 1];
       this.col[i * 4 + 2] = this.base[j + 2];
-      this.col[i * 4 + 3] = (1 - k) * tw;
+      this.col[i * 4 + 3] = a * this.alphaK;
     }
     const geo = this.points.geometry;
     geo.attributes.position.needsUpdate = true;

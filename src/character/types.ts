@@ -3,6 +3,7 @@ import type { Persona } from '../persona/types';
 import type { MouthShape, Viseme } from '../lipsync/visemes';
 import type { AnchorName } from '../fx/core';
 import { knownClip, resolveClip, clipDef } from './clips';
+import type { AimRequest } from './toolIK';
 
 /**
  * Имя клипа: id из content/animations.json (71 шт.), 'idle' (выбор по весам характера),
@@ -72,6 +73,12 @@ export interface Character {
   reach?(target: { dx: number; dy: number } | null): void;
   /** держать реквизит при любом клипе (кисть, баллончик раскраски карты: character/props.ts hold); null — отпустить */
   holdProp?(id: string | null, tint?: string | null): void;
+  /** раскраска карты: присед, наклон и правая лапа с инструментом к точке (character/toolIK.ts); null — по клипу */
+  aimTool?(r: AimRequest | null): void;
+  /** сопло баллончика / кончик кисти в мире (точка и направление); нет — null */
+  toolRay?(): { o: THREE.Vector3; d: THREE.Vector3 } | null;
+  /** откуда клип: 'meshy' — настоящий клип Meshy, 'fallback' — опора, null — нет */
+  clipSource?(id: string): 'meshy' | 'own' | 'alias' | 'fallback' | null;
   /** зона касания: head | cheek | belly | paw | tail | body; null — мимо */
   hitZone?(ray: THREE.Raycaster): TouchZone | null;
   /** точка части кота в локальных координатах object (ноги в 0, рост 1) — для эффектов; null — по умолчанию */
