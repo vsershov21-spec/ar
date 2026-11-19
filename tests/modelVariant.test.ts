@@ -21,8 +21,8 @@ describe('поколение моделей котов: v1 по умолчани
     for (const c of ['hooligan', 'kind']) {
       const p = variantGlb(`models/${c}_v1.glb`, 'v2');
       expect(p).toBe(`models/v2/${c}_p1.glb`);
-      // геометрия v1 — прокси из меша, коллайдеры модельщика (под v2) не подходят
-      expect(collidersUrl(p)).toBeNull();
+      // геометрия v1 — прокси v1 (colliders.py по v1 GLB), коллайдеры модельщика (под v2) не подходят
+      expect(collidersUrl(p)).toBe(`models/${c}_v1_colliders.json`);
     }
   });
   it('?models=v2h — геометрия v2 у всех трёх с коллайдерами модельщика', () => {
