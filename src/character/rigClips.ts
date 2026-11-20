@@ -503,6 +503,17 @@ export const RIG_CLIPS: Record<string, ClipFn> = {
   hug_receive_hooligan: (k, t) => RIG_CLIPS.purr_stroke(k, t),
   hug_receive_glitter: (k, t) => RIG_CLIPS.purr_stroke(k, t),
   skate_ride: (k, t) => RIG_CLIPS.idle_hooligan_skate(k, t),
+  // клипы Meshy под шаблоны (20.11, P2): без клипа тело ведут holdAction / skateRig / aliveIdle — заглушка = покой
+  hold_sip_body: (k, t) => RIG_CLIPS.idle_breathe(k, t),
+  hold_mirror_body: (k, t) => RIG_CLIPS.idle_breathe(k, t),
+  hold_treat_body: (k, t) => RIG_CLIPS.idle_breathe(k, t),
+  skate_hop_on: (k, t) => RIG_CLIPS.idle_hooligan_skate(k, t),
+  skate_cruise: (k, t) => RIG_CLIPS.idle_hooligan_skate(k, t),
+  skate_ollie_air: (k, t) => RIG_CLIPS.idle_hooligan_skate(k, t),
+  skate_hop_off: (k, t) => RIG_CLIPS.idle_hooligan_skate(k, t),
+  idle_glitter_alive: (k, t) => RIG_CLIPS.idle_breathe(k, t),
+  glitter_react_coy: (k, t) => RIG_CLIPS.purr_stroke(k, t),
+  glitter_react_happy: (k, t) => RIG_CLIPS.celebrate(k, t),
   // ── additive (только уши/хвост) ──
   ear_twitch: (k) => ({ b: { LeftEar1: [0.5 * tri(k / 0.5) * (k < 0.5 ? 1 : 0), 0, -0.3 * S(k * 40) * tri(k)] } }),
   ears_back: (k) => ({ b: { LeftEar1: [-0.9 * win(k, 0, 0.9, 0.15), 0, 0], RightEar1: [-0.9 * win(k, 0, 0.9, 0.15), 0, 0] } }),

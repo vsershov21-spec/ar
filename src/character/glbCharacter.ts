@@ -45,6 +45,12 @@ import type { AnchorName } from '../fx/core';
 
 const BONES = ['Hips', 'Spine', 'Spine1', 'Spine2', 'Neck', 'Head', 'LeftArm', 'RightArm', 'LeftForeArm', 'RightForeArm', 'LeftHand', 'RightHand', 'LeftUpLeg', 'RightUpLeg', 'LeftLeg', 'RightLeg', 'LeftFoot', 'RightFoot', 'LeftShoulder', 'RightShoulder', 'Jaw', 'Tail1', 'Tail2', 'Tail3', 'Tail4', 'LeftEar1', 'RightEar1', 'LeftEye', 'RightEye'];
 
+/** клипы Meshy под шаблоны (scripts/models/t2m_prompts_v2.json, P2 20.11): тело действия; без клипа — покой */
+const ACT_BODY: Record<string, string> = { cocoa: 'hold_sip_body', mirror: 'hold_mirror_body', treat: 'hold_treat_body' };
+const SKATE_BODY: Partial<Record<string, string>> = { hop: 'skate_hop_on', push: 'skate_cruise', ride: 'skate_cruise', roll: 'skate_cruise', ollie: 'skate_ollie_air', flip: 'skate_ollie_air', hopoff: 'skate_hop_off', kickup: 'skate_hop_off' };
+
+const ACT_CLIPS = new Set<string>([...Object.values(ACT_BODY), ...(Object.values(SKATE_BODY) as string[])]);
+
 /** клипы-сцены с предметом → шаблон holdAction (play перенаправляет) */
 const SCENE_HOLD: Record<string, string> = { idle_glitter_mirror: 'mirror', idle_kind_cocoa: 'cocoa' };
 
@@ -541,16 +547,18 @@ export class GlbCharacter implements Character {
       this.act = { kind: 'skate', id, t: 0, f: skatePose(0), dir: 1, wheel: 0 };
       this.props.rebuild('skateboard');
       this.props.hold('skateboard');
-      // ровный покой на всё действие (варианты покоя — оглядеться, наушники — сбивали бы позу на доске)
-      this.play('idle_breathe', { loop: true, force: true });
+      // ровный покой на всё действие (варианты покоя — оглядеться, наушники — сбивали бы позу на доске); клипы Meshy
+      // стойки на доске (если пришли) — по фазам в skatePre
+      this.clips.play('idle_breathe', { loop: true, force: true });
       return SKATE_TOTAL;
     }
     const spec = HOLD_SPECS[id];
     if (!spec || !this.bones.has(spec.hand + 'Arm')) return 0;
     this.act = { kind: 'hold', id, spec, t: 0 };
     this.props.hold(spec.prop);
-    // клип-сцена (idle_kind_cocoa и т.п.) не нужен: тело — ровный покой, лапа — шаблон
-    this.play('idle_breathe', { loop: true, force: true });
+    // тело: клип Meshy под шаблон (если пришёл, manifest.json) — иначе ровный покой; лапу с предметом ведёт шаблон
+    const body = ACT_BODY[id];
+    this.clips.play(body && this.clipSource(body) === 'meshy' ? body : 'idle_breathe', { loop: true, force: true });
     return holdDuration(spec);
   }
   /** прервать действие: предмет убрать, лапа — к клипу */
@@ -560,7 +568,7 @@ export class GlbCharacter implements Character {
     this.restoreArms();
     this.actFace = null;
     this.propFx.hide();
-    if (this.clips.requested === 'idle_breathe') this.play('idle');
+    if (this.clips.requested === 'idle_breathe' || ACT_CLIPS.has(this.clips.requested)) this.play('idle');
     this.actLook = null;
     this.props?.place(null);
     this.props?.hold(null);
@@ -573,12 +581,21 @@ export class GlbCharacter implements Character {
     return { id: a.id, phase: a.f.phase, t: a.t };
   }
 
+  /** покой характера (+ клип Meshy «живой покой» Блёстки, если пришёл — основной вариант) */
+  private setIdles() {
+    const id = this.personaId;
+    if (!id) return;
+    const idles = [...personaMeta(id).idles];
+    if (id === 'glitter' && this.clipSource('idle_glitter_alive') === 'meshy') idles.push({ clip: 'idle_glitter_alive', weight: 8 });
+    this.clips.setIdles(idles, id);
+  }
+
   setPersona(p: Persona) {
     this.personaId = p.id;
     this.collider?.setPersona(p.id);
     this.furTone.setPersona(p.id);
     const meta = personaMeta(p.id);
-    this.clips.setIdles(meta.idles, p.id);
+    this.setIdles();
     if (!this.model) return;
     const glb = { ...meta.glb, ...(p.glb ?? {}) };
     const show = glb.show ?? [];
@@ -669,6 +686,7 @@ export class GlbCharacter implements Character {
         // петля — по правилу каталога (meshy.loop из спеки), иначе манифест
         loopOf: (id, l) => clipDef(id)?.meshy?.loop ?? l,
       });
+      this.setIdles();
     } catch (e) {
       console.warn('[meshy] клипы не загрузились', e);
     }
@@ -1545,7 +1563,8 @@ export class GlbCharacter implements Character {
     if (this.aliveW < 0.001) return;
     this.aliveT += dt;
     const f = alivePose(this.aliveT, this.aliveF);
-    const W = this.aliveW * this.aliveW * (3 - 2 * this.aliveW);
+    // клип Meshy «живой покой» (если пришёл) уже двигает тело — слой поверх вполсилы
+    const W = this.aliveW * this.aliveW * (3 - 2 * this.aliveW) * (cs.cur.id === 'idle_glitter_alive' ? 0.5 : 1);
     const obj = this.object;
     obj.updateMatrixWorld(true);
     const ax = this.modelAxes();
@@ -1657,6 +1676,10 @@ export class GlbCharacter implements Character {
       return this.cancelAct();
     }
     this.standY = a.f.standOn + a.f.lift - a.f.crouch * 0.075;
+    // тело на доске — клипом Meshy фазы, если он пришёл (стопы, лапы и доску всё равно ведёт skateRig)
+    const want = SKATE_BODY[a.f.phase];
+    const clip = want && this.clipSource(want) === 'meshy' ? want : 'idle_breathe';
+    if (this.clips.requested !== clip) this.clips.play(clip, { loop: true, force: true });
   }
   /** крен в поворот (рад, вокруг оси хода X — корень inner) */
   private skateLean = 0;

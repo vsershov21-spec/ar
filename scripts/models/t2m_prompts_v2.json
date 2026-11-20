@@ -1405,6 +1405,156 @@
     "duration": 3.0,
     "mode": "prime"
    }
+  },
+  "hold_sip_body": {
+   "priority": "P2",
+   "group": "Предметы, скейт, живая Блёстка (20.11)",
+   "durationS": 5.0,
+   "loop": false,
+   "start": "стойка idle",
+   "end": "стойка idle",
+   "replaces": "процедурная опора (holdAction / skateRig / aliveIdle)",
+   "trigger": "Какао (Добряк): тело под шаблон holdAction — правую лапу ведёт IK кружки",
+   "meshy": {
+    "prompt": "Starts standing upright facing forward. The right hand rises to just below the mouth as if holding a small mug, elbow lifted out to the side; head and upper body lean forward toward it. Two small sips: the head dips forward twice. Then the head tilts back with a content sigh, the hand lowers to the chest, relaxed standing pose, in place, no turning.",
+    "duration": 5.0,
+    "mode": "prime"
+   }
+  },
+  "hold_mirror_body": {
+   "priority": "P2",
+   "group": "Предметы, скейт, живая Блёстка (20.11)",
+   "durationS": 5.5,
+   "loop": false,
+   "start": "стойка idle",
+   "end": "стойка idle",
+   "replaces": "процедурная опора (holdAction / skateRig / aliveIdle)",
+   "trigger": "Зеркальце (Блёстка): тело под шаблон — левую лапу ведёт IK зеркальца, правая поправляет бант",
+   "meshy": {
+    "prompt": "Starts standing upright facing forward. The left hand rises beside the left cheek as if holding a hand mirror. The head turns to it and tilts coquettishly side to side twice, hips sway. The right hand pats the top right of the head twice and lowers. A playful lean toward the left hand like a kiss, then hands lower, relaxed standing pose, in place, no turning.",
+    "duration": 5.5,
+    "mode": "prime"
+   }
+  },
+  "hold_treat_body": {
+   "priority": "P2",
+   "group": "Предметы, скейт, живая Блёстка (20.11)",
+   "durationS": 4.5,
+   "loop": false,
+   "start": "стойка idle",
+   "end": "стойка idle",
+   "replaces": "процедурная опора (holdAction / skateRig / aliveIdle)",
+   "trigger": "Угостить (все): тело под шаблон — правую лапу ведёт IK рыбки",
+   "meshy": {
+    "prompt": "Starts standing upright facing forward. The right hand rises to the mouth as if holding a small snack; the head leans in to bite, pulls back chewing with small happy head bobs; a second bite and more chewing with a little shoulder wiggle. The hand lowers to the chest, relaxed standing pose, in place, no turning.",
+    "duration": 4.5,
+    "mode": "prime"
+   }
+  },
+  "skate_hop_on": {
+   "priority": "P2",
+   "group": "Предметы, скейт, живая Блёстка (20.11)",
+   "durationS": 2.0,
+   "loop": false,
+   "start": "стойка idle",
+   "end": "стойка idle",
+   "replaces": "процедурная опора (holdAction / skateRig / aliveIdle)",
+   "trigger": "Скейт: прыжок на доску боком (фаза hop skateRig)",
+   "meshy": {
+    "prompt": "Starts standing upright facing forward. Crouches and makes a small two-footed hop forward, landing in a sideways skateboard stance: feet wide apart left-right, knees bent, hips low, torso upright facing forward, arms spread to the sides for balance. Holds the stance, in place.",
+    "duration": 2.0,
+    "mode": "prime"
+   }
+  },
+  "skate_cruise": {
+   "priority": "P2",
+   "group": "Предметы, скейт, живая Блёстка (20.11)",
+   "durationS": 3.0,
+   "loop": true,
+   "start": "стойка на доске",
+   "end": "петля",
+   "replaces": "процедурная опора (holdAction / skateRig / aliveIdle)",
+   "trigger": "Скейт: стойка на доске при проезде, петля (фазы push/ride/roll)",
+   "meshy": {
+    "prompt": "Seamless loop. Sideways skateboard stance, feet wide apart left-right, knees bent, hips low. Smooth riding: gentle bounce from the knees, torso leaning a little forward then back as if carving, arms out to the sides balancing with slow waves, head facing forward. Feet stay planted in place.",
+    "duration": 3.0,
+    "mode": "prime"
+   }
+  },
+  "skate_ollie_air": {
+   "priority": "P2",
+   "group": "Предметы, скейт, живая Блёстка (20.11)",
+   "durationS": 2.0,
+   "loop": false,
+   "start": "стойка idle",
+   "end": "стойка idle",
+   "replaces": "процедурная опора (holdAction / skateRig / aliveIdle)",
+   "trigger": "Скейт: олли и кикфлип (фазы ollie/flip)",
+   "meshy": {
+    "prompt": "Starts in a sideways skateboard stance with knees bent. Crouches deep, jumps straight up with knees tucked high, arms thrown up and out for balance, lands softly back in the same wide stance absorbing with bent knees, holds. In place, no turning.",
+    "duration": 2.0,
+    "mode": "prime"
+   }
+  },
+  "skate_hop_off": {
+   "priority": "P2",
+   "group": "Предметы, скейт, живая Блёстка (20.11)",
+   "durationS": 2.5,
+   "loop": false,
+   "start": "стойка idle",
+   "end": "стойка idle",
+   "replaces": "процедурная опора (holdAction / skateRig / aliveIdle)",
+   "trigger": "Скейт: соскок и подброс доски ногой в лапу (фазы hopoff/kickup)",
+   "meshy": {
+    "prompt": "Starts in a sideways skateboard stance, knees bent. Hops forward to a normal standing pose, taps the floor behind with the right foot, then catches something rising beside the right hip with the right hand and holds it at the side, confident posture. Ends standing relaxed, in place, no turning.",
+    "duration": 2.5,
+    "mode": "prime"
+   }
+  },
+  "idle_glitter_alive": {
+   "priority": "P2",
+   "group": "Предметы, скейт, живая Блёстка (20.11)",
+   "durationS": 6.0,
+   "loop": true,
+   "start": "стойка idle",
+   "end": "петля",
+   "replaces": "процедурная опора (holdAction / skateRig / aliveIdle)",
+   "trigger": "Живой покой Блёстки, петля (слой aliveIdle поверх — вполсилы)",
+   "meshy": {
+    "prompt": "Seamless loop. A cute girly character standing in place: slowly shifts weight from leg to leg with gentle hip sway, free knee softly bent, torso counter-sways, head tilts coquettishly to one side then the other, one hand rests on the hip a while, then both hands meet in front of the belly. Feet stay planted, no stepping, no turning.",
+    "duration": 6.0,
+    "mode": "prime"
+   }
+  },
+  "glitter_react_coy": {
+   "priority": "P2",
+   "group": "Предметы, скейт, живая Блёстка (20.11)",
+   "durationS": 2.5,
+   "loop": false,
+   "start": "стойка idle",
+   "end": "стойка idle",
+   "replaces": "процедурная опора (holdAction / skateRig / aliveIdle)",
+   "trigger": "Блёстка: кокетливая реакция на тап по голове/щёчке (вместо poke_head «голова вниз»)",
+   "meshy": {
+    "prompt": "Starts standing upright facing forward. Pulls the shoulders up shyly, tilts the head to one side with a small giggle bounce, both hands rise to the cheeks, a little hip twist to the side and back, then hands lower to a relaxed standing pose. In place, head stays facing forward, no bowing.",
+    "duration": 2.5,
+    "mode": "prime"
+   }
+  },
+  "glitter_react_happy": {
+   "priority": "P2",
+   "group": "Предметы, скейт, живая Блёстка (20.11)",
+   "durationS": 3.0,
+   "loop": false,
+   "start": "стойка idle",
+   "end": "стойка idle",
+   "replaces": "процедурная опора (holdAction / skateRig / aliveIdle)",
+   "trigger": "Блёстка: радость в такт — руки и ноги вместе (похвала, комплимент)",
+   "meshy": {
+    "prompt": "Starts standing upright facing forward. Two small happy bounces with knees bending in rhythm, arms swinging up together in time with the bounces, then hands twirl near the chest and a cute pose with one hand on the hip and the head tilted. Feet return to the same spot, in place, no turning.",
+    "duration": 3.0,
+    "mode": "prime"
+   }
   }
  },
  "props": {

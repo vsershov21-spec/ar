@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 // @ts-expect-error — .mjs без типов (серверный скрипт без зависимостей)
-import { readGlb, writeGlb, slimGlb, glbAnimInfo, pickClips, metaDuration } from '../scripts/meshy/motion.mjs';
+import { readGlb, writeGlb, slimGlb, glbAnimInfo, pickClips, metaDuration, reduceKeys, leanAnims } from '../scripts/meshy/motion.mjs';
 import { skelFrom, retargetClip } from '../src/character/meshyClips';
 
 /** hooligan_v1.glb + синтетическая анимация Spine (как GLB анимации Meshy: меш, скин, клип) */
@@ -84,4 +84,43 @@ describe('scripts/meshy/motion.mjs: облегчение GLB', () => {
     expect(metaDuration(4)).toBe(4);
     expect(pickClips(d, { only: ['poke_head', 'world_hungry'] }).map((c: { id: string }) => c.id)).toEqual(['poke_head', 'world_hungry']);
   });
+
+  it('прореживание ключей: плавный поворот 30 к/с → единицы ключей, ошибка ≤ 0,5°; шум не выбрасывается', () => {
+    const T: number[] = [], V: number[] = [];
+    for (let i = 0; i <= 90; i++) {
+      T.push(i / 30);
+      const q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), (i / 90) * 1.2);
+      V.push(q.x, q.y, q.z, q.w);
+    }
+    const tol = (0.5 * Math.PI) / 180;
+    const r = reduceKeys(T, V, 4, tol, true);
+    expect(r.times.length).toBeLessThanOrEqual(4);
+    // проверка: в каждом исходном ключе ошибка ≤ допуска
+    const track = new THREE.QuaternionKeyframeTrack('b.quaternion', r.times, r.vals);
+    const it = (track as unknown as { createInterpolant(): { evaluate(t: number): number[] } }).createInterpolant();
+    for (let i = 0; i <= 90; i++) {
+      const v = it.evaluate(T[i]);
+      const a = new THREE.Quaternion(v[0], v[1], v[2], v[3]).normalize(), b = new THREE.Quaternion().fromArray(V, i * 4);
+      expect(a.angleTo(b)).toBeLessThanOrEqual(tol + 1e-6);
+    }
+    const W = V.map((x, i) => x + (i % 8 === 1 ? 0.02 : 0));
+    expect(reduceKeys(T, W, 4, tol, true).times.length).toBeGreaterThan(20);
+  });
+  it('облегчение треков: масштаб и перенос не-корня — прочь, повороты int16, GLTFLoader читает', async () => {
+    const full = withAnim();
+    const { json, bin } = readGlb(full);
+    const sp = json.animations[0].channels[0].target.node;
+    json.animations[0].channels.push({ sampler: 1, target: { node: sp, path: 'translation' } }, { sampler: 1, target: { node: sp, path: 'scale' } });
+    const stats: Record<string, number> = {};
+    const lean = leanAnims(json, bin, { stats });
+    expect(lean.json.animations[0].channels.map((c: { target: { path: string } }) => c.target.path).sort()).toEqual(['rotation', 'translation']);
+    const rotAcc = lean.json.accessors[lean.json.animations[0].samplers[lean.json.animations[0].channels.find((c: { target: { path: string } }) => c.target.path === 'rotation').sampler].output];
+    expect(rotAcc).toMatchObject({ componentType: 5122, normalized: true });
+    const slim: Buffer = slimGlb(writeGlb(json, bin));
+    const g = await parse(slim);
+    const q = g.animations[0].tracks.find((t) => t.name === 'mixamorigSpine.quaternion')!;
+    expect(q.values.length).toBe(8);
+    expect(Math.abs(new THREE.Quaternion().fromArray(Array.from(q.values), 0).length() - 1)).toBeLessThan(1e-3);
+  });
 });
+

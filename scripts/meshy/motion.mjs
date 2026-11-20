@@ -8,7 +8,8 @@
 //   --model-url https://ar.vershov.com/models/hooligan_v1.glb  --height 1.0
 //   --out /srv/ar-extra/models/anims/meshy   --state /var/lib/vershov-commander/ar/meshy
 //   --env /etc/ar-meshy.env  (MESHY_API_KEY=…; ключ читается здесь и никуда не выводится)
-//   node motion.mjs --slim in.glb out.glb                         — облегчить GLB (без сети, для проверки)
+//   node motion.mjs --slim in.glb out.glb [--no-lean]             — облегчить GLB (без сети, для проверки): кости и
+//                                                                  анимация; ключи с допуском 0,5°/1 мм, повороты int16
 //
 // Правила трат: план по умолчанию; одна задача = одна отправка. Состояние (task id) пишется до и после POST;
 // задачу, которая могла быть списана (ответ потерян, 5xx), сама не переотправляет — только --redo.
@@ -113,10 +114,12 @@ function readFloats(json, bin, ai) {
  * (обратная inverseBindMatrix — в пространстве сцены) — в extras.bindWorld: GLTFLoader кладёт её в userData,
  * перенос (src/character/meshyClips.ts) берёт её как позу привязки. null — если облегчить нельзя (сжатые буферы).
  */
-export function slimGlb(buf) {
-  const { json, bin } = readGlb(buf);
+export function slimGlb(buf, opts = {}) {
+  let { json, bin } = readGlb(buf);
   const req = json.extensionsRequired ?? [];
   if (req.some((e) => /meshopt|draco/i.test(e)) || !bin) return null;
+  // «детально, но легко» (20.11): прореживание ключей с допуском, повороты — int16, лишние треки — прочь
+  if (opts.lean !== false) ({ json, bin } = leanAnims(json, bin, opts));
   // поза привязки суставов
   for (const skin of json.skins ?? []) {
     if (skin.inverseBindMatrices === undefined) continue;
@@ -175,6 +178,137 @@ export function slimGlb(buf) {
   const used2 = (json.extensionsUsed ?? []).filter((e) => e === 'KHR_mesh_quantization');
   if (used2.length) out.extensionsUsed = used2;
   return writeGlb(out, Buffer.concat(parts));
+}
+
+/** допуски прореживания: поворот — 0,5° на сустав, перенос корня — 1 мм (в метрах сцены; риг Meshy — рост 1 м) */
+export const LEAN_TOL = { rotDeg: 0.5, posM: 0.001 };
+
+/** запись float32/int16 значений accessor-ом в конец буфера */
+function pushAcc(json, parts, st, values, type, opts = {}) {
+  const n = NCOMP[type], cnt = values.length / n;
+  let data;
+  const acc = { componentType: 5126, count: cnt, type };
+  if (opts.short) {
+    const a = new Int16Array(values.length);
+    for (let i = 0; i < values.length; i++) a[i] = Math.round(Math.max(-1, Math.min(1, values[i])) * 32767);
+    data = Buffer.from(a.buffer);
+    acc.componentType = 5122;
+    acc.normalized = true;
+  } else data = Buffer.from(new Float32Array(values).buffer);
+  if (type === 'SCALAR') {
+    acc.min = [Math.min(...values)];
+    acc.max = [Math.max(...values)];
+  }
+  const pad = (4 - (st.size % 4)) % 4;
+  if (pad) parts.push(Buffer.alloc(pad)), (st.size += pad);
+  json.bufferViews.push({ buffer: 0, byteOffset: st.size, byteLength: data.length });
+  parts.push(data);
+  st.size += data.length;
+  acc.bufferView = json.bufferViews.length - 1;
+  json.accessors.push(acc);
+  return json.accessors.length - 1;
+}
+
+function slerp4(a, b, u) {
+  let d = a[0] * b[0] + a[1] * b[1] + a[2] * b[2] + a[3] * b[3];
+  const s = d < 0 ? -1 : 1;
+  d = Math.abs(d);
+  let k0 = 1 - u, k1 = u * s;
+  if (d < 0.9995) {
+    const th = Math.acos(d), sn = Math.sin(th);
+    k0 = Math.sin((1 - u) * th) / sn;
+    k1 = (Math.sin(u * th) / sn) * s;
+  }
+  const o = [0, 1, 2, 3].map((i) => a[i] * k0 + b[i] * k1);
+  const l = Math.hypot(...o) || 1;
+  return o.map((x) => x / l);
+}
+const qAng = (a, b) => 2 * Math.acos(Math.min(1, Math.abs(a[0] * b[0] + a[1] * b[1] + a[2] * b[2] + a[3] * b[3])));
+
+/**
+ * Прореживание ключей (жадно): ключ k выбрасывается, если интерполяция между соседними оставленными отличается от него
+ * не больше допуска на всех выброшенных между ними. rot — VEC4 (угол), иначе — расстояние.
+ */
+export function reduceKeys(times, vals, n, tol, rot) {
+  const cnt = times.length;
+  if (cnt <= 2) return { times: [...times], vals: [...vals] };
+  const at = (i) => vals.slice(i * n, i * n + n);
+  const err = (a, b, k) => {
+    const u = (times[k] - times[a]) / (times[b] - times[a] || 1);
+    const va = at(a), vb = at(b), vk = at(k);
+    if (rot) return qAng(slerp4(va, vb, u), vk);
+    return Math.hypot(...va.map((x, i) => x + (vb[i] - x) * u - vk[i]));
+  };
+  const keep = [0];
+  let last = 0;
+  for (let j = 2; j < cnt; j++) {
+    let ok = true;
+    for (let k = last + 1; k < j && ok; k++) if (err(last, j, k) > tol) ok = false;
+    if (!ok) {
+      keep.push(j - 1);
+      last = j - 1;
+    }
+  }
+  keep.push(cnt - 1);
+  // постоянный трек — два ключа
+  return { times: keep.map((i) => times[i]), vals: keep.flatMap((i) => at(i)) };
+}
+
+/**
+ * Облегчение треков: только повороты костей и перенос корня (Hips); масштаб и перенос остальных костей — прочь
+ * (ретаргет meshyClips.ts их не берёт); ключи — с допуском LEAN_TOL; повороты — нормированный int16 (core glTF).
+ */
+export function leanAnims(json, bin, opts = {}) {
+  const tol = { ...LEAN_TOL, ...(opts.tol ?? {}) };
+  json = JSON.parse(JSON.stringify(json));
+  const parts = [bin];
+  const st = { size: bin.length };
+  // масштаб узла в метрах сцены: произведение масштабов предков (Armature у Mixamo часто 0,01)
+  const parent = new Map();
+  (json.nodes ?? []).forEach((n, i) => (n.children ?? []).forEach((c) => parent.set(c, i)));
+  const sceneScale = (ni) => {
+    let k = 1;
+    for (let p = parent.get(ni); p !== undefined; p = parent.get(p)) k *= json.nodes[p].scale?.[0] ?? 1;
+    return k || 1;
+  };
+  let before = 0, after = 0;
+  for (const an of json.animations ?? []) {
+    const chans = [];
+    const samplers = [];
+    for (const ch of an.channels ?? []) {
+      const node = json.nodes[ch.target.node];
+      const path = ch.target.path;
+      const root = /hips$/i.test(node?.name ?? '');
+      if (path === 'scale' || path === 'weights' || (path === 'translation' && !root)) continue;
+      const smp = an.samplers[ch.sampler];
+      if (json.accessors[smp.input].componentType !== 5126 || json.accessors[smp.output].componentType !== 5126) {
+        chans.push({ ...ch, sampler: samplers.length });
+        samplers.push(smp);
+        continue;
+      }
+      const t = readFloats(json, bin, smp.input).map((r) => r[0]);
+      const raw = readFloats(json, bin, smp.output);
+      const n = path === 'rotation' ? 4 : 3;
+      if ((smp.interpolation ?? 'LINEAR') !== 'LINEAR' || raw.length !== t.length) {
+        chans.push({ ...ch, sampler: samplers.length });
+        samplers.push(smp);
+        continue;
+      }
+      const rot = path === 'rotation';
+      const r = reduceKeys(t, raw.flat(), n, rot ? (tol.rotDeg * Math.PI) / 180 : tol.posM / sceneScale(ch.target.node), rot);
+      before += t.length;
+      after += r.times.length;
+      const input = pushAcc(json, parts, st, r.times, 'SCALAR');
+      const output = pushAcc(json, parts, st, r.vals, rot ? 'VEC4' : 'VEC3', { short: rot });
+      chans.push({ ...ch, sampler: samplers.length });
+      samplers.push({ input, output, interpolation: 'LINEAR' });
+    }
+    an.channels = chans;
+    an.samplers = samplers;
+  }
+  json.buffers = [{ byteLength: st.size }];
+  if (opts.stats) Object.assign(opts.stats, { keysBefore: before, keysAfter: after });
+  return { json, bin: Buffer.concat(parts) };
 }
 
 /** длительность анимации GLB (макс. время входов) */
@@ -327,8 +461,10 @@ async function main() {
   if (has('--slim')) {
     const [i, o] = [argv[argv.indexOf('--slim') + 1], argv[argv.indexOf('--slim') + 2]];
     const raw = fs.readFileSync(i);
-    const s = slimGlb(raw);
+    const st = {};
+    const s = slimGlb(raw, { stats: st, lean: !has('--no-lean') });
     if (!s) throw new Error('облегчить нельзя (сжатые буферы) — файл как есть');
+    if (st.keysBefore) console.log(`ключи ${st.keysBefore} → ${st.keysAfter}`);
     fs.writeFileSync(o, s);
     console.log(`${i} ${raw.length} → ${o} ${s.length} байт`, glbAnimInfo(s));
     return;
@@ -497,8 +633,10 @@ async function main() {
     const url = t.result?.animation_glb_url;
     if (!url) return save(), log(`✗ ${c.id}: в ответе нет animation_glb_url (${Object.keys(t.result ?? {}).join(', ')})`);
     const raw = await download(url, path.join(STATE_DIR, 'raw', `${c.id}.glb`));
-    const slim = slimGlb(raw);
+    const lean = {};
+    const slim = slimGlb(raw, { stats: lean });
     const outB = slim ?? raw;
+    if (lean.keysBefore) log(`  ключи ${lean.keysBefore} → ${lean.keysAfter} (допуск ${LEAN_TOL.rotDeg}°/${LEAN_TOL.posM * 1000} мм), int16`);
     fs.mkdirSync(OUT, { recursive: true });
     fs.writeFileSync(path.join(OUT, `${c.id}.glb`), outB);
     const info = glbAnimInfo(outB);

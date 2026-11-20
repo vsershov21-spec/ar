@@ -2067,6 +2067,205 @@
         "code:echo_playback"
       ],
       "notes": "Повторяет фразу: смешно гримасничает, лапами изображает собеседника."
+    },
+    {
+      "id": "hold_sip_body",
+      "durationS": 5.0,
+      "loop": false,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 200,
+      "persona": "kind",
+      "priority": "P2",
+      "usedBy": [
+        "act"
+      ],
+      "notes": "Какао (Добряк): тело под шаблон holdAction — правую лапу ведёт IK кружки. Только Meshy (scripts/models/t2m_prompts_v2.json); без клипа — процедурная версия.",
+      "meshy": {
+        "loop": false,
+        "blendInMs": 200,
+        "blendOutMs": 300
+      }
+    },
+    {
+      "id": "hold_mirror_body",
+      "durationS": 5.5,
+      "loop": false,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 200,
+      "persona": "glitter",
+      "priority": "P2",
+      "usedBy": [
+        "act"
+      ],
+      "notes": "Зеркальце (Блёстка): тело под шаблон — левую лапу ведёт IK зеркальца, правая поправляет бант. Только Meshy (scripts/models/t2m_prompts_v2.json); без клипа — процедурная версия.",
+      "meshy": {
+        "loop": false,
+        "blendInMs": 200,
+        "blendOutMs": 300
+      }
+    },
+    {
+      "id": "hold_treat_body",
+      "durationS": 4.5,
+      "loop": false,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 200,
+      "persona": "all",
+      "priority": "P2",
+      "usedBy": [
+        "act"
+      ],
+      "notes": "Угостить (все): тело под шаблон — правую лапу ведёт IK рыбки. Только Meshy (scripts/models/t2m_prompts_v2.json); без клипа — процедурная версия.",
+      "meshy": {
+        "loop": false,
+        "blendInMs": 200,
+        "blendOutMs": 300
+      }
+    },
+    {
+      "id": "skate_hop_on",
+      "durationS": 2.0,
+      "loop": false,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 200,
+      "persona": "hooligan",
+      "priority": "P2",
+      "usedBy": [
+        "act"
+      ],
+      "notes": "Скейт: прыжок на доску боком (фаза hop skateRig). Только Meshy (scripts/models/t2m_prompts_v2.json); без клипа — процедурная версия.",
+      "meshy": {
+        "loop": false,
+        "blendInMs": 200,
+        "blendOutMs": 300
+      }
+    },
+    {
+      "id": "skate_cruise",
+      "durationS": 3.0,
+      "loop": true,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 200,
+      "persona": "hooligan",
+      "priority": "P2",
+      "usedBy": [
+        "act"
+      ],
+      "notes": "Скейт: стойка на доске при проезде, петля (фазы push/ride/roll). Только Meshy (scripts/models/t2m_prompts_v2.json); без клипа — процедурная версия.",
+      "meshy": {
+        "loop": true,
+        "blendInMs": 200,
+        "blendOutMs": 300
+      }
+    },
+    {
+      "id": "skate_ollie_air",
+      "durationS": 2.0,
+      "loop": false,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 200,
+      "persona": "hooligan",
+      "priority": "P2",
+      "usedBy": [
+        "act"
+      ],
+      "notes": "Скейт: олли и кикфлип (фазы ollie/flip). Только Meshy (scripts/models/t2m_prompts_v2.json); без клипа — процедурная версия.",
+      "meshy": {
+        "loop": false,
+        "blendInMs": 200,
+        "blendOutMs": 300
+      }
+    },
+    {
+      "id": "skate_hop_off",
+      "durationS": 2.5,
+      "loop": false,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 200,
+      "persona": "hooligan",
+      "priority": "P2",
+      "usedBy": [
+        "act"
+      ],
+      "notes": "Скейт: соскок и подброс доски ногой в лапу (фазы hopoff/kickup). Только Meshy (scripts/models/t2m_prompts_v2.json); без клипа — процедурная версия.",
+      "meshy": {
+        "loop": false,
+        "blendInMs": 200,
+        "blendOutMs": 300
+      }
+    },
+    {
+      "id": "idle_glitter_alive",
+      "durationS": 6.0,
+      "loop": true,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 200,
+      "persona": "glitter",
+      "priority": "P2",
+      "usedBy": [
+        "act"
+      ],
+      "notes": "Живой покой Блёстки, петля (слой aliveIdle поверх — вполсилы). Только Meshy (scripts/models/t2m_prompts_v2.json); без клипа — процедурная версия.",
+      "meshy": {
+        "loop": true,
+        "blendInMs": 200,
+        "blendOutMs": 300
+      }
+    },
+    {
+      "id": "glitter_react_coy",
+      "durationS": 2.5,
+      "loop": false,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 200,
+      "persona": "glitter",
+      "priority": "P2",
+      "usedBy": [
+        "tap_cat_head",
+        "tap_cat_cheek"
+      ],
+      "notes": "Блёстка: кокетливая реакция на тап по голове/щёчке (вместо poke_head «голова вниз»). Только Meshy (scripts/models/t2m_prompts_v2.json); без клипа — процедурная версия.",
+      "meshy": {
+        "loop": false,
+        "blendInMs": 200,
+        "blendOutMs": 300,
+        "on": [
+          "tap_cat_head",
+          "tap_cat_cheek"
+        ]
+      }
+    },
+    {
+      "id": "glitter_react_happy",
+      "durationS": 3.0,
+      "loop": false,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 200,
+      "persona": "glitter",
+      "priority": "P2",
+      "usedBy": [
+        "praise"
+      ],
+      "notes": "Блёстка: радость в такт — руки и ноги вместе (похвала, комплимент). Только Meshy (scripts/models/t2m_prompts_v2.json); без клипа — процедурная версия.",
+      "meshy": {
+        "loop": false,
+        "blendInMs": 200,
+        "blendOutMs": 300,
+        "on": [
+          "praise",
+          "compliment"
+        ]
+      }
     }
   ]
 }
