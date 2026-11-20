@@ -3,7 +3,8 @@
  * же значений). v2 — только ?models=v2: в lab и со страницы /test (PARAMS models → feature model.v2).
  *
  * ?models=v2 — у каждого кота своя основа, та, что ближе к рефам персонажа (design/cut/<кот>, docs/models/persona_*):
- *   • Блёстка — v2 (c686be3: форма головы по рефам, фатин, одежда отдельными мешами, коллайдеры модельщика);
+ *   • Блёстка — p1 (20.11): геометрия v1 + фатин с золотым подолом, звёзды-заколки, глаза с ресницами
+ *     (tulle.py --puff 1.32 → untangle → persona_tune.py --clean) → models/v2/glitter_p1.glb, свои прокси;
  *   • Хулиган и Добряк — p1: геометрия v1 (голова и наушники ближе к рефам, чем у v2) + глаза по рефам
  *     (scripts/models/persona_tune.py: веко открыто, подводка) → models/v2/<кот>_p1.glb; прокси — как у v1 (геометрия та же): models/<кот>_v1_colliders.json.
  * ?models=v2h — геометрия v2 у всех трёх (для сравнения). Мех, тон и лицо при v2/v2h берут значения v2
@@ -12,7 +13,13 @@
 export type ModelsVariant = 'v1' | 'v2' | 'v2h';
 
 /** основа кота при ?models=v2: v2 — геометрия v2, p1 — v1 с правками по рефам персонажа */
-export const V2_BASE: Record<string, 'v2' | 'p1'> = { glitter: 'v2', hooligan: 'p1', kind: 'p1' };
+export const V2_BASE: Record<string, 'v2' | 'p1'> = { glitter: 'p1', hooligan: 'p1', kind: 'p1' };
+
+/**
+ * p1 со своими прокси (геометрия отличается от v1): Блёстка — юбка Tripo заменена фатином пышнее (tulle.py --puff 1.32)
+ * и звёзды-заколки → models/v2/glitter_p1_colliders.json (scripts/models/colliders.py по p1)
+ */
+export const P1_OWN_COLLIDERS = new Set(['glitter']);
 
 /** ?models=v2 → 'v2', ?models=v2h → 'v2h', иначе 'v1' (адрес уже прошёл guardUrl: в MVP/пилоте без /test параметра нет) */
 export function modelsVariant(search = typeof location !== 'undefined' ? location.search : ''): ModelsVariant {
@@ -42,5 +49,6 @@ export function collidersUrl(glb: string): string | null {
   const m1 = glb.match(/^(.*\/)?(hooligan|kind|glitter)_v1\.glb$/);
   if (m1) return `${m1[1] ?? ''}${m1[2]}_v1_colliders.json`;
   const p1 = glb.match(/^(.*\/)?v2\/(hooligan|kind|glitter)_p1\.glb$/);
-  return p1 ? `${p1[1] ?? ''}${p1[2]}_v1_colliders.json` : null;
+  if (!p1) return null;
+  return P1_OWN_COLLIDERS.has(p1[2]) ? `${p1[1] ?? ''}v2/${p1[2]}_p1_colliders.json` : `${p1[1] ?? ''}${p1[2]}_v1_colliders.json`;
 }

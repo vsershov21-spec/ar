@@ -34,8 +34,13 @@ export interface FurToneParams {
    * тон одежды в альбедо (одежда запечена в общую текстуру с мехом): тексели в радиусе r от src (sRGB) → dst
    * с сохранением рисунка (контраст k). Блёстка — без (её вид не трогаем).
    */
-  cloth?: { src: [number, number, number]; r: number; dst: [number, number, number]; k: number };
+  cloth?: ClothTone | ClothTone[];
 }
+
+/** одна «краска» одежды: тексели в радиусе r от src → dst, контраст рисунка k */
+export interface ClothTone { src: [number, number, number]; r: number; dst: [number, number, number]; k: number }
+/** слотов краски одежды в шейдере */
+export const CLOTH_SLOTS = 3;
 
 const S = (r: number, g: number, b: number): [number, number, number] => [r / 255, g / 255, b / 255];
 
@@ -52,7 +57,16 @@ export const FUR_TONE: Record<string, FurToneParams> = {
  * design/cut/<кот> (модели models/v2/<кот>_p1.glb на основе v1 и models/v2/<кот>_v2.glb при ?models=v2h).
  */
 export const FUR_TONE_V2: Record<string, FurToneParams> = {
-  glitter: { ...FUR_TONE.glitter, dst: S(152, 158, 184), white: S(222, 226, 238), face: 0.72 },
+  // Блёстка (20.11, по design/cut/glitter): мех лавандово-голубой, морда чуть светлее, брови едва; нос розовый;
+  // худи — пастельная лаванда (не насыщенный фиолет), бант, звёзды и окантовка — яркое золото
+  glitter: {
+    src: S(110, 122, 166), dst: S(136, 146, 182), contrast: 0.6, desat: 0.06, white: S(202, 200, 224), face: 0.4, brow: 0.2,
+    nose: S(226, 150, 162),
+    cloth: [
+      { src: S(175, 138, 210), r: 0.2, dst: S(196, 184, 228), k: 0.6 },
+      { src: S(236, 214, 161), r: 0.2, dst: S(240, 212, 136), k: 0.9 },
+    ],
+  },
   // ?models=v2, 19.11 — по рефам персонажей design/cut/<кот>/turn: мех лавандово-голубой (щёки ≈ 134,146,174), морда
   // лишь чуть светлее и с розоватым оттенком (≈ 190,183,192), брови едва заметны, рисунок шерсти мягче
   // нос — маленький розовый (≈ 226,150,160), кепка Хулигана — мягкий салатовый, шарф и сапожки Добряка — персиковые
@@ -94,8 +108,8 @@ export class FurTone {
     /** цвет носа (rgb) и доля замены (w; 0 — встроенный тон шейдера, как было) */
     uFtNoseC: { value: new THREE.Vector4(0, 0, 0, 0) },
     /** одежда: src (rgb) + радиус, dst (rgb) + контраст; радиус 0 — выкл. */
-    uFtClS: { value: new THREE.Vector4(0, 0, 0, 0) },
-    uFtClD: { value: new THREE.Vector4(0, 0, 0, 1) },
+    uFtClS: { value: Array.from({ length: CLOTH_SLOTS }, () => new THREE.Vector4(0, 0, 0, 0)) },
+    uFtClD: { value: Array.from({ length: CLOTH_SLOTS }, () => new THREE.Vector4(0, 0, 0, 1)) },
   };
   private done = new WeakSet<THREE.Material>();
 
@@ -110,9 +124,12 @@ export class FurTone {
     this.uniforms.uFtBrow.value = p.brow ?? 0;
     if (p.nose) this.uniforms.uFtNoseC.value.set(p.nose[0], p.nose[1], p.nose[2], 1);
     else this.uniforms.uFtNoseC.value.set(0, 0, 0, 0);
-    const c = p.cloth;
-    this.uniforms.uFtClS.value.set(c?.src[0] ?? 0, c?.src[1] ?? 0, c?.src[2] ?? 0, c?.r ?? 0);
-    this.uniforms.uFtClD.value.set(c?.dst[0] ?? 0, c?.dst[1] ?? 0, c?.dst[2] ?? 0, c?.k ?? 1);
+    const cl = p.cloth ? (Array.isArray(p.cloth) ? p.cloth : [p.cloth]) : [];
+    for (let i = 0; i < CLOTH_SLOTS; i++) {
+      const c = cl[i];
+      this.uniforms.uFtClS.value[i].set(c?.src[0] ?? 0, c?.src[1] ?? 0, c?.src[2] ?? 0, c?.r ?? 0);
+      this.uniforms.uFtClD.value[i].set(c?.dst[0] ?? 0, c?.dst[1] ?? 0, c?.dst[2] ?? 0, c?.k ?? 1);
+    }
   }
 
   /** все меховые материалы модели (после buildFurShells — оболочки и карточки тоже) */
@@ -161,7 +178,7 @@ export class FurTone {
       }
       sh.fragmentShader =
         (spatial ? '#define FT_SPATIAL\nvarying vec3 vFtP;\n' : '') +
-        'uniform vec3 uFtSrc; uniform vec3 uFtDst; uniform vec2 uFtK; uniform float uFtOn; uniform vec4 uFtWhite; uniform vec4 uFtNose; uniform vec3 uFtEyeL; uniform vec3 uFtEyeR; uniform float uFtBrow; uniform vec4 uFtNoseC; uniform vec4 uFtClS; uniform vec4 uFtClD;\n' +
+        'uniform vec3 uFtSrc; uniform vec3 uFtDst; uniform vec2 uFtK; uniform float uFtOn; uniform vec4 uFtWhite; uniform vec4 uFtNose; uniform vec3 uFtEyeL; uniform vec3 uFtEyeR; uniform float uFtBrow; uniform vec4 uFtNoseC; uniform vec4 uFtClS[' + CLOTH_SLOTS + ']; uniform vec4 uFtClD[' + CLOTH_SLOTS + '];\n' +
         'float ftEll(vec3 p, vec3 c, vec3 r) { vec3 q = (p - c) / r; return 1.0 - smoothstep(0.55, 1.0, length(q)); }\n' +
         sh.fragmentShader.replace(
           '#include <color_fragment>',
@@ -213,16 +230,17 @@ export class FurTone {
     ftC = mix(ftC, ftP, ftN);
     diffuseColor.rgb = mix(diffuseColor.rgb, pow(clamp(ftC, 0.0, 1.0), vec3(2.2)), max(ftM, ftN * 0.85));
     // одежда в общей текстуре (кепка, шарф, сапожки): тон по рефам персонажа; мех и нос не задевает (другой цвет)
-    if (uFtClS.w > 0.0) {
-      float ftCl = (1.0 - smoothstep(0.55 * uFtClS.w, uFtClS.w, length(ftS - uFtClS.rgb))) * (1.0 - ftM) * (1.0 - ftN);
-      vec3 ftCc = uFtClD.rgb + (ftS - uFtClS.rgb) * uFtClD.w;
+    for (int i = 0; i < ${CLOTH_SLOTS}; i++) {
+      if (uFtClS[i].w <= 0.0) continue;
+      float ftCl = (1.0 - smoothstep(0.55 * uFtClS[i].w, uFtClS[i].w, length(ftS - uFtClS[i].rgb))) * (1.0 - ftM) * (1.0 - ftN);
+      vec3 ftCc = uFtClD[i].rgb + (ftS - uFtClS[i].rgb) * uFtClD[i].w;
       diffuseColor.rgb = mix(diffuseColor.rgb, pow(clamp(ftCc, 0.0, 1.0), vec3(2.2)), ftCl);
     }
   }`,
         );
     };
     const prevKey = m.customProgramCacheKey?.bind(m);
-    m.customProgramCacheKey = () => (prevKey ? prevKey() : '') + (spatial ? '|fur-tone-v3s' : '|fur-tone-v3') + (v2 ? '|m2' : '');
+    m.customProgramCacheKey = () => (prevKey ? prevKey() : '') + (spatial ? '|fur-tone-v4s' : '|fur-tone-v4') + (v2 ? '|m2' : '');
     m.needsUpdate = true;
   }
 }

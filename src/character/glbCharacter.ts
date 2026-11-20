@@ -27,6 +27,7 @@ import { ToolIK, type AimRequest } from './toolIK';
 import { BodyCollider, CAT_MM, worstPair, type CollidersJson } from './bodyCollide';
 import { FootPin } from './footPin';
 import { buildFurShells } from './furShell';
+import { attachTulle } from './tulleFx';
 import { FaceMixer, EMOTE_FACE, MORPH_TARGETS, facePreset, type FacePreset } from './face';
 import { EyeRig } from './eyeRig';
 import { FaceWrinkles } from './faceWrinkles';
@@ -126,9 +127,17 @@ export const TRIPO_ALIAS: Record<string, string[]> = {
 const PERSONA_FACE: Record<string, Record<string, number>> = {
   glitter: { blush: 0.32, smile: 0.12 },
 };
-/** то же для моделей v2 (?models=v2): румянец Блёстки слабее — под персиковый тон faceWrinkles v2 */
+/**
+ * то же для моделей v2 (?models=v2), по design/cut/glitter: у Блёстки в покое открытая улыбка (рот приоткрыт, видны
+ * клычки), без сиреневого румянца
+ */
 const PERSONA_FACE_V2: Record<string, Record<string, number>> = {
-  glitter: { blush: 0.14, smile: 0.12 },
+  glitter: { smile: 0.6, mouth_A: 0.46 },
+};
+
+/** множители век по характеру (?models=v2): 1 — как в пресете */
+const PERSONA_EYES_V2: Record<string, Record<string, number>> = {
+  glitter: { eyes_smug: 0.3, eyes_sleepy: 0.5, eyes_squint: 0.6 },
 };
 
 let ENV: THREE.Texture | null = null;
@@ -346,6 +355,8 @@ export class GlbCharacter implements Character {
     if (this.mixer && meshyWanted(feature('anims.meshy'))) void this.loadMeshy();
     this.setFaceObj('usual');
     this.furTone.attach(model);
+    // фатин Блёстки с разметкой (models/v2/glitter_p1.glb): сетка, золотые блёстки и полоса по подолу
+    attachTulle(model);
     this.mouthRig = MouthRig.find(model);
     this.eyes = EyeRig.find(model);
     this.wrinkles = FaceWrinkles.attach(model);
@@ -841,6 +852,10 @@ export class GlbCharacter implements Character {
     // характер в покое (референс): у Блёстки всегда чуть розовые щёчки и мягкая полуулыбка
     const base = (modelsV2() ? PERSONA_FACE_V2 : PERSONA_FACE)[this.personaId];
     if (base) for (const k in base) W[k] = Math.max(W[k] ?? 0, base[k] * (1 - (W.frown ?? 0)));
+    // характер глаз (только ?models=v2): у Блёстки по рефу глаза широко открыты — пресеты «самодовольно/сонно/прищур»
+    // в idle-клипах (зеркальце, кружение) прикрывают веки слабее
+    const eyeK = modelsV2() ? PERSONA_EYES_V2[this.personaId] : undefined;
+    if (eyeK) for (const k in eyeK) if (W[k]) W[k] *= eyeK[k];
     // складки и мягкость: щёки поднимаются при улыбке, морщинка у носа при хмурых бровях
     W.cheek_up = Math.max(W.cheek_up ?? 0, 0.5 * (W.smile ?? 0), 0.3 * (W.smirk ?? 0));
     W.nose_wrinkle = Math.max(W.nose_wrinkle ?? 0, 0.35 * (W.brow_down ?? 0));

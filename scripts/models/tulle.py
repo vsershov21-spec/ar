@@ -2,7 +2,7 @@
 """Юбка-пачка Блёстки из фатина: вместо спаянной с телом непрозрачной юбки Tripo (рюши режут друг друга и бёдра) —
 три слоя полупрозрачного фатина по форме исходной юбки.
 
-  python3 scripts/models/tulle.py glitter in.glb out.glb
+  python3 scripts/models/tulle.py glitter in.glb out.glb [--puff 1.16]
 
 - Треугольники юбки (mesh_parts: метка «юбка») убираются из тела; под ними у Tripo есть поверхность бёдер.
 - Слой k (0 — внутренний): от пояса вниз до подола, радиус по секторам: у пояса — тело + 3 мм, у подола —
@@ -84,7 +84,9 @@ def main():
         m = np.abs(((sec - k + NT // 2) % NT) - NT // 2) <= 2
         r_hem[k] = np.percentile(rad(X[m]), 90) if m.sum() > 3 else np.nan
     r_hem = np.where(np.isnan(r_hem), np.nanmedian(r_hem), r_hem)
-    r_hem = r_hem * 1.16  # пачка пышнее (рефы: фатин расходится колоколом)
+    # пачка пышнее (рефы: фатин расходится колоколом); --puff K — свой множитель (p1 Блёстки: 1.32)
+    puff = float(sys.argv[sys.argv.index('--puff') + 1]) if '--puff' in sys.argv else 1.16
+    r_hem = r_hem * puff
     # тело (без юбки, без рук и хвоста) в поясе и ниже — максимальный радиус по сектору и высоте
     jn = [j['nodes'][k]['name'].replace('mixamorig:', '') for k in j['skins'][0]['joints']]
     Wf = Wt.astype(np.float64) / (255.0 if Wt.max() > 1.5 else 1.0)

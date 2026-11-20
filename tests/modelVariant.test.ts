@@ -13,11 +13,12 @@ describe('поколение моделей котов: v1 по умолчани
     expect(collidersUrl('models/hooligan_v1.glb')).toBe('models/hooligan_v1_colliders.json');
     expect(collidersUrl('models/character.glb')).toBeNull();
   });
-  it('?models=v2 — у каждого кота основа ближе к рефам персонажа: Блёстка — v2, Хулиган и Добряк — p1 (v1 + глаза)', () => {
+  it('?models=v2 — у каждого кота основа ближе к рефам персонажа: все трое — p1 (геометрия v1 + правки по design/cut)', () => {
     expect(modelsVariant('?nocard=off&models=v2')).toBe('v2');
     const g = variantGlb('models/glitter_v1.glb', 'v2');
-    expect(g).toBe('models/v2/glitter_v2.glb');
-    expect(collidersUrl(g)).toBe('models/v2/glitter_colliders.json');
+    expect(g).toBe('models/v2/glitter_p1.glb');
+    // у Блёстки p1 своя геометрия (фатин вместо юбки Tripo) — свои прокси
+    expect(collidersUrl(g)).toBe('models/v2/glitter_p1_colliders.json');
     for (const c of ['hooligan', 'kind']) {
       const p = variantGlb(`models/${c}_v1.glb`, 'v2');
       expect(p).toBe(`models/v2/${c}_p1.glb`);
