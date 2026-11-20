@@ -31,7 +31,8 @@ import { HOLD_SPECS, holdDuration, holdPose, type HoldFrame, type HoldSpec } fro
 import { PropFx } from './propFx';
 import { BOARD, FEET_ON_DECK, SKATE_TOTAL, setSkateFit, skatePose, type SkateFrame } from './skateRig';
 import { buildFurShells } from './furShell';
-import { attachTulle } from './tulleFx';
+import { attachTulle, tulleMotion, tulleOf, type TulleMotion } from './tulleFx';
+import { alivePose } from './aliveIdle';
 import { attachTailSparkle } from './tailSparkle';
 import { FaceMixer, EMOTE_FACE, MORPH_TARGETS, facePreset, type FacePreset } from './face';
 import { EyeRig } from './eyeRig';
@@ -43,6 +44,9 @@ import { personaMeta } from './personaMeta';
 import type { AnchorName } from '../fx/core';
 
 const BONES = ['Hips', 'Spine', 'Spine1', 'Spine2', 'Neck', 'Head', 'LeftArm', 'RightArm', 'LeftForeArm', 'RightForeArm', 'LeftHand', 'RightHand', 'LeftUpLeg', 'RightUpLeg', 'LeftLeg', 'RightLeg', 'LeftFoot', 'RightFoot', 'LeftShoulder', 'RightShoulder', 'Jaw', 'Tail1', 'Tail2', 'Tail3', 'Tail4', 'LeftEar1', 'RightEar1', 'LeftEye', 'RightEye'];
+
+/** клипы-сцены с предметом → шаблон holdAction (play перенаправляет) */
+const SCENE_HOLD: Record<string, string> = { idle_glitter_mirror: 'mirror', idle_kind_cocoa: 'cocoa' };
 
 /** кость → зона касания (ближайшая к точке попадания) */
 const BONE_ZONE: Record<string, TouchZone> = {
@@ -841,6 +845,10 @@ export class GlbCharacter implements Character {
   }
 
   play(clip: ClipName, opts: PlayOptions = {}) {
+    // сцены «какао» / «зеркальце» (инициатива режиссёра, дом, реакции) — шаблоном «держать предмет», а не клипом-опорой
+    // с реквизитом на смещении от кисти (на листе 20.11 зеркальце висело над лапой)
+    const tpl = SCENE_HOLD[clip];
+    if (tpl && !this.act && this.model && this.runAct(tpl)) return;
     this.clips.play(clip, opts);
   }
 
@@ -986,6 +994,7 @@ export class GlbCharacter implements Character {
       this.anim?.post(dt, cs, this.model ?? this.object);
       this.groundClamp(dt, cs.cur.id);
       this.pinFeet(dt, cs.cur.id);
+      this.applyAlive(dt);
     } else {
       this.lift = 0;
       this.mixer?.update(dt);
@@ -1128,6 +1137,7 @@ export class GlbCharacter implements Character {
     this.applySkate(dt);
     this.placeHold(dt);
     if (!this.act) this.propFx.hide();
+    this.applyTulle(dt);
     this.groundFinal(dt, cs.cur.id);
     this.props?.aim(ik.aimW > 0.01 ? ik.aimPoint : null, ik.aimW);
     this.props?.update(this.clips.cur.id);
@@ -1510,6 +1520,123 @@ export class GlbCharacter implements Character {
       spark: f.spark,
       sparkR: dims.h * 0.7,
     });
+  }
+
+  // ───────────── живой покой Блёстки (aliveIdle.ts) и вторичная анимация фатина ─────────────
+  private aliveW = 0;
+  /** стенд «до/после»: выключить слой */
+  aliveOff = false;
+  private aliveT = 0;
+  private aliveF = alivePose(0);
+  /** стенд: вес слоя и текущая поза рук */
+  readonly aliveDbg = { w: 0, pose: '', tulle: 0 };
+  private tulle: { mesh: THREE.Mesh; m: TulleMotion }[] | null = null;
+  private tulleD = new THREE.Vector3();
+  private tulleV = new THREE.Vector3();
+  private tulleHip: THREE.Vector3 | null = null;
+  private tulleHipV = new THREE.Vector3();
+
+  /** слой «живого покоя» (только Блёстка, в покое, без действия/сцены): перенос веса, контрапост, позы рук, голова */
+  private applyAlive(dt: number) {
+    const cs = this.clips;
+    const want = !this.aliveOff && this.personaId === 'glitter' && cs.idleMode && !this.act && !this.poseTweak && this.toolIK.mode === 'off' && /^idle/.test(cs.cur.id) && this.lift < 0.01;
+    this.aliveW = clamp(this.aliveW + ((want ? 1 : 0) - this.aliveW > 0 ? dt / 0.6 : -dt / 0.3), 0, 1);
+    this.aliveDbg.w = this.aliveW;
+    if (this.aliveW < 0.001) return;
+    this.aliveT += dt;
+    const f = alivePose(this.aliveT, this.aliveF);
+    const W = this.aliveW * this.aliveW * (3 - 2 * this.aliveW);
+    const obj = this.object;
+    obj.updateMatrixWorld(true);
+    const ax = this.modelAxes();
+    const V = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
+    const ws = obj.getWorldScale(new THREE.Vector3()).y || 1;
+    const feet = (['Left', 'Right'] as const).map((s) => this.bones.get(s + 'Foot')?.getWorldPosition(new THREE.Vector3()) ?? null);
+    // таз: вбок и чуть вниз (перенос веса), крен; корпус и голова — против (контрапост)
+    const hips = this.bones.get('Hips');
+    if (hips?.parent) {
+      const hw = hips.getWorldPosition(new THREE.Vector3());
+      const off = ax.side.clone().multiplyScalar(f.hipX * W * ws).addScaledVector(ax.up, -f.hipDown * W * ws);
+      const a = hips.parent.worldToLocal(hw.clone()), b = hips.parent.worldToLocal(hw.clone().add(off));
+      hips.position.add(b.sub(a));
+      hips.updateMatrixWorld(true);
+      rotW(hips, ax.fwd, f.hipRoll * W);
+    }
+    const sp1 = this.bones.get('Spine1'), sp2 = this.bones.get('Spine2'), head = this.bones.get('Head');
+    if (sp2) rotW(sp2, ax.fwd, (f.chestRoll - f.hipRoll * 0.6) * W);
+    if (sp1) rotW(sp1, ax.up, f.chestYaw * W);
+    if (head) {
+      rotW(head, ax.fwd, f.headRoll * W);
+      rotW(head, ax.side, f.headPitch * W);
+    }
+    // стопы — где стояли (IK ног): перенос веса виден в коленях, а не скольжением
+    (['Left', 'Right'] as const).forEach((s, i) => {
+      const U = this.bones.get(s + 'UpLeg'), K = this.bones.get(s + 'Leg'), F = this.bones.get(s + 'Foot'), p = feet[i];
+      if (U && K && F && p) twoBoneIK(U, K, F, p, V(s === 'Left' ? 0.2 : -0.2, 0, 1).transformDirection(obj.matrixWorld).normalize(), W);
+    });
+    // лапы: смесь поз (цель ладони, нормаль ладони, пальцы, полюс локтя) — система кота
+    obj.updateMatrixWorld(true);
+    const hl = this.props?.handLen || 0.07;
+    let best = '', bw = 0;
+    for (const k in f.arms) if (f.arms[k as keyof typeof f.arms] > bw) [best, bw] = [k, f.arms[k as keyof typeof f.arms]];
+    this.aliveDbg.pose = best;
+    for (const side of ['Left', 'Right'] as const) {
+      const s = side === 'Left' ? 1 : -1;
+      const S = this.bones.get(side + 'Arm'), E = this.bones.get(side + 'ForeArm'), H = this.bones.get(side + 'Hand');
+      if (!S || !E || !H) continue;
+      const palm = V(0, 0, 0), pn = V(0, 0, 0), fd = V(0, 0, 0), pole = V(0, 0, 0);
+      const add = (w: number, p: THREE.Vector3, n: THREE.Vector3, d: THREE.Vector3, po: THREE.Vector3) => {
+        if (w <= 0) return;
+        palm.addScaledVector(p, w);
+        pn.addScaledVector(n.normalize(), w);
+        fd.addScaledVector(d.normalize(), w);
+        pole.addScaledVector(po.normalize(), w);
+      };
+      const free = () => [V(s * 0.19, 0.33, 0.13), V(-s, 0, 0.3), V(s * 0.1, -0.6, 0.6), V(s, -0.5, -0.3)] as const;
+      const onHip = f.hipSide === s;
+      add(f.arms.free + (onHip ? 0 : f.arms.hip), ...free());
+      if (onHip) add(f.arms.hip, V(s * 0.16, 0.39, 0.07), V(-s, 0, 0), V(s * 0.2, -0.45, 1), V(s, 0.15, -0.8));
+      add(f.arms.clasp, V(s * 0.04, 0.41, 0.24), V(-s, 0, 0.25), V(-s * 0.3, -0.25, 1), V(s, -0.6, -0.2));
+      add(f.arms.cheeks, V(s * 0.12, 0.55, 0.22), V(-s * 0.7, 0, -1), V(s * 0.1, 1, 0.25), V(s, -0.7, 0));
+      if (fd.lengthSq() < 1e-6) continue;
+      pn.normalize();
+      fd.addScaledVector(pn, -fd.dot(pn)).normalize();
+      const wrist = obj.localToWorld(palm.clone().addScaledVector(fd, -0.5 * hl));
+      twoBoneIK(S, E, H, wrist, pole.normalize().transformDirection(obj.matrixWorld), W * 0.92);
+      this.orientHand(H, side, fd, pn, W * 0.85);
+      this.fist(side, 0.3 * W, 0.3);
+    }
+  }
+
+  /** фатин: пружина от скорости таза (в системе кота) → сдвиг подола; рябь — всегда чуть-чуть */
+  private applyTulle(dt: number) {
+    if (!this.model) return;
+    this.tulle ??= tulleOf(this.model).map((mesh) => ({ mesh, m: tulleMotion(mesh)! })).filter((x) => !!x.m);
+    if (!this.tulle.length || !(dt > 0)) return;
+    const hips = this.bones.get('Hips');
+    if (!hips) return;
+    const p = this.object.worldToLocal(hips.getWorldPosition(new THREE.Vector3()));
+    if (this.tulleHip) this.tulleHipV.copy(p).sub(this.tulleHip).multiplyScalar(1 / dt).clampLength(0, 2);
+    this.tulleHip = p;
+    // подол отстаёт от таза: цель = −скорость × 0,22 с, пружина 1,7 Гц с небольшим затуханием (качнётся и успокоится)
+    const target = this.tulleHipV.clone().multiplyScalar(-0.22);
+    target.y *= 0.4;
+    const w = Math.PI * 2 * 1.7, z = 0.32;
+    const h = Math.min(dt, 1 / 20);
+    this.tulleV.addScaledVector(target.sub(this.tulleD).multiplyScalar(w * w).addScaledVector(this.tulleV, -2 * z * w), h);
+    this.tulleD.addScaledVector(this.tulleV, h).clampLength(0, 0.035);
+    this.aliveDbg.tulle = this.tulleD.length();
+    this.object.updateMatrixWorld(true);
+    for (const { mesh, m } of this.tulle) {
+      mesh.updateWorldMatrix(true, false);
+      const inv = mesh.matrixWorld.clone().invert();
+      const o = this.object.localToWorld(p.clone());
+      const a = o.clone().applyMatrix4(inv), b = this.object.localToWorld(p.clone().add(this.tulleD)).applyMatrix4(inv);
+      m.sway.value.copy(b.sub(a));
+      // рябь — 0,0025 роста в единицах меша
+      const unit = this.object.localToWorld(p.clone().add(new THREE.Vector3(0.0025, 0, 0))).applyMatrix4(inv).distanceTo(a);
+      m.flut.value.set(this.time, unit);
+    }
   }
 
   /** скейт (skateRig.ts): опора-дека, присед и прыжки — до клипа (standY); стопы, лапа с доской, доска — после */

@@ -23,6 +23,29 @@ export interface TulleLook {
  */
 export const TULLE_GLITTER: TulleLook = { band: 0.04, sparkle: 0.16, gold: [0.8, 0.58, 0.24], bandK: 0.6 };
 
+/**
+ * Вторичная анимация фатина (живой покой Блёстки, 20.11): сдвиг к подолу (∝ t^1.5) — пружина от скорости таза
+ * (GlbCharacter.applyTulle), и мелкая рябь по нормали. Униформы — в userData.tulle материала.
+ */
+export interface TulleMotion {
+  /** сдвиг подола в системе меша */
+  sway: { value: THREE.Vector3 };
+  /** x — время, с; y — амплитуда ряби (в единицах меша) */
+  flut: { value: THREE.Vector2 };
+}
+const tulleMeshes = new WeakSet<THREE.Mesh>();
+export function tulleMotion(m: THREE.Mesh): TulleMotion | null {
+  return ((m.material as THREE.Material).userData?.tulle as TulleMotion | undefined) ?? null;
+}
+/** меши фатина модели (после attachTulle) */
+export function tulleOf(model: THREE.Object3D): THREE.Mesh[] {
+  const out: THREE.Mesh[] = [];
+  model.traverse((o) => {
+    if (tulleMeshes.has(o as THREE.Mesh)) out.push(o as THREE.Mesh);
+  });
+  return out;
+}
+
 /** подключить к фатину модели (если есть разметка); вернуть число мешей */
 export function attachTulle(model: THREE.Object3D, look: TulleLook = TULLE_GLITTER): number {
   let n = 0;
@@ -34,6 +57,7 @@ export function attachTulle(model: THREE.Object3D, look: TulleLook = TULLE_GLITT
     m.geometry.setAttribute('tulleT', uv);
     const mat = m.material as THREE.MeshStandardMaterial;
     patch(mat, look);
+    tulleMeshes.add(m);
     n++;
   });
   return n;
@@ -41,11 +65,27 @@ export function attachTulle(model: THREE.Object3D, look: TulleLook = TULLE_GLITT
 
 function patch(m: THREE.MeshStandardMaterial, look: TulleLook) {
   const prev = m.onBeforeCompile;
+  const motion: TulleMotion = { sway: { value: new THREE.Vector3() }, flut: { value: new THREE.Vector2() } };
+  m.userData.tulle = motion;
   m.onBeforeCompile = (sh, r) => {
     prev?.call(m, sh, r);
     sh.uniforms.uTuGold = { value: new THREE.Vector3(...look.gold) };
     sh.uniforms.uTuK = { value: new THREE.Vector3(look.band, look.sparkle, look.bandK) };
-    sh.vertexShader = 'attribute vec2 tulleT;\nvarying vec2 vTu;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n  vTu = tulleT;');
+    sh.uniforms.uTuSway = motion.sway;
+    sh.uniforms.uTuFlut = motion.flut;
+    sh.vertexShader =
+      'attribute vec2 tulleT;\nvarying vec2 vTu;\nuniform vec3 uTuSway;\nuniform vec2 uTuFlut;\n' +
+      sh.vertexShader.replace(
+        '#include <begin_vertex>',
+        `#include <begin_vertex>
+  vTu = tulleT;
+  {
+    // пачка качается от пояса к подолу (пружина от таза) и чуть дышит рябью по нормали
+    float tt = clamp(tulleT.y, 0.0, 1.0);
+    transformed += uTuSway * pow(tt, 1.5);
+    transformed += objectNormal * uTuFlut.y * tt * sin(uTuFlut.x * 5.0 + tulleT.x * 6.2832 * 6.0);
+  }`,
+      );
     sh.fragmentShader =
       'varying vec2 vTu;\nuniform vec3 uTuGold;\nuniform vec3 uTuK;\nfloat tuHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }\n' +
       sh.fragmentShader
@@ -79,6 +119,6 @@ function patch(m: THREE.MeshStandardMaterial, look: TulleLook) {
         );
   };
   const prevKey = m.customProgramCacheKey?.bind(m);
-  m.customProgramCacheKey = () => (prevKey ? prevKey() : '') + '|tulle-fx-v2';
+  m.customProgramCacheKey = () => (prevKey ? prevKey() : '') + '|tulle-fx-v3';
   m.needsUpdate = true;
 }

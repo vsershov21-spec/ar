@@ -65,7 +65,7 @@ const MODES: Record<TailMode, ModeDef> = {
 const PERSONA: Record<string, { amp: number; freq: number; flick: number; bounce: number }> = {
   hooligan: { amp: 1.0, freq: 0.85, flick: 1.0, bounce: 0.2 }, // ленивый, щёлкает кончиком
   kind: { amp: 0.85, freq: 0.7, flick: 0.2, bounce: 0.3 }, // плавный, широкий
-  glitter: { amp: 1.15, freq: 1.2, flick: 0.4, bounce: 1.0 }, // пружинит, кокетливо закручивает
+  glitter: { amp: 1.45, freq: 1.2, flick: 0.55, bounce: 1.2 }, // пружинит, кокетливо закручивает (20.11: «хвост неподвижен» — размах больше)
 };
 
 const HAPPY = /happy|smile|excited|proud|cheeky|wink|cheeks_gum/;
@@ -117,6 +117,8 @@ class Spring {
 const clampN = (v: number, a: number) => (Number.isFinite(v) ? Math.max(-a, Math.min(a, v)) : 0);
 
 export class TailRig {
+  /** множитель размаха (стенд «до/после»: scripts/qa/glitter-alive.mjs) */
+  personaScale = 1;
   private t = 0;
   private sw = [0, 1, 2, 3].map(() => new Spring());
   private li = [0, 1, 2, 3].map(() => new Spring());
@@ -162,7 +164,7 @@ export class TailRig {
     this.flick *= Math.exp(-dt * 6);
 
     const freq = m.freq * p.freq;
-    const amp = m.amp * p.amp;
+    const amp = m.amp * p.amp * this.personaScale;
     const tail: [number, number][] = [];
     for (let s = 0; s < 4; s++) {
       const u = (s + 1) / 4; // 0.25 … 1 к кончику
