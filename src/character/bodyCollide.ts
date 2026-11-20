@@ -398,6 +398,11 @@ export class BodyCollider {
   /** прокси головы рядом со стороной (отсев по сферам) — на шаг коррекции */
   private cand: Proxy[] = [];
   contactW = 0;
+  /**
+   * лапы без коррекции на этот кадр ('Left' | 'Right'): предмет в лапе (holdAction) ведёт IK сам — цели подобраны
+   * вне тела, а выталкивание уводило кружку от рта на 0,2 роста (стенд 20.11); замер (measurePairs) — как обычно
+   */
+  exempt = new Set<'Left' | 'Right'>();
 
   constructor(
     private root: THREE.Object3D,
@@ -894,7 +899,12 @@ export class BodyCollider {
     const before = new Map<THREE.Object3D, THREE.Quaternion>();
     for (const n of ['LeftArm', 'LeftForeArm', 'LeftHand', 'RightArm', 'RightForeArm', 'RightHand', 'LeftUpLeg', 'RightUpLeg']) {
       const b = this.bone(n);
-      if (b) before.set(b, b.quaternion.clone());
+      if (!b) continue;
+      if (this.exempt.size && /Arm|Hand/.test(n) && this.exempt.has(n.startsWith('Left') ? 'Left' : 'Right')) {
+        this.held.delete(b);
+        continue;
+      }
+      before.set(b, b.quaternion.clone());
     }
     const surf = !this.legacy && !this.axis && this.samples.length > 0;
     // тёплый старт: поправка прошлого кадра, уже затухшая на этот кадр (τ 0,08 с, не быстрее MAX_DECAY) — дальше
@@ -916,12 +926,13 @@ export class BodyCollider {
     }
     // 0. клип-контакт: ближайшая к голове/наушникам точка лапы, зависшая над поверхностью, — на поверхность
     // (два шага: поворот считается в линейном приближении)
-    if (surf && this.contactW > 0) for (const side of ['Left', 'Right'] as const) for (let k = 0; k < 2; k++) this.pull(side, rs);
+    if (surf && this.contactW > 0) for (const side of ['Left', 'Right'] as const) if (!this.exempt.has(side)) for (let k = 0; k < 2; k++) this.pull(side, rs);
     // рука далеко от головы (ни одного прокси головы рядом) — как раньше, точками на осях (мягкий вход, проверено стендом:
     // общий шаг по торсу/бёдрам/юбке в танце, сальто, прыжке давал «щелчки» 17–26 рад/с); у головы — точки поверхности
     const sides = (['Left', 'Right'] as const).map((side) => {
       const chain = surf && this.nearCheap(side, rs) && this.near(side, rs * (SURF_MARGIN + NEAR + CONTACT_BAND)).length > 0;
-      return { side, arm: false, stop: !chain, chain, prev: 0, stall: 0, steps: 0 };
+      const off = this.exempt.has(side);
+      return { side, arm: false, stop: !chain || off, chain: chain || off, prev: 0, stall: 0, steps: 0 };
     });
     const chainSide = { L: sides[0].chain, R: sides[1].chain };
     // 1. выталкивание: за итерацию — точки на осях (локоть, плечо, ноги) о первый прокси, в который вошли; кисть и
@@ -961,6 +972,7 @@ export class BodyCollider {
         const pt = it >= 6 && p0.alt ? { ...p0, bone: p0.alt.bone, joint: p0.alt.joint } : p0;
         if (done.has(pt.bone) || done.has(pt.bone.parent!)) continue;
         if (this.legacy && LEG.test(pt.group)) continue;
+        if (this.exempt.size && !LEG.test(pt.group) && this.exempt.has(pt.group[0] === 'L' ? 'Left' : 'Right')) continue;
         // рука у головы — целиком в pushChain; иначе — по осям, без прокси головы (их рядом нет)
         if (pt.surf && chainSide[pt.group[0] as 'L' | 'R']) continue;
         const mg = pt.hand && this.inPocket(pt.p) ? 0 : (LEG.test(pt.group) ? this.legMargin : this.margin) * rs;

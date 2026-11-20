@@ -4,7 +4,7 @@
 import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
 import { lowestPoint, twoBoneIK, curlFingers, type GroundVolume } from '../src/character/limbIK';
-import { HOLD_SPECS, PHASES, holdDuration, holdPose } from '../src/character/holdAction';
+import { BITES, HOLD_SPECS, PHASES, SIPS, holdDuration, holdPose } from '../src/character/holdAction';
 import { BOARD, FEET_ON_DECK, SKATE_T, SKATE_TOTAL, RIDE_FROM, RIDE_TO, makeSkateboard, setSkateFit, skatePose } from '../src/character/skateRig';
 import { canonQ, principalAxes } from '../src/character/props';
 
@@ -95,6 +95,34 @@ describe('шаблон «держать предмет»', () => {
       // во время «use» лапа у рта/лица
       expect(holdPose(s, s.t.take + s.t.raise + s.t.use / 2).toMouth).toBe(1);
     }
+  });
+  it('какао: два глотка с прищуром «^^», потом «ах»; пар всё время в лапе', () => {
+    const s = HOLD_SPECS.cocoa;
+    const u0 = s.t.take + s.t.raise;
+    for (const [a, b] of SIPS) {
+      const f = holdPose(s, u0 + (a + b) / 2);
+      expect(f.tilt).toBeGreaterThan(0.4);
+      expect(f.face.eyes_laugh).toBeGreaterThan(0.6);
+    }
+    const ah = holdPose(s, u0 + s.t.use - 0.4);
+    expect(ah.face.mouth_A).toBeGreaterThan(0.4);
+    expect(ah.headPitch).toBeLessThan(0.05);
+    expect(holdPose(s, u0 + 0.1).steam).toBeGreaterThan(0.5);
+  });
+  it('рыбка: два укуса — откушенное растёт, между укусами жуёт; зеркальце: бант, подмигнуть, «чмок»', () => {
+    const s = HOLD_SPECS.treat;
+    const u0 = s.t.take + s.t.raise;
+    const e1 = holdPose(s, u0 + BITES[0] + 0.3).eaten, e2 = holdPose(s, u0 + BITES[1] + 0.3).eaten;
+    expect(e1).toBeGreaterThan(0.2);
+    expect(e2).toBeGreaterThan(e1 + 0.2);
+    expect(holdPose(s, u0 + (BITES[0] + BITES[1]) / 2).face.cheeks_gum).toBeGreaterThan(0.3);
+    const m = HOLD_SPECS.mirror, m0 = m.t.take + m.t.raise;
+    expect(holdPose(m, m0 + 1.4).bow).toBeGreaterThan(0.9);
+    expect(holdPose(m, m0 + 2.3).face.wink_R).toBeGreaterThan(0.9);
+    expect(holdPose(m, m0 + 2.8).face.mouth_U).toBeGreaterThan(0.9);
+    // искра — при появлении и уходе
+    expect(holdPose(m, 0.25).spark).toBeGreaterThan(0);
+    expect(holdPose(m, holdDuration(m) - 0.2).spark).toBeGreaterThan(0);
   });
   it('какао: глоток — кружка наклоняется, голова к кружке', () => {
     const s = HOLD_SPECS.cocoa;

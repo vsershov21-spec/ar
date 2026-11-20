@@ -39,6 +39,11 @@ export interface PropDef {
   canon?: 'pca';
   /** не крепить к кисти (доска скейта стоит под лапами — её ставит place) */
   free?: boolean;
+  /**
+   * ручка кружки: дальний по горизонтали край модели (ручка) поворачивается в −X узла — к ладони (шаблон «держать
+   * предмет» ставит узел осью +X от ладони к кружке)
+   */
+  handle?: boolean;
 }
 
 export const PROPS: Record<string, PropDef> = {
@@ -50,9 +55,9 @@ export const PROPS: Record<string, PropDef> = {
   paint_brush: { make: makeBrush, bone: 'RightHand', size: 0.3, offset: [0, 0.01, 0.05], rot: [140, 0, -15], grip: 0.22 },
   paint_spray: { make: makeSpray, bone: 'RightHand', size: 0.17, offset: [0, 0, 0.05], rot: [12, 0, -10], grip: 0.42 },
   // шаблон «держать предмет» (holdAction.ts): положение и поворот задаёт place() — от ладони, не от клипа
-  hold_cocoa: { url: 'models/props/cocoa_mug.glb', bone: 'RightHand', size: 0.1, handK: 1.25, offset: [0, 0, 0], rot: [0, 0, 0], grip: 0.45 },
+  hold_cocoa: { url: 'models/props/cocoa_mug.glb', bone: 'RightHand', size: 0.1, handK: 1.15, handle: true, offset: [0, 0, 0], rot: [0, 0, 0], grip: 0.45 },
   hold_mirror: { url: 'models/props/hand_mirror.glb', bone: 'LeftHand', size: 0.2, handK: 2.6, canon: 'pca', offset: [0, 0, 0], rot: [0, 0, 0], grip: 0.14 },
-  hold_fish: { make: makeFish, bone: 'RightHand', size: 0.17, handK: 2.4, offset: [0, 0, 0], rot: [0, 0, 0], grip: 0.12 },
+  hold_fish: { make: makeFish, bone: 'RightHand', size: 0.17, handK: 2.9, offset: [0, 0, 0], rot: [0, 0, 0], grip: 0.12 },
   hold_gum: { make: makeGum, bone: 'RightHand', size: 0.06, handK: 0.75, offset: [0, 0, 0], rot: [0, 0, 0], grip: 0.15 },
   skateboard: { make: makeSkateboard, bone: 'RightHand', size: 0.068, free: true, offset: [0, 0, 0], rot: [0, 0, 0], grip: 0 },
 };
@@ -119,20 +124,21 @@ export class PropRig {
   /** длина кисти (запястье → кончик среднего пальца) в системе кота; 0 — не измерена (size из PropDef) */
   handLen = 0;
   /** положение реквизита задано снаружи (holdAction / скейт): позиция и поворот в системе root, масштаб 0…1 */
-  private placed: { p: THREE.Vector3; q: THREE.Quaternion; s: number } | null = null;
+  private placed: { p: THREE.Vector3; q: THREE.Quaternion; s: number; sy: number } | null = null;
   /** размеры текущего реквизита (после масштаба) */
   dims: PropDims | null = null;
 
-  /** поставить реквизит (holdAction, скейт): null — снова по кисти и клипу */
-  place(p: THREE.Vector3 | null, q?: THREE.Quaternion, s = 1) {
+  /** поставить реквизит (holdAction, скейт): null — снова по кисти и клипу; sy — доля длины по оси Y (откушенная рыбка) */
+  place(p: THREE.Vector3 | null, q?: THREE.Quaternion, s = 1, sy = 1) {
     if (!p) {
       this.placed = null;
       return;
     }
-    this.placed ??= { p: new THREE.Vector3(), q: new THREE.Quaternion(), s: 1 };
+    this.placed ??= { p: new THREE.Vector3(), q: new THREE.Quaternion(), s: 1, sy: 1 };
     this.placed.p.copy(p);
     if (q) this.placed.q.copy(q);
     this.placed.s = s;
+    this.placed.sy = sy;
   }
   /** пересобрать процедурный реквизит (размер доски поменялся под кота) */
   rebuild(id: string) {
@@ -217,7 +223,8 @@ export class PropRig {
     if (this.placed) {
       a.obj.position.copy(this.placed.p);
       a.obj.quaternion.copy(this.placed.q);
-      a.obj.scale.setScalar(Math.max(1e-4, this.placed.s));
+      const sc = Math.max(1e-4, this.placed.s);
+      a.obj.scale.set(sc, sc * Math.max(0.05, this.placed.sy), sc);
       a.obj.visible = this.placed.s > 0.01;
       return;
     }
@@ -283,6 +290,7 @@ export class PropRig {
       }
     });
     if (d.canon === 'pca') obj.quaternion.copy(canonQ(obj));
+    if (d.handle) obj.quaternion.premultiply(handleQ(obj));
     obj.updateMatrixWorld(true);
     const box = new THREE.Box3().setFromObject(obj);
     const sz = box.getSize(new THREE.Vector3());
@@ -327,6 +335,37 @@ export class PropRig {
     this.active?.obj.removeFromParent();
     this.active = null;
   }
+}
+
+/**
+ * Ручка кружки → −X: самая дальняя от вертикальной оси точка в средней по высоте части модели (ручка торчит вбок);
+ * поворот вокруг Y (поверх собственного obj.quaternion, premultiply).
+ */
+export function handleQ(obj: THREE.Object3D): THREE.Quaternion {
+  obj.updateMatrixWorld(true);
+  const box = new THREE.Box3().setFromObject(obj);
+  const c = box.getCenter(new THREE.Vector3());
+  const h = box.max.y - box.min.y;
+  let best = 0, dir = new THREE.Vector3(-1, 0, 0);
+  const v = new THREE.Vector3();
+  obj.traverse((o) => {
+    const m = o as THREE.Mesh;
+    const pos = m.isMesh ? (m.geometry.getAttribute('position') as THREE.BufferAttribute | undefined) : undefined;
+    if (!pos) return;
+    const step = Math.max(1, Math.floor(pos.count / 3000));
+    for (let i = 0; i < pos.count; i += step) {
+      v.fromBufferAttribute(pos, i).applyMatrix4(m.matrixWorld);
+      if (v.y < box.min.y + h * 0.2 || v.y > box.min.y + h * 0.85) continue;
+      const r = Math.hypot(v.x - c.x, v.z - c.z);
+      if (r > best) {
+        best = r;
+        dir = new THREE.Vector3(v.x - c.x, 0, v.z - c.z).normalize();
+      }
+    }
+  });
+  // поворот вокруг Y: dir → (−1, 0, 0)
+  const a = Math.atan2(-dir.z, dir.x), b = Math.atan2(0, -1);
+  return new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), b - a);
 }
 
 /**

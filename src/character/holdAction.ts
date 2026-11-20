@@ -1,19 +1,16 @@
 /**
  * Шаблон «держать предмет» (какао Добряка, зеркальце Блёстки, рыбка-угощение, жвачка Хулигана): одна и та же
- * последовательность поверх любого клипа покоя —
- *   take   — предмет появляется в лапе у груди (лапа поднимается, пальцы сжимаются вокруг ручки/кружки);
- *   raise  — подносит ко рту (зеркальце — к лицу, на расстояние взгляда);
- *   use    — sip: отпивает (кружка наклоняется к морде, голова — к кружке), bite: откусывает (лапа «клюёт» ко рту),
- *            look: смотрится (голова и глаза на зеркальце, лёгкое покачивание), pop: кладёт в рот (предмет пропадает);
+ * последовательность поверх клипа покоя —
+ *   take   — предмет появляется в лапе у груди из искры (лапа поднимается, пальцы сжимаются вокруг ручки);
+ *   raise  — подносит к морде: голова сама наклоняется навстречу, локоть вверх, плечо (ключица) подаётся вперёд,
+ *            лапа чуть мультяшно тянется (GlbCharacter.reachAssist) — кружка до рта, зеркальце — на ширину головы;
+ *   use    — sip: два маленьких глотка с прищуром удовольствия → «ах»; bite: укус → жуёт → второй укус → жуёт;
+ *            look: кокетливо вертит головой, второй лапой поправляет бант, подмигивает, «чмок»; pop: в рот → жуёт;
  *   lower  — опускает к груди;
- *   away   — предмет уменьшается и пропадает, лапа возвращается к клипу.
- * Лапа — IK двух костей (limbIK.ts) с локтем вниз-наружу; кисть повёрнута ладонью к предмету, пальцы — кулак
- * (curlFingers), предмет ставится в центр ладони по её нормали: кисть обхватывает ручку, а не висит рядом.
- * Масштаб — от длины кисти (PROPS.handK): кружка с ладонь, зеркальце — две с половиной кисти.
- * Здесь — только расписание и цели (чистая функция holdPose, tests/holdAction.test.ts); кости двигает GlbCharacter.
+ *   away   — предмет уменьшается и пропадает искрой, лапа возвращается к клипу.
+ * Здесь — только расписание (чистая функция holdPose, tests/holdSkate.test.ts) и мимика по тактам; кости двигает
+ * GlbCharacter.applyHold, предмет ставит placeHold — от фактической кисти каждый кадр (не отрывается).
  */
-import * as THREE from 'three';
-
 export type HoldUse = 'sip' | 'bite' | 'look' | 'pop';
 export type HoldPhase = 'take' | 'raise' | 'use' | 'lower' | 'away' | 'done';
 export interface HoldSpec {
@@ -27,10 +24,10 @@ export interface HoldSpec {
 
 /** действие кнопки → шаблон (id — scenario/actions.ts; у Хулигана «Пузыри» — жвачка) */
 export const HOLD_SPECS: Record<string, HoldSpec> = {
-  cocoa: { prop: 'hold_cocoa', hand: 'Right', use: 'sip', t: { take: 0.55, raise: 0.6, use: 1.7, lower: 0.5, away: 0.45 } },
-  mirror: { prop: 'hold_mirror', hand: 'Left', use: 'look', t: { take: 0.5, raise: 0.55, use: 1.9, lower: 0.45, away: 0.4 } },
-  treat: { prop: 'hold_fish', hand: 'Right', use: 'bite', t: { take: 0.5, raise: 0.5, use: 1.3, lower: 0.45, away: 0.4 } },
-  gum: { prop: 'hold_gum', hand: 'Right', use: 'pop', t: { take: 0.4, raise: 0.45, use: 0.5, lower: 0.35, away: 0.25 } },
+  cocoa: { prop: 'hold_cocoa', hand: 'Right', use: 'sip', t: { take: 0.55, raise: 0.6, use: 2.7, lower: 0.5, away: 0.45 } },
+  mirror: { prop: 'hold_mirror', hand: 'Left', use: 'look', t: { take: 0.5, raise: 0.55, use: 3.4, lower: 0.45, away: 0.4 } },
+  treat: { prop: 'hold_fish', hand: 'Right', use: 'bite', t: { take: 0.5, raise: 0.5, use: 2.4, lower: 0.45, away: 0.4 } },
+  gum: { prop: 'hold_gum', hand: 'Right', use: 'pop', t: { take: 0.4, raise: 0.45, use: 1.7, lower: 0.35, away: 0.25 } },
 };
 export const PHASES: Exclude<HoldPhase, 'done'>[] = ['take', 'raise', 'use', 'lower', 'away'];
 export function holdDuration(s: HoldSpec): number {
@@ -49,18 +46,35 @@ export interface HoldFrame {
   toMouth: number;
   /** масштаб предмета 0…1 (появление/уход) */
   scale: number;
-  /** наклон предмета (кружка при глотке), рад */
+  /** наклон предмета к морде (кружка при глотке; зеркальце — покачивание), рад */
   tilt: number;
-  /** голова назад (глоток) / к зеркальцу, рад */
+  /** голова и шея навстречу предмету (вниз-вперёд), рад; < 0 — назад («ах») */
   headPitch: number;
-  /** «клюёт» ко рту (откусить), доля смещения 0…1 */
+  /** голова к предмету по горизонтали (доля угла на предмет) */
+  headYaw: number;
+  /** наклон головы к плечу (кокетливо), рад; + — к лапе с предметом */
+  headRoll: number;
+  /** предмет ближе ко рту (укус, «в рот», «чмок»), доля смещения 0…1 */
   peck: number;
+  /** вторая лапа к банту (зеркальце) 0…1 и «поправляет» 0…1 */
+  bow: number;
+  bowPat: number;
+  /** пар над кружкой 0…1 */
+  steam: number;
+  /** рыбка: сколько откушено 0…1 (длина от головы) */
+  eaten: number;
+  /** искра появления / ухода 0…1 (0 — нет) */
+  spark: number;
+  /** мимика такта поверх лица: веса блендшейпов и глаз (eyes_laugh — «^^») */
+  face: Record<string, number>;
 }
 
 const ss = (x: number) => {
   const k = Math.max(0, Math.min(1, x));
   return k * k * (3 - 2 * k);
 };
+/** окно [a, b] с плавным входом/выходом длиной e (с) */
+const win = (t: number, a: number, b: number, e = 0.15) => Math.min(ss((t - a) / e), ss((b - t) / e));
 
 /** поза шаблона в момент t (с от старта) — чистая функция */
 export function holdPose(s: HoldSpec, t: number): HoldFrame {
@@ -70,61 +84,137 @@ export function holdPose(s: HoldSpec, t: number): HoldFrame {
     if (t < acc + d) return frame(s, ph, (t - acc) / d, t - acc);
     acc += d;
   }
-  return { phase: 'done', k: 1, w: 0, grip: 0, toMouth: 0, scale: 0, tilt: 0, headPitch: 0, peck: 0 };
+  return { ...blank('done'), k: 1, w: 0, grip: 0, scale: 0 };
 }
 
+function blank(phase: HoldPhase): HoldFrame {
+  return { phase, k: 0, w: 1, grip: 1, toMouth: 0, scale: 1, tilt: 0, headPitch: 0, headYaw: 0, headRoll: 0, peck: 0, bow: 0, bowPat: 0, steam: 0, eaten: 0, spark: 0, face: {} };
+}
+
+/** глотки какао: [начало, конец] в фазе use, с */
+export const SIPS: [number, number][] = [
+  [0.2, 0.85],
+  [1.05, 1.7],
+];
+/** укусы рыбки, с от начала use */
+export const BITES = [0.25, 1.25];
+
 function frame(s: HoldSpec, ph: Exclude<HoldPhase, 'done'>, k: number, tt: number): HoldFrame {
-  const f: HoldFrame = { phase: ph, k, w: 1, grip: 1, toMouth: 0, scale: 1, tilt: 0, headPitch: 0, peck: 0 };
+  const f = blank(ph);
+  f.k = k;
   const e = ss(k);
+  const U = s.t.use;
+  const face = f.face;
   switch (ph) {
     case 'take':
       f.w = e;
       f.grip = ss(k * 1.6 - 0.3);
-      f.scale = ss(k * 1.8);
+      // из искры: предмет растёт с лёгким «перелётом» (1.08) и садится в кулак
+      f.scale = k < 0.75 ? ss(k / 0.75) * 1.08 : 1.08 - 0.08 * ss((k - 0.75) / 0.25);
+      f.spark = k;
+      f.steam = 0.5 * e;
+      face.smile = 0.5 * e;
+      face.eyes_wide = 0.25 * Math.sin(k * Math.PI);
       break;
     case 'raise':
       f.toMouth = e;
+      f.steam = 0.5 + 0.5 * e;
+      f.headPitch = (s.use === 'look' ? 0.03 : s.use === 'sip' ? 0.16 : 0.1) * e;
+      f.headYaw = 0.5 * e;
+      face.smile = 0.5 + 0.2 * e;
+      if (s.use === 'bite' || s.use === 'pop') face.mouth_A = 0.25 * e;
       break;
-    case 'use': {
+    case 'use':
       f.toMouth = 1;
-      // вход и выход из действия — плавно (0,25 с)
-      const env = Math.min(1, tt / 0.25, (s.t.use - tt) / 0.25);
       if (s.use === 'sip') {
-        // лапы короткие: кот наклоняет голову к кружке и отпивает, кружка наклоняется к морде
-        f.tilt = 0.5 * env;
-        f.headPitch = 0.16 * env;
+        f.steam = 1 - 0.3 * ss((tt - 1.7) / 0.6);
+        let sip = 0;
+        for (const [a, b] of SIPS) sip = Math.max(sip, win(tt, a, b, 0.18));
+        f.tilt = 0.55 * sip;
+        f.headPitch = 0.16 + 0.12 * sip;
+        f.headYaw = 0.5;
+        // «ах»: кружку чуть от морды, голова назад, рот открыт, глаза «^^»
+        const ah = ss((tt - 1.85) / 0.3) * (1 - ss((tt - (U - 0.15)) / 0.15));
+        f.toMouth = 1 - 0.25 * ah;
+        f.headPitch -= 0.26 * ah;
+        face.eyes_laugh = Math.max(0.85 * sip, 0.8 * ah, 0.5 * win(tt, 0.85, 1.05, 0.1));
+        face.smile = 0.55 + 0.4 * ah;
+        face.mouth_U = 0.35 * sip;
+        face.mouth_A = 0.6 * ah;
+        face.cheek_up = 0.6 * Math.max(sip, ah);
+        face.blush = 0.5 * ah;
       } else if (s.use === 'bite') {
-        f.peck = Math.max(0, Math.sin(tt * Math.PI * 2 * 2.2)) * env;
-        f.headPitch = 0.05 * env;
+        let bite = 0;
+        for (const b of BITES) bite = Math.max(bite, win(tt, b - 0.18, b + 0.12, 0.12));
+        f.peck = bite;
+        f.headPitch = 0.1 + 0.06 * bite;
+        f.headYaw = 0.5;
+        f.eaten = 0.35 * ss((tt - BITES[0]) / 0.1) + 0.3 * ss((tt - BITES[1]) / 0.1);
+        // жуёт: челюсть 4 раза в секунду между укусами, щёки надуты, глаза «^^»
+        const chew = Math.max(win(tt, BITES[0] + 0.15, BITES[1] - 0.2, 0.1), win(tt, BITES[1] + 0.15, U - 0.05, 0.1));
+        const jaw = 0.5 + 0.5 * Math.sin(tt * Math.PI * 2 * 4);
+        face.mouth_A = Math.max(0.75 * bite, 0.3 * chew * jaw);
+        face.mouth_M = 0.4 * chew * (1 - jaw);
+        face.cheeks_gum = 0.45 * chew;
+        face.eyes_laugh = 0.75 * chew;
+        face.smile = 0.5 + 0.3 * chew;
       } else if (s.use === 'look') {
-        f.headPitch = 0.08 * env;
-        f.tilt = 0.12 * Math.sin(tt * Math.PI * 2 * 0.8) * env;
+        // кокетливо: голова туда-сюда к зеркальцу с наклоном к плечу
+        const flirt = win(tt, 0.0, 1.0, 0.2);
+        f.headYaw = 0.65 + 0.35 * Math.sin(tt * Math.PI * 2 * 1.1) * flirt;
+        f.headRoll = 0.16 * Math.sin(tt * Math.PI * 2 * 1.1 + 0.6) * flirt;
+        f.tilt = 0.1 * Math.sin(tt * Math.PI * 2 * 0.7);
+        f.headPitch = 0.03;
+        // поправить бант второй лапой
+        f.bow = win(tt, 0.85, 2.05, 0.3);
+        f.bowPat = f.bow * (0.5 + 0.5 * Math.sin((tt - 0.85) * Math.PI * 2 * 2.2));
+        f.headRoll += -0.14 * f.bow; // голова к лапе у банта
+        // подмигнуть и «чмок» в зеркальце
+        const wink = win(tt, 2.1, 2.5, 0.08);
+        const kiss = win(tt, 2.6, 3.05, 0.1);
+        f.peck = 0.25 * kiss;
+        face.smile = 0.7 * (1 - kiss) + 0.25;
+        face.cheek_up = 0.5;
+        face.blush = 0.35 + 0.35 * kiss;
+        face[s.hand === 'Left' ? 'wink_R' : 'wink_L'] = wink;
+        face.mouth_U = kiss;
+        face.eyes_laugh = 0.6 * kiss;
+        face.brow_up = 0.3 * flirt;
       } else {
-        // pop: в рот — предмет уменьшается к концу фазы
-        f.peck = e;
-        f.scale = 1 - ss(k * 1.4 - 0.2);
+        // pop: в рот (предмет уменьшается у рта) → жуёт с надутыми щеками
+        f.peck = ss(tt / 0.35);
+        f.scale = 1 - ss((tt - 0.15) / 0.3);
+        f.headPitch = 0.08;
+        f.headYaw = 0.4;
+        const chew = ss((tt - 0.45) / 0.15);
+        const jaw = 0.5 + 0.5 * Math.sin(tt * Math.PI * 2 * 3.5);
+        face.mouth_A = Math.max(0.6 * (1 - chew) * ss(tt / 0.2), 0.25 * chew * jaw);
+        face.mouth_M = 0.45 * chew * (1 - jaw);
+        face.cheeks_gum = 0.7 * chew;
+        face.eyes_laugh = 0.4 * chew;
+        face.smile = 0.4;
       }
       break;
-    }
     case 'lower':
       f.toMouth = 1 - e;
+      f.headPitch = 0.06 * (1 - e);
+      f.headYaw = 0.5 * (1 - e);
+      f.steam = 0.7;
       if (s.use === 'pop') f.scale = 0;
+      if (s.use === 'bite') f.eaten = 0.65;
+      face.smile = 0.75;
+      face.cheek_up = 0.4;
       break;
     case 'away':
       f.w = 1 - e;
       f.grip = 1 - e;
       f.scale = s.use === 'pop' ? 0 : 1 - ss(k * 1.5);
+      f.spark = s.use === 'pop' ? 0 : k;
+      f.steam = 0.7 * (1 - e);
+      if (s.use === 'bite') f.eaten = 0.65;
+      face.smile = 0.7 * (1 - e);
       break;
   }
+  if (s.use !== 'sip') f.steam = 0;
   return f;
-}
-
-/** цели лапы в системе персонажа (рост 1, лицом +Z); sx: правая лапа −1 (справа у кота = −X), левая +1 */
-export function handTargets(s: HoldSpec, mouth: THREE.Vector3, head: THREE.Vector3, out: { chest: THREE.Vector3; face: THREE.Vector3 }) {
-  const sx = s.hand === 'Right' ? -1 : 1;
-  out.chest.set(sx * 0.12, 0.4, 0.2);
-  if (s.use === 'look') out.face.set(sx * 0.06, head.y - 0.15, head.z + 0.22);
-  else if (s.use === 'sip') out.face.set(mouth.x + sx * 0.05, mouth.y - 0.07, mouth.z + 0.15);
-  else out.face.set(mouth.x + sx * 0.04, mouth.y - 0.06, mouth.z + 0.14);
-  return out;
 }

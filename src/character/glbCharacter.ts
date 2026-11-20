@@ -22,12 +22,13 @@ import { loadMeshyClips, meshyStatus, meshyWanted, skelFrom, type Skel } from '.
 import { feature } from '../config/edition';
 import { AnimBlender } from './animBlend';
 import { TailRig, type TailOutput } from './tailRig';
-import { PropRig } from './props';
+import { PROPS, PropRig } from './props';
 import { ToolIK, type AimRequest } from './toolIK';
 import { BodyCollider, CAT_MM, worstPair, type CollidersJson } from './bodyCollide';
 import { FootPin } from './footPin';
 import { curlFingers, lowestPoint, rotWorld as rotW, twoBoneIK, type GroundVolume } from './limbIK';
-import { HOLD_SPECS, handTargets, holdDuration, holdPose, type HoldSpec } from './holdAction';
+import { HOLD_SPECS, holdDuration, holdPose, type HoldFrame, type HoldSpec } from './holdAction';
+import { PropFx } from './propFx';
 import { BOARD, FEET_ON_DECK, SKATE_TOTAL, setSkateFit, skatePose, type SkateFrame } from './skateRig';
 /** точка хвоста доски (ось олли) от центра, доли роста */
 const BOARD_TAIL = () => BOARD.len * 0.42;
@@ -423,6 +424,7 @@ export class GlbCharacter implements Character {
       this.inner,
     );
     this.measureHands(model);
+    this.inner.add(this.propFx.group);
   }
 
   /**
@@ -492,6 +494,40 @@ export class GlbCharacter implements Character {
     }
     const hl = lens.length ? lens.reduce((a, b) => a + b, 0) / lens.length : 0;
     if (this.props && hl > 0.02 && hl < 0.3) this.props.handLen = hl;
+    // длины звеньев рук (reachAssist тянет и возвращает), рот и бант в системе головы
+    for (const n of ['LeftForeArm', 'RightForeArm', 'LeftHand', 'RightHand']) {
+      const b = this.bones.get(n);
+      if (b) this.armRest.set(b, b.position.clone());
+    }
+    const head = this.bones.get('Head');
+    if (head) {
+      head.updateWorldMatrix(true, false);
+      const inv = head.matrixWorld.clone().invert();
+      // рот: центр накладки рта (или челюсть) лежит внутри головы — луч спереди по оси кота до поверхности морды
+      const mm = this.mouthRig?.mesh;
+      const jaw = this.bones.get('Jaw');
+      // накладка рта — с запасом вниз под открытый рот: линия сомкнутых губ — на 0,62 её высоты (стенд)
+      const mb = mm ? new THREE.Box3().setFromObject(mm) : null;
+      const c = mb ? mb.getCenter(new THREE.Vector3()).setY(mb.min.y + (mb.max.y - mb.min.y) * 0.62) : jaw ? jaw.getWorldPosition(new THREE.Vector3()) : null;
+      if (c) {
+        const fwd = new THREE.Vector3(0, 0, 1).transformDirection(this.object.matrixWorld);
+        const ray = new THREE.Raycaster(c.clone().addScaledVector(fwd, 2), fwd.clone().negate());
+        const skin: THREE.Object3D[] = [];
+        model.traverse((o) => {
+          const m = o as THREE.Mesh;
+          const mat = m.material as THREE.Material | undefined;
+          if (m.isMesh && m.visible && mat && !mat.transparent && !/tuft|fur|eye|mouth|whisk|tongue|teeth|lid|brow|card/i.test(m.name)) skin.push(m);
+        });
+        const hit = ray.intersectObjects(skin, false).find((h) => h.point.clone().sub(c).dot(fwd) > -0.01);
+        if (hit && hit.point.distanceTo(c) < 0.25) c.copy(hit.point).addScaledVector(fwd, 0.004);
+        this.mouthHL = c.applyMatrix4(inv);
+      }
+      let bow: THREE.Object3D | null = null;
+      model.traverse((o) => {
+        if (!bow && (o as THREE.Mesh).isMesh && /bow|bant|бант/i.test(o.name)) bow = o;
+      });
+      if (bow) this.bowHL = new THREE.Box3().setFromObject(bow as THREE.Object3D).getCenter(new THREE.Vector3()).applyMatrix4(inv);
+    }
   }
 
   // ───────────── действия с предметом и скейт (оркестратор режиссёра вызывает runAct) ─────────────
@@ -519,6 +555,9 @@ export class GlbCharacter implements Character {
   cancelAct() {
     if (!this.act) return;
     this.act = null;
+    this.restoreArms();
+    this.actFace = null;
+    this.propFx.hide();
     if (this.clips.requested === 'idle_breathe') this.play('idle');
     this.actLook = null;
     this.props?.place(null);
@@ -1018,6 +1057,13 @@ export class GlbCharacter implements Character {
     W.cheek_up = Math.max(W.cheek_up ?? 0, 0.5 * (W.smile ?? 0), 0.3 * (W.smirk ?? 0));
     W.nose_wrinkle = Math.max(W.nose_wrinkle ?? 0, 0.35 * (W.brow_down ?? 0));
     for (const k in this.visemeW) W[k] = Math.max((W[k] ?? 0) * 0.5, this.visemeW[k]);
+    // мимика действия с предметом (глоток «^^», подмигнуть, «чмок», жуёт): поверх, без хмурых бровей
+    const af = this.actFace;
+    if (af) {
+      for (const k in af) W[k] = Math.max(W[k] ?? 0, af[k]);
+      W.brow_down = (W.brow_down ?? 0) * 0.15;
+      W.frown = (W.frown ?? 0) * 0.15;
+    }
     this.wrinkles?.update(W);
     this.mouthRig?.setTongue(modelsV2() ? PERSONA_TONGUE_V2[this.personaId] : undefined);
     this.mouthRig?.update(W);
@@ -1082,7 +1128,8 @@ export class GlbCharacter implements Character {
     if (ik.mode !== 'off' || ik.weight > 0.002 || ik.crouch > 0.002) ik.apply(dt, { bones: this.bones, object: this.object, inner: this.inner, axes: this.modelAxes(), rot: (b, a, ang) => this.rotWorld(b, a, ang) });
     // предмет в лапе / скейт — поверх клипа и коррекции тела; затем — пол (ничто не ниже опоры)
     this.applySkate();
-    this.placeHold();
+    this.placeHold(dt);
+    if (!this.act) this.propFx.hide();
     this.groundFinal(dt, cs.cur.id);
     this.props?.aim(ik.aimW > 0.01 ? ik.aimPoint : null, ik.aimW);
     this.props?.update(this.clips.cur.id);
@@ -1195,127 +1242,276 @@ export class GlbCharacter implements Character {
     }
   }
 
-  /** предмет в лапе (holdAction.ts): IK лапы к груди/рту/лицу, кисть ладонью к предмету, кулак, предмет в ладони */
+  /** длины звеньев рук в покое (позиции костей локтя и кисти) — reachAssist тянет их и каждый кадр возвращает */
+  private armRest = new Map<THREE.Object3D, THREE.Vector3>();
+  /** рот (центр накладки рта / челюсть) в системе кости Head — куда подносят кружку, рыбку, жвачку */
+  private mouthHL: THREE.Vector3 | null = null;
+  /** бант (Блёстка) в системе кости Head — вторая лапа его поправляет; нет — макушка сбоку */
+  private bowHL: THREE.Vector3 | null = null;
+  /** мимика действия поверх лица (holdAction: глоток «^^», подмигнуть, «чмок», жуёт) */
+  private actFace: Record<string, number> | null = null;
+  /** пар над кружкой и искра появления/ухода предмета (в системе inner) */
+  readonly propFx = new PropFx();
+  /** стенд: растяжка лапы (1 — без), недолёт IK (доли роста), поворот ключицы (рад) */
+  readonly holdDbg = { stretch: 1, miss: 0, clav: 0, want: new THREE.Vector3(), got: new THREE.Vector3() };
+  private holdF: { f: HoldFrame; side: 'Left' | 'Right'; off: THREE.Vector3; q: THREE.Quaternion; top: THREE.Vector3; look: THREE.Vector3 | null; hl: number } | null = null;
+
+  private lastClav = 0;
+  private restoreArms() {
+    for (const [b, p] of this.armRest) b.position.copy(p);
+  }
+
+  /** рот в системе кота (центр накладки рта; без неё — челюсть) */
+  mouthLocal(out = new THREE.Vector3()): THREE.Vector3 {
+    const h = this.bones.get('Head');
+    if (h && this.mouthHL) {
+      h.updateWorldMatrix(true, false);
+      return this.object.worldToLocal(out.copy(this.mouthHL).applyMatrix4(h.matrixWorld));
+    }
+    return out.copy(this.anchorLocal('mouth') ?? new THREE.Vector3(0, 0.7, 0.2));
+  }
+
+  /**
+   * Дотянуться (мультяшно, «допустимо чуть удлинить за счёт плеча»): цель запястья дальше длины лапы — ключица подаёт
+   * плечо к цели (до 0,6 рад), не хватает и так — звенья плеча и предплечья тянутся до ×1,32 (позиции костей локтя и
+   * кисти; restoreArms возвращает). target — мир; w — вес действия. Возвращает растяжку.
+   */
+  private reachAssist(side: 'Left' | 'Right', target: THREE.Vector3, w: number): number {
+    const C = this.bones.get(side + 'Shoulder'), S = this.bones.get(side + 'Arm'), E = this.bones.get(side + 'ForeArm'), H = this.bones.get(side + 'Hand');
+    if (!S || !E || !H || w <= 0.001) return 1;
+    S.updateWorldMatrix(true, true);
+    const sp = S.getWorldPosition(new THREE.Vector3()), ep = E.getWorldPosition(new THREE.Vector3()), hp = H.getWorldPosition(new THREE.Vector3());
+    const L = sp.distanceTo(ep) + ep.distanceTo(hp);
+    let d = sp.distanceTo(target);
+    let clav = 0;
+    if (C && d > L * 0.9) {
+      const cp = C.getWorldPosition(new THREE.Vector3());
+      const cur = sp.clone().sub(cp), want = target.clone().sub(cp);
+      const ax = cur.clone().cross(want);
+      clav = Math.min(cur.angleTo(want), 0.6) * clamp((d / L - 0.9) * 3, 0, 1) * w;
+      if (ax.lengthSq() > 1e-12 && clav > 1e-4) rotW(C, ax.normalize(), clav);
+      d = S.getWorldPosition(new THREE.Vector3()).distanceTo(target);
+    }
+    const s = 1 + (clamp(d / (L * 0.985), 1, 1.32) - 1) * w;
+    const e0 = this.armRest.get(E), h0 = this.armRest.get(H);
+    if (s > 1.001 && e0 && h0) {
+      E.position.copy(e0).multiplyScalar(s);
+      H.position.copy(h0).multiplyScalar(s);
+      S.updateMatrixWorld(true);
+    }
+    this.lastClav = clav;
+    return s;
+  }
+
+  /** повернуть кисть: пальцы — по fd, ладонь (подушечки) — по pn (оба в системе кота), вес w */
+  private orientHand(H: THREE.Object3D, side: 'Left' | 'Right', fdL: THREE.Vector3, pnL: THREE.Vector3, w: number) {
+    const m1 = this.inner.getObjectByName('mixamorig' + side + 'HandMiddle1');
+    if (!m1 || w <= 0.01) return;
+    const obj = this.object;
+    const dirW = (v: THREE.Vector3) => v.clone().transformDirection(obj.matrixWorld);
+    H.updateWorldMatrix(true, true);
+    const hp = H.getWorldPosition(new THREE.Vector3());
+    const curF = m1.getWorldPosition(new THREE.Vector3()).sub(hp).normalize();
+    const wantF = dirW(fdL);
+    const ang = Math.acos(clamp(curF.dot(wantF), -1, 1));
+    const ax = curF.clone().cross(wantF);
+    if (ax.lengthSq() > 1e-10) rotW(H, ax.normalize(), ang * w);
+    const pnLocal = this.palmN.get(side) ?? new THREE.Vector3(0, 0, 1);
+    const curN = pnLocal.clone().applyQuaternion(H.getWorldQuaternion(new THREE.Quaternion()));
+    const wantN = dirW(pnL);
+    const fw = dirW(fdL);
+    curN.addScaledVector(fw, -curN.dot(fw));
+    wantN.addScaledVector(fw, -wantN.dot(fw));
+    if (curN.lengthSq() > 1e-8 && wantN.lengthSq() > 1e-8) {
+      curN.normalize();
+      wantN.normalize();
+      const r = Math.acos(clamp(curN.dot(wantN), -1, 1));
+      const sg = Math.sign(curN.clone().cross(wantN).dot(fw)) || 1;
+      rotW(H, fw, sg * r * w);
+    }
+  }
+  private fist(side: 'Left' | 'Right', k: number, thumb = 0.45) {
+    const H = this.bones.get(side + 'Hand');
+    if (!H || k <= 0.001) return;
+    const nW = (this.palmN.get(side) ?? new THREE.Vector3(0, 0, 1)).clone().applyQuaternion(H.getWorldQuaternion(new THREE.Quaternion())).normalize();
+    const chains = this.fingers.get(side) ?? [];
+    curlFingers(chains.slice(1), nW, k);
+    if (chains[0]) curlFingers([chains[0]], nW, k * thumb);
+  }
+
+  /**
+   * Предмет в лапе (holdAction.ts): сначала — где должен быть предмет (у рта / у лица / у груди) с осью и нормалью,
+   * от него — ладонь и запястье; тело навстречу (корпус, шея, голова), ключица и растяжка — если лапа не достаёт;
+   * IK лапы, кисть ладонью к ручке, кулак. Предмет ставит placeHold — от фактической кисти (после коррекции тела).
+   */
   private applyHold(dt: number) {
     const a = this.act;
-    if (!a || a.kind !== 'hold' || !this.props) return;
+    this.restoreArms();
+    if (!a || a.kind !== 'hold' || !this.props) {
+      this.actFace = null;
+      if (this.collider?.exempt.size && a?.kind !== 'skate') this.collider.exempt.clear();
+      return;
+    }
     a.t += dt;
     const f = holdPose(a.spec, a.t);
-    if (f.phase === 'done') return this.cancelAct();
-    const side = a.spec.hand, sx = side === 'Right' ? -1 : 1;
+    if (f.phase === 'done') {
+      this.actFace = null;
+      return this.cancelAct();
+    }
+    const spec = a.spec, side = spec.hand, sx = side === 'Right' ? -1 : 1;
+    // лапа с предметом (и лапа у банта) — без выталкивания BodyCollider: цели IK подобраны вне тела
+    const ex = this.collider?.exempt;
+    if (ex) {
+      ex.clear();
+      if (f.w > 0.3) ex.add(side);
+      if (f.bow > 0.3) ex.add(side === 'Left' ? 'Right' : 'Left');
+    }
     const S = this.bones.get(side + 'Arm'), E = this.bones.get(side + 'ForeArm'), H = this.bones.get(side + 'Hand');
     if (!S || !E || !H) return;
     const obj = this.object;
     obj.updateMatrixWorld(true);
-    const mouth = this.anchorLocal('mouth') ?? new THREE.Vector3(0, 0.7, 0.15);
-    const headB = this.bones.get('Head');
-    const head = headB ? obj.worldToLocal(headB.getWorldPosition(new THREE.Vector3())) : new THREE.Vector3(0, 0.7, 0);
-    // короткие лапы чиби не достают до рта: навстречу — наклон корпуса и шеи (как когда пьют/кусают)
-    if (f.toMouth > 0.01 && a.spec.use !== 'look') {
-      const side = this.modelAxes().side;
-      for (const [n, k] of [['Spine1', 0.08], ['Spine2', 0.12], ['Neck', 0.17]] as const) {
-        const b = this.bones.get(n);
-        if (b) rotW(b, side, k * f.toMouth * f.w);
-      }
-      obj.updateMatrixWorld(true);
-    }
-    const mouthNow = this.anchorLocal('mouth') ?? mouth;
-    mouth.copy(mouthNow);
-    const tg = handTargets(a.spec, mouth, head, { chest: new THREE.Vector3(), face: new THREE.Vector3() });
-    const palm = tg.chest.clone().lerp(tg.face, f.toMouth);
-    if (f.peck) palm.lerp(mouth, (a.spec.use === 'pop' ? 0.55 : 0.25) * f.peck);
-    // желаемые оси кисти (система кота): пальцы вперёд-вверх, ладонь к середине тела
-    const fdL = new THREE.Vector3(-sx * 0.15, a.spec.use === 'look' ? -0.1 : 0.35, 1).normalize();
-    const pnL = new THREE.Vector3(-sx, 0, 0);
-    pnL.addScaledVector(fdL, -pnL.dot(fdL)).normalize();
-    const hl = this.props.handLen || 0.07;
-    // кисть (запястье) — так, чтобы центр ладони пришёл в точку palm
-    const wristL = palm.clone().addScaledVector(fdL, -0.5 * hl);
+    const ax = this.modelAxes();
+    const W = f.w;
+    const V = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
     const toW = (v: THREE.Vector3) => obj.localToWorld(v.clone());
     const dirW = (v: THREE.Vector3) => v.clone().transformDirection(obj.matrixWorld);
-    const pole = dirW(new THREE.Vector3(sx * 0.9, -0.45, -0.1).normalize());
-    twoBoneIK(S, E, H, toW(wristL), pole, f.w);
-    // поворот кисти: пальцы — по fd, ладонь — к предмету
-    const pnLocal = this.palmN.get(side) ?? new THREE.Vector3(0, 0, 1);
-    const m1 = this.inner.getObjectByName('mixamorig' + side + 'HandMiddle1') ?? null;
-    if (m1 && f.w > 0.01) {
-      H.updateWorldMatrix(true, true);
-      const hp = H.getWorldPosition(new THREE.Vector3());
-      const curF = m1.getWorldPosition(new THREE.Vector3()).sub(hp).normalize();
-      const wantF = dirW(fdL);
-      const ang = Math.acos(clamp(curF.dot(wantF), -1, 1));
-      const ax = curF.clone().cross(wantF);
-      if (ax.lengthSq() > 1e-10) rotW(H, ax.normalize(), ang * f.w);
-      const curN = pnLocal.clone().applyQuaternion(H.getWorldQuaternion(new THREE.Quaternion()));
-      const wantN = dirW(pnL);
-      const fw = dirW(fdL);
-      curN.addScaledVector(fw, -curN.dot(fw));
-      wantN.addScaledVector(fw, -wantN.dot(fw));
-      if (curN.lengthSq() > 1e-8 && wantN.lengthSq() > 1e-8) {
-        curN.normalize();
-        wantN.normalize();
-        const r = Math.acos(clamp(curN.dot(wantN), -1, 1));
-        const sg = Math.sign(curN.clone().cross(wantN).dot(fw)) || 1;
-        rotW(H, fw, sg * r * f.w);
+    // 1. тело навстречу предмету: корпус, шея и голова вперёд-вниз («ах» — назад), голова к плечу (кокетливо)
+    const lean = f.headPitch * Math.min(1, W * 1.5);
+    for (const [n, k] of [['Spine1', 0.3], ['Spine2', 0.4], ['Neck', 0.55], ['Head', 0.55]] as const) {
+      const b = this.bones.get(n);
+      if (b && lean) rotW(b, ax.side, k * lean);
+    }
+    const headB = this.bones.get('Head');
+    if (headB) {
+      if (f.headRoll) rotW(headB, ax.fwd, -sx * f.headRoll * W);
+      if (spec.use === 'look') rotW(headB, ax.up, sx * (f.headYaw - 0.5) * 0.7 * W);
+    }
+    obj.updateMatrixWorld(true);
+    const M = this.mouthLocal();
+    const Hd = headB ? obj.worldToLocal(headB.getWorldPosition(new THREE.Vector3())) : V(0, 0.6, 0.05);
+    const dims = this.props.dims ?? { h: 0.1, r: 0.04 };
+    const hl = this.props.handLen || 0.07;
+    const gripK = PROPS[spec.prop]?.grip ?? 0;
+    const hTop = dims.h * (1 - gripK);
+    // 2. предмет: ось Y, точка хвата (узел prop) у лица (near) и у груди (far) — система кота
+    const Y = V(0, 1, 0), near = V(0, 0, 0), far = V(sx * 0.07, 0.4, 0.25);
+    let look: THREE.Vector3 | null = null;
+    if (spec.use === 'sip') {
+      // кружка вертикально, край — у рта (чуть ниже и впереди губ); глоток — верх к морде
+      Y.set(0, Math.cos(f.tilt), -Math.sin(f.tilt));
+      // ближний край — у губ: центр края на радиус корпуса кружки впереди рта (dims.r — с ручками)
+      // верх габарита кружки — зефир над краем (≈ 0,2 высоты): край — ниже, поэтому цель — чуть выше губ
+      // камера AR — сверху: край чуть выше губ, иначе с телефона кружка «у подбородка» (листы 20.11)
+      const rim = M.clone().add(V(0, 0.026 + 0.014 * f.tilt, dims.r * 0.55 - 0.018 * f.tilt));
+      near.copy(rim).addScaledVector(Y, -hTop * 0.97);
+      far.set(sx * 0.03, 0.4, 0.27);
+    } else if (spec.use === 'look') {
+      // зеркальце: стекло вертикально к морде на ширину головы, сбоку-спереди; «чмок» — ближе к рту
+      Y.set(sx * 0.08, 1, -0.1).normalize();
+      const G = Hd.clone().add(V(sx * 0.15, 0.09, 0.27));
+      G.lerp(M.clone().add(V(sx * 0.05, 0.02, 0.06)), clamp(f.peck * 2.4, 0, 0.7));
+      near.copy(G).addScaledVector(Y, -dims.h * (0.6 - gripK));
+      far.set(sx * 0.12, 0.42, 0.25);
+      look = G;
+    } else {
+      // рыбка/жвачка: хвост (край) в кулаке, голова — ко рту; укус — до губ
+      Y.set(-sx * 0.42, 0.85, -0.32).normalize();
+      // голова рыбки — к губам (камера сверху: чуть выше линии рта), укус — в рот
+      const top = M.clone().add(V(0, 0.022 - 0.012 * f.peck, 0.03 * (1 - f.peck) - 0.008));
+      near.copy(top).addScaledVector(Y, -hTop * 0.95 * (1 - f.eaten));
+      far.set(sx * 0.1, 0.4, 0.25);
+    }
+    const pivot = far.clone().lerp(near, f.toMouth);
+    // 3. ладонь и оси кисти: кружка — ладонь к ручке сбоку, пальцы вперёд; ручка/хвост — кулак поперёк оси предмета
+    const pn = V(0, 0, 0), fd = V(0, 0, 0);
+    const palm = pivot.clone();
+    if (spec.use === 'sip') {
+      pn.set(-sx, 0, 0);
+      fd.set(0, 0.3, 1).addScaledVector(pn, -0.3 * 0).normalize();
+      fd.addScaledVector(pn, -fd.dot(pn)).normalize();
+      palm.addScaledVector(pn, -dims.r * 0.78);
+    } else {
+      const F = spec.use === 'look' ? V(-sx, 0, 0.7) : V(sx * 0.2, 0, 1);
+      fd.copy(F).addScaledVector(Y, -F.dot(Y)).normalize();
+      pn.crossVectors(Y, fd).normalize();
+      palm.addScaledVector(pn, -0.012);
+    }
+    const wristW = toW(palm.clone().addScaledVector(fd, -0.5 * hl));
+    this.holdDbg.stretch = this.reachAssist(side, wristW, W);
+    this.holdDbg.clav = this.lastClav;
+    // локоть вверх-наружу (кружка, рыбка): предплечье идёт над шарфом/наушниками, а не сквозь
+    const pole = dirW(spec.use === 'look' ? V(sx, -0.3, -0.35) : V(sx, 0.75, -0.15)).normalize();
+    const ws = obj.getWorldScale(new THREE.Vector3()).y || 1;
+    this.holdDbg.miss = twoBoneIK(S, E, H, wristW, pole, W) / ws;
+    this.orientHand(H, side, fd, pn, W);
+    this.fist(side, f.grip * (spec.use === 'pop' ? 0.75 : spec.use === 'sip' ? 0.85 : 0.95));
+    // 4. вторая лапа — поправить бант (зеркальце)
+    if (spec.use === 'look' && f.bow > 0.01) {
+      const os = side === 'Left' ? 'Right' : 'Left', ox = -sx;
+      const S2 = this.bones.get(os + 'Arm'), E2 = this.bones.get(os + 'ForeArm'), H2 = this.bones.get(os + 'Hand');
+      if (S2 && E2 && H2) {
+        const bow = this.bowHL && headB ? obj.worldToLocal(this.bowHL.clone().applyMatrix4(headB.matrixWorld)) : Hd.clone().add(V(ox * 0.12, 0.28, 0.05));
+        // ладонь на бант сбоку-снизу, похлопывает
+        const tgt = bow.clone().add(V(ox * 0.1, -0.04 + 0.02 * f.bowPat, 0.04));
+        const pn2 = bow.clone().sub(tgt).normalize();
+        const fd2 = V(-ox * 0.3, 1, 0.2);
+        fd2.addScaledVector(pn2, -fd2.dot(pn2)).normalize();
+        const w2 = toW(tgt.clone().addScaledVector(fd2, -0.5 * hl));
+        this.reachAssist(os, w2, f.bow);
+        twoBoneIK(S2, E2, H2, w2, dirW(V(ox, 0.5, -0.2)).normalize(), f.bow);
+        this.orientHand(H2, os, fd2, pn2, f.bow);
+        this.fist(os, 0.35 * f.bow, 0.3);
       }
     }
-    // голова: глоток — назад, зеркальце — чуть к нему
-    if (headB && f.headPitch) rotW(headB, this.modelAxes().side, f.headPitch);
-    // кулак вокруг предмета
-    const nW = pnLocal.clone().applyQuaternion(H.getWorldQuaternion(new THREE.Quaternion())).normalize();
-    const chains = this.fingers.get(side) ?? [];
-    curlFingers(chains.slice(1), nW, f.grip * (a.spec.use === 'pop' ? 0.75 : 0.95));
-    if (chains[0]) curlFingers([chains[0]], nW, f.grip * 0.45);
-    this.holdF = { f, side, fdL, hl, nLocal: pnLocal, m1, head };
+    this.actFace = f.face;
+    // предмет относительно ладони и его поворот (оси: X — от ладони к кружке / поперёк, Y — ось, Z — лицом к морде)
+    const Z = V(0, 0, 0), X = V(0, 0, 0);
+    if (spec.use === 'sip') {
+      X.copy(pn).addScaledVector(Y, -pn.dot(Y)).normalize();
+      Z.crossVectors(X, Y).normalize();
+    } else {
+      const toFace = spec.use === 'look' && look ? Hd.clone().add(V(0, 0.08, 0.2)).sub(look) : V(0, 0.15, 1);
+      Z.copy(toFace).addScaledVector(Y, -toFace.dot(Y)).normalize();
+      X.crossVectors(Y, Z).normalize();
+    }
+    const q = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(X, Y, Z));
+    if (spec.use === 'look' && f.tilt) q.premultiply(new THREE.Quaternion().setFromAxisAngle(Y, f.tilt));
+    this.holdDbg.want.copy(pivot);
+    this.holdF = { f, side, off: pivot.clone().sub(palm), q, top: Y.clone().multiplyScalar(hTop), look, hl };
   }
-  private holdF: { f: ReturnType<typeof holdPose>; side: 'Left' | 'Right'; fdL: THREE.Vector3; hl: number; nLocal: THREE.Vector3; m1: THREE.Object3D | null; head: THREE.Vector3 } | null = null;
 
-  /** предмет в ладони — после коррекции тела (BodyCollider мог отодвинуть лапу от шарфа/наушников) */
-  private placeHold() {
+  /** предмет в ладони — после коррекции тела (BodyCollider мог отодвинуть лапу): узел prop = фактическая ладонь + сдвиг */
+  private placeHold(dt: number) {
     const a = this.act, hf = this.holdF;
     this.holdF = null;
     if (!a || a.kind !== 'hold' || !this.props || !hf) return;
-    const { f, side, fdL, hl, m1, head } = hf;
+    const { f, side, off, q, top, hl } = hf;
     const obj = this.object;
     const H = this.bones.get(side + 'Hand');
+    const m1 = this.inner.getObjectByName('mixamorig' + side + 'HandMiddle1');
     if (!H) return;
-    const nW = hf.nLocal.clone().applyQuaternion(H.getWorldQuaternion(new THREE.Quaternion())).normalize();
-    // предмет: центр ладони + нормаль × толщина, ось — по типу предмета
     H.updateWorldMatrix(true, true);
     const hp = obj.worldToLocal(H.getWorldPosition(new THREE.Vector3()));
-    const fdA = m1 ? obj.worldToLocal(m1.getWorldPosition(new THREE.Vector3())).sub(hp).normalize() : fdL.clone();
-    const pnA = nW.clone().transformDirection(obj.matrixWorld.clone().invert()).normalize();
-    const dims = this.props.dims ?? { h: 0.1, r: 0.04 };
-    const pc = hp.clone().addScaledVector(fdA, 0.5 * hl);
-    const q = new THREE.Quaternion();
-    const up = new THREE.Vector3(0, 1, 0);
-    let pos: THREE.Vector3;
-    if (a.spec.use === 'sip') {
-      // кружка: стоит вертикально у ладони, ручкой к ладони; глоток — верх к морде
-      pos = pc.clone().addScaledVector(pnA, dims.r * 0.85).addScaledVector(up, -dims.h * 0.45);
-      const yaw = Math.atan2(-pnA.x, -pnA.z);
-      q.setFromEuler(new THREE.Euler(-f.tilt, yaw, 0, 'YXZ'));
-    } else {
-      // ручка/хвост в кулаке: ось предмета поперёк пальцев (зеркальце, рыбка, жвачка), нормаль — к морде
-      const Y = fdA.clone().cross(pnA).normalize();
-      if (Y.y < 0) Y.negate();
-      if (a.spec.use !== 'look') Y.lerp(fdA, 0.45).normalize();
-      const toFace = head.clone().add(new THREE.Vector3(0, 0.06, 0.12)).sub(pc);
-      const Z = toFace.addScaledVector(Y, -toFace.dot(Y));
-      if (Z.lengthSq() < 1e-8) Z.set(0, 0, -1);
-      Z.normalize();
-      const X = Y.clone().cross(Z).normalize();
-      q.setFromRotationMatrix(new THREE.Matrix4().makeBasis(X, Y, Z));
-      if (f.tilt) q.premultiply(new THREE.Quaternion().setFromAxisAngle(Y, f.tilt));
-      pos = pc.clone().addScaledVector(pnA, 0.012);
-    }
-    // в систему inner (реквизит — его ребёнок)
+    const fdA = m1 ? obj.worldToLocal(m1.getWorldPosition(new THREE.Vector3())).sub(hp).normalize() : new THREE.Vector3(0, 0, 1);
+    const palm = hp.clone().addScaledVector(fdA, 0.5 * hl);
+    const pos = palm.clone().add(off);
+    this.holdDbg.got.copy(pos);
     const pw = obj.localToWorld(pos.clone());
     const qi = this.inner.getWorldQuaternion(new THREE.Quaternion()).invert().multiply(obj.getWorldQuaternion(new THREE.Quaternion())).multiply(q);
-    this.props.place(this.inner.worldToLocal(pw), qi, f.scale);
-    // зеркальце: смотрится в него
-    // зеркальце — смотрится в него; кружка/угощение у морды — смотрит на них (голова к предмету)
-    this.actLook = f.toMouth > 0.3 && a.spec.use !== 'pop' ? pw : null;
+    this.props.place(this.inner.worldToLocal(pw), qi, f.scale, 1 - f.eaten);
+    // смотрит на зеркальце / на предмет у морды (глоток — глаза «^^» и так закрыты)
+    this.actLook = hf.look ? obj.localToWorld(hf.look.clone()) : f.toMouth > 0.3 && a.spec.use !== 'pop' ? pw : null;
+    // пар над краем кружки, искра у кулака (появление / уход)
+    const inn = (v: THREE.Vector3) => this.inner.worldToLocal(obj.localToWorld(v));
+    const dims = this.props.dims ?? { h: 0.1, r: 0.04 };
+    this.propFx.update(dt, {
+      steamAt: f.steam > 0.01 ? inn(pos.clone().add(top).add(new THREE.Vector3(0, 0.01, 0))) : null,
+      steam: f.steam * f.scale,
+      size: dims.r * 1.3,
+      sparkAt: f.spark > 0 ? inn(pos.clone().addScaledVector(top, 0.4)) : null,
+      spark: f.spark,
+      sparkR: dims.h * 0.7,
+    });
   }
 
   /** скейт (skateRig.ts): опора-дека, присед и прыжки — до клипа (standY); стопы, лапа с доской, доска — после */
