@@ -47,6 +47,7 @@ const FRAG_HEAD = `
 uniform vec4 uMA; // drop, round, wide, press
 uniform vec4 uMB; // smile, smirk, frown, tongue
 uniform vec4 uMC; // gum, nose y, style, -
+uniform vec4 uMD; // язык: размер, глубже на долю раскрытия, яркость; -
 varying vec2 vMp;
 float mwl(float x, float hw) {
   // линия «ω»: две дуги вниз от середины к уголкам, уголки вверх при улыбке, вниз при обиде
@@ -80,9 +81,9 @@ const FRAG_BODY = `
     float fo = min(min(Up - p.y, p.y - Lo), (hwo - ax) * 0.6);
     float cav = smoothstep(-aa, aa, fo) * smoothstep(0.012, 0.04, D);
     // язык: овал снизу полости; высунутый — поверх нижней губы
-    float ty = mwl(0.0, hw) - D * 0.82 + 0.04 - 0.1 * tg;
-    float tr = hwo * 0.62;
-    float tyr = max(0.05, D * 0.42) + 0.08 * tg;
+    float ty = mwl(0.0, hw) - D * (0.82 + uMD.y) + 0.04 - 0.1 * tg;
+    float tr = hwo * 0.62 * mix(1.0, uMD.x, 1.0 - tg);
+    float tyr = (max(0.05, D * 0.42) + 0.08 * tg) * mix(1.0, uMD.x, 1.0 - tg);
     float tE = length(vec2(p.x / tr, (p.y - ty) / tyr));
     float tongueIn = (1.0 - smoothstep(1.0 - aa / tyr, 1.0 + aa / tyr, tE)) * cav;
     float tongueOut = tg > 0.01 ? (1.0 - smoothstep(1.0 - aa / tyr, 1.0 + aa / tyr, tE)) * step(p.y, Lo + 0.02) * smoothstep(0.0, 0.3, tg) : 0.0;
@@ -109,6 +110,7 @@ const FRAG_BODY = `
     float dep = clamp((Up - p.y) / max(D, 1e-3), 0.0, 1.0);
     vec3 cavC = mix(vec3(0.07, 0.012, 0.02), vec3(0.3, 0.06, 0.08), smoothstep(0.1, 0.9, dep));
     vec3 tonC = mix(vec3(0.85, 0.32, 0.38), vec3(0.95, 0.5, 0.55), smoothstep(-0.6, 0.6, (p.y - ty) / tyr));
+    tonC *= uMD.z;
     tonC *= 1.0 - 0.08 * (1.0 - smoothstep(0.0, 0.012, ax)) * smoothstep(ty + tyr * 0.6, ty - tyr * 0.2, p.y);
     vec3 lineC = vec3(0.14, 0.06, 0.09);
     vec3 col = cavC;
@@ -127,6 +129,7 @@ export class MouthRig {
     uMA: { value: new THREE.Vector4() },
     uMB: { value: new THREE.Vector4() },
     uMC: { value: new THREE.Vector4() },
+    uMD: { value: new THREE.Vector4(1, 0, 1, 0) },
     uMO: { value: new THREE.Vector3() },
     uMX: { value: new THREE.Vector3() },
     uMY: { value: new THREE.Vector3() },
@@ -183,6 +186,14 @@ export class MouthRig {
     };
     m.customProgramCacheKey = () => 'cat-mouth-v1';
     m.needsUpdate = true;
+  }
+
+  /**
+   * язык по характеру (рантайм ?models=v2, Блёстка): size — размер овала (1 — как было), deeper — центр ниже на долю
+   * раскрытия, tone — яркость. Без аргумента — как у всех (v1). Высунутый язык (tongue_out) — без изменений.
+   */
+  setTongue(t?: { size?: number; deeper?: number; tone?: number }) {
+    this.uniforms.uMD.value.set(t?.size ?? 1, t?.deeper ?? 0, t?.tone ?? 1, 0);
   }
 
   update(W: Record<string, number>) {

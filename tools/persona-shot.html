@@ -52,6 +52,8 @@ function setView(v) {
   if (v === 'pilot') look(ctr, 0, 30, fullD(40) * 1.05, 40);
   else if (v === 'front') look(ctr, 0, 3, fullD(22), 22);
   else if (v === 'tq') look(ctr, -35, 3, fullD(22), 22);
+  else if (v === 'side') look(ctr, -90, 3, fullD(22), 22);
+  else if (v === 'back') look(ctr, 180, 3, fullD(22), 22);
   else if (v === 'face') look(fc, 0, 4, hp.distanceTo(tp) * +(q.get('fz') || 14));
   else if (v === 'faceup') look(fc, 0, 28, hp.distanceTo(tp) * +(q.get('fz') || 14));
   else if (v === 'face34') look(fc, -30, 4, hp.distanceTo(tp) * +(q.get('fz') || 14));

@@ -28,6 +28,7 @@ import { BodyCollider, CAT_MM, worstPair, type CollidersJson } from './bodyColli
 import { FootPin } from './footPin';
 import { buildFurShells } from './furShell';
 import { attachTulle } from './tulleFx';
+import { attachTailSparkle } from './tailSparkle';
 import { FaceMixer, EMOTE_FACE, MORPH_TARGETS, facePreset, type FacePreset } from './face';
 import { EyeRig } from './eyeRig';
 import { FaceWrinkles } from './faceWrinkles';
@@ -133,6 +134,14 @@ const PERSONA_FACE: Record<string, Record<string, number>> = {
  */
 const PERSONA_FACE_V2: Record<string, Record<string, number>> = {
   glitter: { smile: 0.6, mouth_A: 0.46 },
+};
+
+/**
+ * язык по характеру (?models=v2): у Блёстки в покое открытая улыбка — язык маленький и глубже в тёмном рту, не до
+ * нижней губы (иначе розовый овал во весь рот читается как высунутый язык; кадр КотоТом 17-11 — язык внутри)
+ */
+const PERSONA_TONGUE_V2: Record<string, { size?: number; deeper?: number; tone?: number }> = {
+  glitter: { size: 0.6, deeper: 0.1, tone: 0.82 },
 };
 
 /** множители век по характеру (?models=v2): 1 — как в пресете */
@@ -356,7 +365,8 @@ export class GlbCharacter implements Character {
     this.setFaceObj('usual');
     this.furTone.attach(model);
     // фатин Блёстки с разметкой (models/v2/glitter_p1.glb): сетка, золотые блёстки и полоса по подолу
-    attachTulle(model);
+    // …и хвост с искрой к кончику (только эта модель — tailSparkle.ts)
+    if (attachTulle(model)) attachTailSparkle(model);
     this.mouthRig = MouthRig.find(model);
     this.eyes = EyeRig.find(model);
     this.wrinkles = FaceWrinkles.attach(model);
@@ -861,6 +871,7 @@ export class GlbCharacter implements Character {
     W.nose_wrinkle = Math.max(W.nose_wrinkle ?? 0, 0.35 * (W.brow_down ?? 0));
     for (const k in this.visemeW) W[k] = Math.max((W[k] ?? 0) * 0.5, this.visemeW[k]);
     this.wrinkles?.update(W);
+    this.mouthRig?.setTongue(modelsV2() ? PERSONA_TONGUE_V2[this.personaId] : undefined);
     this.mouthRig?.update(W);
     for (const m of this.morphMeshes) {
       const d = m.morphTargetDictionary!;

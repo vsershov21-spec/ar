@@ -28,8 +28,12 @@ TUNE = {
     'kind': {'restUp': 0.1, 'up': [1.0, 1.0, 1.0, 0.9, 0.35], 'lo': [0.75, 0.5, 0.15]},
     'hooligan': {'restUp': 0.22, 'up': [1.0, 1.0, 1.0, 0.7, 0.15], 'lo': [0.7, 0.42, 0.1]},
     'glitter': {'restUp': 0.1, 'up': [1.0, 1.0, 1.0, 0.95, 0.45], 'lo': [0.8, 0.55, 0.18], 'lash': (1.25, 1.6, 1.25),
-                # по рефу: по три звезды с каждой стороны по краю лба — (азимут от «вперёд», град; высота)
-                'stars': {'R': 0.022, 'lift': 0.007, 'at': [(64, 0.78), (57, 0.818), (49, 0.853)]}},
+                # по рефу (design/sheets/glitter_turnaround.jpg, кадр КотоТом 17-11): по две маленькие звезды у каждого
+                # виска — над внешним уголком глаза, ближе к основанию уха; лоб чистый — (азимут от «вперёд», град;
+                # высота; радиус). 20.11 v1 было: по три R 0.022 по краю лба (азимут 49…64) — читалось короной
+                # бант: звезда в центре крупнее (реф — крупная объёмная звезда между бантами), см. bow_star
+                'bow_star': {'k': 1.2, 'r0': 0.035, 'r1': 0.062},
+                'stars': {'R': 0.011, 'lift': 0.008, 'at': [(60, 0.79, 0.012), (55, 0.818, 0.01)]}},
 }
 LASH_SEG = 12  # вершин в лепестке ресницы (face_detail: 6 сечений × 2)
 
@@ -80,6 +84,8 @@ def main():
         g.set_acc(ai, c.astype(np.float32))
         print(f'{cat}: {nm} подводка {ks}')
     tulle_uv(g)
+    if t.get('bow_star'):
+        bow_star(g, cat, t['bow_star'])
     if t.get('stars'):
         add_stars(g, cat, t['stars'])
     g.save(dst)
@@ -93,6 +99,39 @@ def main():
 
 
 LIMIT = 4.5 * 1024 * 1024
+
+
+def bow_star(g, cat, cfg):
+    """звезда в центре банта крупнее: вершины банта (самый большой кусок части «бант/заколки») вокруг центра звезды
+    раздвигаются от него в k раз, с плавным спадом по расстоянию в плоскости XY (r0 — целиком, r1 — нет) — крылья банта
+    и низ у головы на месте. Оболочки меха делят POSITION с телом — двигаются вместе. Повторный запуск — не трогает
+    (extras.bowStar у меша)."""
+    from mesh_parts import label_parts, BOW, weld, components
+    j = g.j
+    bi, b = g.main_mesh()
+    if j['meshes'][bi].get('extras', {}).get('bowStar'):
+        print('звезда банта уже увеличена'); return
+    pa = b['attributes']['POSITION']
+    P = g.acc(pa).astype(np.float64)
+    I = g.acc(b['indices']).reshape(-1, 3).astype(np.int64)
+    lab = label_parts(cat, g, b, P, I)
+    w = weld(P)
+    T = w[I][(lab[I] == BOW).all(1)]
+    comp = components(w.max() + 1, T)
+    vv = np.unique(T)
+    ids, cnt = np.unique(comp[vv], return_counts=True)
+    big = ids[cnt.argmax()]
+    bv = np.where((lab == BOW) & (comp[w] == big))[0]
+    top = P[bv, 1].max()
+    core = bv[(np.abs(P[bv, 0] - np.median(P[bv, 0])) < 0.04) & (P[bv, 1] > top - 0.08)]
+    c = P[core].mean(0)
+    d = np.hypot(P[bv, 0] - c[0], P[bv, 1] - c[1])
+    s = np.clip((cfg['r1'] - d) / (cfg['r1'] - cfg['r0']), 0, 1)
+    s = s * s * (3 - 2 * s)
+    P[bv] += (cfg['k'] - 1) * s[:, None] * (P[bv] - c)
+    g.set_acc(pa, P.astype(np.float32))
+    j['meshes'][bi].setdefault('extras', {})['bowStar'] = cfg['k']
+    print(f'бант: звезда ×{cfg["k"]} вокруг {np.round(c, 3)} ({(s > 0).sum()} вершин)')
 
 
 def add_stars(g, cat, cfg):
@@ -120,17 +159,20 @@ def add_stars(g, cat, cfg):
     head = np.where((lab != BOW) & (P[:, 1] > 0.7))[0]
     hc = P[head].mean(0)
     centers = []
-    for az, y in cfg['at']:
+    radii = []
+    for st in cfg['at']:
+        az, y = st[:2]
         for sg in (1, -1):
+            radii.append(st[2] if len(st) > 2 else cfg['R'])
             d = np.array([sg * np.sin(np.radians(az)), 0, np.cos(np.radians(az))])
             m = head[np.abs(P[head, 1] - y) < 0.008]
             sc = (P[m] - hc) @ d
             centers.append(P[m[sc.argmax()]])
     from scipy.spatial import cKDTree
     tree = cKDTree(P[head])
-    R, lift = cfg['R'], cfg['lift']
+    lift = cfg['lift']
     V, NN, F, JJ, WW = [], [], [], [], []
-    for c0 in centers:
+    for c0, R in zip(centers, radii):
         _, q = tree.query(c0, k=12)
         vi = head[q]
         n = Nb[vi].mean(0); n /= np.linalg.norm(n)
@@ -169,7 +211,7 @@ def add_stars(g, cat, cfg):
     j['nodes'].append({'name': 'BD_Metal_Stars', 'mesh': len(j['meshes']) - 1, 'skin': j['nodes'][bnode]['skin'], 'extras': {'stars': len(centers)}})
     parent = next((n for n in j['nodes'] if bnode in n.get('children', [])), None)
     (parent['children'] if parent is not None else j['scenes'][0]['nodes']).append(len(j['nodes']) - 1)
-    print(f'звёзды-заколки: {len(centers)} шт., R={R}')
+    print(f'звёзды-заколки: {len(centers)} шт., R={sorted(set(radii))}')
 
 
 def tulle_uv(g):

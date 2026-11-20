@@ -3,8 +3,9 @@
  * же значений). v2 — только ?models=v2: в lab и со страницы /test (PARAMS models → feature model.v2).
  *
  * ?models=v2 — у каждого кота своя основа, та, что ближе к рефам персонажа (design/cut/<кот>, docs/models/persona_*):
- *   • Блёстка — p1 (20.11): геометрия v1 + фатин с золотым подолом, звёзды-заколки, глаза с ресницами
- *     (tulle.py --puff 1.32 → untangle → persona_tune.py --clean) → models/v2/glitter_p1.glb, свои прокси;
+ *   • Блёстка — p1 (20.11): геометрия v1 + короткая пачка из фатина с тонкой золотой кромкой, звёзды у висков,
+ *     глаза с ресницами (tulle.py --puff 1.0 --bell 4 … → untangle → persona_tune.py --clean, docs/models/README.md)
+ *     → models/v2/glitter_p1.glb, свои прокси;
  *   • Хулиган и Добряк — p1: геометрия v1 (голова и наушники ближе к рефам, чем у v2) + глаза по рефам
  *     (scripts/models/persona_tune.py: веко открыто, подводка) → models/v2/<кот>_p1.glb; прокси — как у v1 (геометрия та же): models/<кот>_v1_colliders.json.
  * ?models=v2h — геометрия v2 у всех трёх (для сравнения). Мех, тон и лицо при v2/v2h берут значения v2
@@ -16,7 +17,7 @@ export type ModelsVariant = 'v1' | 'v2' | 'v2h';
 export const V2_BASE: Record<string, 'v2' | 'p1'> = { glitter: 'p1', hooligan: 'p1', kind: 'p1' };
 
 /**
- * p1 со своими прокси (геометрия отличается от v1): Блёстка — юбка Tripo заменена фатином пышнее (tulle.py --puff 1.32)
+ * p1 со своими прокси (геометрия отличается от v1): Блёстка — юбка Tripo заменена фатином (tulle.py)
  * и звёзды-заколки → models/v2/glitter_p1_colliders.json (scripts/models/colliders.py по p1)
  */
 export const P1_OWN_COLLIDERS = new Set(['glitter']);

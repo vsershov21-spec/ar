@@ -101,7 +101,7 @@ def main():
             d['mesh'] = mesh
         V.append(d)
 
-    def hull(name, bone, X, mesh=None, n=48):
+    def hull(name, bone, X, mesh=None, n=48, pad=0.0):
         from scipy.spatial import ConvexHull
         h = ConvexHull(X)
         pts = X[h.vertices]
@@ -111,6 +111,10 @@ def main():
             while len(keep) < n:
                 k = int(np.argmax(d2)); keep.append(k); d2 = np.minimum(d2, np.linalg.norm(pts - pts[k], axis=1))
             pts = pts[keep]
+        if pad:  # наружу по горизонтали от оси: прореженная оболочка лежит внутри сетки — без запаса кисть уходит в неё
+            c_ = pts.mean(0); dxz = pts[:, [0, 2]] - c_[[0, 2]]
+            rr = np.linalg.norm(dxz, axis=1, keepdims=True)
+            pts = pts.copy(); pts[:, [0, 2]] = c_[[0, 2]] + dxz * (rr + pad) / np.maximum(rr, 1e-6)
         d = {'name': name, 'bone': bone, 'type': 'hull', 'points': [r5(p) for p in pts]}
         if mesh:
             d['mesh'] = mesh
@@ -198,7 +202,8 @@ def main():
     if tn is not None:
         pr = j['meshes'][tn['mesh']]['primitives'][0]
         X = g.acc(pr['attributes']['POSITION']).astype(np.float64)
-        hull('skirt', 'Hips', X, mesh=tn['name'])
+        # фатин (Блёстка p1, 20.11): запас 20 мм — кисть и манжета ложатся на пачку, а не в неё
+        hull('skirt', 'Hips', X, mesh=tn['name'], pad=0.02)
     # ноги: бедро и голень — капсулы по вершинам кости
     for side, S_ in (('L', 'Left'), ('R', 'Right')):
         for nm_, bone in (('thigh', f'{S_}UpLeg'), ('shin', f'{S_}Leg')):

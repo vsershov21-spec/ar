@@ -2,7 +2,8 @@
 """Юбка-пачка Блёстки из фатина: вместо спаянной с телом непрозрачной юбки Tripo (рюши режут друг друга и бёдра) —
 три слоя полупрозрачного фатина по форме исходной юбки.
 
-  python3 scripts/models/tulle.py glitter in.glb out.glb [--puff 1.16]
+  python3 scripts/models/tulle.py glitter in.glb out.glb [--puff 1.16] [--hem 0.03] [--bell 4] [--ruffle 0.004] [--shards]
+  (p1 Блёстки, 20.11: --puff 1.0 --hem 0.03 --bell 4 --ruffle 0.004 --shards — короткая пачка до середины бедра, docs/models/README.md)
 
 - Треугольники юбки (mesh_parts: метка «юбка») убираются из тела; под ними у Tripo есть поверхность бёдер.
 - Слой k (0 — внутренний): от пояса вниз до подола, радиус по секторам: у пояса — тело + 3 мм, у подола —
@@ -71,6 +72,24 @@ def main():
     I = g.acc(b['indices']).reshape(-1, 3).astype(np.int64)
     lab = label_parts(cat, g, b, P, I)
     skt = (lab[I] == SKIRT).all(1)
+    if '--shards' in sys.argv:
+        # --shards: осколки юбки Tripo у подола (рюши, мятные по цвету, часть размечена «телом») — тоже прочь: при
+        # короткой и узкой пачке они торчат из-под подола
+        bm0 = j['materials'][b['material']]
+        im0 = np.asarray(g.image(j['textures'][bm0['pbrMetallicRoughness']['baseColorTexture']['index']]['source']).convert('RGB')).astype(np.float64)
+        S0 = im0.shape[0]
+        uvt = UV[I].mean(1)
+        ct = im0[np.clip((uvt[:, 1] % 1) * S0, 0, S0 - 1).astype(int), np.clip((uvt[:, 0] % 1) * S0, 0, S0 - 1).astype(int)]
+        Ct = P[I].mean(1)
+        Xs = P[lab == SKIRT]
+        # только низ — то, что видно у подола и под ним (выше осколки закрывают стык пояса с телом под фатином)
+        hem0 = float(sys.argv[sys.argv.index('--hem') + 1]) if '--hem' in sys.argv else 0.0
+        band = (Ct[:, 1] > np.percentile(Xs[:, 1], 1) - 0.01) & (Ct[:, 1] < np.percentile(Xs[:, 1], 2) + hem0 + 0.035)
+        mint = (ct[:, 1] - ct[:, 0] > 25) & (ct[:, 2] - ct[:, 0] > 15)
+        from mesh_parts import HOODIE
+        sh_ = band & (((lab[I] == SKIRT).any(1)) | (mint & ~(lab[I] == HOODIE).any(1)))
+        print(f'  осколки юбки Tripo: ещё {(sh_ & ~skt).sum()} треугольников')
+        skt = skt | sh_
     sv = np.where(lab == SKIRT)[0]
     X = P[sv]
     c = np.array([np.median(X[:, 0]), 0, np.median(X[:, 2])])
@@ -87,6 +106,16 @@ def main():
     # пачка пышнее (рефы: фатин расходится колоколом); --puff K — свой множитель (p1 Блёстки: 1.32)
     puff = float(sys.argv[sys.argv.index('--puff') + 1]) if '--puff' in sys.argv else 1.16
     r_hem = r_hem * puff
+    # --hem H: подол выше на H м (пачка короче; p1 Блёстки 20.11: 0.035 — до середины бедра)
+    hem_up = float(sys.argv[sys.argv.index('--hem') + 1]) if '--hem' in sys.argv else 0.0
+    yb = yb + hem_up
+    # --bell K: профиль 1 − (1 − t)^K — пачка сразу от пояса пышная, к подолу почти вертикально (края мягко вниз,
+    # не «абажур»; руки у бёдер — под фатином, а не сквозь него);
+    # --ruffle A: волна-оборка по краю (радиальная, одна фаза у всех слоёв — зазоры целы) и фестоны подола
+    bell = float(sys.argv[sys.argv.index('--bell') + 1]) if '--bell' in sys.argv else 0.0
+    ruf = float(sys.argv[sys.argv.index('--ruffle') + 1]) if '--ruffle' in sys.argv else 0.0
+    sprof = [float(x) for x in sys.argv[sys.argv.index('--sprof') + 1].split(',')] if '--sprof' in sys.argv else None
+    tier = float(sys.argv[sys.argv.index('--tier') + 1]) if '--tier' in sys.argv else 0.0
     # тело (без юбки, без рук и хвоста) в поясе и ниже — максимальный радиус по сектору и высоте
     jn = [j['nodes'][k]['name'].replace('mixamorig:', '') for k in j['skins'][0]['joints']]
     Wf = Wt.astype(np.float64) / (255.0 if Wt.max() > 1.5 else 1.0)
@@ -107,7 +136,12 @@ def main():
         r0 = max(rb[k, :3].max(), 0.05) + 0.003
         for yi_, y in enumerate(YG):
             t = np.clip((yt - y) / max(yt - yb, 1e-3), 0, 1)
-            base_r[k, yi_] = max(r0 + (r_hem[k] - r0) * t ** 0.75, rb[k, yi_] + 0.004)
+            if sprof:  # S-профиль: у пояса прилегает (манжеты рукавов в позах — снаружи), ниже — расклёш, у подола вниз
+                s_ = np.clip((t - sprof[0]) / (sprof[1] - sprof[0]), 0, 1)
+                prof = s_ * s_ * (3 - 2 * s_)
+            else:
+                prof = 1 - (1 - t) ** bell if bell else t ** 0.75
+            base_r[k, yi_] = max(r0 + (r_hem[k] - r0) * prof, rb[k, yi_] + 0.004)
         base_r[k] = np.maximum.accumulate(base_r[k])
     # по секторам — сгладить (без зубцов от тела)
     for _ in range(3):
@@ -119,15 +153,22 @@ def main():
         V, Nn, U, JJ, WW, COL, F = [], [], [], [], [], [], []
         tree = cKDTree(X)
         for L in range(LAYERS):
-            y_top = yt - 0.003 * L
+            # --tier D: ярусы — внешние слои начинаются ниже пояса на D·L (у пояса один слой: рукав в позе режет один
+            # слой, а не три; по рефу — пачка из 2–3 ярусов)
+            y_top = yt - (tier if tier else 0.003) * L
             base = len(V)
             for si in range(NS):
                 t = si / (NS - 1)
                 for k in range(NT):
                     a = th[k]
                     y_hem = yb + 0.009 * L + 0.006 * np.sin(9 * a + 1.7 * L) * (1 if L else 0.5)
+                    if ruf:
+                        # фестоны: у каждого слоя свой шаг и фаза (слои видны ярусами), край мягко вниз
+                        y_hem += ruf * 1.2 * (0.5 + 0.5 * np.sin((10 + 2 * L) * a + 1.3 * L)) ** 2 * (1 if L else 0.6)
                     y = y_top + (y_hem - y_top) * t
                     r = rfun(k, y) + 0.005 * L + 0.0018 * np.sin(18 * a + 2.1 * L) * t
+                    if ruf:
+                        r += ruf * np.sin(10 * a) * t ** 2
                     p = np.array([c[0] + r * np.cos(a), y, c[2] + r * np.sin(a)])
                     V.append(p)
                     n = np.array([np.cos(a), 0.35 * t + 0.1, np.sin(a)]); Nn.append(n / np.linalg.norm(n))
