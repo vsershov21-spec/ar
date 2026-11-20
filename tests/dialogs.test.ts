@@ -285,7 +285,9 @@ describe('голос ребёнка → интент: словарь content/int
 describe('имя (словарь names.ru.txt)', () => {
   it('из словаря — known, иначе нет', () => {
     expect(matchIntent('Меня зовут Маша', { expectName: true })).toMatchObject({ intent: 'name', name: 'Маша', known: true });
-    expect(matchIntent('Зюзя', { expectName: true })).toMatchObject({ intent: 'name', known: false });
+    // одиночное слово не из словаря — не имя сразу, а «Тебя зовут Зюзя?» (VoiceEngine.nameStep); по фразе — имя
+    expect(matchIntent('Зюзя', { expectName: true })).toMatchObject({ intent: 'unknown', confirmName: 'Зюзя' });
+    expect(matchIntent('меня зовут Зюзя', { expectName: true })).toMatchObject({ intent: 'name', known: false });
     expect(matchIntent('не скажу', { expectName: true }).intent).toBe('skip');
   });
 });

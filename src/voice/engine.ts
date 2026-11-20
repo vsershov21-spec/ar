@@ -332,6 +332,8 @@ export class VoiceEngine extends Emitter<EngineEvents> {
     clearTimeout(this.windowTimer);
     clearTimeout(this.nameEndTimer);
     this.nameCandidate = null;
+    // диалог больше не ждёт ответа: «да» и одиночные слова — снова как в свободной игре (следующий узел поставит своё)
+    if (intentContext().question) setIntentContext({});
     this.echoWindow = false;
     if (this.listenReason === 'window' || this.listenReason === 'barge') this.asr.stop();
     // повтор: между фразами диалог закрывает и снова открывает окно — останавливаемся, только если за 6 с не открыл снова
@@ -423,7 +425,8 @@ export class VoiceEngine extends Emitter<EngineEvents> {
         clearTimeout(this.nameEndTimer); // окно имени: ребёнок продолжил («меня зовут… Маша»)
         turn.userStart();
         // ребёнок заговорил — кот не начинает новую реплику, пока фраза не разобрана
-        if (this.mode === 'auto' || this.listening) this.voice.hold(USER_HOLD_MS);
+        // (голоса нет — модели нет или микрофон запрещён — кота не держим: фразу всё равно не разберём)
+        if ((this.mode === 'auto' && !this.asr.unavailable) || this.listening) this.voice.hold(USER_HOLD_MS);
         // «слушаю всегда»: заговорили — сразу распознаём (начало фразы — из кольца)
         if (this.mode === 'auto' && !this.listening) this.startListening('vad');
       }
