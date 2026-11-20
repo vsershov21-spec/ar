@@ -227,6 +227,33 @@ export function installProbe() {
       walk: stage.walking ? 1 : 0,
       glass: stage.atGlass ? 1 : 0,
       lift: +(c.lift ?? 0).toFixed(3),
+      // пол (ground clamp, 20.11): самая низкая точка тела до и после подъёма, мм на карте; ниже нуля — в опоре
+      graw: +((c.groundDbg?.min ?? 0) * catMM).toFixed(1),
+      // то же независимо от сборки (до/после): капсулы касаний GLB (голова, корпус, лапы без ног), низ − радиус, мм
+      gbody: (() => {
+        if (!c.capsules?.length) return 0;
+        let m = Infinity;
+        const a = new V(), b = new V();
+        for (const k of c.capsules) {
+          if (/Foot|Toe|Leg|Tail|Ear/.test(k.b.name)) continue;
+          c.object.worldToLocal(k.b.getWorldPosition(a));
+          let y = a.y;
+          if (k.c) y = Math.min(y, c.object.worldToLocal(k.c.getWorldPosition(b)).y);
+          m = Math.min(m, y - k.r * 0.75);
+        }
+        return Number.isFinite(m) ? +(m * catMM).toFixed(1) : 0;
+      })(),
+      gmin: +((c.groundDbg?.final ?? 0) * catMM).toFixed(1),
+      gpart: c.groundDbg?.name ?? '',
+      act: c.actState ? `${c.actState.id}:${c.actState.phase}` : '',
+      // предмет в лапе: от точки хвата до кисти, мм (держит, а не висит рядом)
+      propMM: (() => {
+        const po = c.props?.object, st = c.actState;
+        if (!po || !st || st.id === 'skate' || !po.visible) return -1;
+        const hb = c.bones?.get(st.id === 'mirror' ? 'LeftHand' : 'RightHand');
+        if (!hb) return -1;
+        return +(po.getWorldPosition(new V()).distanceTo(hb.getWorldPosition(new V())) / (c.object.getWorldScale(new V()).y || 1) * catMM).toFixed(1);
+      })(),
       phase: app.director.state.phase,
       speaking: app.voice?.speaking ? 1 : 0,
       vis: stage.root.visible ? 1 : 0,

@@ -29,7 +29,8 @@ export function clipPriority(id: string): number {
  * клип, игра с хвостом крутит корпус против поворота к зрителю. Фирменные действия остаются кнопками каталога.
  * Остальные варианты — реже: дыхание основное (вес ×2).
  */
-export const IDLE_SKIP = /^(idle_hooligan_headphones|idle_hooligan_skate|idle_glitter_twirl|idle_kind_hug_self|idle_tail_play)$/;
+// какао и зеркальце (20.11) — действия с предметом по кнопке (holdAction.ts): сами по себе в покое не повторяем старым клипом
+export const IDLE_SKIP = /^(idle_hooligan_headphones|idle_hooligan_skate|idle_glitter_twirl|idle_kind_hug_self|idle_tail_play|idle_kind_cocoa|idle_glitter_mirror)$/;
 export function calmIdles(idles: { clip: string; weight: number }[]) {
   const out = idles.filter((i) => !IDLE_SKIP.test(i.clip)).map((i) => (i.clip === 'idle_breathe' ? { ...i, weight: i.weight * 2 } : i));
   return out.length ? out : idles;

@@ -413,7 +413,8 @@ export class HomeMode {
       case 'home:cocoa':
         h.director.activity();
         h.energy.activity(performance.now());
-        ch?.play('idle_kind_cocoa');
+        // шаблон «держать предмет» (character/holdAction.ts): взять, поднести ко рту, отпить, опустить, убрать
+        if (!(ch as { runAct?: (id: string) => number } | null)?.runAct?.('cocoa')) ch?.play('idle_kind_cocoa');
         ch?.face('happy', 2500);
         h.audio.play('chime_soft', 0.6);
         if (!h.director.speakEvent('home_cocoa')) h.director.log('дом: какао (реплика без озвучки — молча)');

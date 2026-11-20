@@ -567,11 +567,14 @@ export class App {
   readonly switchCooldown = new SwitchCooldown();
   private applyEdition() {
     const d = this.director;
-    const bubble = (text: string) => this.ui.say(text, d.persona.name, d.persona.id, 3500);
+    // пузыри среза и «Чуть позже» — через режиссёра: одинаковый не чаще раза в 8 с (оркестратор, запись 20.11)
+    const bubble = (text: string) => d.bubble(text, 3500);
+    d.laterText = SWITCH_LATER_TEXT;
+    this.wireOrchestrator();
     if (feature('pilot.catalog') || feature('pilot.switchCooldown'))
       d.intentGate = (h) => {
         if (feature('pilot.switchCooldown') && h.type === 'change_persona' && !this.switchCooldown.allow(performance.now())) {
-          bubble(SWITCH_LATER_TEXT);
+          d.sayLater();
           d.log(`смена кота: ещё ${Math.ceil(this.switchCooldown.wait(performance.now()) / 1000)} с (пилот, раз в 3 мин)`);
           return true;
         }
@@ -585,11 +588,12 @@ export class App {
         this.kickSuggest();
         return true;
       };
+    if (feature('pilot.switchCooldown')) d.switchReady = () => this.switchCooldown.allow(performance.now());
     if (feature('pilot.switchCooldown'))
       d.switchGate = () => {
         const now = performance.now();
         if (!this.switchCooldown.allow(now)) {
-          bubble(SWITCH_LATER_TEXT);
+          d.sayLater();
           return false;
         }
         this.switchCooldown.mark(now);
@@ -615,6 +619,31 @@ export class App {
         kickSuggest: () => this.kickSuggest(), log: (s) => d.log(s),
       });
   }
+
+  /**
+   * Оркестратор режиссёра (scenario/orchestrator.ts): сцены снаружи — пробуждение, переход в дом и обратно, раскраска,
+   * сон в кровати. Пока они идут, кнопки ждут в очереди; раскраску и сон кнопка мягко заканчивает (дорисовать сразу /
+   * разбудить), переходы и пробуждение — дожидаемся. Реплика нового кота — когда его модель уже на сцене.
+   */
+  private wireOrchestrator() {
+    const d = this.director;
+    d.orch.external = () => {
+      if (this.awake?.active) return { id: 'awake', interruptible: false };
+      const h = this.home;
+      if (h && (h.phase === 'to_home' || h.phase === 'to_ar' || h.moving)) return { id: 'home', interruptible: false };
+      if (this.paint?.painting) return { id: 'paint', interruptible: true };
+      if (h?.bed && (h.bed.state === 'asleep' || h.bed.state === 'tucking')) return { id: 'bed', interruptible: true };
+      return null;
+    };
+    d.orch.interrupt = (sc) => {
+      if (sc.id === 'paint') return this.paint?.finishNow('кнопка другого действия'), true;
+      if (sc.id === 'bed') return !!this.home?.act('home:wake');
+      return false;
+    };
+    d.charReady = (p) => this.charMode !== 'glb' || !!new URLSearchParams(location.search).get('glb') || this.charFor === p;
+  }
+  /** для какого кота загружена текущая модель (смена кота грузит новую — реплика ждёт её) */
+  private charFor = '';
 
   /** «Мой дом» (на карте) / «На карту» (дома) — первым пунктом раздела «Игры» */
   private withHome(secs: ReturnType<typeof buildCatalog>): ReturnType<typeof buildCatalog> {
@@ -930,7 +959,8 @@ export class App {
   private charMode: CharacterMode = 'sprite';
   async setCharacterMode(mode: CharacterMode) {
     this.charMode = mode;
-    const ch = await makeCharacter(mode, this.director.persona.id);
+    const pid = this.director.persona.id;
+    const ch = await makeCharacter(mode, pid);
     try {
       await ch.load();
     } catch (e) {
@@ -938,6 +968,7 @@ export class App {
     }
     this.character?.dispose();
     this.character = ch;
+    this.charFor = pid;
     this.director.setCharacter(ch);
     this.applyQuality(this.quality.current, this.quality.level);
     this.quality.pause();

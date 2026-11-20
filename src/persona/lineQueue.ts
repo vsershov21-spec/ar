@@ -17,6 +17,8 @@ export interface QueueItem {
   interruptible: boolean;
   /** «диалог.узел», чья это реплика (dialogs.json): ответ ребёнка снимает недоговорённый вопрос узла — drop() */
   tag?: string;
+  /** токен действия оркестратора (scenario/orchestrator.ts), которому принадлежит реплика; нет — ничья (сценарий) */
+  owner?: number;
   run: () => Promise<void>;
 }
 

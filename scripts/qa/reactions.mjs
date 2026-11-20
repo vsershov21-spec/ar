@@ -36,13 +36,15 @@ const flag = (n) => argv.includes(n);
 const arg = (n, d) => (argv.includes(n) ? argv[argv.indexOf(n) + 1] : d);
 const OUT = path.join(root, 'bench-out/reactions');
 const DIST = path.resolve(root, arg('--dist', 'bench-out/reactions/dist'));
-const SHEETS = path.join(root, 'docs/qa/reactions');
+const SHEETS = arg('--sheets', '') ? path.resolve(arg('--sheets')) : path.join(root, 'docs/qa/reactions');
 const REPORT = path.join(root, 'docs/qa/REACTIONS.md');
 const PORT = Number(arg('--port', 4196));
 const TAG = arg('--tag', 'now');
 const CATS = arg('--cats', 'hooligan,kind,glitter').split(',');
 const ONLY = arg('--only', '') ? arg('--only').split(',') : null;
 const SHEET = !flag('--no-sheets');
+/** --zoom: кадры листа крупно вокруг кота (×2 пикселей, кадр по габариту кота с запасом) — для поз и предметов */
+const ZOOM = flag('--zoom');
 const PARAMS_EXTRA = arg('--params', '');
 const MESHY_DIR = arg('--meshy', '') ? path.resolve(arg('--meshy')) : '';
 /**
@@ -92,7 +94,7 @@ function scenarios(cat) {
     { id: 'stroke', dur: 4500, steps: [{ op: 'stroke', at: 300, bone: 'Spine2', dur: 1800 }] },
     { id: 'tap_spam', dur: 4500, steps: [{ op: 'spam', at: 300, n: 8, every: 120, bones: ['Spine1', 'Head', 'Spine'] }] },
     ...['pet', 'scratch', 'tickle', 'treat', 'paw', 'hug', 'dance', 'flip'].map((id) => ({ id: `act_${id}`, dur: id === 'dance' ? 9500 : id === 'flip' ? 6500 : 5000, steps: [{ op: 'action', at: 300, id }] })),
-    ...SIG[cat].map((id) => ({ id: `sig_${id}`, dur: 6500, steps: [{ op: 'action', at: 300, id }] })),
+    ...SIG[cat].map((id) => ({ id: `sig_${id}`, dur: id === 'skate' ? 7500 : 6500, steps: [{ op: 'action', at: 300, id }] })),
     { id: 'glass_scratch', dur: 4500, steps: [{ op: 'swipe', at: 300 }] },
     { id: 'glass_fog', dur: 3500, steps: [{ op: 'long', at: 300, dur: 900 }] },
     { id: 'doze_wake', dur: 7000, steps: [{ op: 'action', at: 300, id: 'sleep' }, { op: 'tap', at: 3800, bone: 'Head', dy: -0.04 }] },
@@ -171,7 +173,7 @@ function serve() {
 // ───────────── прогон одного кота ─────────────
 async function runCat(browser, cat) {
   const page = await browser.newPage();
-  await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 1, isMobile: true, hasTouch: true });
+  await page.setViewport({ width: 390, height: 844, deviceScaleFactor: ZOOM ? 2 : 1, isMobile: true, hasTouch: true });
   page.on('pageerror', (e) => log(`  [${cat}] pageerror`, e.message.slice(0, 200)));
   await page.evaluateOnNewDocument(reactionClock, { persona: cat });
   await page.goto(`http://localhost:${PORT}/?from=test&nocard=off&debug${PARAMS_EXTRA ? '&' + PARAMS_EXTRA : ''}`, { waitUntil: 'load' });
@@ -282,7 +284,16 @@ async function sheet(cat, id, shots) {
   const S = 160, H = 272, cols = 6, rows = Math.ceil(shots.length / cols), lab = 34;
   const tiles = await Promise.all(
     shots.map(async (s, i) => {
-      const img = await sharp(s.buf).extract({ left: 0, top: 60, width: 390, height: 664 }).resize(S, H, { fit: 'cover' }).toBuffer();
+      let ex = { left: 0, top: 60, width: 390, height: 664 };
+      if (ZOOM) {
+        // кадр вокруг кота: высота — рост кота × 1,7, пропорция плитки; ×2 пикселей
+        const b = s.box ?? { x0: 120, x1: 270, y0: 250, y1: 600 };
+        const ch = Math.max(160, (b.y1 - b.y0) * 2.4), cw = (ch * S) / H;
+        const cx = (b.x0 + b.x1) / 2, cy = (b.y0 + b.y1) / 2 - (b.y1 - b.y0) * 0.12;
+        const L = Math.max(0, Math.min(390 - cw, cx - cw / 2)), T = Math.max(0, Math.min(844 - ch, cy - ch / 2));
+        ex = { left: Math.round(L * 2), top: Math.round(T * 2), width: Math.round(Math.min(cw, 390) * 2), height: Math.round(Math.min(ch, 844) * 2) };
+      }
+      const img = await sharp(s.buf).extract(ex).resize(S, H, { fit: 'cover' }).toBuffer();
       const esc = (x) => String(x ?? '').replace(/[<&>]/g, '');
       const svg = Buffer.from(`<svg width="${S}" height="${lab}" xmlns="http://www.w3.org/2000/svg"><rect width="100%" height="100%" fill="#111"/><text x="4" y="14" font-size="12" font-family="DejaVu Sans" fill="#fff">${(s.t / 1000).toFixed(2)} с · ${esc(s.clip)}</text><text x="4" y="29" font-size="11" font-family="DejaVu Sans" fill="#9cf">${esc(s.emo || 'лицо: —')}</text></svg>`);
       return { input: await sharp({ create: { width: S, height: H + lab, channels: 3, background: '#111' } }).composite([{ input: img, top: 0, left: 0 }, { input: svg, top: H, left: 0 }]).png().toBuffer(), left: (i % cols) * S, top: Math.floor(i / cols) * (H + lab) };

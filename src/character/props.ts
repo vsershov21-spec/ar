@@ -7,6 +7,8 @@
  */
 import * as THREE from 'three';
 import { makeBrush, makeSpray } from '../card/paintProps';
+import { makeFish, makeGum } from './holdProps';
+import { makeSkateboard } from './skateRig';
 
 export interface PropDef {
   /** GLB-модель (или make — процедурная) */
@@ -25,6 +27,18 @@ export interface PropDef {
   rot: [number, number, number];
   /** точка хвата по высоте реквизита, доля от низа (по умолчанию 0 — за донышко) */
   grip?: number;
+  /**
+   * размер от кисти: высота = handK × длина кисти (запястье → кончик среднего пальца, PropRig.handLen); size — запас,
+   * пока кисть не измерена. Шаблон «держать предмет» (holdAction.ts): кружка с ладонь, зеркальце — две с половиной кисти.
+   */
+  handK?: number;
+  /**
+   * 'pca' — модель Tripo лежит под углом (зеркальце по диагонали): длинная ось → +Y (ручка внизу — более узкий конец),
+   * самая «тонкая» ось (нормаль стекла) → +Z
+   */
+  canon?: 'pca';
+  /** не крепить к кисти (доска скейта стоит под лапами — её ставит place) */
+  free?: boolean;
 }
 
 export const PROPS: Record<string, PropDef> = {
@@ -35,7 +49,51 @@ export const PROPS: Record<string, PropDef> = {
   // раскраска карты (src/card/paint.ts): кисть Добряка и Блёстки, баллончик Хулигана — процедурные
   paint_brush: { make: makeBrush, bone: 'RightHand', size: 0.3, offset: [0, 0.01, 0.05], rot: [140, 0, -15], grip: 0.22 },
   paint_spray: { make: makeSpray, bone: 'RightHand', size: 0.17, offset: [0, 0, 0.05], rot: [12, 0, -10], grip: 0.42 },
+  // шаблон «держать предмет» (holdAction.ts): положение и поворот задаёт place() — от ладони, не от клипа
+  hold_cocoa: { url: 'models/props/cocoa_mug.glb', bone: 'RightHand', size: 0.1, handK: 1.25, offset: [0, 0, 0], rot: [0, 0, 0], grip: 0.45 },
+  hold_mirror: { url: 'models/props/hand_mirror.glb', bone: 'LeftHand', size: 0.2, handK: 2.6, canon: 'pca', offset: [0, 0, 0], rot: [0, 0, 0], grip: 0.14 },
+  hold_fish: { make: makeFish, bone: 'RightHand', size: 0.17, handK: 2.4, offset: [0, 0, 0], rot: [0, 0, 0], grip: 0.12 },
+  hold_gum: { make: makeGum, bone: 'RightHand', size: 0.06, handK: 0.75, offset: [0, 0, 0], rot: [0, 0, 0], grip: 0.15 },
+  skateboard: { make: makeSkateboard, bone: 'RightHand', size: 0.068, free: true, offset: [0, 0, 0], rot: [0, 0, 0], grip: 0 },
 };
+
+/** ось предмета (после канона/поворота make) и его размеры в системе кота — для хвата (holdAction) */
+export interface PropDims {
+  /** высота (по Y) и полуширина поперёк (по X/Z), в долях роста кота */
+  h: number;
+  r: number;
+}
+
+/** главные оси облака точек: [длинная, средняя, тонкая] (единичные), центр */
+export function principalAxes(pts: THREE.Vector3[]): { axes: THREE.Vector3[]; c: THREE.Vector3 } {
+  const c = new THREE.Vector3();
+  for (const p of pts) c.add(p);
+  c.multiplyScalar(1 / Math.max(1, pts.length));
+  const C = [0, 0, 0, 0, 0, 0, 0, 0, 0];
+  for (const p of pts) {
+    const d = [p.x - c.x, p.y - c.y, p.z - c.z];
+    for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) C[i * 3 + j] += d[i] * d[j];
+  }
+  // степенной метод с исчерпанием — 3×3, хватает
+  const axes: THREE.Vector3[] = [];
+  const M = C.slice();
+  for (let n = 0; n < 3; n++) {
+    let v = new THREE.Vector3(1, 0.7 + n * 0.1, 0.3 - n * 0.2).normalize();
+    for (const a of axes) v.addScaledVector(a, -v.dot(a));
+    v.normalize();
+    let lam = 0;
+    for (let it = 0; it < 80; it++) {
+      const w = new THREE.Vector3(M[0] * v.x + M[1] * v.y + M[2] * v.z, M[3] * v.x + M[4] * v.y + M[5] * v.z, M[6] * v.x + M[7] * v.y + M[8] * v.z);
+      for (const a of axes) w.addScaledVector(a, -w.dot(a));
+      lam = w.length();
+      if (lam < 1e-12) break;
+      v = w.multiplyScalar(1 / lam);
+    }
+    axes.push(v.clone());
+    for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) M[i * 3 + j] -= lam * v.getComponent(i) * v.getComponent(j);
+  }
+  return { axes, c };
+}
 
 type Loader = (url: string) => Promise<THREE.Object3D>;
 
@@ -58,6 +116,38 @@ export class PropRig {
   private va = new THREE.Vector3();
   private vb = new THREE.Vector3();
   private vc = new THREE.Vector3();
+  /** длина кисти (запястье → кончик среднего пальца) в системе кота; 0 — не измерена (size из PropDef) */
+  handLen = 0;
+  /** положение реквизита задано снаружи (holdAction / скейт): позиция и поворот в системе root, масштаб 0…1 */
+  private placed: { p: THREE.Vector3; q: THREE.Quaternion; s: number } | null = null;
+  /** размеры текущего реквизита (после масштаба) */
+  dims: PropDims | null = null;
+
+  /** поставить реквизит (holdAction, скейт): null — снова по кисти и клипу */
+  place(p: THREE.Vector3 | null, q?: THREE.Quaternion, s = 1) {
+    if (!p) {
+      this.placed = null;
+      return;
+    }
+    this.placed ??= { p: new THREE.Vector3(), q: new THREE.Quaternion(), s: 1 };
+    this.placed.p.copy(p);
+    if (q) this.placed.q.copy(q);
+    this.placed.s = s;
+  }
+  /** пересобрать процедурный реквизит (размер доски поменялся под кота) */
+  rebuild(id: string) {
+    const d = PROPS[id];
+    if (d?.make) this.cache.delete(`make:${id}`);
+    if (this.active?.clip === id) {
+      this.active.obj.removeFromParent();
+      this.active = null;
+      this.want = '';
+    }
+  }
+  /** узел реквизита в сцене (тесты, стенд) */
+  get object(): THREE.Object3D | null {
+    return this.active?.obj ?? null;
+  }
 
   /** навести реквизит: point — куда смотрит сопло (кончик), null — держать как в клипе */
   aim(point: THREE.Vector3 | null, w = 1) {
@@ -124,6 +214,15 @@ export class PropRig {
     }
     const a = this.active;
     if (!a) return;
+    if (this.placed) {
+      a.obj.position.copy(this.placed.p);
+      a.obj.quaternion.copy(this.placed.q);
+      a.obj.scale.setScalar(Math.max(1e-4, this.placed.s));
+      a.obj.visible = this.placed.s > 0.01;
+      return;
+    }
+    a.obj.scale.setScalar(1);
+    a.obj.visible = !a.def.free;
     a.hand.updateWorldMatrix(true, false);
     const p = this.root.worldToLocal(a.hand.getWorldPosition(this.v));
     const other = a.def.both ? this.bone(a.def.bone === 'RightHand' ? 'LeftHand' : 'RightHand') : undefined;
@@ -183,11 +282,23 @@ export class PropRig {
         m.roughness = 0.05;
       }
     });
+    if (d.canon === 'pca') obj.quaternion.copy(canonQ(obj));
+    obj.updateMatrixWorld(true);
     const box = new THREE.Box3().setFromObject(obj);
-    const h = box.getSize(new THREE.Vector3()).y || 1;
-    const k = d.size / h;
-    obj.scale.setScalar(k);
+    const sz = box.getSize(new THREE.Vector3());
+    const h = sz.y || 1;
+    const size = d.free ? h : d.handK && this.handLen > 0 ? d.handK * this.handLen : d.size;
+    const k = size / h;
+    this.dims = { h: size, r: (Math.max(sz.x, sz.z) / 2) * k };
+    obj.scale.multiplyScalar(k);
     // хват — за низ (ручку/донышко) или на доле grip высоты (баллончик — за корпус)
+    if (d.free) {
+      // свой размер и начало (доска: колёса на y = 0) — как сделано
+      const pv = new THREE.Group();
+      pv.name = 'prop';
+      pv.add(obj);
+      return pv;
+    }
     obj.position.set(-((box.min.x + box.max.x) / 2) * k, -(box.min.y + h * (d.grip ?? 0)) * k, -((box.min.z + box.max.z) / 2) * k);
     const pivot = new THREE.Group();
     pivot.name = 'prop';
@@ -216,4 +327,43 @@ export class PropRig {
     this.active?.obj.removeFromParent();
     this.active = null;
   }
+}
+
+/**
+ * Канон модели под углом: длинная главная ось → +Y, тонкая (нормаль плоскости) → +Z; узкий конец длинной оси
+ * (ручка) — вниз. Поворот для obj.quaternion (поверх его собственного).
+ */
+export function canonQ(obj: THREE.Object3D): THREE.Quaternion {
+  obj.updateMatrixWorld(true);
+  const pts: THREE.Vector3[] = [];
+  obj.traverse((o) => {
+    const m = o as THREE.Mesh;
+    const pos = m.isMesh ? (m.geometry.getAttribute('position') as THREE.BufferAttribute | undefined) : undefined;
+    if (!pos) return;
+    const step = Math.max(1, Math.floor(pos.count / 1500));
+    for (let i = 0; i < pos.count; i += step) pts.push(new THREE.Vector3().fromBufferAttribute(pos, i).applyMatrix4(m.matrixWorld));
+  });
+  if (pts.length < 10) return new THREE.Quaternion();
+  const { axes, c } = principalAxes(pts);
+  const Y = axes[0].clone(), Z = axes[2].clone();
+  // узкий конец — ручка: сравнить разброс поперёк оси у концов
+  let lo = 0, hi = 0, nlo = 0, nhi = 0, mn = Infinity, mx = -Infinity;
+  for (const p of pts) {
+    const t = p.clone().sub(c).dot(Y);
+    mn = Math.min(mn, t);
+    mx = Math.max(mx, t);
+  }
+  for (const p of pts) {
+    const d = p.clone().sub(c);
+    const t = d.dot(Y);
+    const rad = d.addScaledVector(Y, -t).length();
+    if (t < mn + (mx - mn) * 0.3) (lo += rad), nlo++;
+    else if (t > mn + (mx - mn) * 0.7) (hi += rad), nhi++;
+  }
+  if (nlo && nhi && lo / nlo > hi / nhi) Y.negate();
+  const X = new THREE.Vector3().crossVectors(Y, Z).normalize();
+  Z.crossVectors(X, Y).normalize();
+  // базис (X, Y, Z) в координатах модели → поворот, переводящий его в оси (1,0,0), (0,1,0), (0,0,1)
+  const m = new THREE.Matrix4().makeBasis(X, Y, Z);
+  return new THREE.Quaternion().setFromRotationMatrix(m).invert().multiply(obj.quaternion);
 }

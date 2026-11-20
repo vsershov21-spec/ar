@@ -16,7 +16,7 @@ import { loadTestContent } from './content';
 import type { ContentBundle } from '../../src/persona/content';
 import { turn } from '../../src/voice/turn';
 
-export interface Spoken { t: number; id: string; text: string; event: string }
+export interface Spoken { t: number; id: string; text: string; event: string; template?: string }
 
 const root = path.resolve(__dirname, '../..');
 
@@ -116,7 +116,7 @@ export async function makeDirector(o: HarnessOpts = {}) {
       voice.cancel();
       const my = ++gen;
       const id = req.lineId ?? req.template;
-      spoken.push({ t: T(), id, text: req.text, event: id.split('.').slice(1, -1).join('.') || id });
+      spoken.push({ t: T(), id, text: req.text, template: req.template, event: id.split('.').slice(1, -1).join('.') || id });
       voice.speaking = true;
       const dur = 450 + (req.text.length / 14) * 1000;
       await new Promise<void>((r) => {

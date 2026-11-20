@@ -25,7 +25,8 @@ describe('знакомство (новый ребёнок)', () => {
     await h.until(() => !h!.d.queue.busy && h!.d.state.phase === 'play');
     expect(ev(h)).toEqual(['meet_card', 'meet_congrats', 'ask_name', 'nice_name', 'meet_self', 'meet_skills']);
     // каждая реплика — записью
-    for (const s of h.spoken) expect(h.isVoiced('hooligan', s.id, s.text, s.text) || h.voiced.has(s.id), s.id).toBe(true);
+    // шаблон с {name} — как проверяет режиссёр (perform): запись шаблона + имя склейкой
+    for (const s of h.spoken) expect(h.isVoiced('hooligan', s.id, s.template ?? s.text, s.text) || h.voiced.has(s.id), s.id).toBe(true);
     expect(h.d.state.met).toBe(true);
     expect(JSON.parse(localStorage.getItem('sber-ar-cat:v1')!).met).toBe(true);
   });

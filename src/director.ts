@@ -34,6 +34,8 @@ import { rand } from './core/util';
 import { emotionFor } from './character/emotions';
 import { ACTION_ROUTE, SLEEP_WAKE_MS, isActionId, type ActionId } from './scenario/actions';
 import { track } from './analytics';
+import { LineDedupe, Orchestrator } from './scenario/orchestrator';
+import { RIDE_FROM, RIDE_TO } from './character/skateTiming';
 
 export type DirectorEvents = { log: string; phase: string; persona: PersonaId; game: { id: string; start: boolean }; named: boolean };
 
@@ -163,6 +165,29 @@ export class Director extends Emitter<DirectorEvents> {
   /** кнопка, которая сейчас обрабатывается (Director.action): клип Meshy «action:<id>» (Почесать → scratch_enjoy) */
   private curAction: string | null = null;
   private chainTimer = 0;
+  /**
+   * Оркестратор действий (scenario/orchestrator.ts): одно активное действие, очередь на одно место, блок повторных
+   * нажатий; реплики помечаются токеном действия — у вытесненного снимаются.
+   */
+  readonly orch = new Orchestrator(() => performance.now());
+  /** одинаковый пузырь не чаще раза в 8 с («Чуть позже!…» по кругу — запись 20.11) */
+  readonly dedupe = new LineDedupe(() => performance.now());
+  /** токен действия, которое сейчас обрабатывается (реплики enqueue получают owner) */
+  private owner = 0;
+  /** тело занято действием с предметом / скейтом (character.runAct) до этого момента */
+  private actUntil = 0;
+  private actTimers: number[] = [];
+  /** смена кота отложена (идёт сцена/номер): повторить, когда освободится */
+  private deferred: { e: ScenarioEvent; at: number } | null = null;
+  /**
+   * модель кота для персонажа уже на сцене (app.ts: новая модель грузится после set_persona) — реплика нового кота ждёт
+   * (запись 20.11: «Вот и я…» Добряка над моделью Хулигана)
+   */
+  charReady: ((persona: string) => boolean) | null = null;
+  /** смену кота сейчас можно начать (пилот: раз в 3 мин); false — «Чуть позже!» без вопроса «Хочешь, я стану другим?» */
+  switchReady: (() => boolean) | null = null;
+  /** текст «Чуть позже» (config/pilot.ts) */
+  laterText = 'Чуть позже! Давай ещё немного поиграем со мной.';
 
   /** у кота есть настоящий клип Meshy с этим id (GlbCharacter.clipSource) */
   private isMeshy(id: string): boolean {
@@ -214,6 +239,11 @@ export class Director extends Emitter<DirectorEvents> {
     d.fx.palette = this.persona.palette;
     d.fx.onGlitch = (on) => d.glCanvas.classList.toggle('glitch', on);
     d.fx.onSlap = () => d.audio.play('sticker_slap', 0.7);
+    this.orch.onLog = (m) => this.log(m);
+    this.orch.onCancel = (a) => {
+      if (this.queue.drop((it) => it.owner === a.token && it.priority < 3)) this.log(`сняты реплики вытесненного «${a.id}»`);
+      if (this.actBusy()) this.stopAct();
+    };
     d.tracker.onFound(() => this.dispatch({ type: 'card_found' }));
     d.tracker.onLost(() => this.dispatch({ type: 'card_lost' }));
   }
@@ -257,9 +287,25 @@ export class Director extends Emitter<DirectorEvents> {
     }
     const r = step(this.state, e, this.cfg);
     // смена кота (экран заклеивается): не чаще, чем разрешает switchGate (пилот — раз в 3 мин)
-    if (r.state.phase === 'switching' && prev.phase !== 'switching' && this.switchGate && !this.switchGate()) {
-      this.log(`смена кота отложена (${e.type})`);
-      return;
+    if (r.state.phase === 'switching' && prev.phase !== 'switching') {
+      // идёт сцена (раскраска, дом, пробуждение) или номер — наклейки и «Встряхни телефон» не поверх: подождём
+      const b = this.orch.blocking();
+      if (b && b !== 'other' && b !== 'switch') {
+        this.deferred = { e, at: now };
+        this.log(`смена кота подождёт конца «${b}»`);
+        return;
+      }
+      if (this.switchGate && !this.switchGate()) {
+        this.log(`смена кота отложена (${e.type})`);
+        return;
+      }
+      if (this.actBusy()) this.stopAct();
+      const t = this.orch.request('switch');
+      this.switchTok = t.token;
+    }
+    if (prev.phase === 'switching' && r.state.phase !== 'switching' && this.switchTok) {
+      this.orch.done(this.switchTok);
+      this.switchTok = 0;
     }
     if (r.state.phase !== this.state.phase) this.emit('phase', r.state.phase);
     if (!prev.dialog && r.state.dialog) this.emit('game', { id: r.state.dialog.id, start: true });
@@ -404,6 +450,7 @@ export class Director extends Emitter<DirectorEvents> {
   }
 
   private canWalk() {
+    if (this.actBusy()) return false; // на скейте / с предметом в лапе — тап по карте не уводит
     return this.state.phase === 'play' || this.state.phase === 'free' || this.state.phase === 'ask_name';
   }
   private isOnSurface(p: THREE.Vector2) {
@@ -421,7 +468,33 @@ export class Director extends Emitter<DirectorEvents> {
     this.childAct();
     this.coachDone();
     this.activity();
+    // «Другой кот» раньше срока — сразу «Чуть позже!» (один раз), без вопроса «Хочешь, я стану другим котом?»
+    if (id === 'other' && this.switchReady && !this.switchReady()) return this.sayLater();
+    const ord = this.orch.request(id);
+    if (ord.verdict !== 'start') return;
+    // реплики прошлых действий, ещё ждущие в очереди, — не звучат поверх нового
+    const tok = ord.token;
+    if (this.queue.drop((it) => it.owner !== undefined && it.owner !== tok && it.priority < 3)) this.log('сняты реплики прошлого действия');
+    if (this.actBusy()) this.stopAct();
+    this.owner = tok;
+    try {
+      this.runAction(id);
+    } finally {
+      this.owner = 0;
+    }
+  }
+
+  /** предмет в лапу / скейт по кнопке: id действия → шаблон персонажа (у Хулигана «Пузыри» — жвачка) */
+  private actTemplate(id: string): string | null {
+    if (id === 'skate' || id === 'cocoa' || id === 'mirror' || id === 'treat') return id;
+    if (id === 'bubbles' && this.persona.id === 'hooligan') return 'gum';
+    return null;
+  }
+
+  private runAction(id: ActionId) {
     clearTimeout(this.sleepTimer);
+    const tpl = this.actTemplate(id);
+    if (tpl) this.propAct(tpl);
     const r = ACTION_ROUTE[id];
     // кнопка — явная команда: мини-игру заканчивает, а не считается «ответом» на загадку
     if ('say' in r) return this.dispatch({ type: 'intent', intent: { type: r.say, text: r.text, button: true } });
@@ -460,6 +533,77 @@ export class Director extends Emitter<DirectorEvents> {
   }
   private sleepTimer = 0;
   private purrTimer = 0;
+  private switchTok = 0;
+
+  /** «Чуть позже!» — пузырём, не чаще раза в 8 с */
+  sayLater() {
+    this.bubble(this.laterText, 3500);
+  }
+  /** пузырь без озвучки (срез редакции, «Чуть позже») — одинаковый не чаще раза в 8 с */
+  bubble(text: string, ms = 3500): boolean {
+    if (!this.dedupe.allow(text)) {
+      this.log(`пузырь «${text.slice(0, 30)}…» — повтор, не показываю`);
+      return false;
+    }
+    const p = this.persona;
+    this.d.ui.say(text, p.name, p.id, ms);
+    return true;
+  }
+
+  /** тело занято действием с предметом или скейтом */
+  actBusy(): boolean {
+    return performance.now() < this.actUntil;
+  }
+  private stopAct() {
+    this.actUntil = 0;
+    this.actTimers.forEach((t) => clearTimeout(t));
+    this.actTimers = [];
+    (this.character as Character & { cancelAct?: () => void })?.cancelAct?.();
+    if (this.d.stage.walking) this.d.stage.cancelWalk();
+  }
+
+  /**
+   * Действие с предметом (holdAction.ts: какао, зеркальце, рыбка, жвачка) или скейт (skateRig.ts): тело ведёт персонаж,
+   * режиссёр — реплика, эффект и (скейт) проезд дугой по карте. false — персонаж не умеет (спрайт, нет модели).
+   */
+  private propAct(act: string): boolean {
+    const ch = this.character as Character & { runAct?: (id: string) => number };
+    if (!ch?.runAct || this.d.stage.atGlass) return false;
+    this.stopAct();
+    const dur = ch.runAct(act);
+    if (!dur) return false;
+    this.actUntil = performance.now() + dur * 1000;
+    this.log(`🎬 ${act}: ${dur.toFixed(1)} с (шаблон тела)`);
+    if (act === 'skate') this.actTimers.push(window.setTimeout(() => this.rideArc(), RIDE_FROM * 1000));
+    return true;
+  }
+
+  /** проезд на скейте: небольшая дуга по карте (к её середине), скорость — чтобы уложиться во время проезда */
+  private rideArc() {
+    const st = this.d.stage;
+    if (!this.actBusy()) return;
+    const p0 = st.pos.clone();
+    const dir = p0.x > 0 ? -1 : 1;
+    const R = 0.2;
+    const pts: THREE.Vector2[] = [];
+    for (let i = 1; i <= 4; i++) {
+      const th = (i / 4) * 1.9;
+      pts.push(st.clampTarget(new THREE.Vector2(p0.x + dir * R * Math.sin(th), p0.y - R * 0.55 * (1 - Math.cos(th)))));
+    }
+    let len = 0, prev = p0;
+    for (const p of pts) {
+      len += p.distanceTo(prev);
+      prev = p;
+    }
+    const speed = Math.max(0.05, len / Math.max(0.5, RIDE_TO - RIDE_FROM));
+    let i = 0;
+    const next = () => {
+      if (!this.actBusy() || i >= pts.length) return;
+      const p = pts[i++];
+      if (!st.walkTo(p, next, { speed })) next();
+    };
+    next();
+  }
 
   /**
    * Ребёнок что-то сделал со стеклом (запотело, царапины): кот сразу смотрит туда и удивляется/радуется — лицо и взгляд
@@ -910,15 +1054,25 @@ export class Director extends Emitter<DirectorEvents> {
 
   private enqueue(pk: PickedLine, visuals: boolean, tag?: string, riddleId?: string): boolean {
     const ok = this.queue.say({
-      persona: pk.persona, event: pk.event, priority: pk.priority, interruptible: pk.interruptible, tag,
-      run: () => this.perform(pk, visuals, riddleId),
+      persona: pk.persona, event: pk.event, priority: pk.priority, interruptible: pk.interruptible, tag, owner: this.owner || undefined,
+      run: () => this.perform(pk, visuals, riddleId, !tag),
     });
     if (!ok) this.log(`реплика «${pk.line.id}» отброшена очередью`);
     return ok;
   }
 
-  private async perform(pk: PickedLine, visuals: boolean, riddleId?: string) {
+  private async perform(pk: PickedLine, visuals: boolean, riddleId?: string, free = true) {
     const p = this.personas.get(pk.persona)!;
+    // новый кот говорит, когда его модель уже на сцене (не над прежним котом)
+    if (this.charReady && !this.charReady(pk.persona)) {
+      for (let i = 0; i < 50 && !this.charReady(pk.persona); i++) await wait(100);
+      if (this.persona.id !== pk.persona) return;
+    }
+    // одинаковая реплика (реакция, не шаг игры) — не чаще раза в 8 с
+    if (free && pk.priority < 3 && !this.dedupe.allow(pk.text)) {
+      this.log(`🔁 «${pk.text.slice(0, 32)}» — повтор, пропуск`);
+      return;
+    }
     const vp = this.d.voice as VoicePlayer & { recorded?: (p: string, id: string | undefined, t: string, x?: string) => boolean; elRecorded?: (p: string, id: string | undefined, t: string, x?: string) => boolean; hasRecordings?: boolean; usePersona?: (p: string) => Promise<unknown> };
     // ответ загадки целиком одной записью («Ответ — огурец.»), а не склейкой «Ответ —» + «огурец»; загадка — та, что была при выборе
     let lineId = pk.line.id, template = pk.line.text;
@@ -940,7 +1094,7 @@ export class Director extends Emitter<DirectorEvents> {
     if (pk.event === 'meet_skills') this.startCoach();
     const prevClip = this.character.currentClip;
     // покой — и вариант покоя (idle_look_around…): кот начинает «говорить» телом
-    const talk = /^idle/.test(prevClip) && !this.d.stage.walking && !this.bodyBusy?.();
+    const talk = /^idle/.test(prevClip) && !this.d.stage.walking && !this.bodyBusy?.() && !this.actBusy();
     if (talk) this.character.play('talk', { loop: true });
     const v = p.voice;
     const req: SpeakRequest & { lineId: string; piperVoice: string; pitchSemitones: number; emotion: string } = {
@@ -1046,7 +1200,7 @@ export class Director extends Emitter<DirectorEvents> {
     const now = performance.now();
     // тапы чаще TAP_CLIP_HOLD_MS — клип прошлого тапа доигрывает (а не 5 смен позы за 0,3 с)
     const held = v.tap && now - this.lastTapClipAt < TAP_CLIP_HOLD_MS;
-    if (clip && !d.stage.walking && !held && !this.bodyBusy?.()) {
+    if (clip && !d.stage.walking && !held && !this.bodyBusy?.() && !this.actBusy()) {
       this.playChained(clip);
       if (v.tap) this.lastTapClipAt = now;
       this.guardLoop(clip);
@@ -1228,7 +1382,8 @@ export class Director extends Emitter<DirectorEvents> {
       this.character?.emote('blink', 150);
     }
     const playing = this.state.phase === 'play' || this.state.phase === 'free';
-    this.turnStep(playing);
+    this.turnStep(playing && !this.actBusy());
+    this.orchTick();
     // idle-набор характера с весами (в дрёме — нет)
     if (playing && !this.dozing && !v.speaking && this.character?.currentClip === 'idle' && !this.d.stage.walking) {
       if ((this.idleT += dt) > 8 + Math.random() * 4) {
@@ -1240,6 +1395,21 @@ export class Director extends Emitter<DirectorEvents> {
       }
     } else this.idleT = 0;
     this.idleTick(playing);
+  }
+
+  /** оркестратор: конец текущего действия (тело в покое, своих реплик нет) → ждавшее действие; отложенная смена кота */
+  private orchTick() {
+    const ch = this.character;
+    const tok = this.orch.token;
+    const own = tok ? this.queue.current?.owner === tok || this.queue.pending.some((it) => it.owner === tok) : false;
+    const busy = this.actBusy() || own || (!!ch && !/^(idle|talk)$/.test(ch.currentClip)) || this.d.stage.walking;
+    const next = this.orch.tick(busy);
+    if (next) this.action(next);
+    const df = this.deferred;
+    if (df && !this.orch.blocking()) {
+      this.deferred = null;
+      if (performance.now() - df.at < 12_000) this.dispatch(df.e);
+    }
   }
 
   /** лестница тишины: «ты тут?» → предложить занятие → мысль вслух → другое занятие → дрёма (docs/scenario/LOGIC.md) */
