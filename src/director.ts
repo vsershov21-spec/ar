@@ -359,6 +359,11 @@ export class Director extends Emitter<DirectorEvents> {
     const type = m.intent === 'switch' ? 'change_persona' : m.intent;
     const h: Heard = m.intent === 'name' ? { type: 'name', name: m.name, known: !!m.known, text: t } : { type, text: t };
     this.log(`«${t}» → ${h.type}${h.name ? ` ${h.name}${h.known ? '' : ' (нет в словаре)'}` : ''} ${m.confidence.toFixed(2)}${listening ? ` (ждём: ${listening})` : ''}`);
+    // нет микрофона — повторялку не запускаем ни чипом, ни текстом (повторять нечего)
+    if (h.type === 'echo_start' && !this.voiceOk('echo')) {
+      this.d.ui.toast('Повторялке нужен микрофон — разреши доступ в настройках браузера', 4000);
+      return this.log('повторялка: нет микрофона');
+    }
     // «Угадай эмоцию»: «ты грустный» — ответ про кота, а не «мне грустно» (про себя — «мне», «я» — поддержка, как всегда)
     if (listening === 'emo' && !/(^| )(мне|я|меня)( |$)/.test(normalize(t))) {
       const it = this.gameItems('emo').find((i) => !!i.keywords?.length && answerMatches(t, i.keywords));
@@ -1015,11 +1020,6 @@ export class Director extends Emitter<DirectorEvents> {
       this.log(`реплика «${event}» не выбрана (${this.picker.coolingDown(event) ? 'cooldown' : 'нет озвученных'})`);
       return false;
     }
-    // нет микрофона — кот не зовёт говорить («Скажи „повторяй за мной“»): реплики тишины/подсказки с таким призывом молчат
-    if ((!o.scenario || INVITE_EVENTS.has(event)) && SAY_INVITE.test(pk.text) && this.d.voiceIn && !this.d.voiceIn().mic) {
-      this.log(`реплика «${event}» зовёт говорить — без микрофона молчим`);
-      return false;
-    }
     // реплика сценария/диалога встаёт в очередь (не ниже 2), даже если событие само по себе — реакция («нет» в «Хочешь загадку?»)
     // фон (подсказка кота по своей инициативе) — любое действие ребёнка её перебивает
     const priority = (o.background ? 0 : o.scenario ? Math.max(pk.priority, 2) : pk.priority) as PickedLine['priority'];
@@ -1099,6 +1099,12 @@ export class Director extends Emitter<DirectorEvents> {
   }
 
   private enqueue(pk: PickedLine, visuals: boolean, tag?: string, riddleId?: string): boolean {
+    // нет микрофона — кот не зовёт говорить («Скажи „повторяй за мной“»): реплики тишины, подсказок и реакций с таким
+    // призывом молчат (реплики сценария — нет: голосовые занятия без микрофона и так не начинаются)
+    if ((INVITE_EVENTS.has(pk.event) || pk.priority < 2) && SAY_INVITE.test(pk.text) && this.d.voiceIn && !this.d.voiceIn().mic) {
+      this.log(`реплика «${pk.line.id}» зовёт говорить — без микрофона молчим`);
+      return false;
+    }
     const ok = this.queue.say({
       persona: pk.persona, event: pk.event, priority: pk.priority, interruptible: pk.interruptible, tag, owner: this.owner || undefined,
       run: () => this.perform(pk, visuals, riddleId, !tag),
