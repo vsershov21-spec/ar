@@ -35,6 +35,20 @@ export const HINT_TEXT: Record<Exclude<Hint, null>, string> = {
   notcard: 'Это не карта',
 };
 
+/**
+ * Событие поиска карты для внешнего слоя (ui/cardSearch.ts) — вместо обёртки методов оверлея: переименование методов
+ * не ломает слой молча. Те же данные, что идут в guide / candidate / track / lost.
+ *   catPlaced  — кот сидит на карте (повторная посадка тихая);
+ *   catOnScreen — кот уже на экране (сидел в этой сессии: ждёт у стекла после «Мой дом»/«Пересадить») —
+ *                 «Это не карта» и текст подсказок поверх него не показывать.
+ * «Это не карта» при catOnScreen событием не приходит вовсе.
+ */
+export type CardSearchEvent =
+  | { type: 'guide'; state: TrackState; progress: number; hint: Hint; catPlaced: boolean; catOnScreen: boolean }
+  | { type: 'candidate'; quad: Pt[]; kind: CandidateKind; catPlaced: boolean; catOnScreen: boolean }
+  | { type: 'track'; silent: boolean; catPlaced: boolean; catOnScreen: boolean }
+  | { type: 'lost'; catPlaced: boolean; catOnScreen: boolean };
+
 const NEAR_TEXT = 'Отодвинь телефон чуть дальше';
 
 const MODEL = roundedCardOutline(85.6 / 53.98, 3.18 / 85.6, 6);
@@ -88,8 +102,24 @@ export class CardOverlay {
    */
   catPlaced = false;
 
+  /** подписчик событий поиска (ui/cardSearch.ts) */
+  onSearch: ((e: CardSearchEvent) => void) | null = null;
+  /** поиск рисует внешний слой: свои пунктир, кольцо, подписи и «Это не карта» не рисуем (прилипание контура — да) */
+  externalSearch = false;
+  private emit(e: CardSearchEvent) {
+    try {
+      this.onSearch?.(e);
+    } catch (err) {
+      console.warn('[card] onSearch', err);
+    }
+  }
+  private get catOnScreen() {
+    return this.catPlaced || this.quietHints;
+  }
+
   /** детектор видит карту (уже подтверждённую трекером); silent — кот уже стоял: без анимации «нашёл» */
   track(v: CardView, silent = false) {
+    this.emit({ type: 'track', silent, catPlaced: this.catPlaced, catOnScreen: this.catOnScreen });
     this.view = v;
     // карта вернулась (или кот и так на экране) — без повторной анимации «нашёл» и искр, кот просто стоит дальше
     if (this.state === 'search' && (silent || performance.now() - this.lostAt < 5000)) {
@@ -110,6 +140,7 @@ export class CardOverlay {
     this.lostAt = -1e9;
   }
   lost() {
+    this.emit({ type: 'lost', catPlaced: this.catPlaced, catOnScreen: this.catOnScreen });
     if (this.state !== 'search') this.lostAt = performance.now();
     this.view = null;
     if (this.state !== 'search') {
@@ -224,6 +255,7 @@ export class CardOverlay {
    */
   quietHints = false;
   candidate(pts: Pt[], kind: CandidateKind = 'sber') {
+    if (!(kind === 'notcard' && this.catOnScreen)) this.emit({ type: 'candidate', quad: pts, kind, catPlaced: this.catPlaced, catOnScreen: this.catOnScreen });
     if (this.state !== 'search' || this.catPlaced) return;
     const now = performance.now();
     if (kind === 'notcard') {
@@ -235,6 +267,7 @@ export class CardOverlay {
     this.cand = { pts, at: now, kind };
   }
   guide(state: TrackState, progress: number, hint: Hint) {
+    this.emit({ type: 'guide', state, progress, hint, catPlaced: this.catPlaced, catOnScreen: this.catOnScreen });
     this.trackState = state;
     this.progress = progress;
     this.hint = hint;
@@ -264,6 +297,7 @@ export class CardOverlay {
   }
 
   private drawNotCard() {
+    if (this.externalSearch) return;
     const n = this.notCard;
     if (!n || this.state !== 'search') return;
     const age = performance.now() - n.at;
@@ -309,6 +343,7 @@ export class CardOverlay {
   }
 
   private drawCandidate() {
+    if (this.externalSearch) return;
     const c = this.cand;
     if (!c || this.state !== 'search' || this.trackState !== 'candidate') return;
     // короткий пропуск кадра — рамка гаснет плавно, а не мигает

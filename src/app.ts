@@ -41,8 +41,8 @@ import { feature } from './config/edition';
 import { HintsController } from './ui/hints';
 import { KidsOffer } from './ui/kidsOffer';
 import { FogBoard } from './ui/fogBoard';
-import { CardSearch, SEARCH_LINES, type SearchKind } from './ui/cardSearch';
-import type { Hint, TrackState } from './tracker/card/fsm';
+import { CardSearch, SEARCH_LINES } from './ui/cardSearch';
+import type { CardSearchEvent } from './tracker/card/overlay';
 
 /** кот выглядывает из нижней плашки поиска карты */
 const PEEK: Record<string, string> = { hooligan: 'video/sprites/hooligan/turn_front.webp', kind: 'video/sprites/kind/turn_front.webp', glitter: 'video/sprites/glitter/pose_wave.webp' };
@@ -742,50 +742,34 @@ export class App {
   }
 
   /**
-   * Детский поиск карты (ui/cardSearch.ts): тот же поток состояний FSM, что получает оверлей трекера
-   * (tracker/card/overlay.ts: guide / candidate / track / lost) — оборачиваем эти методы на экземпляре, логику трекера не
-   * трогаем. Сухие кольцо, пунктир и «Держи телефон ровно…» оверлея выключаются (drawCandidate / drawNotCard — пустые);
-   * прилипание контура и «нашёл» остаются у оверлея и сцены пробуждения. Нет таких методов (другой трекер, переименовали) —
-   * ничего не меняем, поиск выглядит как раньше.
+   * Детский поиск карты (ui/cardSearch.ts): тот же поток состояний FSM, что получает оверлей трекера, — через его
+   * публичное событие onSearch (tracker/card/overlay.ts CardSearchEvent: guide / candidate / track / lost, с флагами
+   * catPlaced и catOnScreen). Свои кольцо, пунктир, подписи и «Это не карта» оверлей не рисует (externalSearch);
+   * прилипание контура и «нашёл» остаются у оверлея и сцены пробуждения. Нет события (другой трекер) — поиск как раньше.
    */
   private wireCardSearch() {
-    type Ov = {
-      guide(s: TrackState, k: number, h: Hint): void;
-      candidate(pts: { x: number; y: number }[], kind?: SearchKind): void;
-      track(v: unknown, silent?: boolean): void;
-      lost(): void;
-      catPlaced: boolean;
-      drawCandidate?: () => void;
-      drawNotCard?: () => void;
-    };
+    type Ov = { onSearch: ((e: CardSearchEvent) => void) | null; externalSearch: boolean };
     const ov = (this.tracker as unknown as { overlay?: Ov }).overlay;
-    if (!ov || typeof ov.guide !== 'function' || typeof ov.candidate !== 'function' || typeof ov.track !== 'function') return;
+    // нет оверлея карты с событием поиска (другой трекер) — поиск выглядит как раньше
+    if (!ov || !('onSearch' in ov)) return;
     const cs = new CardSearch({ container: this.root, sound: (id, v) => this.audio.play(id, v ?? 1) });
     this.cardSearch = cs;
-    const guide = ov.guide.bind(ov), cand = ov.candidate.bind(ov), track = ov.track.bind(ov), lost = ov.lost.bind(ov);
-    ov.guide = (st, k, h) => {
-      guide(st, k, h);
-      cs.guide(st, k, h, !!ov.catPlaced);
-    };
-    ov.candidate = (pts, kind = 'sber') => {
-      cand(pts, kind);
-      cs.candidate(pts, kind, !!ov.catPlaced);
-    };
-    // track() приходит каждый кадр, пока карта захвачена: «нашёл!» — только на переходе в захват
+    // события оверлея (overlay.ts onSearch) — без обёртки методов: переименование не ломает слой молча.
+    // «Это не карта», пока кот уже на экране (после «Мой дом»/«Пересадить»), оверлей не присылает вовсе.
     let locked = false;
-    ov.track = (v, silent = false) => {
-      const was = !!ov.catPlaced;
-      track(v, silent);
-      if (!locked) cs.found(silent || was);
-      locked = true;
+    ov.externalSearch = true;
+    ov.onSearch = (e) => {
+      if (e.type === 'guide') cs.guide(e.state, e.progress, e.hint, e.catPlaced);
+      else if (e.type === 'candidate') cs.candidate(e.quad, e.kind, e.catPlaced);
+      else if (e.type === 'track') {
+        // track приходит каждый кадр, пока карта захвачена: «нашёл!» — только на переходе в захват
+        if (!locked) cs.found(e.silent || e.catPlaced);
+        locked = true;
+      } else {
+        locked = false;
+        cs.lost();
+      }
     };
-    ov.lost = () => {
-      lost();
-      locked = false;
-      cs.lost();
-    };
-    ov.drawCandidate = () => undefined;
-    ov.drawNotCard = () => undefined;
     // нижняя плашка, пока карты нет: кот выглядывает и «принюхивается», фразы меняются
     const scan = this.ui.root.querySelector('.scan') as HTMLElement | null;
     const em = scan?.querySelector('span');
