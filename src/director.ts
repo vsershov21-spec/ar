@@ -53,6 +53,12 @@ export interface DirectorDeps {
   /** mode — какой ответ ждём ('echo' — режим повтора: VoiceEngine пишет звук без распознавания) */
   listen?: (ms: number, mode?: string) => void;
   stopListen?: () => void;
+  /** узел диалога ждёт ответа (до того, как кот договорил): VoiceEngine.expect — «да»/«сдаюсь» не шум */
+  expect?: (ms: number, mode?: string) => void;
+  /** голосовой вход: asr — модель есть или грузится, ready — уже в памяти, mic — доступ не запрещён (VoiceEngine) */
+  voiceIn?: () => { asr: boolean; ready: boolean; mic: boolean };
+  /** дождаться готовности распознавания не дольше ms (false — модели нет / не успела) */
+  whenAsrReady?: (ms: number) => Promise<boolean>;
   /** заполняется сам: для старых вкладок debug, читающих d.personas */
   personas?: ContentBundle['personas'];
   /**
@@ -464,6 +470,11 @@ export class Director extends Emitter<DirectorEvents> {
    */
   action(id: ActionId | string) {
     if (!isActionId(id)) return this.log(`нет действия «${id}»`);
+    // нет доступа к микрофону — повторялку не запускаем (кот повторял бы тишину)
+    if (id === 'echo' && !this.voiceOk('echo')) {
+      this.d.ui.toast('Повторялке нужен микрофон — разреши доступ в настройках браузера', 4000);
+      return this.log('повторялка: нет микрофона');
+    }
     track('action', { id }); // воронка (src/analytics): id кнопки, без текста
     this.childAct();
     this.coachDone();
@@ -1443,12 +1454,25 @@ export class Director extends Emitter<DirectorEvents> {
   private offerNext() {
     for (let i = 0; i < OFFERS.length; i++) {
       const what = OFFERS[(this.offerIdx + i) % OFFERS.length];
+      if (!this.voiceOk(what)) continue; // голоса нет — не предлагаем занятия, где отвечают голосом
       if (this.hasVoiced(`offer_${what}`)) {
         this.offerIdx = (this.offerIdx + i + 1) % OFFERS.length;
         return this.dispatch({ type: 'offer', what });
       }
     }
     return this.react('bored');
+  }
+
+  /**
+   * Занятие возможно без голоса? Загадка и угадайки (emo, rps) — ответ голосом: нужны микрофон и модель; повторялка —
+   * только микрофон (повтор без распознавания). Остальное — кнопками.
+   */
+  voiceOk(what: string): boolean {
+    const v = this.d.voiceIn?.();
+    if (!v) return true;
+    if (what === 'echo') return v.mic;
+    if (what === 'riddle' || what === 'emo' || what === 'rps') return v.mic && v.asr;
+    return true;
   }
 
   /** любая активность пользователя (касание, голос) откладывает инициативу кота */

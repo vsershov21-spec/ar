@@ -14,8 +14,18 @@
 import { asset } from '../core/util';
 import type { MicInput } from './mic';
 import { perf } from '../core/perf';
+import { feature } from '../config/edition';
 
 export type AsrState = 'idle' | 'loading' | 'listening' | 'error';
+/**
+ * Здоровье офлайн-модели: unknown — ещё не пробовали; ok — модель в памяти; down — попытка не удалась, следующая не
+ * раньше RETRY_MS; dead — MAX_ATTEMPTS попыток за сессию не удались, больше не грузим (голос выключен до перезагрузки).
+ */
+export type ModelHealth = 'unknown' | 'loading' | 'ok' | 'down' | 'dead';
+/** попыток загрузить модель за сессию (раньше — на каждую фразу: 15 запросов 45 МБ за минуту) */
+export const MODEL_MAX_ATTEMPTS = 2;
+/** пауза перед второй попыткой */
+export const MODEL_RETRY_MS = 30_000;
 
 export interface Asr {
   readonly name: string;
@@ -36,6 +46,16 @@ export interface Asr {
   onProgress: (p: number) => void;
   /** заранее загрузить модель (без микрофона) */
   preload?(): Promise<boolean>;
+  /** только скачать модель в HTTP-кэш (без распаковки в воркере): с жеста «Разбудить», пока ищем карту */
+  prefetch?(): Promise<boolean>;
+  /** здоровье модели (Vosk); у Web Speech — всегда ok */
+  readonly health?: ModelHealth;
+  /** модель готова: распознавание стартует сразу */
+  readonly ready?: boolean;
+  /** распознавание сейчас невозможно и запускать его не нужно (модели нет, ждём паузу перед повтором) */
+  readonly unavailable?: boolean;
+  /** уверенность распознавателя в слове последней фразы 0..1 (Vosk setWords); undefined — не знаем */
+  wordConf?(word: string): number | undefined;
   setGrammar?(phrases: string[] | null): void;
   /** сколько слов вне грамматики ([unk]) было в последней фразе — «речь есть, но не из словаря» */
   lastUnk?: number;
@@ -168,6 +188,34 @@ export async function fetchModelWithProgress(url: string, onProgress: (p: number
   return true;
 }
 
+/**
+ * Health-проверка модели до скачивания 45 МБ: HEAD. 404/410, сеть, HTML вместо архива (SPA-фолбэк Caddy отдаёт
+ * index.html с 200 на любой путь) или подозрительно маленький файл — модели нет. Модель уже разворачивалась на этом
+ * телефоне (лежит в IndexedDB воркера) — не проверяем: работает и без сети.
+ */
+export async function checkModel(url: string, f: typeof fetch = (...a) => fetch(...a)): Promise<{ ok: boolean; why?: string }> {
+  const full = new URL(asset(url), location.href).href;
+  try {
+    if (localStorage.getItem(READY_KEY) === full) return { ok: true };
+  } catch {
+    /* приватный режим */
+  }
+  let r: Response;
+  try {
+    r = await f(full, { method: 'HEAD', cache: 'no-store' });
+  } catch (e) {
+    return { ok: false, why: 'no-model fetch ' + String((e as Error)?.message ?? e).slice(0, 60) };
+  }
+  // HEAD не поддержан (405/501) — пусть решает GET
+  if (r.status === 405 || r.status === 501) return { ok: true };
+  if (!r.ok) return { ok: false, why: `no-model ${r.status}` };
+  const type = r.headers.get('content-type') ?? '';
+  if (/text\/html/i.test(type)) return { ok: false, why: 'no-model html' };
+  const len = Number(r.headers.get('content-length') || 0);
+  if (len && len < 1_000_000) return { ok: false, why: `no-model size ${len}` };
+  return { ok: true };
+}
+
 function markModelReady(url: string) {
   try {
     localStorage.setItem(READY_KEY, new URL(asset(url), location.href).href);
@@ -211,19 +259,86 @@ export class VoskAsr implements Asr {
     this.grammar = phrases;
   }
 
-  preload(): Promise<boolean> {
-    this.loading ??= (async () => {
+  /** здоровье модели (MODEL_MAX_ATTEMPTS попыток за сессию, между ними MODEL_RETRY_MS) */
+  health: ModelHealth = 'unknown';
+  private attempts = 0;
+  private nextTryAt = 0;
+  private prefetching: Promise<boolean> | null = null;
+
+  /** распознавание сейчас невозможно: модели нет (dead) или ждём паузу перед второй попыткой */
+  get unavailable() {
+    if (this.model) return false;
+    if (this.health === 'dead') return true;
+    return this.health === 'down' && performance.now() < this.nextTryAt;
+  }
+
+  private fail(why: string) {
+    this.loading = null;
+    this.prefetching = null;
+    this.health = this.attempts >= MODEL_MAX_ATTEMPTS ? 'dead' : 'down';
+    this.nextTryAt = performance.now() + MODEL_RETRY_MS;
+    this.onState('error', /no-model|404|fetch|load|html/i.test(why) ? `no-model ${why}` : why);
+  }
+
+  /** можно ли начать новую попытку (не dead, пауза прошла); засчитывает попытку */
+  private takeAttempt(): boolean {
+    if (this.health === 'dead') return false;
+    if (this.health === 'down' && performance.now() < this.nextTryAt) return false;
+    this.attempts++;
+    this.health = 'loading';
+    return true;
+  }
+
+  /**
+   * Только скачать архив в HTTP-кэш (с прогрессом) после health-проверки — без распаковки: распаковка в воркере Vosk
+   * на iPhone забирает процессор у трекера карты, поэтому её (preload) app.ts запускает после посадки кота.
+   */
+  prefetch(): Promise<boolean> {
+    if (this.model) return Promise.resolve(true);
+    if (this.loading) return this.loading;
+    if (this.prefetching) return this.prefetching;
+    if (!this.takeAttempt()) return Promise.resolve(false);
+    this.prefetching = (async () => {
       try {
         this.onState('loading');
-        // модель (сеть или Cache Storage) и сам движок (≈2.4 МБ gzip) — параллельно
-        const [, vosk] = await Promise.all([fetchModelWithProgress(this.modelUrl, (p) => this.onProgress(p)), import('vosk-browser')]);
-        this.model = await vosk.createModel(new URL(asset(this.modelUrl), location.href).href);
-        markModelReady(this.modelUrl);
+        const h = await checkModel(this.modelUrl);
+        if (!h.ok) throw new Error(h.why);
+        await Promise.all([fetchModelWithProgress(this.modelUrl, (p) => this.onProgress(p)), import('vosk-browser')]);
+        // скачали — попытка засчитана, распаковка (preload) продолжит её без новой
+        this.health = 'unknown';
+        this.attempts--;
         this.onState('idle');
         return true;
       } catch (e) {
-        this.loading = null;
-        this.onState('error', /no-model|404|fetch|load/i.test(String(e)) ? 'no-model' : String(e));
+        this.fail(String((e as Error)?.message ?? e));
+        return false;
+      } finally {
+        this.prefetching = null;
+      }
+    })();
+    return this.prefetching;
+  }
+
+  preload(): Promise<boolean> {
+    if (this.model) return Promise.resolve(true);
+    if (this.loading) return this.loading;
+    const pre = this.prefetching;
+    if (pre) return (this.loading = pre.then((ok) => (this.loading = null, ok ? this.preload() : false)));
+    if (!this.takeAttempt()) return Promise.resolve(false);
+    this.loading = (async () => {
+      try {
+        this.onState('loading');
+        const h = await checkModel(this.modelUrl);
+        if (!h.ok) throw new Error(h.why);
+        // модель (сеть или HTTP-кэш) и сам движок (≈2.4 МБ gzip) — параллельно
+        const [, vosk] = await Promise.all([fetchModelWithProgress(this.modelUrl, (p) => this.onProgress(p)), import('vosk-browser')]);
+        this.model = await vosk.createModel(new URL(asset(this.modelUrl), location.href).href);
+        markModelReady(this.modelUrl);
+        this.health = 'ok';
+        this.onState('idle');
+        return true;
+      } catch (e) {
+        this.fail(String((e as Error)?.message ?? e));
         return false;
       }
     })();
@@ -232,6 +347,11 @@ export class VoskAsr implements Asr {
 
   async start(preroll?: Float32Array[]) {
     if (this.listening) return;
+    // модели нет и повторять рано — не перезапрашиваем 45 МБ на каждую фразу; состояние — сразу «idle»
+    if (this.unavailable) {
+      this.onState('idle');
+      return;
+    }
     this.listening = true;
     this.aborted = false;
     this.final = '';

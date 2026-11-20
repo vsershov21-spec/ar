@@ -35,7 +35,14 @@ import { classifyUtterance, type ListenReason } from './utterance';
 import { turn } from './turn';
 
 export type MicMode = 'ptt' | 'auto';
-export type VoiceEventId = 'echo_start' | 'echo_done' | 'echo_stop' | 'loud' | 'whisper' | 'clap' | 'barge_in' | 'listen_timeout';
+export type VoiceEventId = 'echo_start' | 'echo_done' | 'echo_stop' | 'loud' | 'whisper' | 'clap' | 'barge_in' | 'listen_timeout'
+  /** офлайн-модели нет (health-проверка, загрузка не удалась): один раз за сессию — «Голос пока не работает» */
+  | 'asr_down'
+  /** доступ к микрофону запрещён: один раз за сессию */
+  | 'mic_denied';
+
+/** голосовой вход доступен: распознавание (модель) и микрофон — для режиссёра (не предлагать голосовые занятия) */
+export interface VoiceAvailability { asr: boolean; mic: boolean }
 
 export type EngineEvents = {
   text: { text: string; match: IntentMatch; source: 'asr' | 'chip' | 'api' | 'echo' };
@@ -62,6 +69,9 @@ export interface EngineState {
   lastEvent: string;
   question: boolean;
   micError: string | null;
+  /** здоровье офлайн-модели (asr.ts ModelHealth) */
+  asrHealth: string;
+  micDenied: boolean;
 }
 
 export interface ListenOpts {
@@ -106,6 +116,11 @@ export class VoiceEngine extends Emitter<EngineEvents> {
   /** энергия: в окне ответа звук идёт в распознаватель, только пока в микрофоне есть голос (до этой отметки, мс) */
   private voiceUntil = 0;
   private readonly asrGate = () => this.vad.speaking || performance.now() < this.voiceUntil;
+  /** окно имени: таймер конца фразы (NAME_END_PAUSE_MS) */
+  private nameEndTimer = 0;
+  /** «Тебя зовут X?» — ждём «да»/«нет» или другое имя */
+  private nameCandidate: string | null = null;
+  private asrDownFired = false;
   private st = { asrState: 'idle' as AsrState, modelProgress: 0, lastText: '', lastIntent: '', lastConfidence: 0, lastEvent: '' };
   /** пресет повтора текущего характера (app.ts: из persona.voice) */
   echoPreset: () => EchoPreset = () => ({ echoPitchSemitones: 5, echoRate: 1.05 });
@@ -170,6 +185,11 @@ export class VoiceEngine extends Emitter<EngineEvents> {
         setTimeout(() => !this.listening && this.voice.release(), 400);
       }
       if (s === 'error') this.st.lastEvent = `asr: ${m}`;
+      // модели нет — один раз за сессию (вторая попытка — тихо, по MODEL_RETRY_MS)
+      if (s === 'error' && /no-model/.test(m ?? '') && !this.asrDownFired) {
+        this.asrDownFired = true;
+        this.fire('asr_down', { why: m, health: this.asr.health });
+      }
       this.pushState();
     };
     this.asr.onProgress = (p) => {
@@ -185,6 +205,26 @@ export class VoiceEngine extends Emitter<EngineEvents> {
           setTimeout(() => void this.mic.ensureOpen().then(() => this.pushState()), 300);
       });
     if (typeof window !== 'undefined') (window as any).__voice = this.api();
+  }
+
+  /** голосовой вход: распознавание (модель есть или ещё может загрузиться) и микрофон (доступ не запрещён) */
+  get available(): VoiceAvailability {
+    const h = this.asr.health;
+    return { asr: !!this.asr.supported && h !== 'dead' && h !== 'down', mic: this.mic.supported && !this.mic.denied };
+  }
+
+  /** DirectorDeps.voiceIn: доступность голоса и готовность модели */
+  voiceIn() {
+    return { ...this.available, ready: !!this.asr.ready || this.asr.health === undefined };
+  }
+
+  /** DirectorDeps.whenAsrReady: модель в памяти — сразу true; нет/пауза перед повтором — false; иначе ждём ≤ ms */
+  whenAsrReady(ms: number): Promise<boolean> {
+    const a = this.asr;
+    if (a.ready || a.health === undefined) return Promise.resolve(true); // Web Speech — без модели
+    if (a.unavailable || a.health === 'dead' || !a.preload) return Promise.resolve(false);
+    if (ms <= 0) return Promise.resolve(false);
+    return Promise.race([a.preload(), new Promise<boolean>((r) => setTimeout(() => r(false), ms))]);
   }
 
   get selfMuted() {
@@ -205,6 +245,11 @@ export class VoiceEngine extends Emitter<EngineEvents> {
   private startListening(reason: 'ptt' | 'window' | 'barge' | 'vad') {
     if (this.listening) {
       if (reason === 'ptt') this.listenReason = 'ptt';
+      return;
+    }
+    // микрофон запрещён / модели нет (и повторять рано): не открываем — без повторных запросов доступа и загрузок 45 МБ
+    if (this.mic.denied || this.asr.unavailable) {
+      if (reason === 'ptt') this.emit('interim', this.mic.denied ? 'Нет доступа к микрофону — жми кнопки' : 'Голос пока не работает — жми кнопки');
       return;
     }
     this.listening = true;
@@ -414,6 +459,7 @@ export class VoiceEngine extends Emitter<EngineEvents> {
       level: this.mic.level, floorDb: +this.mic.floor.floorDb.toFixed(1), modelProgress: this.st.modelProgress, echo: this.echo.phase,
       catSpeaking: this.catSpeaking, lastText: this.st.lastText, lastIntent: this.st.lastIntent, lastConfidence: this.st.lastConfidence,
       lastEvent: this.st.lastEvent, question: !!intentContext().question, micError: this.mic.error,
+      asrHealth: this.asr.health ?? 'ok', micDenied: this.mic.denied,
     };
   }
 
@@ -434,6 +480,7 @@ export class VoiceEngine extends Emitter<EngineEvents> {
       echo: { start: () => this.echo.start('direct'), stop: () => this.echo.stop('api') },
       ptt: { down: () => this.pttDown(), up: () => this.pttUp() },
       preloadModel: () => this.asr.preload?.(),
+      available: () => this.available,
       thresholds: { vad: this.vad.opts, sound: this.sound.opts },
       lips: (s: 'phon' | 'amp') => (this.voice.lipStrategy = s),
       /** звуковой стек на устройстве: контекст, аудиосессия, узел микрофона, кэш реплик */

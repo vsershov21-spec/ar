@@ -437,7 +437,8 @@ export class App {
         /* см. выше */
       } else if (s.asrState === 'listening') this.ui.micHintText(s.echo !== 'off' ? 'Говори — повторю!' : 'Слушаю…');
       else if (s.asrState === 'error')
-        this.ui.micHintText(s.micError === 'not-allowed' ? 'Нет доступа к микрофону — жми лапку' : /no-model/.test(s.lastEvent) ? 'Офлайн-модель не найдена — жми лапку' : 'Не расслышал, попробуй ещё', s.micError === 'not-allowed' || /no-model/.test(s.lastEvent) ? 'warn' : 'info');
+        // нет модели / нет микрофона — один тост (событие asr_down / mic_denied ниже), подсказка не мигает на каждой фразе
+        this.ui.micHintText(s.micDenied || /no-model/.test(s.lastEvent) ? '' : 'Не расслышал, попробуй ещё', 'info');
       else if (s.echo === 'waiting') this.ui.micHintText('Говори — повторю!');
       if (s.asrState === 'idle' && !s.listening && s.echo === 'off') this.ui.micLevel(0);
     });
@@ -458,6 +459,9 @@ export class App {
     });
     e.on('event', ({ id, data }) => {
       this.director.log(`🎙 ${id}${data ? ' ' + JSON.stringify(data) : ''}`);
+      // голос недоступен — сказать один раз за сессию (движок шлёт каждое событие однажды)
+      if (id === 'asr_down') this.ui.toast('Голос пока не работает — жми кнопки', 5000);
+      if (id === 'mic_denied') this.ui.toast('Нет доступа к микрофону — жми кнопки', 5000);
       // громкость без распознавания → реакции кота (events.json: loud, whisper, clap)
       if ((id === 'loud' || id === 'whisper' || id === 'clap') && this.director.state.appeared) this.director.interaction(id);
     });
