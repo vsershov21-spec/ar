@@ -176,6 +176,12 @@ export class VoiceEngine extends Emitter<EngineEvents> {
       this.fire('echo_done', { count: this.echo.count });
     };
     voice.onSpeaking = (on) => this.onCatSpeaking(on);
+    // есть ли готовая запись повтора: без неё ветка «*» повторялки молчит (director: нет «мой голос круче» без повтора)
+    voice.echoReady = () => this.echo.phase === 'ready';
+    this.mic.onDenied = (why) => {
+      if (this.echo.active) this.echo.stop('api');
+      this.fire('mic_denied', { why });
+    };
     this.asr.onResult = (t) => this.onAsrResult(t);
     this.asr.onInterim = (t) => this.emit('interim', t);
     this.asr.onState = (s, m) => {
@@ -278,6 +284,7 @@ export class VoiceEngine extends Emitter<EngineEvents> {
     const windowMs = o.windowMs ?? 5000;
     clearTimeout(this.windowTimer);
     if (o.mode === 'echo') {
+      if (this.mic.denied) return; // без микрофона повторялки нет (director её и не запускает)
       clearTimeout(this.echoStopTimer);
       this.echoWindow = true;
       if (this.listening) this.asr.abort();

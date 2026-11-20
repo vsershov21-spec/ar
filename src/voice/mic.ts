@@ -113,8 +113,20 @@ export class MicInput {
     }
   }
 
+  /**
+   * Доступ к микрофону запрещён (или микрофона нет): больше не спрашиваем в эту сессию — повторные getUserMedia
+   * на iOS сразу отклоняются, а в других браузерах снова показывают запрос поверх игры. Вернуть — перезагрузкой.
+   */
+  get denied() {
+    return this.error === 'not-allowed' || this.error === 'no-device';
+  }
+  /** колбэк: доступ запретили (один раз за сессию) */
+  onDenied: ((why: string) => void) | null = null;
+  private deniedFired = false;
+
   private open(): Promise<boolean> {
     if (this.node) return Promise.resolve(true);
+    if (this.denied) return Promise.resolve(false);
     if (this.opening) return this.opening;
     // Сначала присваиваем, потом очищаем по завершении. Раньше было `opening ??= (async () => {… finally opening = null})()`:
     // если открыть было нельзя сразу (AudioContext ещё не создан — «слушаю всегда» до жеста), finally срабатывал
@@ -187,8 +199,12 @@ export class MicInput {
       this.error = null;
       return true;
     } catch (e: any) {
-      this.error = e?.name === 'NotAllowedError' ? 'not-allowed' : e?.name === 'NotFoundError' ? 'no-device' : String(e?.message ?? e);
+      this.error = e?.name === 'NotAllowedError' || e?.name === 'SecurityError' ? 'not-allowed' : e?.name === 'NotFoundError' ? 'no-device' : String(e?.message ?? e);
       this.cleanup();
+      if (this.denied && !this.deniedFired) {
+        this.deniedFired = true;
+        this.onDenied?.(this.error);
+      }
       return false;
     }
   }
