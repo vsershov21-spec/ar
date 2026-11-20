@@ -4,7 +4,7 @@
 //   node scripts/qa/glitter-alive.mjs --dist DIR                        (сборка pilot)
 // «До» — тот же код с выключенным слоем (character.aliveOff = true, фатин без пружины, хвост — прежний размах).
 // Выход: docs/qa/glitter_alive/{before,after}.png (16 кадров покоя + 6 кадров реакции), {before,after}.gif (покой,
-// 10 к/с), bench-out/glitter_alive.json — замеры:
+// 6 к/с, 128 px — ≈ 0,5 МБ), bench-out/glitter_alive.json — замеры:
 //   hipSway — размах таза вбок, мм; tail — размах кончика хвоста, мм; tulle — макс. сдвиг подола, мм; elbow — средний
 //   сгиб локтя, град (палка — ≈ 0–10°); pen — макс. проникновение лап в тело/одежду, мм; slide — уезд опорной стопы, мм;
 //   frameMs — время update() кота на кадр, мс (headless swiftshader, относительное до/после).
@@ -201,9 +201,9 @@ async function sheet(name, shots, st) {
 
 async function makeGif(name, frames) {
   const dir = fs.mkdtempSync('/tmp/alive-gif-');
-  await Promise.all(frames.map(async (s, i) => (await crop(s, 240, 408)).png().toFile(path.join(dir, `f${String(i).padStart(3, '0')}.png`))));
+  await Promise.all(frames.map(async (s, i) => (await crop(s, 160, 272)).png().toFile(path.join(dir, `f${String(i).padStart(3, '0')}.png`))));
   const out = path.join(OUTD, `${name}.gif`);
-  const r = spawnSync('ffmpeg', ['-v', 'error', '-y', '-framerate', '10', '-i', path.join(dir, 'f%03d.png'), '-vf', 'split[a][b];[a]palettegen=max_colors=96[p];[b][p]paletteuse=dither=bayer', out]);
+  const r = spawnSync('ffmpeg', ['-v', 'error', '-y', '-framerate', '10', '-i', path.join(dir, 'f%03d.png'), '-vf', 'fps=6,scale=128:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=48:stats_mode=diff[p];[b][p]paletteuse=dither=none:diff_mode=rectangle', out]);
   fs.rmSync(dir, { recursive: true, force: true });
   if (r.status) log('ffmpeg:', String(r.stderr).slice(0, 300));
 }
