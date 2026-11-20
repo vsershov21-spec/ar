@@ -681,6 +681,12 @@ export class Director extends Emitter<DirectorEvents> {
     const d = this.d;
     switch (a.type) {
       case 'say':
+        // повторялка, ветка «*»: повторять было нечего (записи нет, синтез выключен) — без «мой голос круче»
+        if (a.key === 'echo_done' && this.echoSkipped) {
+          this.echoSkipped = false;
+          this.log('повтор: нечего повторять — без echo_done');
+          break;
+        }
         this.speakEvent(a.key, { force: a.force, node: a.node, scenario: true });
         break;
       case 'say_riddle':
@@ -1160,12 +1166,18 @@ export class Director extends Emitter<DirectorEvents> {
     return hint ? `${t} ${hint}` : t.replace(/\s*[:—–-]\s*$/, '.');
   }
 
+  /** повторялка, ветка «*» без записи: echo_done следом не говорим */
+  private echoSkipped = false;
+
   /** повторялка: фраза ребёнка голосом характера (выше тоном) */
   private echo(text: string) {
     const p = this.persona;
     const v = p.voice;
     const t = text.trim().slice(0, 120);
-    if (!t) return;
+    const vp = this.d.voice as VoicePlayer & { echoReady?: () => boolean; synthAllowed?: boolean };
+    // записи нет, а синтез выключен (пилот) — повторять нечего: ни пузыря, ни «мой голос круче»
+    this.echoSkipped = !!vp.echoReady && !vp.echoReady() && (vp.synthAllowed === false || t === '…');
+    if (!t || this.echoSkipped) return;
     // ребёнок тараторит: повторяем последнюю фразу, а не копим очередь из повторов (docs/qa/BUGS.md № 25)
     const cur = this.queue.current;
     this.queue.drop((it) => it !== cur && (it.event === 'echo' || it.tag === 'echo.repeat'));

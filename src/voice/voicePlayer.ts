@@ -640,6 +640,8 @@ export class VoicePlayer {
   echoSource: (() => AudioBuffer | null) | null = null;
   /** конец проигрыша повтора (VoiceEngine снова слушает) */
   onEchoDone: () => void = () => {};
+  /** есть готовая запись повтора (VoiceEngine): без неё ветке «*» повторялки нечего повторять */
+  echoReady: () => boolean = () => false;
   /**
    * Повтор фразы ребёнка (director.echo): если есть запись — играем её (тон/темп уже сдвинуты),
    * иначе (чип/текст без записи) — синтез текста выше тоном.

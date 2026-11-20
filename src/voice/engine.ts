@@ -141,7 +141,12 @@ export class VoiceEngine extends Emitter<EngineEvents> {
     if (this.asr instanceof VoskAsr) {
       const a = this.asr;
       this.echo.checkStop = (pcm, sr, g) => (a.ready ? a.recognizeOnce(pcm, sr, g) : Promise.resolve(null));
+      this.echo.canCheck = () => a.ready;
     }
+    this.echo.onFiltered = (why) => {
+      this.st.lastEvent = why === 'bad' ? 'повтор: грубое слово — не повторяю' : 'повтор: модели нет — длинную фразу не повторяю';
+      this.pushState();
+    };
     this.echo.onEvent = (e) => {
       switch (e.id) {
         case 'echo_speaking':
@@ -189,7 +194,8 @@ export class VoiceEngine extends Emitter<EngineEvents> {
       if (s === 'idle' || s === 'error') {
         this.listening = false;
         this.listenReason = null;
-        this.audio.duck(false, 'mic');
+        // повторялка слушает сама (EchoMode) — её приглушение снимет echo_stop, а не конец фразы распознавания
+        if (!this.echo.active) this.audio.duck(false, 'mic');
         turn.userEnd();
         // ребёнок замолчал — коту можно продолжать
         setTimeout(() => !this.listening && this.voice.release(), 400);
@@ -518,6 +524,8 @@ export class VoiceEngine extends Emitter<EngineEvents> {
     this.st.lastIntent = match.intent === 'name' ? `name:${match.name}` : match.intent;
     this.st.lastConfidence = +match.confidence.toFixed(2);
     this.voice.release();
+    // «хватит» в повторялке — сразу тишина: не пишем и не повторяем, пока сценарий отвечает (раньше — через 6 с)
+    if (match.intent === 'echo_stop' && this.echo.active) this.echo.stop('intent');
     this.emit('text', { text, match, source });
     if (ctx.question && source !== 'echo') setIntentContext({});
     this.pushState();

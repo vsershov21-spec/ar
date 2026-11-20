@@ -9,8 +9,10 @@
  *     микрофон не слушается (кот не повторяет сам себя).
  *  4. Исходная и обработанная записи затираются нулями сразу после проигрыша; никуда не отправляются и
  *     не сохраняются.
- *  5. «Хватит»/«стоп» во время повтора: если модель Vosk уже загружена, фраза сначала проверяется
- *     маленькой грамматикой стоп-слов — и тогда кот не повторяет, а выходит из режима.
+ *  5. «Хватит»/«стоп» и мат во время повтора: если модель Vosk уже загружена, фраза сначала проверяется
+ *     маленькой грамматикой (стоп-слова + badWords.ts + [unk]): стоп-слово — кот не повторяет и выходит из режима,
+ *     мат/грубость — фраза молча выбрасывается. Модели нет (ещё грузится или недоступна) — проверить нечем:
+ *     повторяем только короткое (≤ UNCHECKED_MAX_SEC: «мяу», «привет»), длинные фразы — нет.
  *  6. События: echo_start, echo_done {count}, echo_stop {reason}. Автовыход — 20 с без речи
  *     (в режиме deferred таймаут ведёт сценарий: listen echo 20 000 мс в dialogs.json).
  */
@@ -19,6 +21,7 @@ import type { VoicePlayer } from './voicePlayer';
 import { Vad, VAD_DEFAULTS } from './vad';
 import type { MicEvent } from './mic';
 import { ECHO_SR, processEcho } from './echoDsp';
+import { BAD_WORDS, isBad } from './badWords';
 
 export interface EchoPreset { echoPitchSemitones: number; echoRate: number }
 export type EchoEvent =
@@ -34,7 +37,10 @@ export type EchoEvent =
 
 const PREROLL_MS = 250;
 const IDLE_EXIT_MS = 20000;
-const STOP_GRAMMAR = ['хватит', 'стоп', 'хватит повторять', 'не повторяй', 'перестань', 'всё', 'все', '[unk]'];
+const STOP_WORDS = ['хватит', 'стоп', 'хватит повторять', 'не повторяй', 'перестань', 'всё', 'все'];
+const STOP_GRAMMAR = [...STOP_WORDS, ...BAD_WORDS, '[unk]'];
+/** без проверки (модели нет) повторяем фразы не длиннее, с */
+export const UNCHECKED_MAX_SEC = 1.0;
 
 export class EchoMode {
   active = false;
@@ -59,8 +65,12 @@ export class EchoMode {
   private seq = 0;
   /** пока true — кадры игнорируются (говорит кот + 250 мс) */
   gated = () => false;
-  /** проверка стоп-слова (VoskAsr.recognizeOnce) — если есть */
+  /** проверка стоп-слова и мата (VoskAsr.recognizeOnce) — если есть */
   checkStop: ((pcm: Float32Array, sr: number, grammar: string[]) => Promise<string | null>) | null = null;
+  /** модель в памяти — проверка возможна (иначе длинные фразы не повторяем) */
+  canCheck: () => boolean = () => false;
+  /** фраза выброшена фильтром (для лога/debug) */
+  onFiltered: (why: 'bad' | 'unchecked') => void = () => {};
   onEvent: (e: EchoEvent) => void = () => {};
 
   constructor(private mic: MicInput, private voice: VoicePlayer, private preset: () => EchoPreset) {
@@ -193,9 +203,21 @@ export class EchoMode {
     }
     this.wipe();
     try {
-      // «хватит» — не повторяем, выходим
-      if (this.checkStop && n < sr * 2.5) {
-        const t = await this.checkStop(pcm, sr, STOP_GRAMMAR).catch(() => null);
+      const checked = !!this.checkStop && this.canCheck();
+      // модели нет — мат не проверить: длинное не повторяем (короткое «мяу», «привет» — можно)
+      if (!checked && n > sr * UNCHECKED_MAX_SEC) {
+        pcm.fill(0);
+        this.onFiltered('unchecked');
+        return;
+      }
+      // «хватит» — не повторяем, выходим; мат — молча выбрасываем
+      if (checked) {
+        const t = await this.checkStop!(pcm, sr, STOP_GRAMMAR).catch(() => null);
+        if (t && isBad(t)) {
+          pcm.fill(0);
+          this.onFiltered('bad');
+          return;
+        }
         if (t && /хватит|стоп|повторяй|перестань|^вс[её]$/.test(t)) {
           pcm.fill(0);
           if (this.delivery === 'deferred') {
