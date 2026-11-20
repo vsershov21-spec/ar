@@ -1,8 +1,9 @@
 /**
- * Поколение моделей котов. По умолчанию во всех редакциях — v1 (вид как на 841b373: модели bb768e9 и мех/тон/лицо тех
- * же значений). v2 — только ?models=v2: в lab и со страницы /test (PARAMS models → feature model.v2).
+ * Поколение моделей котов. С 20.11 по умолчанию во всех редакциях (mvp, lab, пилот /mvp) — v2: основы по рефам персонажей
+ * и мех/тон/лицо v2. Прежний вид (как на 841b373: модели bb768e9 и мех/тон/лицо тех же значений) — ?models=v1,
+ * геометрия v2 для сравнения — ?models=v2h; оба — в lab и со страницы /test (PARAMS models → feature model.variants).
  *
- * ?models=v2 — у каждого кота своя основа, та, что ближе к рефам персонажа (design/cut/<кот>, docs/models/persona_*):
+ * v2 (по умолчанию; ?models=v2 — то же) — у каждого кота своя основа, та, что ближе к рефам персонажа (design/cut/<кот>, docs/models/persona_*):
  *   • Блёстка — p1 (20.11): геометрия v1 + короткая пачка из фатина с тонкой золотой кромкой, звёзды у висков,
  *     глаза с ресницами (tulle.py --puff 1.0 --bell 4 … → untangle → persona_tune.py --clean, docs/models/README.md)
  *     → models/v2/glitter_p1.glb, свои прокси;
@@ -13,7 +14,7 @@
  */
 export type ModelsVariant = 'v1' | 'v2' | 'v2h';
 
-/** основа кота при ?models=v2: v2 — геометрия v2, p1 — v1 с правками по рефам персонажа */
+/** основа кота в v2 (по умолчанию): v2 — геометрия v2, p1 — v1 с правками по рефам персонажа */
 export const V2_BASE: Record<string, 'v2' | 'p1'> = { glitter: 'p1', hooligan: 'p1', kind: 'p1' };
 
 /**
@@ -22,10 +23,10 @@ export const V2_BASE: Record<string, 'v2' | 'p1'> = { glitter: 'p1', hooligan: '
  */
 export const P1_OWN_COLLIDERS = new Set(['glitter']);
 
-/** ?models=v2 → 'v2', ?models=v2h → 'v2h', иначе 'v1' (адрес уже прошёл guardUrl: в MVP/пилоте без /test параметра нет) */
+/** ?models=v1 → 'v1', ?models=v2h → 'v2h', иначе (и ?models=v2) — 'v2' (адрес уже прошёл guardUrl: в MVP/пилоте без /test параметра нет) */
 export function modelsVariant(search = typeof location !== 'undefined' ? location.search : ''): ModelsVariant {
   const m = new URLSearchParams(search).get('models');
-  return m === 'v2' ? 'v2' : m === 'v2h' ? 'v2h' : 'v1';
+  return m === 'v1' ? 'v1' : m === 'v2h' ? 'v2h' : 'v2';
 }
 
 export const modelsV2 = (search?: string) => modelsVariant(search) !== 'v1';

@@ -26,8 +26,9 @@ for (const v of models)
     const errs = [];
     page.on('pageerror', (e) => errs.push(e.message));
     if (throttle > 1) await (await page.target().createCDPSession()).send('Emulation.setCPUThrottlingRate', { rate: throttle });
-    const m = v === 'v2' ? `/models/v2/${cat}_v2.glb` : `/models/${cat}_v1.glb`;
-    await page.goto(`http://localhost:${port}/tools/hands-probe.html?p=${cat}&m=${m}&frames=${process.env.FRAMES || 12}&shots=${shots ? 1 : 0}${clips ? `&clips=${clips}` : ''}${v === 'v2' ? '&models=v2' : ''}`, { waitUntil: 'load' });
+    // v2 — по умолчанию (основа p1, variantGlb), v1 — прежний вид (?models=v1), v2h — геометрия v2
+    const m = v === 'v2h' ? `/models/v2/${cat}_v2.glb` : v === 'v1' ? `/models/${cat}_v1.glb` : `/models/v2/${cat}_p1.glb`;
+    await page.goto(`http://localhost:${port}/tools/hands-probe.html?p=${cat}&m=${m}&frames=${process.env.FRAMES || 12}&shots=${shots ? 1 : 0}${clips ? `&clips=${clips}` : ''}${v === 'v2' ? '' : `&models=${v}`}`, { waitUntil: 'load' });
     await page.waitForFunction(() => window.__ready, { timeout: 1800000, polling: 500 });
     const res = await page.evaluate(() => window.__poses);
     await page.close();

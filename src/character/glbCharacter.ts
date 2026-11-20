@@ -129,7 +129,7 @@ const PERSONA_FACE: Record<string, Record<string, number>> = {
   glitter: { blush: 0.32, smile: 0.12 },
 };
 /**
- * то же для моделей v2 (?models=v2), по design/cut/glitter: у Блёстки в покое открытая улыбка (рот приоткрыт, видны
+ * то же для моделей v2 (по умолчанию), по design/cut/glitter: у Блёстки в покое открытая улыбка (рот приоткрыт, видны
  * клычки), без сиреневого румянца
  */
 const PERSONA_FACE_V2: Record<string, Record<string, number>> = {
@@ -137,14 +137,14 @@ const PERSONA_FACE_V2: Record<string, Record<string, number>> = {
 };
 
 /**
- * язык по характеру (?models=v2): у Блёстки в покое открытая улыбка — язык маленький и глубже в тёмном рту, не до
+ * язык по характеру (v2, по умолчанию): у Блёстки в покое открытая улыбка — язык маленький и глубже в тёмном рту, не до
  * нижней губы (иначе розовый овал во весь рот читается как высунутый язык; кадр КотоТом 17-11 — язык внутри)
  */
 const PERSONA_TONGUE_V2: Record<string, { size?: number; deeper?: number; tone?: number }> = {
   glitter: { size: 0.6, deeper: 0.1, tone: 0.82 },
 };
 
-/** множители век по характеру (?models=v2): 1 — как в пресете */
+/** множители век по характеру (v2, по умолчанию): 1 — как в пресете */
 const PERSONA_EYES_V2: Record<string, Record<string, number>> = {
   glitter: { eyes_smug: 0.3, eyes_sleepy: 0.5, eyes_squint: 0.6 },
 };
@@ -862,7 +862,7 @@ export class GlbCharacter implements Character {
     // характер в покое (референс): у Блёстки всегда чуть розовые щёчки и мягкая полуулыбка
     const base = (modelsV2() ? PERSONA_FACE_V2 : PERSONA_FACE)[this.personaId];
     if (base) for (const k in base) W[k] = Math.max(W[k] ?? 0, base[k] * (1 - (W.frown ?? 0)));
-    // характер глаз (только ?models=v2): у Блёстки по рефу глаза широко открыты — пресеты «самодовольно/сонно/прищур»
+    // характер глаз (v2 — по умолчанию; ?models=v1 — без них): у Блёстки по рефу глаза широко открыты — пресеты «самодовольно/сонно/прищур»
     // в idle-клипах (зеркальце, кружение) прикрывают веки слабее
     const eyeK = modelsV2() ? PERSONA_EYES_V2[this.personaId] : undefined;
     if (eyeK) for (const k in eyeK) if (W[k]) W[k] *= eyeK[k];

@@ -3,8 +3,8 @@
 # тон одежды → мех → одежда отдельными мешами → проверка проникновений → коллайдеры.
 #   sh scripts/models/build_v2.sh <base_dir> <out_dir> [cat…]
 # base_dir/<cat>.glb — GLB после body_detail.py (для текущих моделей: git show bb768e9^:public/models/<cat>_v1.glb).
-# Результат — out_dir/<cat>_v2.glb + <cat>_colliders.json → public/models/v2/ (только ?models=v2, lab и /test;
-# по умолчанию приложение грузит v1 — public/models/<cat>_v1.glb).
+# Результат — out_dir/<cat>_v2.glb + <cat>_colliders.json → public/models/v2/ (геометрия v2 — только ?models=v2h, lab и /test;
+# по умолчанию приложение грузит основы p1 — public/models/v2/<cat>_p1.glb, docs/models/README.md).
 set -e
 cd "$(dirname "$0")"
 BASE=$1; OUT=$2; shift 2

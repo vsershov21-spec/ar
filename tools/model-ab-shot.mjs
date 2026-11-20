@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 // Коты v1 | v2 в приложении (сборка dist/, сервер «как Caddy», кадр как у scripts/tom-shots.mjs tom_ar_<кот>.png):
 //   npm run build && node tools/model-ab-shot.mjs <outdir> [hooligan,kind,glitter]
-// Снимает каждого кота дважды — ED (по умолчанию pilot) без параметра (v1, по умолчанию) и с ?models=v2 — и кладёт
-//   <outdir>/v1_<кот>.png, <outdir>/v2_<кот>.png и склейку <outdir>/v2b_app_<кот>.png (слева v1, справа v2).
+// Снимает каждого кота дважды — ED (по умолчанию pilot) с ?models=v1 (прежний вид) и без параметра (v2, по умолчанию с 20.11) —
+//   и кладёт <outdir>/v1_<кот>.png, <outdir>/v2_<кот>.png и склейку <outdir>/v2b_app_<кот>.png (слева v1, справа v2).
+//   VARIANTS=…,v2h — ещё геометрия v2 (?models=v2h).
 // env: ED=pilot|lab|mvp, VARIANTS=v1,v2 (какие снимать), HOME_SHOT=1 — ещё кухня «Мира кота» (<outdir>/v1_kitchen_<кот>.png …),
 //      Q — доп. query, CHROME, BASE — адрес vite dev вместо dist/.
 import fs from 'node:fs';
@@ -54,6 +55,8 @@ async function shoot(cat, variant) {
   const logs = [];
   page.on('pageerror', (e) => logs.push('ERR ' + e.message));
   page.on('console', (m) => /\[glb\]/.test(m.text()) && logs.push(m.text()));
+  // какие модели качает сборка (проверка варианта по умолчанию: v2 → models/v2/opt/<кот>_p1.*.glb)
+  page.on('request', (r) => /\.glb(\?|$)/.test(r.url()) && !/anims_|props\//.test(r.url()) && logs.push('GLB ' + new URL(r.url()).pathname));
   await page.evaluateOnNewDocument(() => {
     localStorage.clear();
     const P = location.pathname.startsWith('/lab') ? 'lab:' : location.pathname.startsWith('/mvp') ? 'pilot:' : '';
@@ -61,7 +64,7 @@ async function shoot(cat, variant) {
     localStorage.setItem(P + 'ar.catalog.tried', JSON.stringify(['pet', 'tickle', 'treat']));
   });
   const dir = ED === 'lab' ? 'lab/' : ED === 'mvp' ? '' : 'mvp/';
-  const q = `from=test&nocard=off&cat=${cat}&progress=0&q=0&mic=ptt&noanalytics${variant === 'v2' ? '&models=v2' : ''}${process.env.Q ? '&' + process.env.Q : ''}`;
+  const q = `from=test&nocard=off&cat=${cat}&progress=0&q=0&mic=ptt&noanalytics${variant === 'v2' ? '' : `&models=${variant}`}${process.env.Q ? '&' + process.env.Q : ''}`;
   await page.goto(`${base}/${dir}?${q}`, { waitUntil: 'networkidle0', timeout: 90000 });
   await page.waitForFunction(() => window.__app?.home && window.__edition, { timeout: 60000 });
   await page.evaluate(() => document.querySelector('[data-a="wake"]')?.click());
@@ -102,7 +105,7 @@ async function shoot(cat, variant) {
     await quiet();
     out.kitchen = await shot(`${variant}_kitchen_${cat}.png`);
   }
-  console.log(cat, variant, page.url().includes('models=v2') ? '(models=v2 в адресе)' : '', logs.filter((l) => /ERR|объёмы/.test(l)).join(' | '));
+  console.log(cat, variant, (page.url().match(/models=\w+/)?.[0] ?? '(по умолчанию)'), logs.filter((l) => /ERR|объёмы|GLB/.test(l)).join(' | '));
   await page.close();
   return out;
 }
@@ -124,7 +127,7 @@ for (const cat of cats) {
   const r = {};
   for (const v of VARIANTS) r[v] = await shoot(cat, v);
   if (r.v1 && r.v2) {
-    await sideBySide([r.v1.ar, r.v2.ar], ['v1 (по умолчанию)', 'v2 (?models=v2)'], path.join(outDir, `v2b_app_${cat}.png`));
+    await sideBySide([r.v1.ar, r.v2.ar], ['v1 (?models=v1)', 'v2 (по умолчанию)'], path.join(outDir, `v2b_app_${cat}.png`));
     if (r.v1.kitchen && r.v2.kitchen) await sideBySide([r.v1.kitchen, r.v2.kitchen], ['v1', 'v2'], path.join(outDir, `v2b_kitchen_${cat}.png`));
   }
 }

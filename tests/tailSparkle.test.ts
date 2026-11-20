@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { tailFactor } from '../src/character/tailSparkle';
 import { MouthRig } from '../src/character/mouthRig';
 
-describe('Блёстка ?models=v2: искра хвоста и язык в покое', () => {
+describe('Блёстка v2 (по умолчанию): искра хвоста и язык в покое', () => {
   it('доля кончика хвоста — по весам скина, к кончику больше, вне хвоста 0', () => {
     const rank = new Map([[10, 1], [11, 2], [12, 3], [13, 4]]);
     expect(tailFactor([0, 1, 2, 3], [0.5, 0.5, 0, 0], rank, 4)).toBe(0);

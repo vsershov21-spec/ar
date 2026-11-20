@@ -87,7 +87,7 @@ export class FaceWrinkles {
   private patch(m: THREE.MeshStandardMaterial) {
     const U = this.uniforms;
     const v2 = modelsV2();
-    // румянец: v1 — розовый, как на 841b373; v2 (?models=v2) — мягкий персиковый, слабо (рефы: едва заметен)
+    // румянец: v1 — розовый, как на 841b373; v2 (по умолчанию) — мягкий персиковый, слабо (рефы: едва заметен)
     const BLUSH = v2
       ? { spot: 'exp(-pow(c.x / 0.036, 2.0) - pow(c.y / 0.022, 2.0))', mix: 'diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.93, 0.58, 0.52), clamp(bl, 0.0, 1.0) * 0.42 * uWrB.z * step(0.0, vWrP.z - uWrMouthL.z + 0.04));' }
       : { spot: 'exp(-pow(c.x / 0.03, 2.0) - pow(c.y / 0.018, 2.0))', mix: 'diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.98, 0.42, 0.5) * 0.95, clamp(bl, 0.0, 1.0) * 0.75 * uWrB.z * step(0.0, vWrP.z - uWrMouthL.z + 0.04));' };

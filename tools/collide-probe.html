@@ -7,7 +7,8 @@ import * as THREE from 'three';
 const { GlbCharacter } = await import('../src/character/glbCharacter.ts');
 const q = new URLSearchParams(location.search);
 const persona = q.get('p') || 'hooligan';
-const ch = new GlbCharacter(q.get('m') || `/models/${persona}_v1.glb`, '/models/anims_v1.glb');
+const { variantGlb } = await import('../src/character/modelVariant.ts');
+const ch = new GlbCharacter(q.get('m') || variantGlb(`/models/${persona}_v1.glb`), '/models/anims_v1.glb');
 await ch.load();
 ch.setPersona?.({ id: persona });
 // дождаться коллайдеров из json (loadColliders — асинхронно после загрузки)

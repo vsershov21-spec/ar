@@ -6,7 +6,8 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 const q = new URLSearchParams(location.search);
-const url = q.get('m') || '/models/kind_v1.glb';
+const { variantGlb } = await import('../src/character/modelVariant.ts');
+const url = q.get('m') || variantGlb('/models/kind_v1.glb');
 const states = (q.get('s') || 'neutral').split(',');
 const cols = +(q.get('cols') || Math.min(4, states.length));
 const T = +(q.get('tile') || 320), yaw = +(q.get('yaw') || 0) * Math.PI / 180, pitch = +(q.get('pitch') || 0) * Math.PI / 180, zoom = +(q.get('zoom') || 1);

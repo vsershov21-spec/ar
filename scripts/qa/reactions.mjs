@@ -10,7 +10,7 @@
 //   node scripts/qa/reactions.mjs --report before,after — только отчёт из двух сохранённых прогонов (до → после)
 //   node scripts/qa/reactions.mjs --params collide=legacy — добавить параметры в адрес (коррекция рук как до 18.11;
 //                                                         collide=axis — как до 19.11: кисть по осям, замер по поверхности)
-//   node scripts/qa/reactions.mjs --params models=v2 --tag v2_after — модели v2 (?models=v2)
+//   node scripts/qa/reactions.mjs --params models=v1 --tag v1_after — прежние модели (?models=v1; по умолчанию с 20.11 — v2)
 //   node scripts/qa/reactions.mjs --report v1_before,v1_after --also "v1_before,v1_after,v1_axis;v2_before,v2_after,v2_axis"
 //                                                       — отчёт + разделы пар прогонов (проникновение и щелчки до → после)
 //   node scripts/qa/reactions.mjs --meshy DIR — отдавать /models/anims/meshy/* из DIR (клипы Meshy локально; scripts/qa/meshy-check.mjs)
@@ -535,7 +535,7 @@ function handsSection() {
   const clips = [...new Set(S.map((x) => x.clip))];
   const cell = (x) => (x ? `${x.raw} / ${x.before} (${Math.round(x.over1Before * 100)} %) → **${x.after}** (${Math.round(x.over1After * 100)} %)` : '—');
   for (const v of models) {
-    L.push(`### ${v === 'v1' ? 'v1 (по умолчанию)' : 'v2 (?models=v2)'} — как есть / до → после, мм`);
+    L.push(`### ${v === 'v1' ? 'v1 (?models=v1)' : v === 'v2h' ? 'геометрия v2 (?models=v2h)' : 'v2 (по умолчанию)'} — как есть / до → после, мм`);
     L.push('');
     L.push(`| клип | ${cats.join(' | ')} |`);
     L.push(`|---|${cats.map(() => '---').join('|')}|`);
@@ -644,7 +644,7 @@ function renderReport(runs, also = null) {
     }
     L.push('');
   }
-  // вторая пара прогонов (--also before,after[,axis]): другие модели (?models=v2) — проникновение и щелчки до → после
+  // вторая пара прогонов (--also before,after[,axis]): другие модели (?models=v1) — проникновение и щелчки до → после
   for (const g of also ?? []) L.push(...alsoSection(g));
   L.push(...handsSection());
   // что исправлено и какие клипы нужны от Meshy — ручной раздел (docs/animations/REACTIONS_FIXES.md)

@@ -3,9 +3,16 @@ import { collidersUrl, modelsVariant, variantGlb } from '../src/character/modelV
 import { filterSearch } from '../src/config/edition';
 import { FurTone } from '../src/character/furTone';
 
-describe('поколение моделей котов: v1 по умолчанию, v2 — ?models=v2 (lab и /test)', () => {
-  it('без параметра — v1 и исходные пути, прокси v1 рядом с моделью', () => {
-    expect(modelsVariant('')).toBe('v1');
+describe('поколение моделей котов: v2 по умолчанию, прежний вид — ?models=v1 (lab и /test)', () => {
+  it('без параметра (и ?models=v2, и неизвестное значение) — v2: основы p1 по рефам', () => {
+    expect(modelsVariant('')).toBe('v2');
+    expect(modelsVariant('?nocard=off')).toBe('v2');
+    expect(modelsVariant('?models=v2')).toBe('v2');
+    expect(modelsVariant('?models=zzz')).toBe('v2');
+    // путь по умолчанию (variant не задан, location нет) — p1
+    expect(variantGlb('models/kind_v1.glb')).toBe('models/v2/kind_p1.glb');
+  });
+  it('?models=v1 — прежний вид: исходные пути, прокси v1 рядом с моделью', () => {
     expect(modelsVariant('?models=v1')).toBe('v1');
     expect(variantGlb('models/kind_v1.glb', 'v1')).toBe('models/kind_v1.glb');
     // v1 — свои прокси (scripts/models/colliders.py по v1 GLB), чужая модель — без файла
@@ -13,7 +20,7 @@ describe('поколение моделей котов: v1 по умолчани
     expect(collidersUrl('models/hooligan_v1.glb')).toBe('models/hooligan_v1_colliders.json');
     expect(collidersUrl('models/character.glb')).toBeNull();
   });
-  it('?models=v2 — у каждого кота основа ближе к рефам персонажа: все трое — p1 (геометрия v1 + правки по design/cut)', () => {
+  it('v2 — у каждого кота основа ближе к рефам персонажа: все трое — p1 (геометрия v1 + правки по design/cut)', () => {
     expect(modelsVariant('?nocard=off&models=v2')).toBe('v2');
     const g = variantGlb('models/glitter_v1.glb', 'v2');
     expect(g).toBe('models/v2/glitter_p1.glb');
@@ -36,11 +43,17 @@ describe('поколение моделей котов: v1 по умолчани
     // чужая модель (?glb=…) не подменяется
     expect(variantGlb('models/character.glb', 'v2')).toBe('models/character.glb');
   });
-  it('параметр models: в lab остаётся, в MVP и пилоте — только со страницы /test', () => {
-    expect(filterSearch('?models=v2', 'lab').search).toBe('models=v2');
-    expect(filterSearch('?models=v2', 'mvp').search).toBe('');
-    expect(filterSearch('?models=v2', 'pilot').search).toBe('');
-    expect(filterSearch('?from=test&models=v2', 'pilot').search).toBe('from=test&models=v2');
+  it('параметр models: v1/v2h в lab остаются, в MVP и пилоте — только со страницы /test; v2 (= по умолчанию) — везде', () => {
+    for (const v of ['v1', 'v2h']) {
+      expect(filterSearch(`?models=${v}`, 'lab').search).toBe(`models=${v}`);
+      expect(filterSearch(`?models=${v}`, 'mvp').search).toBe('');
+      expect(filterSearch(`?models=${v}`, 'pilot').search).toBe('');
+      expect(filterSearch(`?from=test&models=${v}`, 'pilot').search).toBe(`from=test&models=${v}`);
+      expect(filterSearch(`?from=test&models=${v}`, 'mvp').search).toBe(`from=test&models=${v}`);
+    }
+    // вырезанный ?models=v1 в пилоте → вид по умолчанию (v2), а не прежний
+    expect(modelsVariant('?' + filterSearch('?models=v1', 'pilot').search)).toBe('v2');
+    expect(filterSearch('?models=v2', 'pilot').search).toBe('models=v2');
   });
   it('тон меха: наушники и фатин v2 не тонируются, у v1 — как раньше', () => {
     expect(FurTone.isFur('Headphones_Hooligan', true)).toBe(false);

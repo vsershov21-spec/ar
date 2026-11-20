@@ -47,15 +47,16 @@ describe('адаптивное качество', () => {
 });
 
 describe('мех: уровни, LOD и доля оболочек', () => {
-  it('?fur=0..3 — уровни, ≥4 — число оболочек; по умолчанию телефон 8, ПК 12', () => {
+  it('?fur=0..3 — уровни, ≥4 — число оболочек; по умолчанию телефон — PHONE_SHELLS_V2 (v1 — 8), ПК 12', () => {
     expect(furLayersFor(undefined, '?fur=0')).toBe(0);
     expect(furLayersFor(undefined, '?fur=1')).toBe(4);
     expect(furLayersFor(undefined, '?fur=2')).toBe(8);
     expect(furLayersFor(undefined, '?fur=3')).toBe(12);
     expect(furLayersFor(undefined, '?fur=6')).toBe(6);
     expect(furLayersFor(undefined, '?fur=40')).toBe(16);
-    expect(furLayersFor(undefined, '', true)).toBe(FUR_LEVELS[2]);
+    expect(furLayersFor(undefined, '', true)).toBe(PHONE_SHELLS_V2);
     expect(furLayersFor(undefined, '?models=v2', true)).toBe(PHONE_SHELLS_V2);
+    expect(furLayersFor(undefined, '?models=v1', true)).toBe(FUR_LEVELS[2]);
     expect(furLayersFor(undefined, '', false)).toBe(FUR_LEVELS[3]);
   });
 
