@@ -303,6 +303,9 @@ export class App {
       // окно ответа: кот спросил — микрофон слушает сам ms (mode 'echo' — повтор: запись без распознавания)
       listen: (ms, mode) => this.engine.listenFor(ms, mode),
       stopListen: () => this.engine.stopListen(),
+      expect: (ms, mode) => this.engine.expect(mode, ms),
+      voiceIn: () => this.engine.voiceIn(),
+      whenAsrReady: (ms) => this.engine.whenAsrReady(ms),
     });
     this.applyEdition();
     await this.setCharacterMode(p.character);
@@ -1288,6 +1291,9 @@ export class App {
     // Не во время поиска карты: распаковка модели (воркер Vosk, WASM) на iPhone забирала процессор у трекера —
     // посадка шла медленнее. Начинаем через 1,5 с после посадки кота (или через 25 с, если карты так и нет).
     if (!(navigator as any).connection?.saveData) {
+      // скачивание (health-проверка + архив в HTTP-кэш) — сразу с жеста: пока ищем карту, модель уже едет по сети;
+      // распаковка в воркере (тяжёлая для процессора) — как раньше, после посадки
+      void this.engine.asr.prefetch?.();
       let started = false;
       const go = () => {
         if (started) return;

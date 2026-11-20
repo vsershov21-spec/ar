@@ -708,6 +708,13 @@ export class Director extends Emitter<DirectorEvents> {
       case 'ui':
         if (a.ui === 'chips' && a.show && this.coachPending) break; // панель покажет обучалка
         if (a.ui === 'name_prompt' && a.show && this.state.dialog?.id === 'intro') {
+          // голоса нет (модель не готова / нет микрофона) — поле ввода сразу, ждать нечего
+          const v = d.voiceIn?.();
+          if (v && (!v.mic || !v.ready)) {
+            d.ui.show('name_prompt', true);
+            d.ui.show('mic', true);
+            break;
+          }
           // лист «Как тебя зовут?» — когда кот договорил вопрос, а не поверх поздравления
           void this.queue.whenIdle().then(() => {
             if (this.state.phase === 'ask_name' && this.state.dialog?.listening === 'name') {
@@ -843,10 +850,24 @@ export class Director extends Emitter<DirectorEvents> {
 
   /** окно ответа: ждём, пока кот договорит, затем микрофон слушает ms */
   private async openListen(mode: ListenMode, ms: number, token: number) {
+    // ответ ждём с входа в узел: «да» в паузе между репликами кота — ответ (окно микрофона — после реплики)
+    this.d.expect?.(ms, mode);
     await this.queue.whenIdle();
     if (this.state.listenToken !== token || this.state.dialog?.listening !== mode) return;
+    // имя: голосом — только если распознавание готово (ждём до 4 с), иначе — поле ввода и время напечатать
+    let voice = true;
+    if (mode === 'name' && this.d.whenAsrReady) {
+      const v = this.d.voiceIn?.();
+      voice = !!v?.mic && (await this.d.whenAsrReady(v.ready ? 0 : 4000));
+      if (this.state.listenToken !== token || this.state.dialog?.listening !== mode) return;
+      if (!voice) {
+        this.d.ui.show('name_prompt', true);
+        ms = Math.max(ms, 20_000);
+        this.log('🎤 имя: голос не готов — поле ввода');
+      }
+    }
     this.d.ui.show('mic', true);
-    this.d.listen?.(ms, mode);
+    if (voice) this.d.listen?.(ms, mode);
     this.log(`🎤 слушаю ${ms / 1000} с (${mode})`);
     clearTimeout(this.listenTimer);
     this.listenTimer = window.setTimeout(() => {
