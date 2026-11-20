@@ -116,7 +116,7 @@ export function wordScore(pw: string, tw: string): number {
 export function phraseScore(p: string[], words: string[]): number {
   let best = 0;
   for (let s = 0; s < words.length; s++) {
-    let i = s, sum = 0, ok = true;
+    let i = s, sum = 0, ok = true, negInside = false;
     for (let k = 0; k < p.length; k++) {
       let got = 0, at = -1;
       for (let j = i; j < Math.min(words.length, i + (k === 0 ? 1 : 2)); j++) {
@@ -127,11 +127,14 @@ export function phraseScore(p: string[], words: string[]): number {
         ok = false;
         break;
       }
+      // пропущенное слово между словами фразы — «не» («мне не грустно», «мне не страшно»): это не она
+      if (k > 0 && at > i && words.slice(i, at).includes('не')) negInside = true;
       sum += got;
       i = at + 1;
     }
-    // отрицание перед фразой («не танцуй», «не повторяй за мной») — это не она
-    if (ok) best = Math.max(best, sum / p.length - (s > 0 && words[s - 1] === 'не' && p[0] !== 'не' ? 0.45 : 0));
+    const hasNe = p.includes('не');
+    // отрицание перед фразой («не танцуй», «не повторяй за мной») или внутри неё — это не она
+    if (ok) best = Math.max(best, sum / p.length - ((s > 0 && words[s - 1] === 'не' && p[0] !== 'не') || (negInside && !hasNe) ? 0.45 : 0));
   }
   if (!best) return 0;
   // длинные фразы специфичнее: «не хочу» сильнее «хочу», «давай другого» сильнее «давай»
