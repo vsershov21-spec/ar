@@ -73,6 +73,7 @@ export const FEATURES = {
   'home.bed': { mvp: false, lab: true, pilot: true, note: 'кровать в спальне «Мира кота»: уложить спать, сон, разбудить, время суток (src/home/bedFlow.ts; homeMode.ts — точка входа)' },
   'anims.new': { mvp: false, lab: true, pilot: false, note: 'новые анимации по мере генерации (точка входа — у агента анимаций)' },
   'anims.meshy': { mvp: false, lab: true, pilot: true, note: 'клипы Meshy Text-to-Motion из /models/anims/meshy/manifest.json поверх anims_v1 (character/meshyClips.ts; GlbCharacter.load — точка входа); ?meshy=0 — без них' },
+  'asr.web': { mvp: false, lab: true, pilot: false, note: '?asr=web — распознавание Web Speech (в Chrome звук уходит на серверы Google): только lab, в MVP и пилоте параметр вырезается — всегда офлайн Vosk (voice/asr.ts makeAsr)' },
   'debug.flows': { mvp: false, lab: true, pilot: false, note: 'тестовые флоу и ускорения ?flow=… (src/debug/flows.ts); в MVP — только со страницы /test (?from=test)' },
   'tracker.nocard': { mvp: false, lab: true, pilot: false, note: '?nocard — кот на столе без карты; в MVP — только со страницы /test' },
   'card.anycard': { mvp: false, lab: true, pilot: false, note: '?anycard — кот садится на любой прямоугольник (без проверки «это карта Сбера»)' },
@@ -113,6 +114,7 @@ export const PARAMS: Record<string, { feature: FeatureId; test?: boolean; keep?:
   glb: { feature: 'model.custom' },
   models: { feature: 'model.variants', test: true, keep: ['v2'] }, // ?models=v1|v2h — прежний вид / геометрия v2 (lab и /test); v2 — по умолчанию, character/modelVariant.ts
   meshy: { feature: 'anims.meshy' }, // ?meshy=0 — lab без клипов Meshy (сравнить с опорами)
+  asr: { feature: 'asr.web' }, // ?asr=web — Web Speech (звук уходит в облако): с детьми нельзя, даже со страницы /test
   meshyreport: { feature: 'anims.meshy', test: true }, // ?meshyreport — таблица клипов Meshy во вкладке «Тест» (ui/deskPanel.ts)
 };
 

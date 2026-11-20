@@ -516,8 +516,8 @@ export class VoskAsr implements Asr {
   }
 }
 
-/** ?asr=web — Web Speech (только по флагу), иначе Vosk */
+/** ?asr=web — Web Speech (только по флагу и только где включено asr.web: lab), иначе Vosk */
 export function makeAsr(kind: string | null, mic: MicInput): Asr {
-  if (kind === 'web' || kind === 'webspeech') return new WebSpeechAsr();
+  if ((kind === 'web' || kind === 'webspeech') && feature('asr.web')) return new WebSpeechAsr();
   return new VoskAsr(mic);
 }

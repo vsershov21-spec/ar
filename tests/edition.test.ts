@@ -174,3 +174,13 @@ describe('редакции: раздельное хранилище', () => {
     expect(cookieName('pilot:')).toBe('pilot_ar_device');
   });
 });
+
+describe('редакции: ?asr (аудит голоса 20.11)', () => {
+  it('?asr=web вырезается в mvp и пилоте (и со страницы /test), в lab остаётся', () => {
+    for (const ed of ['mvp', 'pilot'] as const) {
+      expect(filterSearch('?asr=web&char=kind', ed).search, ed).toBe('char=kind');
+      expect(filterSearch('?asr=web&from=test', ed).search, ed).toBe('from=test');
+    }
+    expect(filterSearch('?asr=web', 'lab').search).toBe('asr=web');
+  });
+});
