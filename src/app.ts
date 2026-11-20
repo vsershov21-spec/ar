@@ -38,6 +38,14 @@ import { EnergyBudget, defaultPixelRatio, fxNeedsBoost, isMobileDevice } from '.
 import { isPersonaId } from './persona/types';
 import { prepareFlowMemory, runFlow } from './debug/flows';
 import { feature } from './config/edition';
+import { HintsController } from './ui/hints';
+import { KidsOffer } from './ui/kidsOffer';
+import { FogBoard } from './ui/fogBoard';
+import { CardSearch, SEARCH_LINES, type SearchKind } from './ui/cardSearch';
+import type { Hint, TrackState } from './tracker/card/fsm';
+
+/** кот выглядывает из нижней плашки поиска карты */
+const PEEK: Record<string, string> = { hooligan: 'video/sprites/hooligan/turn_front.webp', kind: 'video/sprites/kind/turn_front.webp', glitter: 'video/sprites/glitter/pose_wave.webp' };
 import { SWITCH_LATER_TEXT, SwitchCooldown, cutRedirect, fxAllowed } from './config/pilot';
 import { track } from './analytics';
 import { startCardPaint, type CardPaint } from './card/paint';
@@ -118,6 +126,16 @@ export class App {
   awake: AwakeController | null = null;
   /** раскраска карты (src/card/paint.ts); feature('card.paint') выкл. — null */
   paint: CardPaint | null = null;
+  /** подсказки «нажми сюда» (feature 'ui.hints', ui/hints.ts) */
+  hints: HintsController | null = null;
+  /** карточка «Войти в СберKids» (feature 'sberkids.offer', ui/kidsOffer.ts) */
+  kidsOffer: KidsOffer | null = null;
+  /** запотевшее стекло на весь экран (feature 'glass.fogDraw', ui/fogBoard.ts) */
+  fogBoard: FogBoard | null = null;
+  /** когда ребёнок последний раз нажимал микрофон (подсказка загрузки распознавания — только после нажатия) */
+  private micPressedAt = -1e9;
+  /** детский поиск карты (feature 'intro.search', ui/cardSearch.ts) */
+  cardSearch: CardSearch | null = null;
   private clock = new THREE.Clock();
   private elapsed = 0;
   fps = 0;
@@ -188,12 +206,16 @@ export class App {
     this.ui = new UI(this.root, {
       onWake: () => void this.wake(),
       onMicDown: () => {
+        this.micPressedAt = performance.now();
         clearInterval(this.tapTimer);
         this.engine.pttDown();
       },
       onMicUp: () => this.engine.pttUp(),
       onMicTap: () => this.tapListen(),
-      onSuggest: (c) => this.runChip(c),
+      onSuggest: (c) => {
+        this.kidsOffer?.noteAction();
+        this.runChip(c);
+      },
       onReanchor: () => this.reanchor(),
       onMicMode: (m) => {
         this.engine.setMode(m);
@@ -309,6 +331,7 @@ export class App {
     // кот спит в кровати (src/home/bedFlow.ts): касания — к кровати (бормочет, ворочается), а не «А? Я не спал!»
     // раскраска карты: касания по коту, пока он рисует, — съедены (кисть не бросает)
     this.director.touchGate = (k, c) => !!this.paint?.onTouch() || this.home.onTouch(k, c);
+    this.wireUx();
     this.home.runFlow(new URLSearchParams(location.search));
     // чипы кота и подсказка (scenario/suggest.ts): по событиям режиссёра (фаза, лог = любое событие сценария),
     // пока идёт игра — ещё и шагом 330 мс (пороги тишины). В дрёме, вне игры и в скрытой вкладке опрос стоит
@@ -403,8 +426,16 @@ export class App {
       this.ui.setListening(s.asrState === 'listening');
       // 99 % — архив скачан, дальше Vosk распаковывает его в своём воркере (на iPhone — десятки секунд): «99 %» висело
       // всё это время поверх поиска карты (запись 18.11). Процент — только пока качаем, распаковка — молча
-      if (s.asrState === 'loading') this.ui.micHintText(s.modelProgress < 0.99 ? `Загружаю распознавание… ${Math.round(s.modelProgress * 100)}%` : '');
-      else if (s.asrState === 'listening') this.ui.micHintText(s.echo !== 'off' ? 'Говори — повторю!' : 'Слушаю…');
+      // запись 20.11: «Загружаю распознавание… N%» висело минуту над чипами, пока ребёнок играл кнопками. Теперь текст —
+      // только если ребёнок нажал микрофон (≤ 10 с назад), иначе — тихое кольцо загрузки на самой кнопке микрофона
+      if (s.asrState === 'loading') {
+        const asked = performance.now() - this.micPressedAt < 10_000;
+        this.ui.micLoading(s.modelProgress < 0.99 ? s.modelProgress : null);
+        if (asked) this.ui.micHintText(s.modelProgress < 0.99 ? `Кот учится слушать… ${Math.round(s.modelProgress * 100)}%` : '');
+      } else this.ui.micLoading(null);
+      if (s.asrState === 'loading') {
+        /* см. выше */
+      } else if (s.asrState === 'listening') this.ui.micHintText(s.echo !== 'off' ? 'Говори — повторю!' : 'Слушаю…');
       else if (s.asrState === 'error')
         this.ui.micHintText(s.micError === 'not-allowed' ? 'Нет доступа к микрофону — жми лапку' : /no-model/.test(s.lastEvent) ? 'Офлайн-модель не найдена — жми лапку' : 'Не расслышал, попробуй ещё', s.micError === 'not-allowed' || /no-model/.test(s.lastEvent) ? 'warn' : 'info');
       else if (s.echo === 'waiting') this.ui.micHintText('Говори — повторю!');
@@ -681,6 +712,151 @@ export class App {
     return out;
   }
   /** для меню «как у Тома» (feature ui.tomLayout): где кот и чем занят */
+  /**
+   * UX пилота 20.11 (docs/EDITIONS.md: intro.tour, ui.hints, glass.fogDraw, sberkids.offer): подсказки «нажми сюда»,
+   * карточка СберKids и запотевшее стекло. Всё — по флагам редакции; без флагов ничего не создаётся.
+   */
+  private wireUx() {
+    const d = this.director;
+    const playing = () => ['play', 'free'].includes(d.state.phase) && !!d.state.appeared;
+    const homeOn = () => this.home?.phase === 'home';
+    const busy = () => {
+      const c = this.uiContext();
+      return !!c.busy || !!d.state.dialog || !!this.fogBoard?.on || !!this.ui.tom?.popOpen || this.ui.sheetOpen || !!this.awake?.active;
+    };
+    if (feature('ui.hints'))
+      this.hints = new HintsController({
+        root: this.ui.root, playing, busy, home: homeOn, log: (s) => d.log(s),
+        face: () => {
+          const r = this.ui.catRect();
+          return r ? { l: r.cx - r.half * 0.75, r: r.cx + r.half * 0.75, t: r.top, b: r.headY + (r.bottom - r.headY) * 0.2 } : null;
+        },
+      });
+    if (feature('sberkids.offer'))
+      this.kidsOffer = new KidsOffer({
+        root: this.ui.root, playing, home: homeOn, busy, log: (s) => d.log(s),
+        showSheet: (url) => this.ui.showKids(true, url),
+      });
+    if (feature('glass.fogDraw')) this.wireFogBoard();
+    if (feature('intro.search')) this.wireCardSearch();
+  }
+
+  /**
+   * Детский поиск карты (ui/cardSearch.ts): тот же поток состояний FSM, что получает оверлей трекера
+   * (tracker/card/overlay.ts: guide / candidate / track / lost) — оборачиваем эти методы на экземпляре, логику трекера не
+   * трогаем. Сухие кольцо, пунктир и «Держи телефон ровно…» оверлея выключаются (drawCandidate / drawNotCard — пустые);
+   * прилипание контура и «нашёл» остаются у оверлея и сцены пробуждения. Нет таких методов (другой трекер, переименовали) —
+   * ничего не меняем, поиск выглядит как раньше.
+   */
+  private wireCardSearch() {
+    type Ov = {
+      guide(s: TrackState, k: number, h: Hint): void;
+      candidate(pts: { x: number; y: number }[], kind?: SearchKind): void;
+      track(v: unknown, silent?: boolean): void;
+      lost(): void;
+      catPlaced: boolean;
+      drawCandidate?: () => void;
+      drawNotCard?: () => void;
+    };
+    const ov = (this.tracker as unknown as { overlay?: Ov }).overlay;
+    if (!ov || typeof ov.guide !== 'function' || typeof ov.candidate !== 'function' || typeof ov.track !== 'function') return;
+    const cs = new CardSearch({ container: this.root, sound: (id, v) => this.audio.play(id, v ?? 1) });
+    this.cardSearch = cs;
+    const guide = ov.guide.bind(ov), cand = ov.candidate.bind(ov), track = ov.track.bind(ov), lost = ov.lost.bind(ov);
+    ov.guide = (st, k, h) => {
+      guide(st, k, h);
+      cs.guide(st, k, h, !!ov.catPlaced);
+    };
+    ov.candidate = (pts, kind = 'sber') => {
+      cand(pts, kind);
+      cs.candidate(pts, kind, !!ov.catPlaced);
+    };
+    // track() приходит каждый кадр, пока карта захвачена: «нашёл!» — только на переходе в захват
+    let locked = false;
+    ov.track = (v, silent = false) => {
+      const was = !!ov.catPlaced;
+      track(v, silent);
+      if (!locked) cs.found(silent || was);
+      locked = true;
+    };
+    ov.lost = () => {
+      lost();
+      locked = false;
+      cs.lost();
+    };
+    ov.drawCandidate = () => undefined;
+    ov.drawNotCard = () => undefined;
+    // нижняя плашка, пока карты нет: кот выглядывает и «принюхивается», фразы меняются
+    const scan = this.ui.root.querySelector('.scan') as HTMLElement | null;
+    const em = scan?.querySelector('span');
+    if (scan && em) {
+      // без статичной рамки по центру («прицел» спорил с настоящей картой): плашка снизу, лапки — по самой карте
+      scan.classList.add('kid', 'free');
+      em.innerHTML = `<img class="scan-peek" alt="" src="${asset(PEEK[this.director.persona.id] ?? PEEK.kind)}"><em></em>`;
+      const txt = em.querySelector('em') as HTMLElement;
+      let i = 0;
+      txt.textContent = SEARCH_LINES[0];
+      window.setInterval(() => {
+        if (scan.classList.contains('hidden') || scan.style.visibility === 'hidden') return;
+        i = (i + 1) % SEARCH_LINES.length;
+        txt.classList.remove('swap');
+        void txt.offsetWidth;
+        txt.classList.add('swap');
+        txt.textContent = SEARCH_LINES[i];
+      }, 4000);
+      this.director.on('persona', (id) => {
+        const img = em.querySelector('img');
+        if (img) img.src = asset(PEEK[id] ?? PEEK.kind);
+      });
+    }
+  }
+
+  /** кот дышит на стекло: «К стеклу» (glass_cat), «Подыши» (steam) — после них туман на весь экран, рисуем пальцем */
+  private wireFogBoard() {
+    const fb = new FogBoard(this.root);
+    this.fogBoard = fb;
+    const d = this.director;
+    fb.onSqueak = () => this.audio.play('glass_squeak', 0.35);
+    // ушли домой / сменился режим — туман убираем без реакции
+    window.setInterval(() => {
+      if (fb.on && (this.home?.active || !d.state.appeared)) {
+        fb.cancel();
+        this.ui.root.classList.remove('fog-on');
+      }
+    }, 500);
+    fb.onStroke = (p) => d.glassMoment('fog', p);
+    fb.onDone = (r) => {
+      this.ui.root.classList.remove('fog-on');
+      this.input.activity();
+      d.log(`стекло: туман ушёл (${r.byButton ? 'кнопка' : 'сам'}), нарисовано ${r.drawn} px, штрихов ${r.strokes}`);
+      // кот отвечает на рисунок (озвученная реплика «сюрприз» — «Ух ты, вот это сюрприз!», «Ого! Ещё!»)
+      if (r.drawn > 80) d.speakEvent('surprise', { force: true });
+    };
+    // точка интеграции: FxLayer.play — «дыхнуть» на стекло (glass_cat, steam) запускает туман чуть позже, как будто кот
+    // надышал на весь экран; эффекты слоя не меняются (src/fx — общий)
+    const fx = this.fx as FxLayer & { play: (id: string, a?: unknown) => unknown };
+    const play = fx.play.bind(fx);
+    fx.play = (id: string, a?: unknown) => {
+      const h = play(id as never, a as never);
+      if ((id === 'glass_cat' || id === 'steam') && !fb.on && !this.home?.active && d.state.appeared) {
+        const at = id === 'glass_cat' ? 1700 : 900;
+        window.setTimeout(() => {
+          if (this.home?.active || fb.on) return;
+          const m = this.stage.anchorScreen('mouth', this.root.clientWidth, this.root.clientHeight);
+          this.startFog(id === 'glass_cat' ? { x: this.root.clientWidth / 2, y: this.root.clientHeight * 0.42 } : m);
+        }, at);
+      }
+      return h;
+    };
+  }
+  private startFog(p: { x: number; y: number }) {
+    if (!this.fogBoard) return;
+    this.hints?.stop();
+    this.ui.root.classList.add('fog-on');
+    this.fogBoard.start(p);
+    this.director.log('стекло: запотело на весь экран — рисуй пальцем (ui/fogBoard.ts)');
+  }
+
   uiContext(): TomUiCtx {
     const home = this.home, d = this.director;
     const zone = home?.phase === 'home' ? home.zone : null;
@@ -691,6 +867,7 @@ export class App {
   }
   runCatalogItem(item: CatalogItem) {
     this.input.activity();
+    this.kidsOffer?.noteAction();
     if (item.id.startsWith('home:')) return void this.home.act(item.id);
     if ('action' in item.run) this.suggest.note(item.run.action);
     routeItem(item, {
@@ -934,6 +1111,7 @@ export class App {
    * — ближайшая общая реакция + клип/лицо из таблицы, чтобы тычки по зонам были видны всегда.
    */
   private touchCat(event: string, p: { x?: number; y?: number } = {}, fallback = 'tap_cat') {
+    this.kidsOffer?.noteAction();
     const d = this.director;
     const has = !!d.persona.reactions?.[event];
     d.interaction((has ? event : fallback) as InteractionKind, p);
@@ -1001,6 +1179,14 @@ export class App {
     const glass = () => feature('glass.gestures') && d.state.appeared && !this.home?.active && !d.state.dialog;
     i.on('longpress', (p) => {
       if (d.state.appeared && !this.home?.active && this.ui.pressMenu(p.x, p.y)) return;
+      if (glass() && !p.onCat && this.fogBoard) {
+        // туман на весь экран, рисуем пальцем (feature glass.fogDraw, ui/fogBoard.ts)
+        d.activity();
+        this.startFog(p);
+        d.glassMoment('fog', p);
+        this.audio.play('breath', 0.7);
+        return;
+      }
       if (glass() && !p.onCat) {
         d.activity();
         this.fx.play('steam_draw');

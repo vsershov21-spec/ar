@@ -61,6 +61,12 @@ export const FEATURES = {
   analytics: { mvp: false, lab: true, pilot: true, note: 'воронка: события sendBeacon → POST /api/progress/event (src/analytics, docs/ANALYTICS.md); ?noanalytics — выкл.' },
   'ui.tomLayout': { mvp: false, lab: true, pilot: true, note: 'меню «как у Говорящего Тома»: колонки кнопок у краёв (Ласка слева, Трюки/Образ справа), кот в центре, снизу микрофон, «Мой дом», «Игры», дома — действия комнаты; колонки прячутся к краю (ui/tomMenu.ts, ui/tomLayout.ts, docs/ui/TOM_LAYOUT.md). В MVP — прежний лист' },
   'card.paint': { mvp: false, lab: true, pilot: true, note: 'раскраска карты котом: предложение, лист цветов, рисунок на плоскости карты, память (src/card/paint.ts; app.ts applyEdition — точка входа)' },
+  // ── UX пилота 20.11 (запись с iPhone): онбординг, подсказки «нажми сюда», СберKids, туман на стекле ──
+  'intro.tour': { mvp: false, lab: true, pilot: true, note: 'онбординг из 4 экранов: кто такой кот, что можно делать, как держать телефон над картой + камера; «Пропустить» (ui.ts OB_TOUR); выкл. — прежние 2 экрана' },
+  'intro.search': { mvp: false, lab: true, pilot: true, note: 'детский поиск карты: лапки бегут по краю карты (прогресс посадки), звёздочка наполняется, весёлые подсказки, мягкий отказ чужой карте, звон «нашёл!»; кот выглядывает из плашки (ui/cardSearch.ts; app.ts wireCardSearch — обёртка вызовов оверлея, логика трекера не меняется)' },
+  'ui.hints': { mvp: false, lab: true, pilot: true, note: 'подсказки «нажми сюда»: кольцо и палец на 2–3 главных кнопках после онбординга, на ~9 с бездействия, после смены режима; раз за сессию (ui/hints.ts; app.ts — точка входа)' },
+  'glass.fogDraw': { mvp: false, lab: true, pilot: true, note: 'кот дышит на стекло («К стеклу», «Подыши», долгое нажатие мимо кота) — туман на весь экран, палец стирает (мягкая кисть, мультитач), ~12 с или «Протереть», кот отвечает репликой (ui/fogBoard.ts; app.ts — точка входа)' },
+  'sberkids.offer': { mvp: false, lab: true, pilot: true, note: 'закрываемая карточка «Войти в СберKids» дома и после игры (N действий / минуты), диплинк и веб-фолбэк — config/sberkids.ts (плейсхолдеры TODO), аналитика sberkids_click (ui/kidsOffer.ts; app.ts — точка входа)' },
   // ── только lab ──
   'games.new': { mvp: false, lab: true, pilot: false, note: 'мини-игры «Угадай рожицу», «Камень-ножницы», «Делай как я» (emo/rps/simon): persona/content.ts убирает их диалоги' },
   'stickers.pack': { mvp: false, lab: true, pilot: false, note: 'новый пак наклеек СберКота и коллекция (fx/stickerPack, fxLayer)' },

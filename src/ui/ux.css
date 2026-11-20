@@ -1,0 +1,104 @@
+/* UX пилота 20.11: онбординг из 4 экранов, подсказки «нажми сюда», карточка СберKids, туман на стекле,
+   правки по записи (неактивные кнопки, пузырь). Токены — styles.css. */
+
+/* ───────────── онбординг (feature intro.tour) ───────────── */
+.ob-skip { position: absolute; z-index: 3; top: calc(var(--safe-t) + 12px); right: calc(var(--safe-r) + 14px); min-height: 40px; padding: 8px 16px;
+  border: 0; border-radius: 999px; background: rgba(255,255,255,.14); color: rgba(255,255,255,.92); font: 700 15px/1 var(--font); pointer-events: auto; }
+.ob-skip:active { background: rgba(255,255,255,.26); }
+.ob-skip.hidden { display: none; }
+
+/* шаг 2: три кота */
+.art-who .who-cat { position: absolute; bottom: 4%; height: 82%; width: auto; filter: drop-shadow(0 14px 18px rgba(0,0,0,.35)); animation: whobob 3s ease-in-out infinite; }
+.art-who .c1 { left: -4%; height: 66%; animation-delay: .4s; transform: rotate(-6deg); }
+.art-who .c2 { left: 50%; translate: -50% 0; z-index: 1; }
+.art-who .c3 { right: -4%; height: 66%; animation-delay: .9s; }
+@keyframes whobob { 50% { margin-bottom: 8px; } }
+
+/* шаг 3: что можно делать — 5 плиток */
+.art-do { display: flex; flex-wrap: wrap; align-content: center; justify-content: center; gap: 12px 10px; }
+.do-tile { width: calc(33% - 8px); display: flex; flex-direction: column; align-items: center; gap: 6px; animation: dopop .5s var(--ease-back) both; }
+.do-tile b { width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center; background: #fff; color: var(--green);
+  box-shadow: 0 5px 0 rgba(0,0,0,.12), 0 10px 22px rgba(0,0,0,.18); }
+.do-tile b svg { width: 34px; height: 34px; }
+.do-tile em { font: 800 14px/1.15 var(--font); font-style: normal; color: #fff; text-align: center; }
+.do-tile.d-pet b { color: #e2483d; } .do-tile.d-feed b { color: #2a7ad8; } .do-tile.d-trick b { color: var(--green); }
+.do-tile.d-paint b { color: #d6338a; } .do-tile.d-home b { color: #f08a4b; }
+.do-tile:nth-child(2) { animation-delay: .08s; } .do-tile:nth-child(3) { animation-delay: .16s; } .do-tile:nth-child(4) { animation-delay: .24s; } .do-tile:nth-child(5) { animation-delay: .32s; }
+@keyframes dopop { from { transform: scale(.6); opacity: 0; } }
+
+/* шаг 4: телефон над картой на столе */
+.art-hold .hd-table { position: absolute; left: 0; right: 0; bottom: 4%; height: 36%; border-radius: 18px; background: linear-gradient(180deg, rgba(255,255,255,.16), rgba(255,255,255,.04));
+  transform: perspective(380px) rotateX(48deg); transform-origin: 50% 100%; }
+.art-hold .hd-card { left: 18%; right: 18%; bottom: 5%; aspect-ratio: 1.586; transform: perspective(380px) rotateX(48deg); transform-origin: 50% 100%; box-shadow: 0 10px 20px rgba(0,0,0,.3); }
+.art-hold .hd-card .kc-logo { font-size: 8px; }
+.art-hold .hd-phone { position: absolute; left: 50%; top: -6%; width: 27%; aspect-ratio: .5; translate: -50% 0; border-radius: 18px; background: #12262a;
+  border: 3px solid rgba(255,255,255,.85); box-shadow: 0 16px 30px rgba(0,0,0,.35); animation: hdhover 3s ease-in-out infinite; overflow: hidden; }
+.art-hold .hd-cam { position: absolute; left: 50%; top: 5%; width: 26%; height: 4%; translate: -50% 0; border-radius: 9px; background: #000; }
+.art-hold .hd-cat { position: absolute; left: 14%; right: 14%; bottom: 16%; height: 62%; object-fit: contain; object-position: 50% 100%; }
+.art-hold .hd-arrow { position: absolute; left: 50%; top: 50%; width: 3px; height: 14%; translate: -50% 0; background: repeating-linear-gradient(180deg, rgba(255,255,255,.8) 0 6px, transparent 6px 11px); }
+@keyframes hdhover { 50% { translate: -50% -6px; } }
+
+/* ───────────── подсказки «нажми сюда» (feature ui.hints) ───────────── */
+.hintp { position: absolute; z-index: 8; width: 0; height: 0; pointer-events: none; }
+.hintp.hidden { display: none; }
+.hintp-ring { position: absolute; left: calc(var(--d, 60px) / -2); top: calc(var(--d, 60px) / -2); width: var(--d, 60px); height: var(--d, 60px); border-radius: 50%;
+  border: 3px solid var(--lime); box-shadow: 0 0 0 3px rgba(33,160,56,.35); animation: hintring 1.3s ease-out infinite; }
+.hintp-ring.r2 { animation-delay: .65s; }
+@keyframes hintring { from { transform: scale(.85); opacity: 1; } to { transform: scale(1.45); opacity: 0; } }
+.hintp-hand { position: absolute; left: -8px; top: -4px; width: 46px; height: 46px; transform-origin: 30% 10%; filter: drop-shadow(0 4px 6px rgba(0,0,0,.3)); }
+.hintp-hand svg { width: 100%; height: 100%; animation: hinttap 1.3s ease-in-out infinite; transform-origin: 40% 15%; }
+@keyframes hinttap { 0%, 100% { transform: translate(6px, 10px) scale(1); } 45% { transform: translate(0, 0) scale(.92); } 55% { transform: translate(0, 0) scale(.92); } }
+.hint-on { animation: hintbtn 1.3s ease-in-out infinite; }
+@keyframes hintbtn { 50% { transform: scale(1.08); } }
+@media (prefers-reduced-motion: reduce) { .hintp-ring, .hintp-hand svg, .hint-on { animation-duration: 2.6s; } }
+
+/* ───────────── карточка СберKids (feature sberkids.offer) ───────────── */
+.kids-card { position: absolute; z-index: 6; left: 50%; bottom: 190px; translate: -50% 0; display: flex; align-items: center; gap: 2px; padding: 4px;
+  border-radius: 999px; background: var(--surface); box-shadow: 0 4px 0 rgba(0,0,0,.08), var(--sh-2); pointer-events: auto; animation: kcin .45s var(--ease-back); }
+.kids-card.hidden { display: none; }
+.kids-card .kc-go { display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 6px 14px 6px 8px; border: 0; border-radius: 999px; background: none;
+  color: var(--green-text); font: 800 16px/1 var(--font); white-space: nowrap; }
+.kids-card .kc-go svg { width: 28px; height: 28px; flex: none; }
+.kids-card .kc-go:active { background: rgba(33,160,56,.1); }
+.kids-card .kc-x { width: 40px; height: 40px; border: 0; border-radius: 50%; background: rgba(31,42,46,.07); color: var(--ink); font: 700 22px/1 var(--font); }
+@keyframes kcin { from { transform: translateY(14px) scale(.9); opacity: 0; } }
+
+/* ───────────── туман на стекле (feature glass.fogDraw) ───────────── */
+.fogb { position: absolute; inset: 0; z-index: 2; touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+.fogb.hidden { display: none; }
+.fogb-cv { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; }
+.fogb.in .fogb-cv { animation: fogin .9s var(--ease) both; }
+@keyframes fogin { from { clip-path: circle(0 at var(--fx) var(--fy)); opacity: .4; } to { clip-path: circle(150% at var(--fx) var(--fy)); opacity: 1; } }
+.fogb.out { opacity: 0; transition: opacity .9s var(--ease); pointer-events: none; }
+.fogb-wipe { position: absolute; left: 50%; bottom: calc(var(--safe-b) + 128px); translate: -50% 0; min-height: 46px; padding: 0 20px; border-radius: 999px;
+  background: rgba(255,255,255,.92); color: var(--green-text); font: 800 16px/1 var(--font); box-shadow: var(--sh-2); animation: kcin .4s .8s var(--ease-back) both; }
+/* туман: колонки меню не нужны — рисуем на всём стекле, док остаётся */
+.ui.fog-on .tom-col, .ui.fog-on .tom-tab, .ui.fog-on .chips.suggest, .ui.fog-on .kids-card { opacity: 0; pointer-events: none !important; transition: opacity .3s; }
+
+/* ───────────── неактивные кнопки: под замочком — почему (tomMenu.ts whyShort: «нужна карта») ───────────── */
+.tom-btn.dis .tb-l { color: #8a4b00; }
+
+/* ───────────── пузырь под мордой кота (ui.ts bubbleLow): сверху и сбоку некуда ───────────── */
+.bubble.tail-up::after { display: block; left: calc(var(--tail-x, 50%) - 9px); top: -7px; transform: rotate(45deg); }
+
+/* ───────────── поиск карты по-детски (feature intro.search): кот выглядывает из плашки ───────────── */
+.scan.kid span { padding: 8px 18px 8px 8px; gap: 10px; font-size: 16px; }
+.scan.kid span::before { display: none; }
+.scan-peek { width: 40px; height: 40px; flex: none; border-radius: 50%; object-fit: cover; object-position: 50% 6%; background: #e9f8cf;
+  box-shadow: inset 0 0 0 2px #fff; animation: sniff 1.6s ease-in-out infinite; transform-origin: 50% 90%; }
+@keyframes sniff { 0%, 60%, 100% { transform: translateY(0) rotate(0); } 70% { transform: translateY(-3px) rotate(-6deg); } 80% { transform: translateY(-1px) rotate(5deg); } 90% { transform: translateY(-3px) rotate(-3deg); } }
+.scan.kid em.swap { animation: scanswap .35s var(--ease); }
+@keyframes scanswap { from { opacity: 0; transform: translateY(6px); } }
+@media (prefers-reduced-motion: reduce) { .scan-peek, .scan.kid em.swap { animation: none; } }
+
+/* ───────────── интро без лишнего: до первой игры в доке только звук и микрофон, язычков и счётчика нет ───────────── */
+.dock .tom-home, .dock .tom-games, .dock .tom-gear, .tom-tab, .tom-top { transition: opacity .35s var(--ease); }
+.dock.no-play .tom-home, .dock.no-play .tom-games, .dock.no-play .tom-gear { opacity: 0; pointer-events: none; }
+.ui:has(.dock.no-play) .tom-tab, .ui:has(.dock.no-play) .tom-top { opacity: 0; pointer-events: none; }
+/* плашка поиска появляется, когда онбординг уже ушёл (без наложения текста на текст) */
+.scan.kid:not(.hidden) span { animation: scanin .45s .35s var(--ease-back) both; }
+@keyframes scanin { from { opacity: 0; transform: translateY(12px) scale(.94); } }
+
+/* распознавание качается — кольцо вокруг микрофона вместо висящей плашки «Загружаю… N%» */
+.mic-slot.loading::after { content: ''; position: absolute; inset: -5px; border-radius: 50%; pointer-events: none;
+  background: conic-gradient(var(--lime) var(--load, 0deg), rgba(255,255,255,.25) 0); -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 3px)); mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 3px)); }

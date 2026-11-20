@@ -14,6 +14,7 @@ import { collection as stickerCollection } from '../fx/stickerPack';
 import { feature } from '../config/edition';
 import { GROUP_META, RecentStore, groupCatalog, oftenGroup, type CatalogGroup } from './catalogGroups';
 import { TomMenu, type TomUiCtx } from './tomMenu';
+import './ux.css';
 
 export interface UiHandlers {
   onWake(): void;
@@ -132,6 +133,41 @@ const ICON = {
   camoff: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7.5h3l2-2.5h8l2 2.5h3v11H3z"/><circle cx="12" cy="13" r="3.5"/><path d="M3 3l18 18"/></svg>',
 };
 
+/** онбординг из 4 экранов (feature 'intro.tour'): кто такой кот, что можно делать, как держать телефон */
+const TOUR = feature('intro.tour');
+const OB_STEPS = TOUR ? 4 : 2;
+const OB_DO: { icon: string; label: string; cls: string }[] = [
+  { icon: 'hand', label: 'Погладь', cls: 'd-pet' },
+  { icon: 'fish', label: 'Накорми', cls: 'd-feed' },
+  { icon: 'flip', label: 'Трюки', cls: 'd-trick' },
+  { icon: 'paint', label: 'Раскрась карту', cls: 'd-paint' },
+  { icon: 'ob_home', label: 'Загляни домой', cls: 'd-home' },
+];
+const OB_HOME = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 3.2 2.8 11h2.7v9.3h5V15h3v5.3h5V11h2.7z"/></svg>';
+const OB_TOUR = `
+          <section class="ob-slide" aria-label="Шаг 2: кто такой кот">
+            <div class="ob-art art-who" aria-hidden="true">
+              <img class="who-cat c1" src="${asset('video/sprites/hooligan/turn_front.webp')}" alt="" loading="lazy" decoding="async">
+              <img class="who-cat c2" src="${asset('video/sprites/kind/turn_front.webp')}" alt="" loading="lazy" decoding="async">
+              <img class="who-cat c3" src="${asset('video/sprites/glitter/pose_wave.webp')}" alt="" loading="lazy" decoding="async">
+              <span class="spk s1"></span><span class="spk s2"></span><span class="spk s3"></span>
+            </div>
+            <div class="screen-text"><h1>Это кот из&nbsp;карты</h1><p>Он&nbsp;говорит, слушает тебя и&nbsp;очень любит играть.</p></div>
+          </section>
+          <section class="ob-slide" aria-label="Шаг 3: что можно делать">
+            <div class="ob-art art-do" aria-hidden="true">
+              ${OB_DO.map((d) => `<span class="do-tile ${d.cls}"><b>${d.icon === 'ob_home' ? OB_HOME : CAT_ICON[d.icon] ?? (ICON as Record<string, string>)[d.icon] ?? ''}</b><em>${d.label}</em></span>`).join('')}
+            </div>
+            <div class="screen-text"><h1>Что можно делать</h1><p>Жми кнопки по&nbsp;краям или&nbsp;скажи коту.</p></div>
+          </section>`;
+/** телефон над картой на столе: как держать */
+const OB_HOLD_ART = `<div class="ob-art art-hold" aria-hidden="true">
+              <div class="hd-table"></div>
+              <div class="hd-card kc"><div class="kc-chip"></div><div class="kc-logo">СБЕР KIDS</div></div>
+              <div class="hd-phone"><i class="hd-cam"></i><img class="hd-cat" src="${asset('video/sprites/kind/turn_front.webp')}" alt="" loading="lazy" decoding="async"></div>
+              <i class="hd-arrow"></i>
+            </div>`;
+
 export class UI {
   readonly root: HTMLDivElement;
   private start: HTMLDivElement;
@@ -168,9 +204,10 @@ export class UI {
     root.className = 'ui';
     root.innerHTML = `
       <div class="screen start ob" data-step="0">
+        ${TOUR ? '<button class="ob-skip" type="button" data-a="ob-skip">Пропустить</button>' : ''}
         <div class="ob-sky" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
         <div class="ob-track">
-          <section class="ob-slide" aria-label="Шаг 1 из 2">
+          <section class="ob-slide" aria-label="Шаг 1">
             <div class="ob-art art-mystery" aria-hidden="true">
               <div class="kc">
                 <div class="kc-chip"></div><div class="kc-logo">СБЕР KIDS</div>
@@ -181,17 +218,18 @@ export class UI {
             </div>
             <div class="screen-text"><h1>Привет! В&nbsp;твоей карте кто-то живёт</h1><p>Он давно ждёт, когда ты заглянешь. Познакомимся?</p></div>
           </section>
-          <section class="ob-slide" aria-label="Шаг 2 из 2">
-            <div class="ob-art art-safe" aria-hidden="true">
+${TOUR ? OB_TOUR : ''}
+          <section class="ob-slide" aria-label="Шаг: камера">
+            ${TOUR ? OB_HOLD_ART : `<div class="ob-art art-safe" aria-hidden="true">
               <div class="sf-card"><div class="kc-chip"></div><div class="kc-logo">СБЕР KIDS</div></div>
               <div class="sf-shield">${ICON.shield}</div>
               <div class="sf-fam"><span class="ava a-kid">${ICON.kid}</span><span class="ava a-mom">${ICON.adult}</span><span class="ava a-dad">${ICON.adult}</span></div>
-            </div>
-            <div class="screen-text"><h1>Положи карту на&nbsp;стол и&nbsp;наведи камеру</h1><p>Карта — только твоя: показывай её только маме или папе. Цифры на&nbsp;карте я&nbsp;не&nbsp;читаю.</p></div>
+            </div>`}
+            <div class="screen-text"><h1>Положи карту на&nbsp;стол и&nbsp;наведи камеру</h1><p>${TOUR ? 'Держи телефон над картой, как&nbsp;для&nbsp;фото. Карту показывай только маме или папе.' : 'Карта — только твоя: показывай её только маме или папе. Цифры на&nbsp;карте я&nbsp;не&nbsp;читаю.'}</p></div>
           </section>
         </div>
         <div class="ob-foot">
-          <div class="ob-dots" aria-hidden="true"><i class="on"></i><i></i></div>
+          <div class="ob-dots" aria-hidden="true"><i class="on"></i>${'<i></i>'.repeat(OB_STEPS - 1)}</div>
           <button class="btn btn-primary btn-block ob-next" data-a="ob-next" type="button">Познакомиться</button>
           <button class="btn btn-primary btn-block ob-wake hidden" data-a="wake" type="button">${ICON.cam}<span>Открыть камеру</span></button>
           <div class="fine">${ICON.lock}<span>Камера и микрофон — одним нажатием. Видео и голос остаются в телефоне, данные карты не считываются. <button class="linkbtn" type="button" data-a="terms">Условия</button></span></div>
@@ -293,6 +331,7 @@ export class UI {
         else this.openCatalog();
       }
       if (a === 'ob-next') this.obGo(this.obStep + 1);
+      if (a === 'ob-skip') this.obGo(OB_STEPS - 1);
       if (a === 'terms') this.start.querySelector('.terms')!.classList.remove('hidden');
       if (a === 'terms-close') this.start.querySelector('.terms')!.classList.add('hidden');
       if (a === 'kids') h.onKids();
@@ -369,6 +408,10 @@ export class UI {
     }
   }
 
+  /** открыт лист поверх игры (имя, выбор кота, СберKids, каталог) — подсказкам и карточкам не время */
+  get sheetOpen() {
+    return this.catalogOpen || [this.namebox, this.choice, this.root.querySelector('.kids-sheet') as HTMLElement].some((e) => e && !e.classList.contains('hidden'));
+  }
   /** меню «как у Тома»; null — выключено (MVP) */
   tom: TomMenu | null = null;
   /** меню «как у Тома» сейчас на экране (десктоп-панель забирает его место — там всё как было) */
@@ -405,18 +448,23 @@ export class UI {
     this.h.onName(v);
   }
 
-  /** онбординг: два шага, свайп и кнопка «дальше»; на последнем — «Открыть камеру» (жест для iOS: камера, микрофон, датчики) */
+  /**
+   * онбординг: шаги, свайп и кнопка «дальше»; на последнем — «Открыть камеру» (жест для iOS: камера, микрофон, датчики).
+   * feature 'intro.tour' — 4 экрана (кто такой кот · что можно делать · как держать телефон + камера), «Пропустить»
+   * сверху — сразу к камере; без неё — прежние 2 экрана
+   */
   private obStep = 0;
   private obGo(i: number) {
-    const n = 2;
+    const n = OB_STEPS;
     i = Math.max(0, Math.min(n - 1, i));
     this.obStep = i;
     this.start.dataset.step = String(i);
     (this.start.querySelector('.ob-track') as HTMLElement).style.transform = `translateX(${-i * 100}%)`;
     this.start.querySelectorAll('.ob-dots i').forEach((d, k) => d.classList.toggle('on', k === i));
     const next = this.start.querySelector('.ob-next') as HTMLElement;
-    next.textContent = ['Познакомиться', ''][i];
+    next.textContent = (TOUR ? ['Познакомиться', 'Дальше', 'Понятно!', ''] : ['Познакомиться', ''])[i] ?? 'Дальше';
     next.classList.toggle('hidden', i === n - 1);
+    this.start.querySelector('.ob-skip')?.classList.toggle('hidden', i >= n - 1);
     this.start.querySelector('.ob-wake')!.classList.toggle('hidden', i !== n - 1);
   }
   private obSwipe() {
@@ -1156,7 +1204,7 @@ export class UI {
     this.bubbleAt = bubbleKey(cat);
     const st = b.style;
     // по умолчанию — сверху (позиция из CSS)
-    b.classList.remove('side', 'tail-left', 'tail-right', 'tail-down');
+    b.classList.remove('side', 'tail-left', 'tail-right', 'tail-down', 'tail-up', 'low');
     st.left = st.right = st.top = st.width = '';
     if (!cat || cat.bottom < 0 || cat.top > H) return;
     const top = b.offsetTop, bh = b.offsetHeight, bl = b.offsetLeft, bw = b.offsetWidth;
@@ -1174,7 +1222,7 @@ export class UI {
     const spaceR = x1 - (cat.cx + cat.half) - pad - gap;
     const side = spaceR >= spaceL ? 'r' : 'l';
     const space = Math.min(300, Math.max(spaceL, spaceR));
-    if (space < 150) return; // некуда — остаётся сверху (кот крупно, пузырь короткий)
+    if (space < 150) return this.bubbleLow(cat, top, bh, gap); // сбоку некуда — под мордой (над нижними кнопками) или сверху
     b.classList.add('side', side === 'r' ? 'tail-left' : 'tail-right');
     st.width = `${space}px`;
     st.left = `${side === 'r' ? cat.cx + cat.half + gap : cat.cx - cat.half - gap - space}px`;
@@ -1182,6 +1230,30 @@ export class UI {
     const y = Math.max(top, Math.min(H - h2 - 120, cat.headY - h2 / 2));
     st.top = `${y}px`;
     st.setProperty('--tail-y', `${Math.max(20, Math.min(h2 - 20, cat.headY - y))}px`);
+  }
+
+  /**
+   * Сверху и сбоку пузырь не помещается (кот крупно, колонки меню по краям): раньше он оставался сверху и закрывал коту
+   * морду (запись 20.11). Теперь — под мордой, над нижними рядами (чипы, ряд комнаты, док), хвостиком вверх к голове;
+   * если и там некуда — сверху, как было.
+   */
+  private bubbleLow(cat: CatRect, top: number, bh: number, gap: number) {
+    const b = this.bubble, st = b.style;
+    const faceB = cat.headY + (cat.bottom - cat.headY) * 0.2;
+    // верх самого высокого нижнего ряда
+    const rr = this.root.getBoundingClientRect();
+    let limit = this.root.clientHeight - 150;
+    for (const el of this.root.querySelectorAll<HTMLElement>('.dock, .chips.suggest:not(.hidden), .tom-room:not(.hidden), .kids-card:not(.hidden)')) {
+      const r = el.getBoundingClientRect();
+      if (r.height > 4 && r.top - rr.top < limit) limit = r.top - rr.top;
+    }
+    const y = limit - gap - bh;
+    // сверху морду не закрывает — пусть остаётся сверху
+    if (top + bh + 6 <= cat.top + (cat.headY - cat.top) * 0.35) return;
+    if (y < faceB + gap) return;
+    b.classList.add('low', 'tail-up');
+    st.top = `${Math.round(y)}px`;
+    st.setProperty('--tail-x', `${Math.max(28, Math.min(b.offsetWidth - 28, cat.cx - b.offsetLeft))}px`);
   }
 
   /** режим микрофона (переключатель — в каталоге, раздел «Ещё»; ?mic=ptt): в «слушаю всегда» нажатие — «я говорю» */
@@ -1194,6 +1266,11 @@ export class UI {
     return this.micModeNow;
   }
 
+  /** распознавание качается: тихое кольцо прогресса вокруг микрофона (k 0..1; null — убрать) */
+  micLoading(k: number | null) {
+    this.micSlot.classList.toggle('loading', k !== null);
+    if (k !== null) this.micSlot.style.setProperty('--load', `${Math.round(k * 360)}deg`);
+  }
   micLevel(v: number) {
     this.mic.style.setProperty('--lvl', String(v));
   }

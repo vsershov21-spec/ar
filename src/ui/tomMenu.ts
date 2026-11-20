@@ -60,6 +60,13 @@ const TIP: Record<string, string> = {
   echo: 'Буду повторять за тобой',
 };
 
+/** короткая причина под подписью неактивной кнопки (полная — по нажатию, над микрофоном) */
+export function whyShort(why: string): string {
+  if (/карт/i.test(why)) return 'нужна карта';
+  if (/сплю/i.test(why)) return /не сплю/i.test(why) ? 'не спит' : 'спит';
+  return 'позже';
+}
+
 export class TomMenu {
   readonly el: HTMLDivElement;
   private colL: HTMLDivElement;
@@ -386,7 +393,9 @@ export class TomMenu {
   private renderRoom(p: TomPlan, items: CatalogItem[]) {
     const box = this.room;
     box.classList.toggle('hidden', !p.room || !items.length);
-    this.reconcile(box, p.room ? items.map((it) => this.getBtn('room', it)) : []);
+    // «Уложить» / «Разбудить»: на экране только та, что сейчас работает (запись 20.11: «Разбудить» с замочком у бодрого кота)
+    const live = items.filter((it) => !(it.id === 'home:wake' && !this.ctxNow.sleeping) && !(it.id === 'home:sleep' && this.ctxNow.sleeping));
+    this.reconcile(box, p.room ? live.map((it) => this.getBtn('room', it)) : []);
   }
 
   /** круглая кнопка: иконка, короткая подпись, точка «новое» */
@@ -420,6 +429,10 @@ export class TomMenu {
     e.b.classList.toggle('new', !why && this.isNew(it));
     if (why) e.b.setAttribute('aria-disabled', 'true');
     else e.b.removeAttribute('aria-disabled');
+    // замочек без объяснения непонятен (запись 20.11): под подписью — коротко, почему кнопка не работает
+    const l = e.b.querySelector('.tb-l') as HTMLElement | null;
+    const txt = why ? whyShort(why) : shortLabel(it);
+    if (l && l.textContent !== txt) l.textContent = txt;
     return e.b;
   }
   private itemBtn(cur: () => CatalogItem, pick: (it: CatalogItem) => void): HTMLButtonElement {
