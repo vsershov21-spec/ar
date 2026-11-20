@@ -120,6 +120,8 @@ export class Stage {
   private onArrive: (() => void) | null = null;
   /** шаг назад (раскраска: «отошёл посмотреть») — идёт спиной вперёд, лицом к цели */
   private walkBack = false;
+  /** боком к ходу (скейт): 1 / −1, 0 — лицом по ходу */
+  private walkSide: 0 | 1 | -1 = 0;
   /** скорость текущей прогулки, если задана (раскраска — короткий быстрый шаг между точками у края) */
   private walkSpeedNow: number | null = null;
   /** стоя — лицом к этой точке карты, а не к зрителю (раскраска: кот смотрит туда, где рисует); null — к зрителю */
@@ -203,20 +205,26 @@ export class Stage {
   /**
    * Дойти до точки (в координатах карты). Возвращает false, если уже на месте.
    * opts.free — можно встать за краем карты (на стол рядом, до 0,2 ширины): раскраска — кот рисует, стоя у края;
-   * opts.back — спиной вперёд (лицом против хода); opts.speed — своя скорость, ширин карты в секунду.
+   * opts.back — спиной вперёд (лицом против хода); opts.speed — своя скорость, ширин карты в секунду;
+   * opts.side — боком к ходу (скейт): ось +X кота × side смотрит по ходу, лицо — поперёк.
    */
-  walkTo(p: THREE.Vector2, onArrive?: () => void, opts: { free?: boolean; back?: boolean; speed?: number } = {}): boolean {
+  walkTo(p: THREE.Vector2, onArrive?: () => void, opts: { free?: boolean; back?: boolean; speed?: number; side?: 1 | -1 } = {}): boolean {
     const t = opts.free ? new THREE.Vector2(clamp(p.x, -0.7, 0.7), clamp(p.y, -0.5 / this.tracker.aspect - 0.2, 0.5 / this.tracker.aspect + 0.2)) : this.clampTarget(p);
     if (t.distanceTo(this.pos) < 0.04) return false;
     this.walkTarget = t;
     this.onArrive = onArrive ?? null;
     this.walkBack = !!opts.back;
+    this.walkSide = opts.side ?? 0;
     this.walkSpeedNow = opts.speed ?? null;
     return true;
   }
 
   get walking() {
     return !!this.walkTarget;
+  }
+  /** куда смотрит кот на карте (yaw, рад; вперёд кота = −Y карты при 0) — скейт выбирает сторону проезда */
+  get heading() {
+    return this.yaw;
   }
 
   /** остановиться там, где стоит (раскраска карты: карта ушла посреди ряда) */
@@ -225,6 +233,7 @@ export class Stage {
     this.walkYaw = null;
     this.onArrive = null;
     this.walkBack = false;
+    this.walkSide = 0;
     this.walkSpeedNow = null;
   }
 
@@ -334,7 +343,7 @@ export class Stage {
       const d = this.v2.copy(this.walkTarget).sub(this.pos);
       const len = d.length();
       // направление движения в координатах карты → yaw (вперёд кота = -Y карты при yaw=0)
-      this.walkYaw = Math.atan2(d.x, -d.y) + (this.walkBack ? Math.PI : 0);
+      this.walkYaw = Math.atan2(d.x, -d.y) + (this.walkBack ? Math.PI : 0) - (this.walkSide * Math.PI) / 2;
       // шагает, когда уже почти развернулся по ходу (не едет боком/задом)
       const err = Math.abs(Math.atan2(Math.sin(this.walkYaw - this.yaw), Math.cos(this.walkYaw - this.yaw)));
       const step = (this.walkSpeedNow ?? this.cfg.walkSpeed) * dt * clamp((Math.cos(err) - 0.2) / 0.7, 0.15, 1);
@@ -343,6 +352,7 @@ export class Stage {
         this.walkTarget = null;
         this.walkYaw = null;
         this.walkBack = false;
+        this.walkSide = 0;
         this.walkSpeedNow = null;
         const cb = this.onArrive;
         this.onArrive = null;

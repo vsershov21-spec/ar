@@ -99,7 +99,7 @@ function propProbe() {
         r.prop.dist = +(ctr.distanceTo(eyes) / (0.3 * s)).toFixed(2);
       }
     }
-    if (st?.id === 'skate' && c.skateDbg) r.skate = { ...c.skateDbg };
+    if (st?.id === 'skate' && c.skateDbg) r.skate = { ...c.skateDbg, deck: mm(c.skateDbg.deck * s), lean: +(c.skateDbg.lean * 57.3).toFixed(1) };
     r.phase2 = st ? `${st.id}:${st.phase}` : '';
     return r;
   };
@@ -183,6 +183,7 @@ async function runCat(browser, cat) {
       distMed: use.length && use[0].prop.dist !== undefined ? [...use.map((f) => f.prop.dist)].sort((a, b) => a - b)[Math.floor(use.length / 2)] : null,
       deckMax: sk.length ? mx(sk.filter((f) => f.skate.onDeck).map((f) => f.skate.deck ?? 0)) : null,
       wheelTurns: sk.length ? +(sk[sk.length - 1].skate.wheel ?? 0).toFixed(1) : null,
+      leanMax: sk.length ? mx(sk.map((f) => Math.abs(f.skate.lean ?? 0))) : null,
       // проникновение лап в тело/одежду за действие, мм (BodyCollider.measurePairs) — самая глубокая пара
       penMax: mx(fr.filter((f) => f.phase2).map((f) => f.penMM ?? 0)),
       penPair: fr.filter((f) => f.phase2).reduce((b, f) => ((f.penMM ?? 0) > (b.v ?? 0) ? { v: f.penMM, p: f.penPair + '@' + f.phase2 } : b), {}).p ?? '',
@@ -205,8 +206,8 @@ async function sheet(cat, id, shots, close) {
     const b = s.box ?? { x0: 120, x1: 270, y0: 250, y1: 600 };
     // кости: от стоп до головы — сверху ещё уши и макушка (≈ 0,6 роста костей)
     const bh = Math.max(60, b.y1 - b.y0);
-    const ch = Math.max(160, bh * 2.1), cw = (ch * S) / H;
-    const cx = (b.x0 + b.x1) / 2, cy = (b.y0 - bh * 0.6 + b.y1 + bh * 0.08) / 2;
+    const ch = Math.max(160, bh * 2.3), cw = (ch * S) / H;
+    const cx = (b.x0 + b.x1) / 2, cy = (b.y0 - bh * 0.6 + b.y1 + bh * 0.3) / 2;
     const L = Math.max(0, Math.min(390 - cw, cx - cw / 2)), T = Math.max(0, Math.min(844 - ch, cy - ch / 2));
     const ex = { left: Math.round(L * 2), top: Math.round(T * 2), width: Math.round(Math.min(cw, 390) * 2), height: Math.round(Math.min(ch, 844) * 2) };
     const img = await sharp(s.buf).extract(ex).resize(S, H, { fit: 'cover' }).toBuffer();

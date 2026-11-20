@@ -593,22 +593,48 @@ export class Director extends Emitter<DirectorEvents> {
     if (!dur) return false;
     this.actUntil = performance.now() + dur * 1000;
     this.log(`🎬 ${act}: ${dur.toFixed(1)} с (шаблон тела)`);
-    if (act === 'skate') this.actTimers.push(window.setTimeout(() => this.rideArc(), RIDE_FROM * 1000));
+    if (act === 'skate') {
+      // сторона проезда (нос доски) — до того, как доску поставят: меньше упора в край карты
+      this.skateDir = this.skateArc(1).clip <= this.skateArc(-1).clip ? 1 : -1;
+      (ch as { setSkateDir?: (d: 1 | -1) => void }).setSkateDir?.(this.skateDir);
+      this.actTimers.push(window.setTimeout(() => this.rideArc(), RIDE_FROM * 1000));
+    }
     return true;
   }
 
-  /** проезд на скейте: небольшая дуга по карте (к её середине), скорость — чтобы уложиться во время проезда */
+  /**
+   * Сторона проезда на скейте: кот едет боком (нос доски — ±X кота), лицом к зрителю; дуга загибается к зрителю.
+   * Сторона — та, где дуга меньше упирается в край карты. Точки — в координатах карты.
+   */
+  private skateArc(bdir: 1 | -1): { pts: THREE.Vector2[]; clip: number } {
+    const st = this.d.stage;
+    const p0 = st.pos.clone();
+    const yaw = st.heading;
+    // stage.walkTo side: yaw кота = ход − side·π/2 → ход = yaw + side·π/2; вперёд при yaw — (sin, −cos)
+    const ty = yaw + (bdir * Math.PI) / 2;
+    const d = new THREE.Vector2(Math.sin(ty), -Math.cos(ty));
+    const n = new THREE.Vector2(Math.sin(yaw), -Math.cos(yaw));
+    // пологая дуга (~60°): кот к концу проезда всё ещё почти лицом к зрителю
+    const R = 0.3;
+    const pts: THREE.Vector2[] = [];
+    let clip = 0;
+    for (let i = 1; i <= 4; i++) {
+      const th = (i / 4) * 1.05;
+      const raw = p0.clone().addScaledVector(d, R * Math.sin(th)).addScaledVector(n, R * 0.5 * (1 - Math.cos(th)));
+      const c = st.clampTarget(raw.clone());
+      clip += c.distanceTo(raw);
+      pts.push(c);
+    }
+    return { pts, clip };
+  }
+  private skateDir: 1 | -1 = 1;
+
+  /** проезд на скейте: дуга боком к ходу (skateArc), скорость — чтобы уложиться во время проезда */
   private rideArc() {
     const st = this.d.stage;
     if (!this.actBusy()) return;
     const p0 = st.pos.clone();
-    const dir = p0.x > 0 ? -1 : 1;
-    const R = 0.2;
-    const pts: THREE.Vector2[] = [];
-    for (let i = 1; i <= 4; i++) {
-      const th = (i / 4) * 1.9;
-      pts.push(st.clampTarget(new THREE.Vector2(p0.x + dir * R * Math.sin(th), p0.y - R * 0.55 * (1 - Math.cos(th)))));
-    }
+    const { pts } = this.skateArc(this.skateDir);
     let len = 0, prev = p0;
     for (const p of pts) {
       len += p.distanceTo(prev);
@@ -616,10 +642,11 @@ export class Director extends Emitter<DirectorEvents> {
     }
     const speed = Math.max(0.05, len / Math.max(0.5, RIDE_TO - RIDE_FROM));
     let i = 0;
+    const side = this.skateDir;
     const next = () => {
       if (!this.actBusy() || i >= pts.length) return;
       const p = pts[i++];
-      if (!st.walkTo(p, next, { speed })) next();
+      if (!st.walkTo(p, next, { speed, side })) next();
     };
     next();
   }

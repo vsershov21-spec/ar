@@ -139,39 +139,60 @@ describe('скейт', () => {
       const p = skatePose(t).phase;
       if (seen[seen.length - 1] !== p) seen.push(p);
     }
-    expect(seen).toEqual(['grab', 'drop', 'mount', 'push', 'ride', 'ollie', 'roll', 'dismount', 'stow', 'done']);
-    expect(RIDE_TO - RIDE_FROM).toBeCloseTo(SKATE_T.push + SKATE_T.ride + SKATE_T.ollie + SKATE_T.roll, 5);
-    expect(SKATE_TOTAL).toBeLessThan(6.5);
+    expect(seen).toEqual(['conjure', 'place', 'hop', 'push', 'ride', 'ollie', 'flip', 'roll', 'hopoff', 'kickup', 'vanish', 'done']);
+    expect(RIDE_TO - RIDE_FROM).toBeCloseTo(SKATE_T.push + SKATE_T.ride + SKATE_T.ollie + SKATE_T.flip + SKATE_T.roll, 5);
+    expect(SKATE_TOTAL).toBeLessThan(7.5);
   });
   it('доска не отлетает: положение и масштаб меняются плавно (кадр 1/30 с)', () => {
     let prev = skatePose(0);
     let pb = prev.board.clone(), ps = prev.boardScale;
     for (let t = 1 / 30; t < SKATE_TOTAL; t += 1 / 30) {
       const f = skatePose(t);
-      if (f.carry < 0.01 && prev.carry < 0.01) expect(f.board.distanceTo(pb), `t=${t.toFixed(2)} ${f.phase}`).toBeLessThan(0.03);
+      // подлёт доски из-под стопы (kickup) — быстрый, но непрерывный: до 5 см за кадр
+      if (f.carry < 0.01 && prev.carry < 0.01) expect(f.board.distanceTo(pb), `t=${t.toFixed(2)} ${f.phase}`).toBeLessThan(f.phase === 'kickup' ? 0.05 : 0.03);
       expect(Math.abs(f.boardScale - ps)).toBeLessThan(0.2);
       pb = f.board.clone();
       ps = f.boardScale;
       prev = f;
     }
   });
-  it('на деке стопы — IK (вес 1), тело поднято на высоту деки', () => {
+  it('на деке стопы — IK (вес 1), тело поднято на высоту деки; олли и кикфлип — в воздухе, оборот доски', () => {
     const f = skatePose(RIDE_FROM + SKATE_T.push + SKATE_T.ride / 2);
     expect(f.phase).toBe('ride');
     expect(f.feetW).toBe(1);
     expect(f.standOn).toBeCloseTo(BOARD.deck, 6);
-    expect(f.board.length()).toBeLessThan(1e-6);
+    expect(f.leanK).toBe(1);
+    const o = skatePose(RIDE_FROM + SKATE_T.push + SKATE_T.ride + SKATE_T.ollie * 0.55);
+    expect(o.phase).toBe('ollie');
+    expect(o.lift).toBeGreaterThan(0.08);
+    expect(o.board.y).toBeGreaterThan(0.08);
+    const flipEnd = skatePose(RIDE_FROM + SKATE_T.push + SKATE_T.ride + SKATE_T.ollie + SKATE_T.flip * 0.95);
+    expect(flipEnd.roll).toBeCloseTo(Math.PI * 2, 3);
+    const mid = skatePose(RIDE_FROM + SKATE_T.push + SKATE_T.ride + SKATE_T.ollie + SKATE_T.flip * 0.55);
+    expect(mid.feetUp).toBeGreaterThan(0.03);
+  });
+  it('появление и уход — из лапы с искрой; kickup — доска встаёт и в лапу', () => {
+    expect(skatePose(0.2).carry).toBe(1);
+    expect(skatePose(0.2).spark).toBeGreaterThan(0);
+    const t0 = SKATE_TOTAL - SKATE_T.vanish - SKATE_T.kickup;
+    expect(skatePose(t0 + SKATE_T.kickup * 0.2).kick).toBeGreaterThan(0.5);
+    expect(skatePose(t0 + SKATE_T.kickup * 0.99).carry).toBeGreaterThan(0.95);
+    expect(skatePose(t0 + SKATE_T.kickup * 0.6).pitch).toBeGreaterThan(1);
+    expect(skatePose(SKATE_TOTAL - 0.01).boardScale).toBeLessThan(0.05);
   });
   it('размер доски по лапам: длина ≈ стойка + стопа с запасом, стопы на деке', () => {
     setSkateFit(0.1, 0.15);
     expect(BOARD.len).toBeCloseTo(0.3375, 3);
-    expect(Math.abs(FEET_ON_DECK.L.z) + 0.05).toBeLessThan(BOARD.len / 2);
-    expect(Math.abs(FEET_ON_DECK.L.x)).toBeLessThan(BOARD.wid / 2);
+    expect(FEET_ON_DECK.front.z + 0.05).toBeLessThan(BOARD.len / 2);
+    expect(-FEET_ON_DECK.back.z).toBeLessThan(BOARD.len / 2);
     const g = makeSkateboard();
     const box = new THREE.Box3().setFromObject(g);
     expect(box.min.y).toBeGreaterThan(-1e-3);
     expect(box.max.y).toBeGreaterThan(BOARD.deck - 1e-3);
     expect(box.getSize(new THREE.Vector3()).z).toBeCloseTo(BOARD.len, 2);
+    let wheels = 0;
+    g.traverse((o) => o.name === 'wheel' && wheels++);
+    expect(wheels).toBe(4);
   });
 });
 

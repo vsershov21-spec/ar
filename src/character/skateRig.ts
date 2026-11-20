@@ -1,19 +1,19 @@
 /**
- * «Скейт» Хулигана (запись 20.11: кнопка была, анимации не было; «скейт не стильный и вылетает из кота»).
- * Короткий уличный номер, доска всё время жёстко в системе кота (никаких отлётов и телепортов):
- *   grab     — доска появляется в правой лапе у бока (хват: IK лапы + кулак на деке);
- *   drop     — кот ставит её перед собой (лапа опускает, присед), отпускает на колёса;
- *   mount    — встаёт: прыжок на деку, стопы — IK на деку (передняя/задняя), доска не двигается;
- *   push     — толчок: задняя лапа сходит с деки, отталкивается от опоры позади, возвращается на деку;
- *   ride     — проезд дугой (режиссёр ведёт кота по карте: stage.walkTo), колени согнуты, лапы в стороны, крен;
- *   ollie    — небольшой олли: присед, хлопок хвостом доски (нос вверх), кот и доска вместе в воздухе, ровная посадка;
- *   roll     — докат;
- *   dismount — мягкий соскок вперёд-вбок, доска остаётся под тем местом и откатывается на 2–3 см;
- *   stow     — доска уменьшается и пропадает.
- * Размер доски — от лап кота (setSkateFit): длина ≈ от пятки задней лапы до носка передней + запас.
- * Доска процедурная (makeSkateboard): дека с загнутыми носом и хвостом, грип-тейп с зерном, графика на низе,
- * подвески и колёса — модели Tripo нет (t2m_prompts_v2.json: «skateboard: нужна»).
- * Чистое расписание skatePose — tests/skateRig.test.ts; кости двигает GlbCharacter (skatePre/applySkate).
+ * «Скейт» Хулигана (лист 20.11 не принят: «доска как обломок у ноги, проезд статичный»). Стильный короткий номер, доска
+ * всё время в системе кота (никаких отлётов и телепортов):
+ *   conjure — доска появляется из лапы с искрой и кручением (вертикально, в правой лапе у бока);
+ *   place   — кот ставит её перед собой поперёк (нос — по ходу проезда), отпускает на колёса;
+ *   hop     — запрыгивает: стойка боком (передняя стопа у передних болтов, задняя — на хвосте), колени согнуты;
+ *   push    — толчок задней лапой от опоры и снова на хвост;
+ *   ride    — проезд дугой (режиссёр ведёт кота боком к ходу: stage.walkTo side), корпус кренится в поворот, руки
+ *             для баланса, колёса крутятся по пройденному пути;
+ *   ollie   — присед → щелчок хвостом (нос вверх) → доска с котом в воздухе → ровная посадка с амортизацией;
+ *   flip    — кикфлип: доска в воздухе делает оборот вокруг длинной оси, стопы над декой, ловит и приземляется;
+ *   roll    — докат; hopoff — соскок вперёд, доска остаётся сзади;
+ *   kickup  — стопа жмёт на хвост, доска встаёт и подлетает в правую лапу;
+ *   vanish  — кручение и искра, доска пропадает.
+ * Доска — вдоль оси X кота (dir — по ходу), кот стоит к ней боком, лицом к зрителю. Размер — от лап (setSkateFit).
+ * Чистое расписание skatePose — tests/holdSkate.test.ts; кости двигает GlbCharacter (skatePre/applySkate).
  */
 import * as THREE from 'three';
 
@@ -22,12 +22,12 @@ export { RIDE_FROM, RIDE_TO, SKATE_T, SKATE_TOTAL, type SkatePhase };
 
 /** доска в ростах кота: длина, ширина, высота верха деки над опорой, толщина, радиус колеса */
 export const BOARD = { len: 0.36, wid: 0.12, deck: 0.062, thick: 0.012, wheelR: 0.018 };
-/** стопы на деке (система кота: x поперёк, z вдоль доски; передняя — левая) */
-export const FEET_ON_DECK = { L: new THREE.Vector3(0.035, BOARD.deck, 0.075), R: new THREE.Vector3(-0.035, BOARD.deck, -0.075) };
+/** стопы на деке, система доски (z — вдоль, к носу): передняя — у передних болтов, задняя — на хвосте */
+export const FEET_ON_DECK = { front: new THREE.Vector3(0, BOARD.deck, 0.07), back: new THREE.Vector3(0, BOARD.deck, -0.11) };
 
 /**
- * Подогнать доску под лапы: footLen — длина стопы (пятка → носок), stance — расстояние между стопами вдоль доски.
- * Длина деки = stance + стопа + запас 35 %, ширина — 0,36 длины, колёса и высота — пропорционально.
+ * Подогнать доску под лапы: footLen — длина стопы (пятка → носок), stance — расстояние между стопами.
+ * Длина деки = stance + стопа + запас 35 %, ширина — 0,34 длины, колёса и высота — пропорционально.
  */
 export function setSkateFit(footLen: number, stance = 0.15) {
   if (!(footLen > 0.02 && footLen < 0.3)) return;
@@ -37,32 +37,39 @@ export function setSkateFit(footLen: number, stance = 0.15) {
   BOARD.wheelR = len * 0.05;
   BOARD.thick = len * 0.034;
   BOARD.deck = BOARD.wheelR * 2 + len * 0.055 + BOARD.thick;
-  const half = Math.min(stance / 2, len * 0.28);
-  FEET_ON_DECK.L.set(BOARD.wid * 0.28, BOARD.deck, half);
-  FEET_ON_DECK.R.set(-BOARD.wid * 0.28, BOARD.deck, -half);
+  FEET_ON_DECK.front.set(0, BOARD.deck, len * 0.21);
+  FEET_ON_DECK.back.set(0, BOARD.deck, -len * 0.33);
 }
 
 export interface SkateFrame {
   phase: SkatePhase;
   k: number;
-  /** доска: положение в системе кота, наклон носа (рад, + — нос вверх), масштаб 0…1 */
+  /** доска: центр (низ колёс) в системе кота; наклон носа (рад, + — вверх, вокруг хвоста), кикфлип (рад), масштаб */
   board: THREE.Vector3;
   pitch: number;
+  roll: number;
   boardScale: number;
-  /** доска в правой лапе (0…1): 1 — держит у бока, доска едет за кистью */
+  /** доска в правой лапе 0…1 (держит вертикально у бока), кручение в лапе (рад) */
   carry: number;
+  spin: number;
   /** куда тянется правая лапа с доской (система кота) */
   hand: THREE.Vector3;
   /** подъём тела: опора (дека) + дуга прыжка; присед 0…1 */
   standOn: number;
   lift: number;
   crouch: number;
-  /** вес IK стоп на деке; задняя лапа в толчке: 0…1 — на опоре позади */
+  /** вес IK стоп на деке; толчок задней: 0…1 на опоре, мах −1…1 (вперёд → назад); стопы над декой (кикфлип) */
   feetW: number;
   push: number;
-  /** лапы в стороны 0…1, смотреть на доску 0…1 */
+  sweep: number;
+  feetUp: number;
+  /** стопа на хвост (kickup) 0…1 */
+  kick: number;
+  /** лапы в стороны 0…1, разрешённый крен в поворот 0…1, смотреть на доску 0…1, искра 0…1 */
   arms: number;
+  leanK: number;
   lookDown: number;
+  spark: number;
 }
 
 const ss = (x: number) => {
@@ -71,11 +78,20 @@ const ss = (x: number) => {
 };
 
 export function newSkateFrame(): SkateFrame {
-  return { phase: 'done', k: 1, board: new THREE.Vector3(), pitch: 0, boardScale: 0, carry: 0, hand: new THREE.Vector3(), standOn: 0, lift: 0, crouch: 0, feetW: 0, push: 0, arms: 0, lookDown: 0 };
+  return { phase: 'done', k: 1, board: new THREE.Vector3(), pitch: 0, roll: 0, boardScale: 0, carry: 0, spin: 0, hand: new THREE.Vector3(), standOn: 0, lift: 0, crouch: 0, feetW: 0, push: 0, sweep: 0, feetUp: 0, kick: 0, arms: 0, leanK: 0, lookDown: 0, spark: 0 };
 }
 
-/** доска на опоре перед лапами (куда её ставят) */
-const FRONT_Z = 0.26;
+/** доска перед лапами (куда её ставят) и под ними (на ней), позади после соскока */
+const FRONT_Z = 0.19;
+const UNDER_Z = 0.015;
+const BEHIND_Z = -0.16;
+/** правая лапа держит доску у бока */
+const HAND_SIDE = new THREE.Vector3(-0.19, 0.34, 0.12);
+
+/** прыжок с доской (ollie / flip): присед до 0.3, в воздухе 0.3…0.85, посадка */
+function air(k: number) {
+  return k < 0.3 || k > 0.85 ? 0 : Math.sin(((k - 0.3) / 0.55) * Math.PI);
+}
 
 export function skatePose(t: number, out?: SkateFrame): SkateFrame {
   const f = out ?? newSkateFrame();
@@ -91,95 +107,127 @@ export function skatePose(t: number, out?: SkateFrame): SkateFrame {
   }
   f.phase = ph;
   f.k = k;
-  f.pitch = 0;
-  f.carry = 0;
-  f.lift = 0;
-  f.standOn = 0;
-  f.feetW = 0;
-  f.push = 0;
-  f.crouch = 0;
-  f.arms = 0;
-  f.lookDown = 0;
+  f.pitch = f.roll = f.carry = f.spin = f.lift = f.standOn = f.feetW = f.push = f.sweep = f.feetUp = f.kick = f.crouch = f.arms = f.leanK = f.lookDown = f.spark = 0;
   f.boardScale = 1;
+  f.board.set(0, 0, UNDER_Z);
   const D = BOARD.deck;
+  const onBoard = () => {
+    f.standOn = D;
+    f.feetW = 1;
+  };
   switch (ph) {
-    case 'grab':
-      // доска «из-за спины» в правой лапе у бока
+    case 'conjure': {
+      // из искры в лапе: растёт с кручением (два оборота, замедляясь), лапа поднимается к боку
       f.carry = 1;
-      f.hand.set(-0.2, 0.3, 0.06 + 0.04 * ss(k));
-      f.boardScale = ss(k / 0.9);
-      f.lookDown = 0.3 * ss(k);
+      f.hand.copy(HAND_SIDE).add(new THREE.Vector3(0, -0.06 * (1 - ss(k)), 0));
+      f.boardScale = Math.min(1, ss(k / 0.7) * 1.06);
+      f.spin = Math.PI * 4 * (1 - ss(k));
+      f.spark = k;
+      f.lookDown = 0.4 * ss(k);
+      f.board.set(0, 0, FRONT_Z);
       break;
-    case 'drop': {
-      // опускает перед собой: лапа вниз-вперёд, присед; в конце — доска на колёсах, лапа отпускает
+    }
+    case 'place': {
+      // перед собой поперёк, присед; в конце отпускает — доска на колёсах
       const e = ss(k / 0.8);
-      f.carry = 1 - ss((k - 0.75) / 0.25);
-      f.hand.set(-0.2 + 0.14 * e, 0.3 - 0.2 * e, 0.1 + (FRONT_Z - 0.1) * e);
-      f.crouch = 0.55 * Math.sin(Math.min(1, k) * Math.PI);
+      f.carry = 1 - ss((k - 0.7) / 0.3);
+      f.hand.set(HAND_SIDE.x + 0.14 * e, HAND_SIDE.y - 0.22 * e, HAND_SIDE.z + (FRONT_Z - HAND_SIDE.z) * e);
+      f.crouch = 0.6 * Math.sin(Math.min(1, k) * Math.PI);
       f.board.set(0, 0, FRONT_Z);
       f.lookDown = 1;
       break;
     }
-    case 'mount': {
-      // шаг-прыжок на деку: доска на месте (в системе кота подъезжает под лапы — кот шагнул вперёд)
+    case 'hop': {
+      // прыжок на деку: доска под лапы (кот прыгнул вперёд), стопы — IK на деку в воздухе
       const e = ss(k);
-      f.board.set(0, 0, FRONT_Z * (1 - e));
-      f.standOn = D * ss(k * 1.5 - 0.3);
-      f.lift = Math.sin(k * Math.PI) * 0.08;
-      f.feetW = ss(k * 1.8 - 0.6);
-      f.crouch = 0.3;
-      f.arms = 0.6 * e;
-      f.lookDown = 1 - 0.5 * e;
+      f.board.set(0, 0, FRONT_Z + (UNDER_Z - FRONT_Z) * e);
+      f.standOn = D * ss(k * 1.6 - 0.3);
+      f.lift = Math.sin(k * Math.PI) * 0.09;
+      f.feetW = ss(k * 1.8 - 0.5);
+      f.crouch = k < 0.25 ? 0.45 * ss(k / 0.25) : k > 0.75 ? 0.5 * ss((k - 0.75) / 0.25) : 0.15;
+      f.arms = 0.7 * e;
+      f.lookDown = 1 - 0.6 * e;
       break;
     }
     case 'push':
-      // задняя лапа: деку → опора позади-сбоку → деку
-      f.standOn = D;
-      f.feetW = 1;
+      // задняя лапа: хвост → опора сбоку, мах назад → снова на хвост
+      onBoard();
       f.push = Math.sin(k * Math.PI);
-      f.crouch = 0.4 + 0.15 * Math.sin(k * Math.PI);
-      f.arms = 0.6;
-      f.lookDown = 0.3;
+      f.sweep = -Math.cos(k * Math.PI);
+      f.crouch = 0.45 + 0.15 * Math.sin(k * Math.PI);
+      f.arms = 0.6 + 0.2 * Math.sin(k * Math.PI);
+      f.lookDown = 0.25;
+      f.leanK = 0.3;
       break;
     case 'ride':
-      f.standOn = D;
-      f.feetW = 1;
-      f.crouch = 0.35 + 0.05 * Math.sin(k * Math.PI * 4);
-      f.arms = 0.75 + 0.12 * Math.sin(k * Math.PI * 3);
+      onBoard();
+      f.crouch = 0.4 + 0.08 * Math.sin(k * Math.PI * 4);
+      f.arms = 0.8 + 0.12 * Math.sin(k * Math.PI * 3);
+      f.leanK = 1;
       break;
     case 'ollie': {
-      // присед → хлопок хвостом (нос вверх) → в воздухе вместе → ровно на колёса
-      const air = k < 0.3 ? 0 : Math.sin(((k - 0.3) / 0.7) * Math.PI);
-      f.standOn = D;
+      // присед → щелчок хвостом (нос вверх) → в воздухе вместе → ровно на колёса, амортизация
+      const a = air(k);
+      onBoard();
+      f.crouch = k < 0.3 ? 0.4 + 0.4 * ss(k / 0.3) : k < 0.85 ? 0.8 * (1 - ss((k - 0.3) / 0.2)) + 0.15 : 0.15 + 0.5 * Math.sin(((k - 0.85) / 0.15) * Math.PI);
+      f.lift = a * 0.11;
+      f.board.y = a * 0.11;
+      f.pitch = k < 0.3 ? 0 : 0.45 * Math.sin(Math.min(1, (k - 0.3) / 0.35) * Math.PI) * (1 - ss((k - 0.5) / 0.25)) + (k < 0.4 ? 0.2 * ss((k - 0.3) / 0.1) : 0);
+      f.arms = 0.95;
+      f.leanK = 0.4;
+      break;
+    }
+    case 'flip': {
+      // кикфлип: в воздухе доска — оборот вокруг длинной оси, стопы поднимаются над декой и ловят её
+      const a = air(k);
+      onBoard();
+      f.crouch = k < 0.3 ? 0.4 + 0.4 * ss(k / 0.3) : k < 0.85 ? 0.8 * (1 - ss((k - 0.3) / 0.2)) + 0.15 : 0.15 + 0.5 * Math.sin(((k - 0.85) / 0.15) * Math.PI);
+      f.lift = a * 0.15;
+      f.board.y = a * 0.1;
+      f.pitch = k < 0.3 ? 0 : 0.3 * Math.sin(Math.min(1, (k - 0.3) / 0.2) * Math.PI) * (1 - ss((k - 0.4) / 0.15));
+      f.roll = Math.PI * 2 * ss((k - 0.36) / 0.4);
+      f.feetUp = Math.sin(Math.min(1, Math.max(0, (k - 0.33) / 0.47)) * Math.PI) * 0.06;
       f.feetW = 1;
-      f.crouch = k < 0.3 ? 0.35 + 0.35 * ss(k / 0.3) : 0.7 * (1 - ss((k - 0.3) / 0.25)) + 0.3 * ss((k - 0.75) / 0.25);
-      f.lift = air * 0.1;
-      f.board.y = air * 0.1;
-      f.pitch = k < 0.3 ? 0 : 0.42 * Math.sin(((k - 0.3) / 0.7) * Math.PI) * (1 - ss((k - 0.55) / 0.45)) + (k < 0.45 ? 0.15 * ss((k - 0.3) / 0.15) : 0);
-      f.arms = 0.9;
+      f.arms = 1;
       break;
     }
     case 'roll':
-      f.standOn = D;
-      f.feetW = 1;
-      f.crouch = 0.3 * (1 - ss(k)) + 0.2;
-      f.arms = 0.7 * (1 - 0.4 * k);
+      onBoard();
+      f.crouch = 0.4 * (1 - ss(k)) + 0.2;
+      f.arms = 0.75 * (1 - 0.4 * k);
+      f.leanK = 0.5;
       break;
-    case 'dismount': {
-      // мягкий соскок вперёд-вбок: доска остаётся за лапами и чуть откатывается
+    case 'hopoff': {
+      // соскок вперёд (к зрителю): доска остаётся сзади
       const e = ss(k);
-      f.board.set(-0.2 * e, 0, -0.12 * e);
-      f.standOn = D * (1 - ss(k * 1.6));
-      f.lift = Math.sin(k * Math.PI) * 0.06;
+      f.board.set(0, 0, UNDER_Z + (BEHIND_Z - UNDER_Z) * e);
+      f.standOn = D * (1 - ss(k * 1.7));
+      f.lift = Math.sin(k * Math.PI) * 0.07;
       f.feetW = 1 - ss(k * 2.2);
-      f.crouch = 0.25 + 0.2 * Math.sin(k * Math.PI);
-      f.arms = 0.45 * (1 - e);
+      f.crouch = 0.3 + 0.25 * Math.sin(k * Math.PI);
+      f.arms = 0.5 * (1 - e);
       break;
     }
-    case 'stow':
-      f.board.set(-0.2, 0, -0.12);
-      f.boardScale = 1 - ss(k);
-      f.lookDown = 0.4 * (1 - k);
+    case 'kickup': {
+      // стопа на хвост → доска встаёт (нос вверх) и подлетает в правую лапу
+      f.board.set(0, 0, BEHIND_Z);
+      f.kick = Math.sin(Math.min(1, k / 0.55) * Math.PI);
+      const pop = ss((k - 0.25) / 0.45);
+      f.pitch = (Math.PI / 2) * pop;
+      f.board.y = 0.14 * Math.sin(Math.min(1, Math.max(0, (k - 0.25) / 0.5)) * Math.PI) * (1 - ss((k - 0.7) / 0.3));
+      f.carry = ss((k - 0.6) / 0.25);
+      f.hand.copy(HAND_SIDE).add(new THREE.Vector3(0.03, -0.06, -0.08 * (1 - f.carry)));
+      f.lookDown = 0.8 * (1 - f.carry);
+      f.crouch = 0.25 * Math.sin(Math.min(1, k / 0.5) * Math.PI);
+      break;
+    }
+    case 'vanish':
+      f.carry = 1;
+      f.hand.copy(HAND_SIDE).add(new THREE.Vector3(0.03, -0.06, 0));
+      f.spin = Math.PI * 3 * ss(k);
+      f.boardScale = 1 - ss(k * 1.15);
+      f.spark = k;
+      f.board.set(0, 0, BEHIND_Z);
       break;
     case 'done':
       f.board.set(0, 0, 0);
@@ -332,14 +380,20 @@ export function makeSkateboard(): THREE.Object3D {
     axle.position.set(0, wheelR, s * tz);
     g.add(axle);
     for (const x of [-1, 1]) {
+      // колесо — узел «wheel» на оси (крутится вокруг X: GlbCharacter по пройденному пути), с метками на ядре
+      const hub = new THREE.Group();
+      hub.name = 'wheel';
+      hub.position.set(x * wid * 0.47, wheelR, s * tz);
+      g.add(hub);
       const w = new THREE.Mesh(new THREE.CylinderGeometry(wheelR, wheelR, wid * 0.17, 16), wheelM);
       w.rotation.z = Math.PI / 2;
-      w.position.set(x * wid * 0.47, wheelR, s * tz);
-      g.add(w);
+      hub.add(w);
       const c = new THREE.Mesh(new THREE.CylinderGeometry(wheelR * 0.45, wheelR * 0.45, wid * 0.175, 10), core);
       c.rotation.z = Math.PI / 2;
-      c.position.copy(w.position);
-      g.add(c);
+      hub.add(c);
+      const mark = new THREE.Mesh(new THREE.BoxGeometry(wid * 0.18, wheelR * 0.22, wheelR * 0.9), metal);
+      mark.position.set(0, wheelR * 0.55, 0);
+      hub.add(mark);
     }
   }
   return g;

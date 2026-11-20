@@ -30,8 +30,6 @@ import { curlFingers, lowestPoint, rotWorld as rotW, twoBoneIK, type GroundVolum
 import { HOLD_SPECS, holdDuration, holdPose, type HoldFrame, type HoldSpec } from './holdAction';
 import { PropFx } from './propFx';
 import { BOARD, FEET_ON_DECK, SKATE_TOTAL, setSkateFit, skatePose, type SkateFrame } from './skateRig';
-/** точка хвоста доски (ось олли) от центра, доли роста */
-const BOARD_TAIL = () => BOARD.len * 0.42;
 import { buildFurShells } from './furShell';
 import { attachTulle } from './tulleFx';
 import { attachTailSparkle } from './tailSparkle';
@@ -281,7 +279,7 @@ export class GlbCharacter implements Character {
   readonly W: Record<string, number> = {};
   private gazeV = new THREE.Vector3();
   /** действие с предметом (holdAction.ts) или скейт (skateRig.ts): расписание поверх клипа покоя */
-  private act: { kind: 'hold'; id: string; spec: HoldSpec; t: number } | { kind: 'skate'; id: string; t: number; f: SkateFrame } | null = null;
+  private act: { kind: 'hold'; id: string; spec: HoldSpec; t: number } | { kind: 'skate'; id: string; t: number; f: SkateFrame; dir: 1 | -1; wheel: number; fw?: THREE.Vector3; bw?: THREE.Vector3 } | null = null;
   /** куда смотрит голова на время действия (зеркальце, доска); null — как обычно */
   private actLook: THREE.Vector3 | null = null;
   /** нормаль ладони в системе кости кисти (по подушечкам BD_Pads) и пальцы [палец][фаланга 1..3] */
@@ -536,7 +534,7 @@ export class GlbCharacter implements Character {
     if (!this.model || !this.props) return 0;
     this.cancelAct();
     if (id === 'skate') {
-      this.act = { kind: 'skate', id, t: 0, f: skatePose(0) };
+      this.act = { kind: 'skate', id, t: 0, f: skatePose(0), dir: 1, wheel: 0 };
       this.props.rebuild('skateboard');
       this.props.hold('skateboard');
       // ровный покой на всё действие (варианты покоя — оглядеться, наушники — сбивали бы позу на доске)
@@ -1127,7 +1125,7 @@ export class GlbCharacter implements Character {
     const ik = this.toolIK;
     if (ik.mode !== 'off' || ik.weight > 0.002 || ik.crouch > 0.002) ik.apply(dt, { bones: this.bones, object: this.object, inner: this.inner, axes: this.modelAxes(), rot: (b, a, ang) => this.rotWorld(b, a, ang) });
     // предмет в лапе / скейт — поверх клипа и коррекции тела; затем — пол (ничто не ниже опоры)
-    this.applySkate();
+    this.applySkate(dt);
     this.placeHold(dt);
     if (!this.act) this.propFx.hide();
     this.groundFinal(dt, cs.cur.id);
@@ -1519,6 +1517,10 @@ export class GlbCharacter implements Character {
     const a = this.act;
     if (!a || a.kind !== 'skate') {
       this.standY = 0;
+      if (this.skateLean) {
+        this.skateLean = 0;
+        this.inner.rotation.x = 0;
+      }
       return;
     }
     a.t += dt;
@@ -1529,69 +1531,126 @@ export class GlbCharacter implements Character {
     }
     this.standY = a.f.standOn + a.f.lift - a.f.crouch * 0.075;
   }
-  private applySkate() {
+  /** крен в поворот (рад, вокруг оси хода X — корень inner) */
+  private skateLean = 0;
+  /** направление носа доски по X кота: +1 / −1 (режиссёр: stage.walkTo side — кот боком к ходу, лицом к зрителю) */
+  setSkateDir(dir: 1 | -1) {
+    if (this.act?.kind === 'skate') this.act.dir = dir;
+  }
+  /** стенд: стопы от точек на деке (доли роста), обороты колеса, крен */
+  readonly skateDbg = { deck: 0, onDeck: false, wheel: 0, lean: 0, dir: 1 };
+
+  private applySkate(dt: number) {
     const a = this.act;
     if (!a || a.kind !== 'skate' || !this.props) return;
-    const f = a.f, obj = this.object;
+    const f = a.f, obj = this.object, dir = a.dir;
+    const V = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
     obj.updateMatrixWorld(true);
+    const ws = obj.getWorldScale(new THREE.Vector3()).y || 1;
+    // крен в поворот: скорость поворота кота (stage ведёт по дуге) → корпус и доска к центру поворота
+    const fw = V(0, 0, 1).transformDirection(obj.matrixWorld);
+    const upW = V(0, 1, 0).transformDirection(obj.matrixWorld);
+    let rate = 0;
+    if (a.fw && dt > 0) rate = (Math.sign(a.fw.clone().cross(fw).dot(upW)) * a.fw.angleTo(fw)) / dt;
+    a.fw = fw;
+    const leanT = clamp(-rate * 0.35, -0.3, 0.3) * f.leanK;
+    this.skateLean += (leanT - this.skateLean) * Math.min(1, dt / 0.18);
+    this.inner.rotation.x = this.skateLean;
+    this.inner.updateMatrixWorld(true);
+    this.skateDbg.lean = this.skateLean;
+    this.skateDbg.dir = dir;
     const { fwd } = this.modelAxes();
-    // лапы в стороны (равновесие)
+    // доска: поперёк кота (нос — dir·X), наклон носа вокруг хвоста, кикфлип вокруг длинной оси, крен — с котом
+    const L = BOARD.len, D = BOARD.deck;
+    const qYaw = new THREE.Quaternion().setFromAxisAngle(V(0, 1, 0), (dir * Math.PI) / 2);
+    const qP = new THREE.Quaternion().setFromAxisAngle(V(1, 0, 0), -f.pitch);
+    const qR = new THREE.Quaternion().setFromAxisAngle(V(0, 0, 1), f.roll * dir + this.skateLean * 0.6 * dir);
+    const Lt = V(0, 0, -L / 2), Lr = V(0, D * 0.6, 0);
+    const pose = (withRoll: boolean) => {
+      const qr = withRoll ? qR : new THREE.Quaternion().setFromAxisAngle(V(0, 0, 1), this.skateLean * 0.6 * dir);
+      const off = Lt.clone().sub(Lt.clone().applyQuaternion(qP)).add(Lr.clone().sub(Lr.clone().applyQuaternion(qr)).applyQuaternion(qP));
+      return { p: f.board.clone().add(off.applyQuaternion(qYaw)), q: qYaw.clone().multiply(qP).multiply(qr) };
+    };
+    const free = pose(true), feetPose = pose(false);
+    const onDeck = (v: THREE.Vector3) => v.clone().applyQuaternion(feetPose.q).add(feetPose.p);
+    // лапы для баланса: в стороны вдоль хода, покачиваются против крена
     const la = this.bones.get('LeftArm'), ra = this.bones.get('RightArm');
-    if (la && f.arms) rotW(la, fwd, 0.7 * f.arms);
-    if (ra && f.arms && f.carry < 0.01) rotW(ra, fwd, -0.7 * f.arms);
-    // стопы: на деку (feetW) или на опору (присед без доски); задняя в толчке — на опору позади-сбоку
-    const bq = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -f.pitch);
-    const tail = new THREE.Vector3(0, 0, -BOARD_TAIL());
-    const onDeck = (v: THREE.Vector3) => v.clone().sub(tail).applyQuaternion(bq).add(tail).add(f.board);
+    if (la && f.arms) rotW(la, fwd, (0.75 + this.skateLean * 0.8) * f.arms);
+    if (ra && f.arms && f.carry < 0.01) rotW(ra, fwd, -(0.75 - this.skateLean * 0.8) * f.arms);
+    // корпус чуть вперёд в приседе
+    const sp = this.bones.get('Spine1');
+    if (sp && f.crouch) rotW(sp, this.modelAxes().side, 0.12 * f.crouch);
+    // стопы: передняя — у передних болтов, задняя — на хвосте; толчок — задняя на опору сбоку и мах назад
+    const front: 'Left' | 'Right' = dir > 0 ? 'Left' : 'Right';
+    const tailFoot: 'Left' | 'Right' = dir > 0 ? 'Right' : 'Left';
     const plant = clamp(1 - f.lift / 0.035, 0, 1);
-    for (const s of ['L', 'R'] as const) {
-      const side = s === 'L' ? 'Left' : 'Right';
+    let deckErr = 0;
+    for (const side of ['Left', 'Right'] as const) {
       const U = this.bones.get(side + 'UpLeg'), K = this.bones.get(side + 'Leg'), F = this.bones.get(side + 'Foot');
       if (!U || !K || !F) continue;
       const r0 = this.footR.get(side + 'Foot') ?? 0.04;
       const cur = obj.worldToLocal(F.getWorldPosition(new THREE.Vector3()));
-      const ground = new THREE.Vector3(cur.x, r0, cur.z);
+      const ground = V(cur.x, r0, cur.z);
       let t = ground, w = (f.crouch > 0.02 ? 1 : 0) * plant;
+      let deck: THREE.Vector3 | null = null;
       if (f.feetW > 0.01) {
-        const deck = onDeck(FEET_ON_DECK[s]);
-        deck.y += r0;
+        deck = onDeck(side === front ? FEET_ON_DECK.front : FEET_ON_DECK.back);
+        deck.y += r0 + f.feetUp;
         t = ground.clone().lerp(deck, f.feetW);
         w = Math.max(w, f.feetW);
       }
-      if (s === 'R' && f.push > 0.01) {
-        const kick = new THREE.Vector3(-0.09, r0 + 0.012 * (1 - f.push), -0.2);
+      if (side !== front && f.push > 0.01) {
+        // толчок: опора перед доской (к зрителю), мах вдоль хода — от передней стопы назад
+        const kick = V(dir * (0.03 - 0.17 * (f.sweep + 1) * 0.5), r0 + 0.01 * (1 - f.push), f.board.z + BOARD.wid * 0.85);
         t = t.clone().lerp(kick, f.push);
         w = 1;
       }
-      const pole = new THREE.Vector3(s === 'L' ? 0.3 : -0.3, 0, 1).normalize().transformDirection(obj.matrixWorld);
-      if (w > 0.01) twoBoneIK(U, K, F, obj.localToWorld(t), pole, w);
+      if (side === tailFoot && f.kick > 0.01) {
+        // kickup: стопа на хвост доски (ещё лежит — до подлёта)
+        const tail = V(-dir * L * 0.45, D + r0 * 0.6, f.board.z);
+        t = t.clone().lerp(tail, f.kick);
+        w = Math.max(w, f.kick);
+      }
+      const pole = V(side === 'Left' ? 0.3 : -0.3, 0, 1).normalize().transformDirection(obj.matrixWorld);
+      if (w > 0.01) twoBoneIK(U, K, F, obj.localToWorld(t.clone()), pole, w);
+      if (deck && f.feetW > 0.99 && f.push < 0.01 && f.feetUp < 0.005) deckErr = Math.max(deckErr, obj.worldToLocal(F.getWorldPosition(new THREE.Vector3())).distanceTo(deck));
     }
-    // доска в лапе: IK правой лапы к точке у бока / перед собой, кулак на деке
-    let bp = f.board.clone();
-    let q = bq.clone();
+    this.skateDbg.deck = deckErr;
+    this.skateDbg.onDeck = f.feetW > 0.99 && f.push < 0.01 && f.feetUp < 0.005;
+    // доска в лапе: IK правой лапы, кулак на кромке; вертикально, нос вверх, кручение вокруг длинной оси
+    let bp = free.p, q = free.q;
     if (f.carry > 0.01) {
       const S = this.bones.get('RightArm'), E = this.bones.get('RightForeArm'), H = this.bones.get('RightHand');
       if (S && E && H) {
-        twoBoneIK(S, E, H, obj.localToWorld(f.hand.clone()), new THREE.Vector3(-0.6, -0.7, -0.3).normalize().transformDirection(obj.matrixWorld), 1);
-        const nW = (this.palmN.get('Right') ?? new THREE.Vector3(0, 0, 1)).clone().applyQuaternion(H.getWorldQuaternion(new THREE.Quaternion())).normalize();
-        const ch = this.fingers.get('Right') ?? [];
-        curlFingers(ch.slice(1), nW, 0.9 * f.carry);
-        if (ch[0]) curlFingers([ch[0]], nW, 0.4 * f.carry);
+        twoBoneIK(S, E, H, obj.localToWorld(f.hand.clone()), V(-0.6, -0.7, -0.3).normalize().transformDirection(obj.matrixWorld), f.carry);
+        this.fist('Right', 0.9 * f.carry, 0.4);
         H.updateWorldMatrix(true, true);
         const hp = obj.worldToLocal(H.getWorldPosition(new THREE.Vector3()));
-        // держит за край деки: доска вертикально у бока, колёсами наружу, нос вверх
-        const qh = new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI / 2 + 0.25, 0, Math.PI / 2, 'YXZ'));
-        const inHand = hp.clone().add(new THREE.Vector3(-0.015, -BOARD.len * 0.35, 0.02));
-        bp = inHand.lerp(f.board, 1 - f.carry);
-        q = qh.slerp(bq, 1 - f.carry);
+        const qh = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(V(0, 0, -1), V(-1, 0, 0), V(0, 1, 0)));
+        qh.premultiply(new THREE.Quaternion().setFromAxisAngle(V(0, 1, 0), f.spin));
+        const inHand = hp.clone().add(V(-0.012, -L * 0.3, 0.01));
+        bp = inHand.lerp(free.p, 1 - f.carry);
+        q = qh.slerp(free.q, 1 - f.carry);
       }
-    } else if (f.pitch) {
-      bp = f.board.clone().add(new THREE.Vector3(0, 0, -BOARD_TAIL()).sub(new THREE.Vector3(0, 0, -BOARD_TAIL()).applyQuaternion(bq)));
     }
-    const pw = obj.localToWorld(bp);
+    const pw = obj.localToWorld(bp.clone());
     const qi = this.inner.getWorldQuaternion(new THREE.Quaternion()).invert().multiply(obj.getWorldQuaternion(new THREE.Quaternion())).multiply(q);
-    this.props.place(this.inner.worldToLocal(pw), qi, f.boardScale);
+    this.props.place(this.inner.worldToLocal(pw.clone()), qi, f.boardScale);
+    // колёса: оборот по пути доски, пока она на колёсах
+    const po = this.props.object;
+    if (a.bw && dt > 0 && f.carry < 0.01 && f.board.y < 0.004 && f.pitch < 0.05) {
+      const dist = pw.distanceTo(a.bw) / ws;
+      a.wheel += dist / BOARD.wheelR;
+    }
+    a.bw = pw;
+    po?.traverse((o) => {
+      if (o.name === 'wheel') o.rotation.x = a.wheel;
+    });
+    this.skateDbg.wheel = a.wheel / (Math.PI * 2);
     this.actLook = f.lookDown > 0.5 ? obj.localToWorld(f.board.clone().setY(0.05)) : null;
+    // искра появления / ухода — у кулака
+    const inn = (v: THREE.Vector3) => this.inner.worldToLocal(obj.localToWorld(v));
+    this.propFx.update(dt, { sparkAt: f.spark > 0 ? inn(f.hand.clone()) : null, spark: f.spark, sparkR: L * 0.45 });
   }
 
   /** опорные лапы не едут (footPin.ts): сдвиг тела по горизонтали; выкл. — ходьба, акробатика, лёжа, кровать */
