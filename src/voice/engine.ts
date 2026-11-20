@@ -287,8 +287,10 @@ export class VoiceEngine extends Emitter<EngineEvents> {
       return;
     }
     if (this.echo.active) this.echo.stop('api');
+    // контекст ответа — сразу (кот ещё договаривает вопрос): «да» в паузе между репликами — ответ, а не шум
+    this.expect(o.mode, windowMs, o.expect, o.expectName);
     const open = () => {
-      setIntentContext({ question: true, expect: o.expect, expectName: o.expectName ?? o.mode === 'name', until: performance.now() + windowMs + 1500 });
+      this.expect(o.mode, windowMs, o.expect, o.expectName);
       this.startListening('window');
       this.windowTimer = window.setTimeout(() => {
         if (this.listenReason === 'window') {
@@ -299,6 +301,17 @@ export class VoiceEngine extends Emitter<EngineEvents> {
     };
     const wait = () => (this.selfMuted ? (this.windowTimer = window.setTimeout(wait, 60)) : open());
     wait();
+  }
+
+  /**
+   * Диалог ждёт ответа (вход в узел с listen, ещё до того, как кот договорил — DirectorDeps.expect): короткие
+   * «да», «нет», «сдаюсь», ответы загадок с этой минуты — ответ, а не шум. Окно микрофона откроет listen() после реплики.
+   */
+  expect(mode?: string, windowMs = 8000, expect?: string[], expectName?: boolean) {
+    if (mode === 'echo') return;
+    const name = expectName ?? mode === 'name';
+    const answers = mode && mode !== 'intent' && mode !== 'name' ? answerWords() : undefined;
+    setIntentContext({ question: true, expect, expectName: name, answers, until: performance.now() + windowMs + 30_000 });
   }
 
   /** DirectorDeps.stopListen */

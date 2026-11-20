@@ -7,11 +7,13 @@
  *    → 'unknown': кот переспрашивает / говорит «я пока умею…» (scenario/machine.ts);
  *  - шум: короче MIN_SPEECH_MS, только междометия/связки («а», «ну» — так Vosk слышит шорох), пусто без [unk]
  *    → молчим (в подсказке — «не расслышал»), кот не болтает в ответ на хлопки, телевизор и себя.
- *  - кнопка (ptt) и чипы — всегда ответ: ребёнок явно обратился к коту.
+ *  - кнопка (ptt) и чипы — всегда ответ: ребёнок явно обратился к коту;
+ *  - открыт диалог (ctx.question): «да», «нет», «сдаюсь» — интенты (первая ветка), ответ загадки/игры из её ключей
+ *    (ctx.answers) — по длине не отбрасывается.
  *  - «слушаю всегда»: непонятые фразы подряд — отвечаем не чаще раза в UNKNOWN_GAP_MS (разговор взрослых рядом
  *    не превращается в «чё? не расслышал» каждые 2 секунды).
  */
-import { isFillerOnly, matchIntent, type IntentContext, type IntentMatch } from './intents';
+import { isAnswer, isFillerOnly, matchIntent, type IntentContext, type IntentMatch } from './intents';
 
 export const MIN_SPEECH_MS = 500;
 export const UNKNOWN_GAP_MS = 4000;

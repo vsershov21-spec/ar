@@ -37,6 +37,8 @@ export interface IntentContext {
   expectName?: boolean;
   /** ожидаемые интенты — небольшой бонус уверенности */
   expect?: string[];
+  /** слова-ответы (загадка, мини-игра): короткая фраза из них — ответ, а не шум (utterance.ts) */
+  answers?: Set<string>;
 }
 
 export interface IntentMatch {
@@ -317,6 +319,22 @@ export function grammarPhrases(): string[] {
     set.add(f);
   set.add('[unk]');
   return [...set].filter(Boolean);
+}
+
+/** все слова-ответы загадок и мини-игр (нормализованные) — IntentContext.answers в окне ответа */
+let ANSWERS: Set<string> | null = null;
+export function answerWords(): Set<string> {
+  if (!ANSWERS) {
+    ANSWERS = new Set<string>();
+    for (const w of [...riddleWords(), ...gameWords()]) for (const x of normalize(w).split(' ')) if (x.length >= 2) ANSWERS.add(x);
+  }
+  return ANSWERS;
+}
+/** фраза — ответ из списка (точно или по основе): «кот», «ёж», «мяч» короче полсекунды — не шум */
+export function isAnswer(raw: string, answers: Set<string> | undefined): boolean {
+  if (!answers?.size) return false;
+  const ws = normalize(raw).split(' ').filter(Boolean);
+  return ws.some((w) => answers.has(w) || (w.length >= 3 && answers.has(stem(w))) || [...answers].some((a) => a.length >= 3 && stem(a) === stem(w)));
 }
 
 /** только связки и междометия («ну», «а», «я») — так Vosk часто «слышит» шум; это не фраза ребёнка */
