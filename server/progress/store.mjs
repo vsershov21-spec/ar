@@ -13,6 +13,52 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 
+/**
+ * Имя ребёнка на сервере не храним (docs/PRIVACY.md): из JSON-значения ключа прогресса убираются все поля, похожие
+ * на имя (name, nameKnown, childName, «имя»…), в том числе во вложенных объектах. Не JSON — как есть.
+ * Тот же список полей вырезает клиент (src/progress/sync.ts stripName); здесь — на случай старого клиента.
+ */
+const NAME_FIELD = /name|имя/i;
+export function stripName(v) {
+  if (typeof v !== 'string') return v;
+  let o;
+  try {
+    o = JSON.parse(v);
+  } catch {
+    return v;
+  }
+  if (!o || typeof o !== 'object') return v;
+  let changed = false;
+  const walk = (x, depth) => {
+    if (!x || typeof x !== 'object' || depth > 4) return x;
+    if (Array.isArray(x)) return x.map((y) => walk(y, depth + 1));
+    const out = {};
+    for (const [k, val] of Object.entries(x)) {
+      if (NAME_FIELD.test(k)) {
+        changed = true;
+        continue;
+      }
+      out[k] = walk(val, depth + 1);
+    }
+    return out;
+  };
+  const r = walk(o, 0);
+  return changed ? JSON.stringify(r) : v;
+}
+
+/** документ устройства без имени ребёнка; второе значение — было ли что вырезать */
+export function stripDocNames(doc) {
+  if (!doc?.data || typeof doc.data !== 'object') return [doc, false];
+  let changed = false;
+  const data = {};
+  for (const [k, v] of Object.entries(doc.data)) {
+    const c = stripName(v);
+    if (c !== v) changed = true;
+    data[k] = c;
+  }
+  return [changed ? { ...doc, data } : doc, changed];
+}
+
 export const DEVICE_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
 /** короткий код устройства — первые 6 hex-символов UUID, заглавными (так же считает клиент: src/progress/device.ts) */

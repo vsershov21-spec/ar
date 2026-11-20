@@ -25,7 +25,7 @@
 import http from 'node:http';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { openStore, DEVICE_RE, deviceCode } from './store.mjs';
+import { openStore, DEVICE_RE, deviceCode, stripName, stripDocNames } from './store.mjs';
 
 export const LIMITS = {
   dataBytes: 16 * 1024,
@@ -117,7 +117,9 @@ export async function createProgressServer(opts = {}) {
   };
   const pub = (doc, device) => {
     const d = doc ?? empty(device);
-    return { device: d.device, code: deviceCode(d.device), version: d.version, createdAt: d.createdAt, updatedAt: d.updatedAt, resetAt: d.resetAt ?? null, data: d.data ?? {}, exists: !!doc, edition: d.edition ?? null };
+    // имя ребёнка не отдаём, даже если оно осталось в старой записи (до scripts/deploy/progress-purge-names.sh)
+    const data = stripDocNames(d)[0].data ?? {};
+    return { device: d.device, code: deviceCode(d.device), version: d.version, createdAt: d.createdAt, updatedAt: d.updatedAt, resetAt: d.resetAt ?? null, data, exists: !!doc, edition: d.edition ?? null };
   };
   // редакция клиента (mvp | lab, src/config/edition.ts): последняя присланная; у lab и mvp разные id устройства
   const setEdition = (doc, b) => {
@@ -136,11 +138,12 @@ export async function createProgressServer(opts = {}) {
     const doc = load(device) ?? empty(device);
     // клиент писал, не зная о сбросе (продакт сбросил устройство во время игры) — не откатываем сброс
     if (body && 'resetAt' in body && doc.resetAt && body.resetAt !== doc.resetAt) throw Object.assign(new HttpError(409, 'reset'), { doc: pub(doc) });
-    const data = { ...doc.data };
+    // имя ребёнка не храним (docs/PRIVACY.md): вырезаем и из старой записи, и из присланного
+    const data = { ...stripDocNames(doc)[0].data };
     for (const [k, v] of Object.entries(patch)) {
       if (!KEY_RE.test(k)) throw new HttpError(400, 'bad key');
       if (v === null) delete data[k];
-      else if (typeof v === 'string') data[k] = v;
+      else if (typeof v === 'string') data[k] = stripName(v);
       else throw new HttpError(400, 'value: string or null');
     }
     if (Object.keys(data).length > LIMITS.keys) throw new HttpError(413, 'too many keys');

@@ -1,7 +1,7 @@
 /**
  * Точка входа серверного прогресса (вызывается из main.ts до создания App).
  *   ?reset=1     — сбросить прогресс этого устройства (локально сразу, на сервере — при первом ответе)
- *   ?noname      — не отправлять имя ребёнка на сервер (или сборка с VITE_PROGRESS_NAME=0)
+ * Имя ребёнка на сервер не уходит никогда (во всех редакциях, флагов нет): sync.ts stripName, docs/PRIVACY.md.
  *   ?progress=0  — без сервера, только localStorage (или сборка с VITE_PROGRESS=0)
  * Консоль: __progress.code, __progress.sync.state, __progress.sync.flush().
  */
@@ -19,11 +19,6 @@ let handle: ProgressHandle | null = null;
 
 const env = (k: string): string | undefined => (import.meta as any).env?.[k];
 
-/** признак «не отправлять имя»: ?noname или VITE_PROGRESS_NAME=0 */
-export function sendNameAllowed(search = typeof location !== 'undefined' ? location.search : '') {
-  return !new URLSearchParams(search).has('noname') && env('VITE_PROGRESS_NAME') !== '0';
-}
-
 export function bootProgress(log?: (s: string) => void): ProgressHandle {
   if (handle) return handle;
   const q = new URLSearchParams(location.search);
@@ -34,7 +29,7 @@ export function bootProgress(log?: (s: string) => void): ProgressHandle {
   // редакция без серверного прогресса (config/edition.ts, progress.server) — только localStorage
   if (!storage || !feature('progress.server') || q.get('progress') === '0' || env('VITE_PROGRESS') === '0') return handle;
 
-  const sync = new ProgressSync({ device, storage, sendName: sendNameAllowed(), edition: EDITION, log: log ?? ((s) => console.info(s)) });
+  const sync = new ProgressSync({ device, storage, edition: EDITION, log: log ?? ((s) => console.info(s)) });
   handle.sync = sync;
   if (q.get('reset') === '1') {
     sync.markReset();

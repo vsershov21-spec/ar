@@ -33,8 +33,6 @@ export interface SyncOptions {
   fetch?: typeof fetch;
   beacon?: (url: string, body: string) => boolean;
   endpoint?: string;
-  /** false — имя ребёнка (поле name в sber-ar-cat:v1) на сервер не отправляется */
-  sendName?: boolean;
   /** редакция (mvp | lab, src/config/edition.ts): уходит на сервер полем edition в записи прогресса и в начале сессии */
   edition?: string;
   timeoutMs?: number;
@@ -42,6 +40,39 @@ export interface SyncOptions {
   debounceMs?: number;
   maxWaitMs?: number;
   log?: (s: string) => void;
+}
+
+/** поле объекта похоже на имя ребёнка или его производную (name, nameKnown, childName, имя…) */
+const NAME_FIELD = /name|имя/i;
+
+/**
+ * Значение ключа прогресса без имени ребёнка: из JSON-объекта (и вложенных объектов) убираются все поля, похожие
+ * на имя. Не JSON — как есть. Так же чистит сервер (server/progress/store.mjs stripName) — двойная защита.
+ */
+export function stripName(v: string): string {
+  let o: unknown;
+  try {
+    o = JSON.parse(v);
+  } catch {
+    return v;
+  }
+  if (!o || typeof o !== 'object') return v;
+  let changed = false;
+  const walk = (x: unknown, depth: number): unknown => {
+    if (!x || typeof x !== 'object' || depth > 4) return x;
+    if (Array.isArray(x)) return x.map((y) => walk(y, depth + 1));
+    const out: Record<string, unknown> = {};
+    for (const [k, val] of Object.entries(x as Record<string, unknown>)) {
+      if (NAME_FIELD.test(k)) {
+        changed = true;
+        continue;
+      }
+      out[k] = walk(val, depth + 1);
+    }
+    return out;
+  };
+  const r = walk(o, 0);
+  return changed ? JSON.stringify(r) : v;
 }
 
 export type SyncState = 'idle' | 'loading' | 'synced' | 'offline' | 'reset' | 'paused' | 'error';
@@ -88,7 +119,6 @@ export class ProgressSync {
     this.o = {
       fetch: opts.fetch ?? ((...a) => fetch(...a)),
       endpoint: '/api/progress',
-      sendName: true,
       timeoutMs: 1500,
       pollMs: 2000,
       debounceMs: 2500,
@@ -387,23 +417,14 @@ export class ProgressSync {
     return out;
   }
 
-  /** что уходит на сервер: без имени ребёнка, если sendName=false */
-  private outbound(k: string, v: string): string {
-    if (this.o.sendName || k !== MEMORY_KEY) return v;
-    try {
-      const o = JSON.parse(v);
-      if (o && typeof o === 'object' && 'name' in o) {
-        delete o.name;
-        return JSON.stringify(o);
-      }
-    } catch {
-      /* не JSON — как есть */
-    }
-    return v;
+  /** что уходит на сервер: имя ребёнка не уходит НИКОГДА (во всех редакциях, без флагов) — см. stripName */
+  private outbound(_k: string, v: string): string {
+    return stripName(v);
   }
 
-  /** что пишем локально с сервера: имя, которого на сервере нет, берём из локальной памяти */
+  /** что пишем локально с сервера: имени там нет (и не должно быть) — берём из локальной памяти */
   private inbound(k: string, sv: string): string {
+    sv = stripName(sv);
     if (k !== MEMORY_KEY) return sv;
     try {
       const o = JSON.parse(sv);

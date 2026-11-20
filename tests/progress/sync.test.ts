@@ -56,11 +56,12 @@ describe('ProgressSync', () => {
     expect(await s.start()).toBe('synced');
     await s.flush();
     const doc = await server(dev);
-    expect(doc.data).toEqual({ [MEM]: a.getItem(MEM), 'ar.catalog.tried': '["x"]' }); // чужие ключи не уходят
+    // чужие ключи не уходят; имя ребёнка — никогда
+    expect(doc.data).toEqual({ [MEM]: '{"persona":"kind","met":true}', 'ar.catalog.tried': '["x"]' });
 
     const b = new MemStorage(); // родитель очистил данные сайта, cookie с id осталась
     expect(await mk(b, dev).start()).toBe('synced');
-    expect(b.getItem(MEM)).toBe(a.getItem(MEM));
+    expect(JSON.parse(b.getItem(MEM)!)).toEqual({ persona: 'kind', met: true }); // имя осталось только на том телефоне
     expect(b.getItem('ar.catalog.tried')).toBe('["x"]');
   });
 
@@ -79,14 +80,38 @@ describe('ProgressSync', () => {
     expect(Object.keys(s.diff())).toEqual([]);
   });
 
-  it('флаг sendName=false: имя на сервер не уходит, при восстановлении не теряется', async () => {
+  it('имя ребёнка не уходит на сервер никогда: ни в одном исходящем запросе (fetch и beacon) нет имени', async () => {
     const dev = newUuid();
-    const st = new MemStorage({ [MEM]: '{"name":"Петя","persona":"hooligan"}' });
-    const s = mk(st, dev, { sendName: false });
+    const bodies: string[] = [];
+    const spy: typeof fetch = (url, init) => {
+      bodies.push(`${init?.method ?? 'GET'} ${String(url)} ${String(init?.body ?? '')}`);
+      return fetch(url, init);
+    };
+    const beacon = (url: string, body: string) => (bodies.push(`BEACON ${url} ${body}`), true);
+    const st = new MemStorage({ [MEM]: '{"name":"Петя","persona":"hooligan","nameKnown":true,"home":{"where":"ar","zone":"x","childName":"Петя"}}', 'sber-ar-cat:paint': '{"pattern":1,"name":"Петя"}' });
+    const s = mk(st, dev, { fetch: spy, beacon });
     await s.start();
     await s.flush();
-    expect(JSON.parse((await server(dev)).data[MEM])).toEqual({ persona: 'hooligan' });
-    expect(s.diff()).toEqual({}); // имя локально есть, но разницей не считается
+    // имя поменялось — само по себе разницей не считается и не уходит
+    st.setItem(MEM, st.getItem(MEM)!.replace('Петя', 'Пётр'));
+    expect(s.diff()).toEqual({});
+    st.setItem(MEM, '{"name":"Пётр","persona":"kind"}');
+    s.tick();
+    await wait(40);
+    await s.flush();
+    s.sessionStart('kind');
+    s.sessionEvent('phase:play');
+    // уход со страницы с несохранённой разницей (и новым именем) — sendBeacon
+    st.setItem(MEM, '{"name":"Петя","persona":"glitter","visits":2}');
+    s.flushBeacon();
+    expect(bodies.some((b) => b.startsWith('BEACON') && b.includes('glitter'))).toBe(true);
+    expect(bodies.length).toBeGreaterThan(1);
+    for (const b of bodies) expect(b).not.toMatch(/Петя|Пётр|name|\\u04/i);
+    const doc = await server(dev);
+    expect(JSON.stringify(doc)).not.toMatch(/Петя|Пётр|name/i);
+    expect(JSON.parse(doc.data[MEM])).toEqual({ persona: 'kind' });
+    expect(JSON.parse(doc.data['sber-ar-cat:paint'])).toEqual({ pattern: 1 });
+    // на телефоне имя на месте
     expect(JSON.parse(st.getItem(MEM)!).name).toBe('Петя');
   });
 

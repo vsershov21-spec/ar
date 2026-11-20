@@ -169,3 +169,33 @@ describe('rate limit', () => {
     rmSync(dir, { recursive: true, force: true });
   });
 });
+
+// имя ребёнка не хранится на сервере (docs/PRIVACY.md): старый клиент прислал — вырезаем при записи и при чтении
+describe('progress server: имя ребёнка', () => {
+  it('PUT с name → в хранилище и в ответе имени нет; старая запись с именем отдаётся без него', async () => {
+    const { stripName, stripDocNames } = await import('../../server/progress/store.mjs');
+    expect(stripName('{"name":"Маша","persona":"kind","home":{"zone":"a","childName":"М"}}')).toBe('{"persona":"kind","home":{"zone":"a"}}');
+    expect(stripName('auto')).toBe('auto');
+    expect(stripDocNames({ data: { a: '{"x":1}' } })[1]).toBe(false);
+    const dir = mkdtempSync(path.join(tmpdir(), 'progress-name-'));
+    const p = await createProgressServer({ dataDir: dir, store: 'file', rate: { ip: 1000, writes: 1000 } });
+    await new Promise<void>((r) => p.server.listen(0, '127.0.0.1', r));
+    const base = `http://127.0.0.1:${(p.server.address() as AddressInfo).port}/api/progress/${DEV}`;
+    try {
+      const j = await (await fetch(base, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ data: { 'sber-ar-cat:v1': '{"name":"Маша","met":true}' } }) })).json();
+      expect(j.data['sber-ar-cat:v1']).toBe('{"met":true}');
+      expect(JSON.stringify(p.store.get(DEV))).not.toMatch(/Маша|name/);
+      // запись, сохранённая до исправления (имя в хранилище) — GET без имени
+      const doc = p.store.get(DEV);
+      p.store.put({ ...doc, data: { ...doc.data, 'sber-ar-cat:v1': '{"name":"Маша","met":true}' } });
+      const g = await (await fetch(base)).json();
+      expect(JSON.stringify(g)).not.toMatch(/Маша|name/);
+      // любая следующая запись чистит и старое значение
+      await fetch(base, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ data: { 'ar.micMode': 'ptt' } }) });
+      expect(JSON.stringify(p.store.get(DEV))).not.toMatch(/Маша|name/);
+    } finally {
+      await p.close();
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});

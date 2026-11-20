@@ -11,7 +11,7 @@ export interface ProgressServerOptions {
 }
 export interface ProgressServer {
   server: Server;
-  store: { kind: 'sqlite' | 'file'; list(): string[]; get(device: string): any; eventRows(since: number): { ts: number; device: string; edition: string; name: string; props: Record<string, unknown> }[] };
+  store: { kind: 'sqlite' | 'file'; list(): string[]; get(device: string): any; put(doc: any): void; eventRows(since: number): { ts: number; device: string; edition: string; name: string; props: Record<string, unknown> }[] };
   handle(req: IncomingMessage, res: ServerResponse): Promise<void>;
   purge(): number;
   close(): Promise<void>;
