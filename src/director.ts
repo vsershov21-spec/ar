@@ -104,6 +104,9 @@ const LOOP_MAX_MS = 3000;
 /** «Погладить»/«Обнять» кнопкой: столько мурчит, потом покой */
 const BUTTON_PURR_MS = 3200;
 const DANCE_MAX_MS = 8000;
+/** реплика зовёт ребёнка говорить — без микрофона не звучит (speakEvent); события тишины и подсказок */
+const SAY_INVITE = /(^|[\s«"(])(скажи|скажешь|говори|повторяй за мной|спроси)(?=[\s,.!?»"]|$)/i;
+const INVITE_EVENTS = new Set(['silence', 'bored', 'filler', 'help']);
 
 /** панель действий и каталог «Что умеет кот»: кнопка → событие режиссёра (таблица — scenario/actions.ts) */
 export { ACTIONS, type ActionId } from './scenario/actions';
@@ -1010,6 +1013,11 @@ export class Director extends Emitter<DirectorEvents> {
     const pk = this.personas.line(event, { name: this.state.name, vars: r ? { answer: r.answer } : {}, force: o.force, prefer: this.prefer, strict: this.strictVoice });
     if (!pk) {
       this.log(`реплика «${event}» не выбрана (${this.picker.coolingDown(event) ? 'cooldown' : 'нет озвученных'})`);
+      return false;
+    }
+    // нет микрофона — кот не зовёт говорить («Скажи „повторяй за мной“»): реплики тишины/подсказки с таким призывом молчат
+    if ((!o.scenario || INVITE_EVENTS.has(event)) && SAY_INVITE.test(pk.text) && this.d.voiceIn && !this.d.voiceIn().mic) {
+      this.log(`реплика «${event}» зовёт говорить — без микрофона молчим`);
       return false;
     }
     // реплика сценария/диалога встаёт в очередь (не ниже 2), даже если событие само по себе — реакция («нет» в «Хочешь загадку?»)
