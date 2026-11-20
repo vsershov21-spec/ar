@@ -3,7 +3,8 @@
 три слоя полупрозрачного фатина по форме исходной юбки.
 
   python3 scripts/models/tulle.py glitter in.glb out.glb [--puff 1.16] [--hem 0.03] [--bell 4] [--ruffle 0.004] [--shards]
-  (p1 Блёстки, 20.11: --puff 1.0 --hem 0.03 --bell 4 --ruffle 0.004 --shards — короткая пачка до середины бедра, docs/models/README.md)
+  (p1 Блёстки, 20.11: --puff 1.1 --hem 0.03 --bell 4 --ruffle 0.004 --shards --skin-puff --wsmooth 13,7 — пачка до середины
+  бедра, ~0.5 роста в ширину, docs/models/README.md; [--gap 0.005] — зазор слоёв)
 
 - Треугольники юбки (mesh_parts: метка «юбка») убираются из тела; под ними у Tripo есть поверхность бёдер.
 - Слой k (0 — внутренний): от пояса вниз до подола, радиус по секторам: у пояса — тело + 3 мм, у подола —
@@ -105,6 +106,12 @@ def main():
     r_hem = np.where(np.isnan(r_hem), np.nanmedian(r_hem), r_hem)
     # пачка пышнее (рефы: фатин расходится колоколом); --puff K — свой множитель (p1 Блёстки: 1.32)
     puff = float(sys.argv[sys.argv.index('--puff') + 1]) if '--puff' in sys.argv else 1.16
+    # --skin-puff: скин фатина по точке «радиус / puff» (20.11: пышная пачка в «сидя» не хуже короткой)
+    skin_k = puff if '--skin-puff' in sys.argv else 1.0
+    # --gap G: зазор между слоями, м (по умолчанию 5 мм); --wsmooth S,R: сглаживание весов скина по секторам и рядам
+    # (по умолчанию 5,3; шире — слои в позах гнутся плавнее и реже режут друг друга)
+    gap = float(sys.argv[sys.argv.index('--gap') + 1]) if '--gap' in sys.argv else 0.005
+    wsm = [int(x) for x in sys.argv[sys.argv.index('--wsmooth') + 1].split(',')] if '--wsmooth' in sys.argv else [5, 3]
     r_hem = r_hem * puff
     # --hem H: подол выше на H м (пачка короче; p1 Блёстки 20.11: 0.035 — до середины бедра)
     hem_up = float(sys.argv[sys.argv.index('--hem') + 1]) if '--hem' in sys.argv else 0.0
@@ -166,13 +173,16 @@ def main():
                         # фестоны: у каждого слоя свой шаг и фаза (слои видны ярусами), край мягко вниз
                         y_hem += ruf * 1.2 * (0.5 + 0.5 * np.sin((10 + 2 * L) * a + 1.3 * L)) ** 2 * (1 if L else 0.6)
                     y = y_top + (y_hem - y_top) * t
-                    r = rfun(k, y) + 0.005 * L + 0.0018 * np.sin(18 * a + 2.1 * L) * t
+                    r = rfun(k, y) + gap * L + 0.0018 * np.sin(18 * a + 2.1 * L) * t
                     if ruf:
                         r += ruf * np.sin(10 * a) * t ** 2
                     p = np.array([c[0] + r * np.cos(a), y, c[2] + r * np.sin(a)])
                     V.append(p)
                     n = np.array([np.cos(a), 0.35 * t + 0.1, np.sin(a)]); Nn.append(n / np.linalg.norm(n))
-                    _, q = tree.query(p)
+                    # скин и UV — от вершины юбки Tripo там, где эта точка была бы без --puff (радиус / puff): пышная
+                    # пачка в позах («сидя») ведёт себя как исходная, подол не берёт веса ног дальше от кости
+                    pq = p.copy(); pq[[0, 2]] = c[[0, 2]] + (p[[0, 2]] - c[[0, 2]]) / skin_k
+                    _, q = tree.query(pq)
                     vi = sv[q]
                     U.append(UV[vi]); JJ.append(J[vi]); WW.append(Wt[vi])
                     # v2b: альфа ровнее и мягче (v2: 0.86→0.5 × 0.9/0.72 — плотный у пояса, «шум» из текстуры),
@@ -246,7 +256,7 @@ def main():
         np.add.at(full[q], JJa0[q], WWa[q])
     full = full.reshape(NS, NT, nj)
     from scipy.ndimage import uniform_filter1d
-    full = uniform_filter1d(uniform_filter1d(full, 5, axis=1, mode='wrap'), 3, axis=0, mode='nearest')
+    full = uniform_filter1d(uniform_filter1d(full, wsm[0], axis=1, mode='wrap'), wsm[1], axis=0, mode='nearest')
     full = full.reshape(NS * NT, nj)
     top = np.argsort(-full, axis=1)[:, :4]
     tw = np.take_along_axis(full, top, 1); tw /= tw.sum(1, keepdims=True)

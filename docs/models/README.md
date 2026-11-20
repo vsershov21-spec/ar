@@ -19,6 +19,32 @@
 > румянец в faceWrinkles.ts, `PERSONA_FACE_V2`). Сравнение в приложении: `node tools/model-ab-shot.mjs <out>` →
 > `v2b_app_<кот>.png` (слева v1, справа v2).
 
+## Блёстка: пачка пышнее (20.11, второй проход)
+
+Пачка после 7e717fd (`--puff 1.0`) вышла уже рефа: в анфас ширина пачки — 0.44 роста (реф turnaround/anim_src и кадр
+КотоТом — 0.47–0.48), к низу худи — 1.37× (реф 1.5–1.66×: у рефа худи к поясу уже). Теперь `--puff 1.1`: ширина 0.443 →
+0.499 м (+13 %), 0.50 роста. Чтобы пышная пачка в позах не резала себя и ноги, два новых ключа `tulle.py`:
+`--skin-puff` — скин и UV фатина берутся у вершины юбки Tripo в точке «радиус / puff» (подол не набирает веса ног из-за
+бо́льшего радиуса) и `--wsmooth 13,7` — веса скина сглажены шире по секторам/рядам (было 5,3; слои гнутся плавнее).
+(`--gap` — зазор между слоями, по умолчанию 5 мм — оставлен.) Сборка:
+
+    python3 tulle.py glitter glitter_v1.glb g1.glb --puff 1.1 --hem 0.03 --bell 4 --ruffle 0.004 --shards --skin-puff --wsmooth 13,7
+    python3 untangle.py glitter g1.glb g2.glb && python3 tulle.py glitter g2.glb g2.glb --fit
+    python3 persona_tune.py glitter g2.glb public/models/v2/glitter_p1.glb --clean
+    python3 colliders.py glitter public/models/v2/glitter_p1.glb public/models/v2/glitter_p1_colliders.json
+
+Проникновения (`penetration.py … --poses all`, теперь печатает и «с фатином»): покой 0. Всего / с фатином:
+
+| поза | до 7e717fd (`--puff 1.32`) | 7e717fd (`--puff 1.0`) | сейчас (`--puff 1.1`) |
+|---|---|---|---|
+| sit @0.6 | 2385 / 1086 | 2295 / 1008 | 1909 / 622 |
+| sit @0.9 | 1122 / 297 | 1092 / 288 | 1100 / 296 |
+| hug @0.5 | 783 / 349 | 779 / 345 | 682 / 248 |
+
+Для сравнения без новых ключей `--puff 1.1` давал sit@0.9 1424 / 620. В остальных позах ±3 %, кроме shy (773 → 813) и
+frightened (788 → 805) — кисть у бедра ложится на более широкую пачку («ладонь», рантайм держит её по прокси юбки).
+Файл 4 683 972 байт (было 4 684 300).
+
 ## Блёстка по рефам: доводка по кадрам (20.11, только `?models=v2`)
 
 Цель — кадр презентации КотоТом 17-11, `design/sheets/glitter_turnaround.jpg` и `design/anim_src/glitter_front_green.png`

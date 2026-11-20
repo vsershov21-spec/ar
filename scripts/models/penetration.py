@@ -445,7 +445,8 @@ def main():
         bad = [p for (k, h, p) in res['body'] if h != 'контакт']
         if imgdir and bad and (worst is None or len(bad) > worst[0]):
             worst = (len(bad), label, V, bad)
-        print(f'{cat} {label}: {n} (складки {nf}, контакт {nc}, прочие {nh}) {desc}')
+        ntl = sum(v for k, v in agg.items() if 'фатин' in k)
+        print(f'{cat} {label}: {n} (складки {nf}, контакт {nc}, прочие {nh}{f", с фатином {ntl}" if ntl else ""}) {desc}')
     if imgdir and worst:
         os.makedirs(imgdir, exist_ok=True)
         tris = np.unique(np.array(worst[3]).ravel())
