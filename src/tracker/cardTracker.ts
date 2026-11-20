@@ -94,6 +94,16 @@ export class CardTracker extends TrackerBase implements Tracker {
    * ни пунктира, ни «Держи телефон ровно…», ни повторного «Нашёл карту!»; повторная посадка — тихо.
    */
   private catPlaced = false;
+  /**
+   * Кот уже сидел на карте в этой сессии (переживает «Пересадить» и возврат из «Мира кота»): кот на экране (у стекла),
+   * поэтому подсказки поиска — без текста поверх игры («Держи телефон ровно…», «Поднеси телефон ближе», «Это не
+   * карта» висели поверх кота после «На карту» — запись 20.11), только пунктир и кольцо над самой картой.
+   */
+  private everPlaced = false;
+  /** телефон вплотную к карте: множитель роста кота (anchor.userData.catScale) и когда в последний раз просили отодвинуть */
+  private catScale = 1;
+  private nearSince = -1;
+  private nearHintAt = -1e9;
 
   constructor(private container: HTMLElement) {
     super();
@@ -584,6 +594,7 @@ export class CardTracker extends TrackerBase implements Tracker {
       }
     } else if (state !== 'locked') this.view = null;
     this.overlay.catPlaced = this.catPlaced;
+    this.overlay.quietHints = this.everPlaced;
     this.applyEvents(st, now);
     if (this.verDebug && this.session.log.length !== logN) for (const l of this.session.log.slice(logN)) console.info('[card]', l);
   }
@@ -598,6 +609,7 @@ export class CardTracker extends TrackerBase implements Tracker {
     if (st.found) {
       this.reanchorAt = -1;
       this.catPlaced = true;
+      this.everPlaced = true;
       this.emitFound();
     }
     if (st.lost) {
@@ -677,10 +689,16 @@ export class CardTracker extends TrackerBase implements Tracker {
     const st = this.session.tick(now);
     if (st.lost) this.debug(this.session.log.at(-1) ?? 'lost');
     this.applyEvents(st, now);
-    if (this.reanchorAt > 0 && now - this.reanchorAt > 6000 && this.session.state !== 'locked') {
-      // пересадили, а карты Сбера так и нет — кот спросит, где карта (как раньше)
-      this.reanchorAt = -1;
-      this.emitLost();
+    if (this.reanchorAt > 0 && now - this.reanchorAt > REANCHOR_LOST_MS && this.session.state !== 'locked') {
+      // пересадили, а карты Сбера так и нет — кот спросит, где карта. Но не когда карта в кадре и её проверяют
+      // (кандидат, видели меньше 2,5 с назад): «Ой, карточка пропала» звучало через 6 с после «На карту», пока
+      // проверка знака ещё шла, а карта лежала в кадре (запись 20.11, 12:37:25)
+      const f = this.session.fsm;
+      if (f.state === 'candidate' || now - f.seenAt < 2500) this.reanchorAt = now - REANCHOR_LOST_MS + 2500;
+      else {
+        this.reanchorAt = -1;
+        this.emitLost();
+      }
     }
     // кот — в позе на момент съёмки кадра, который сейчас на экране (session.ts DISPLAY_AT_FRAME)
     const m = this.session.display(dt, this.rvfc && now - this.shownAt < 100 ? this.shownAt : now, this.hold.quaternion);
@@ -688,6 +706,7 @@ export class CardTracker extends TrackerBase implements Tracker {
       this.anchor.matrix.copy(m);
       this.anchor.matrixWorldNeedsUpdate = true;
     }
+    this.nearCheck(m, dt, now);
     // прогресс посадки и подсказка (с гистерезисом в fsm.ts)
     const f = this.session.fsm;
     const k = f.animate(dt);
@@ -700,6 +719,34 @@ export class CardTracker extends TrackerBase implements Tracker {
       this.overlay.debugLine = `${f.state} ${(k * 100).toFixed(0)}% ${f.hint ?? ''} · ${this.stats.mode} ${this.stats.key} ${this.stats.fps.toFixed(0)}Гц ${this.stats.ms.toFixed(0)}мс${g} · ${this.stats.verLine} · ${this.session.log.at(-1) ?? ''}`;
     }
     this.overlay.update(dt);
+  }
+
+  /**
+   * Телефон вплотную к карте (5–10 см): кот ростом 1,1 ширины карты на таком расстоянии больше экрана — обрезан и
+   * «огромный» (запись 20.11, 12:35:30). Рост кота ограничиваем так, чтобы он занимал не больше NEAR_FRAC высоты
+   * экрана (кот уменьшается на месте, на карте; раскраска карты — нет), и тихо просим отодвинуть телефон
+   * (не чаще раза в 20 с). Ближняя плоскость камеры (1 мм) тут ни при чём — кот просто больше кадра.
+   */
+  private nearCheck(m: THREE.Matrix4 | null, dt: number, now: number) {
+    let want = 1;
+    const tanH = Math.tan(((this.camera.fov || 60) * Math.PI) / 360);
+    const dMin = CAT_HEIGHT_W / (NEAR_FRAC * 2 * tanH);
+    let d = Infinity;
+    if (m) {
+      const e = m.elements;
+      d = Math.hypot(e[12], e[13], e[14]);
+      want = Math.max(0.3, Math.min(1, d / dMin));
+    }
+    this.catScale += (want - this.catScale) * (1 - Math.exp(-Math.max(0, dt) / 0.15));
+    if (Math.abs(this.catScale - want) < 0.002) this.catScale = want;
+    this.anchor.userData.catScale = this.catScale;
+    const near = !!m && this.session.state === 'locked' && d < dMin * 0.8;
+    if (!near) this.nearSince = -1;
+    else if (this.nearSince < 0) this.nearSince = now;
+    else if (now - this.nearSince > 900 && now - this.nearHintAt > 20000) {
+      this.nearHintAt = now;
+      this.overlay.nearHint();
+    }
   }
 
   private debug(s: string) {
@@ -761,6 +808,11 @@ function isIOS() {
 const LAT_KEY = 'ar.camlat.v1';
 /** фрагмент «весь кадр» при потере карты: длинная сторона, px */
 const FULL_CROP_PX = 600;
+/** после «Пересадить»/«На карту» без карты столько — кот спрашивает, где карта, мс (было 6 с) */
+const REANCHOR_LOST_MS = 8000;
+/** рост кота в ширинах карты (config.ts stage.height) и наибольшая доля высоты экрана, которую он занимает на карте */
+const CAT_HEIGHT_W = 1.1;
+const NEAR_FRAC = 0.62;
 
 /** поза (R — столбцы осей карты в системе камеры, t — центр, единица = ширина карты) → матрица якоря */
 export function poseMatrix(p: Pose): THREE.Matrix4 {

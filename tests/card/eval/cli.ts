@@ -32,6 +32,8 @@ export const GATES: [string, boolean, number][] = [
   ['jitterMm', true, 0.5],
   ['scaleErr.p90', true, 1],
   ['headMm.p90', true, 1],
+  ['upsideFrac', true, 0.01],
+  ['normalFlips', true, 1],
   ['lockedFrac', false, 0.03],
   ['cpu.mean', true, 2],
 ];
@@ -83,7 +85,7 @@ export function synthSet(): EvalClip[] {
 /** строка сводной таблицы */
 function row(m: ClipMetrics): string {
   const rec = m.recovery.length ? fmt(Math.max(...m.recovery), 1) : '—';
-  return `| ${m.clip} | ${m.ref} | ${fmt(m.timeToLand)} | ${m.landings} / ${m.falseLandings} | ${m.losses} / ${m.visibleLosses} (${rec}) | ${m.wrongPlace} | ${(m.lockedFrac * 100).toFixed(0)} % | ${fmt(m.errMm.p50, 1)} / ${fmt(m.errMm.p90, 1)} | ${Number.isFinite(m.within5mm) ? (m.within5mm * 100).toFixed(0) + ' %' : '—'} | ${fmt(m.jitterMm)} / ${fmt(m.jitterPx)} | ${fmt(m.scaleErr.p90, 1)} | ${fmt(m.headMm.p90, 1)} | ${fmt(m.cpu.mean, 1)} / ${fmt(m.cpu.p95, 1)} | ${fmt(m.focalEnd, 0)} · ${fmt(m.camLatEnd, 0)} |`;
+  return `| ${m.clip} | ${m.ref} | ${fmt(m.timeToLand)} | ${m.landings} / ${m.falseLandings} | ${m.losses} / ${m.visibleLosses} (${rec}) | ${m.wrongPlace} | ${(m.lockedFrac * 100).toFixed(0)} % | ${fmt(m.errMm.p50, 1)} / ${fmt(m.errMm.p90, 1)} | ${Number.isFinite(m.within5mm) ? (m.within5mm * 100).toFixed(0) + ' %' : '—'} | ${fmt(m.jitterMm)} / ${fmt(m.jitterPx)} | ${fmt(m.scaleErr.p90, 1)} | ${fmt(m.headMm.p90, 1)} | ${((m.upsideFrac ?? 0) * 100).toFixed(1)} % / ${m.normalFlips ?? 0} | ${fmt(m.cpu.mean, 1)} / ${fmt(m.cpu.p95, 1)} | ${fmt(m.focalEnd, 0)} · ${fmt(m.camLatEnd, 0)} |`;
 }
 
 export function report(all: ClipMetrics[], opts: { title: string; args: string; regress?: string[]; baseline?: string }): string {
@@ -91,8 +93,8 @@ export function report(all: ClipMetrics[], opts: { title: string; args: string; 
   L.push(`# Карта: оценка по записям — ${opts.title}`, '');
   L.push(`Команда: \`npm run card:eval -- ${opts.args}\`. Как читать — docs/CARD_DETECTION.md («Стенд записей»), матрица съёмки — docs/qa/CARD_MATRIX.md.`, '');
   L.push('Эталон: `gt` — разметка/синтетика (абсолютные ошибки), `oracle` — тот же трекер на каждом кадре без задержки (видно отставание и дрожание кота, а не общие ошибки ведения). Мм — на плоскости карты; кадр детектора 320 px по длинной стороне.', '');
-  L.push('| клип | эталон | посадка, с | посадок / ложных | уходов из ведения / видимых потерь (макс. восстановление, с) | «не туда» | в ведении | ошибка, мм p50 / p90 | в ±5 мм | дрожание, мм / px | масштаб p90, % | «голова» p90, мм | воркер, мс сред. / p95 | фокус px · задержка мс |');
-  L.push('|---|---|---|---|---|---|---|---|---|---|---|---|---|---|');
+  L.push('| клип | эталон | посадка, с | посадок / ложных | уходов из ведения / видимых потерь (макс. восстановление, с) | «не туда» | в ведении | ошибка, мм p50 / p90 | в ±5 мм | дрожание, мм / px | масштаб p90, % | «голова» p90, мм | вверх ногами / переворотов | воркер, мс сред. / p95 | фокус px · задержка мс |');
+  L.push('|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|');
   for (const m of all) L.push(row(m));
   L.push('');
   const pos = all.filter((m) => !m.negative);

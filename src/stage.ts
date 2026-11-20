@@ -252,6 +252,12 @@ export class Stage {
     this.hiddenUntil = this.now + ms / 1000;
   }
 
+  /** множитель роста кота от трекера (anchor.userData.catScale, 0..1]; в «Мире кота» — 1 */
+  private catScale(): number {
+    const k = this.view ? 1 : (this.anchor.userData.catScale as number | undefined);
+    return typeof k === 'number' && k > 0 ? Math.min(1, k) : 1;
+  }
+
   /** поза центра карты → поза кота на карте */
   /** поза карты для кота — сглаженная (AnchorSmoother); в «Мире кота» пол неподвижен — без сглаживания */
   readonly smoother = new AnchorSmoother();
@@ -271,10 +277,12 @@ export class Stage {
     let d = targetYaw - this.yaw;
     d = Math.atan2(Math.sin(d), Math.cos(d));
     this.turn(d, dt, this.walkYaw !== null || !!f);
+    // трекер карты уменьшает кота, когда телефон поднесли вплотную (cardTracker: catScale) — иначе он во весь экран
+    const hk = c.height * this.catScale();
     const local = this.m2.compose(
       this.tmpB.set(this.pos.x, this.pos.y, c.footZ),
       this.q3.setFromEuler(this.e1.set(Math.PI / 2, this.yaw, 0, 'XYZ')),
-      this.tmpC.set(c.height, c.height, c.height),
+      this.tmpC.set(hk, hk, hk),
     );
     out.multiplyMatrices(aw, local);
   }
@@ -381,7 +389,7 @@ export class Stage {
     // тень: под лапами, пропадает у стекла
     const c = this.cfg;
     this.shadow.position.set(this.pos.x, this.pos.y, c.footZ + 0.002);
-    this.shadow.scale.set(c.height * 0.55, c.height * 0.32, 1);
+    this.shadow.scale.set(c.height * 0.55 * this.catScale(), c.height * 0.32 * this.catScale(), 1);
     const shK = it ? it.shadow : this.visibleK;
     (this.shadow.material as THREE.MeshBasicMaterial).opacity = (1 - this.t) * shK * 0.9;
     this.shadow.visible = shK > 0.001;

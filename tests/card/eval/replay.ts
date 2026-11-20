@@ -121,6 +121,13 @@ export interface ClipMetrics {
   focalEnd: number;
   /** задержка камеры в конце (самооценка), мс */
   camLatEnd: number;
+  /**
+   * «Кот вверх ногами»: доля кадров рендера с котом, где нормаль карты (ось роста кота) на экране смотрит вниз
+   * (y нормали в системе камеры < −0,25 — телефон над столом так не держат; это зеркальное решение позы),
+   * и число переворотов нормали (> 60° между соседними кадрами рендера).
+   */
+  upsideFrac: number;
+  normalFlips: number;
   states: Record<string, number>;
   log: string[];
 }
@@ -373,6 +380,8 @@ export async function replayClip(clip: EvalClip, o: ReplayOpts = {}): Promise<Cl
   const stg: Record<string, number> = {};
   const states: Record<string, number> = {};
   let firstRef = NaN;
+  let catTicks = 0, upsideTicks = 0, normalFlips = 0;
+  let lastN: THREE.Vector3 | null = null;
   for (let t = t0; t < tEnd; t += dt) {
     gyro.advance(t);
     // ответ воркера
@@ -426,6 +435,14 @@ export async function replayClip(clip: EvalClip, o: ReplayOpts = {}): Promise<Cl
     const shownAt = shown >= 0 ? clip.frameTime(shown) : t;
     const m = disp === 'frame' && s.display ? s.display(dt, shownAt * 1000, gyro.last) : s.frame(dt, gyro.last);
     const shownQ = m ? anchorQuadOf(m, s.K) : null;
+    if (m) {
+      const e = m.elements;
+      const n = new THREE.Vector3(e[8], e[9], e[10]).normalize();
+      catTicks++;
+      if (n.y < -0.25) upsideTicks++;
+      if (lastN && lastN.dot(n) < 0.5) normalFlips++;
+      lastN = n;
+    } else lastN = null;
     const ref = refOf(shown);
     states[s.state] = (states[s.state] ?? 0) + 1;
     if (ref && Number.isNaN(firstRef) && inFrame(ref, clip.w, clip.h)) firstRef = t;
@@ -521,6 +538,8 @@ export async function replayClip(clip: EvalClip, o: ReplayOpts = {}): Promise<Cl
     workerHz: replies / Math.max(1e-3, tEnd - t0),
     focalEnd: s.K.f,
     camLatEnd: latOf(s, camLat * 1000),
+    upsideFrac: catTicks ? upsideTicks / catTicks : 0,
+    normalFlips,
     states: Object.fromEntries(Object.entries(states).map(([k, v]) => [k, v / 60])),
     log: s.log.slice(-20),
   };

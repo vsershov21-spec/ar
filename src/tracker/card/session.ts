@@ -16,7 +16,7 @@
  * Машина состояний (поиск → кандидат → посадка → удержание → поиск рядом → потеря) — ./fsm.ts.
  */
 import * as THREE from 'three';
-import { CARD_ASPECT, labelCard, poseFromQuad, quadDiag, type Intrinsics, type Pose, type Pt, type Quad } from './geometry';
+import { CARD_ASPECT, labelCard, mirrorPose, poseFromQuad, poseNormal, quadDiag, type Intrinsics, type Pose, type Pt, type Quad } from './geometry';
 import { CardFsm, type Kind, type TrackState } from './fsm';
 import type { PipelineOut } from './pipeline';
 import { ACCEPT_OTHER_BANKS } from '../../config';
@@ -235,6 +235,12 @@ export interface SessionStep {
 }
 
 const S = new THREE.Matrix4().makeScale(1, -1, -1);
+/** поворот позы больше этого (рад) с одного кадра не принимаем — нужны 3 согласных измерения подряд */
+const ROT_JUMP = 0.52;
+/** без гироскопа: переворот нормали карты больше этого (рад) — тоже только по 3 согласным измерениям */
+const NORMAL_JUMP = 0.6;
+/** зеркальную позу (mirrorPose) ищем только у карты мельче этого (диагональ в px кадра трекера 320 px) */
+const MIRROR_MAX_DIAG = 90;
 const tmpM = new THREE.Matrix4();
 const tmpQ = new THREE.Quaternion();
 
@@ -267,7 +273,50 @@ export class CardSession {
   gyroSamples = 0;
   /** гироскоп признан годным для компенсации (по умолчанию — да, пока не доказано обратное) */
   get gyroOk() {
-    return this.gyroSamples < 8 || this.gyroScore > -0.3;
+    return this.gyroOn;
+  }
+  /**
+   * Решение «гироскоп годен» — с гистерезисом (выкл. ниже −0,3, вкл. снова выше +0,05) и с переводом фильтра между
+   * «миром гироскопа» и системой камеры при каждом переключении. Раньше решение пересчитывалось на каждом кадре
+   * (оценка у −0,3 при встряске гуляла туда-сюда), а положение в фильтре оставалось в прежней системе: кот через кадр
+   * прыгал между двумя местами — на записи экрана это «два Хулигана» (запись 20.11, 13:05:20).
+   */
+  private gyroOn = true;
+  private gyroWanted() {
+    if (this.gyroSamples < 8) return true;
+    return this.gyroOn ? this.gyroScore > -0.3 : this.gyroScore > 0.05;
+  }
+  /** перевести состояние фильтра: в мир (toWorld) или в систему камеры, Q — ориентация телефона на момент кадра */
+  private rebase(Q: THREE.Quaternion, toWorld: boolean) {
+    const q = toWorld ? Q.clone() : Q.clone().invert();
+    const m = new THREE.Matrix3().setFromMatrix4(new THREE.Matrix4().makeRotationFromQuaternion(q)).elements;
+    // m — по столбцам (three); R[i][j] = m[j*3+i]
+    const R = (i: number, j: number) => m[j * 3 + i];
+    const x = this.kf.x;
+    for (const o of [0, 3]) {
+      const v = [x[o], x[o + 1], x[o + 2]];
+      for (let i = 0; i < 3; i++) x[o + i] = R(i, 0) * v[0] + R(i, 1) * v[1] + R(i, 2) * v[2];
+    }
+    // P' = B P Bᵀ, B = diag(R, R)
+    const P = this.kf.P, T = new Float64Array(36), N = new Float64Array(36);
+    const B = (i: number, j: number) => (Math.floor(i / 3) === Math.floor(j / 3) ? R(i % 3, j % 3) : 0);
+    for (let i = 0; i < 6; i++) for (let j = 0; j < 6; j++) {
+      let v = 0;
+      for (let k = 0; k < 6; k++) v += B(i, k) * P[k * 6 + j];
+      T[i * 6 + j] = v;
+    }
+    for (let i = 0; i < 6; i++) for (let j = 0; j < 6; j++) {
+      let v = 0;
+      for (let k = 0; k < 6; k++) v += T[i * 6 + k] * B(j, k);
+      N[i * 6 + j] = v;
+    }
+    P.set(N);
+    this.wPos.applyQuaternion(q);
+    this.wQuat.premultiply(q);
+    this.shownPos.applyQuaternion(q);
+    this.shownQuat.premultiply(q);
+    this.upN = null;
+    this.rotJump = null;
   }
   /** самокалибровка фокуса: четырёхугольники карты с заметной перспективой */
   private fQuads: Quad[] = [];
@@ -335,10 +384,58 @@ export class CardSession {
     return out;
   }
 
+  /**
+   * Нормаль карты, которую показываем (в мире гироскопа, если он годен, иначе в системе камеры), — для выбора из двух
+   * поз (mirrorPose) с гистерезисом. upWorld — в какой системе она записана.
+   */
+  private upN: THREE.Vector3 | null = null;
+  private upWorld = false;
+  /** зеркальная поза выбрана столько раз (для ?debug и стенда) */
+  mirrorPicks = 0;
+
+  /**
+   * Из двух поз карты (по углам и зеркальной, geometry.ts mirrorPose) — та, у которой нормаль «вверх от стола»:
+   * с гироскопом — вверх в мире (карта лежит на столе), без него — вверх по экрану (над столом телефон держат
+   * верхом от себя). Поза с нормалью вниз при «верхней» зеркальной — никогда; иначе зеркальная — только если она
+   * заметно (> 25°) ближе к прежней нормали (гистерезис). Ищем её только у мелкой карты (MIRROR_MAX_DIAG). Без неоднозначности поза с нормалью
+   * вниз в мире (< −0,35) отбрасывается: карта Сбера лицом вниз на столе не видна, а кот вверх ногами хуже потери кадра.
+   */
+  private chooseUp(pose: Pose, quad: Quad, capQ: THREE.Quaternion | null, now: number): Pose | null {
+    const world = !!capQ && this.gyroOk;
+    if (world !== this.upWorld) (this.upN = null), (this.upWorld = world);
+    const nOf = (p: Pose) => {
+      const n = new THREE.Vector3(...poseNormal(p));
+      return world ? n.applyQuaternion(capQ!) : n;
+    };
+    const nP = nOf(pose);
+    // неоднозначность есть только у мелкой карты (слабая перспектива): у крупной зеркальная поза заметно хуже
+    const alt = quadDiag(quad) < MIRROR_MAX_DIAG ? mirrorPose(pose, quad, this.K, CARD_ASPECT) : null;
+    const ambiguous = !!alt && alt.err <= pose.err + 0.8;
+    let pick = pose, nPick = nP;
+    if (ambiguous) {
+      const nA = nOf(alt!);
+      // нормаль вниз → вверх — всегда; иначе зеркальную берём, только если она заметно (> 25°) ближе к прежней
+      // нормали и сама не вниз (гистерезис: без этого выбор дёргался на шуме углов, кот поворачивался туда-сюда)
+      const useAlt = (nP.y < 0 && nA.y > nP.y + 0.3) || (!!this.upN && nA.y > 0 && nA.angleTo(this.upN) + 0.45 < nP.angleTo(this.upN));
+      if (useAlt) {
+        pick = alt!;
+        nPick = nA;
+        this.mirrorPicks++;
+      }
+    } else if (world && nP.y < -0.35) {
+      this.note(now, `поза отброшена: нормаль карты вниз (${nP.y.toFixed(2)})`);
+      return null;
+    }
+    this.upN = nPick;
+    return pick;
+  }
+
   /** «Пересадить кота» */
   reanchor(now: number, why = 'пересадка') {
     this.fsm.reset(now, why);
     this.prevQuad = null;
+    this.upN = null;
+    this.rotJump = null;
     this.orientRef = null;
     this.hasW = false;
     this.shownOk = false;
@@ -380,6 +477,7 @@ export class CardSession {
         this.note(now, `поза отброшена: err ${pose.err.toFixed(1)} z ${pose.t[2].toFixed(2)}`);
         pose = null;
       }
+      if (pose) pose = this.chooseUp(pose, quad, capQ, now);
     }
     let jitter = 1;
     if (pose && quad) {
@@ -420,6 +518,7 @@ export class CardSession {
       still: !(angSpeed > 0.6),
       kind,
       postNotCard: !!r.ver?.postNotCard,
+      quad: !!quad,
       maybeSber: r.ver ? r.ver.maybeSber : undefined,
     });
     if (f.state === 'search' && before !== 'search' && f.log.at(-1)?.why.startsWith('переверификация')) {
@@ -490,6 +589,13 @@ export class CardSession {
     }
     this.lastMeasR = mq;
     this.lastMeasCapQ = capQ ? capQ.clone() : null;
+    const want = this.gyroWanted();
+    if (want !== this.gyroOn) {
+      if (capQ && this.hasW) this.rebase(capQ, want);
+      else if (!capQ) this.hasW = false;
+      this.gyroOn = want;
+      this.note(now, `гироскоп ${want ? 'включён' : 'выключен'} (${this.gyroScore.toFixed(2)}) — фильтр переведён`);
+    }
     // в мир гироскопа
     if (capQ && this.gyroOk) M.premultiply(tmpM.makeRotationFromQuaternion(capQ));
     const p = new THREE.Vector3(), q = new THREE.Quaternion(), s = new THREE.Vector3();
@@ -526,11 +632,30 @@ export class CardSession {
       this.outliers = 0;
     } else this.outliers = 0;
     this.kf.at(ts, this.wPos);
-    // поворот: в мире карта неподвижна — сглаживаем сильно; большой поворот (сменилась нумерация, пересадка) — быстро
+    // поворот: в мире карта неподвижна — сглаживаем сильно. Большой скачок (> 30°: переворот позы, сменилась нумерация
+    // углов, кривой четырёхугольник) — не с одного кадра: только если 3 измерения подряд согласны между собой
+    // (гистерезис; раньше — сразу, и одиночный кадр с зеркальной позой переворачивал кота на 1–2 кадра)
     const ang = this.wQuat.angleTo(q);
-    const k = ang > 0.35 ? 1 : 0.25 + 0.75 * Math.min(1, ang / 0.12);
+    // скачок: в мире гироскопа (карта неподвижна) — любой поворот > 30°; без гироскопа поворот телефона виден как
+    // поворот карты, поэтому — только переворот нормали (> 35° за один ответ воркера телефоном не повернуть)
+    const nOld = new THREE.Vector3(0, 0, 1).applyQuaternion(this.wQuat), nNew = new THREE.Vector3(0, 0, 1).applyQuaternion(q);
+    const jump = capQ && this.gyroOk ? ang > ROT_JUMP : nOld.angleTo(nNew) > NORMAL_JUMP;
+    if (jump) {
+      const j = this.rotJump;
+      if (j && j.q.angleTo(q) < 0.25) j.n++;
+      else this.rotJump = { q: q.clone(), n: 1 };
+      if (this.rotJump!.n < 3) return;
+      this.rotJump = null;
+      this.wQuat.copy(q);
+      return;
+    }
+    this.rotJump = null;
+    let k = ang > 0.35 ? 1 : 0.25 + 0.75 * Math.min(1, ang / 0.12);
+    if (now < this.softRotUntil) k = Math.min(k, 0.15);
     this.wQuat.slerp(q, k);
   }
+  /** кандидат на большой поворот и сколько измерений подряд за него */
+  private rotJump: { q: THREE.Quaternion; n: number } | null = null;
 
   /**
    * Кадр рендера: поза якоря в системе камеры (null — кота нет). qNow — ориентация телефона, tShow — момент (мс), на
@@ -590,12 +715,27 @@ export class CardSession {
     }
     this.fStable = 0;
     this.note(now, `фокус ${this.K.f.toFixed(0)} → ${r.f.toFixed(0)} px (ошибка позы ${(cur * 100).toFixed(2)} → ${(best * 100).toFixed(2)} % диагонали)`);
+    const k = r.f / this.K.f;
     this.K = { ...this.K, f: r.f };
-    // поза в новом масштабе — с нуля (иначе фильтр «подлетает» из позы прежнего фокуса)
-    this.hasW = false;
-    this.prevQuad = null;
+    // поза в новом масштабе: при том же размере карты на экране глубина ∝ фокусу — масштабируем состояние фильтра
+    // (в мире гироскопа тоже: начало координат — камера). Раньше — фильтр с нуля (hasW = false): через 1–3 с после
+    // посадки, в самом конце сцены пробуждения, кот дёргался (записи 20.11)
+    this.rescale(k);
     this.onFocal?.(r.f);
   }
+
+  /** глубина сцены ×k (смена фокуса): положение, скорость и ковариация фильтра, показанная поза */
+  private rescale(k: number) {
+    if (!this.hasW) return;
+    for (let i = 0; i < 6; i++) this.kf.x[i] *= k;
+    for (let i = 0; i < 36; i++) this.kf.P[i] *= k * k;
+    this.wPos.multiplyScalar(k);
+    this.shownPos.multiplyScalar(k);
+    // наклон карты при новом фокусе чуть другой — довернуть плавно (~0,4 с), а не скачком
+    this.softRotUntil = this.kf.t * 1000 + 450;
+  }
+  /** до этого момента (мс) поворот догоняет измерения мягко (после смены фокуса) */
+  private softRotUntil = -1;
 
   resetFocalSamples() {
     this.fQuads = [];

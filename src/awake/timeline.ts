@@ -183,7 +183,9 @@ export function awakePlan(persona: PersonaId, kind: AwakeKind): AwakePlan {
     let roll = 0;
     if (first) {
       const a = s - 0.3;
-      if (a > 0 && a < 0.75) roll = 0.17 * Math.sin(a * Math.PI * 2 * 8.5) * Math.sin((a / 0.75) * Math.PI);
+      // было 0,17 рад × 8,5 Гц: на телефоне читалось как дрожь трекинга в конце появления («кота трясёт», записи
+      // 20.11) — теперь мягкое «отряхнулся»: 5 Гц, 0,07 рад, тот же горб огибающей
+      if (a > 0 && a < 0.75) roll = 0.07 * Math.sin(a * Math.PI * 2 * 5) * Math.sin((a / 0.75) * Math.PI);
     }
     return { lift: 0, scale: 1, squash, spin: 0, flip: 0, roll, shadow: 1 };
   };

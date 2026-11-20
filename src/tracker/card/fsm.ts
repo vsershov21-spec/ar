@@ -45,6 +45,8 @@ export interface Obs {
   postNotCard?: boolean;
   /** есть намёк на знак Сбера (false — по форме не садим: чужая карта, у которой не поймали чип) */
   maybeSber?: boolean;
+  /** воркер видит четырёхугольник карты (даже если поза отброшена — смаз, угол, блик) */
+  quad?: boolean;
 }
 
 export interface FsmEvent {
@@ -66,6 +68,12 @@ export const HOLD_AFTER_MS = 300;
 export const HOLD_MS = 1500;
 /** → LOST (кот спрашивает, где карта) */
 export const LOST_MS = 6000;
+/**
+ * Карта в кадре (воркер видит её четырёхугольник), но поза не проходит — «потерю» откладываем, пока так, но не дольше
+ * LOST_MAX_MS: кот не говорит «Ой, карточка пропала», когда карта лежит перед камерой (запись 20.11).
+ */
+export const LOST_MAX_MS = 12000;
+const QUAD_FRESH_MS = 1500;
 /**
  * Карта Сбера узнана (знак/дизайн в 2+ проверках) — сажаем не дольше чем через столько, даже если «ровно» ещё не
  * накопилось: на iPhone рукой ровно не удержать, а оценки углов из полного поиска и потока расходятся на 3–6 % диагонали
@@ -93,6 +101,8 @@ export class CardFsm {
   log: FsmEvent[] = [];
   /** последний раз карту видели (мс) */
   seenAt = -1e9;
+  /** последний раз воркер видел четырёхугольник карты (поза могла не пройти) */
+  quadAt = -1e9;
   private stableMs = 0;
   private checkingSince = 0;
   /** с какого момента кандидат подряд узнаётся как карта Сбера (0 — нет) */
@@ -138,6 +148,7 @@ export class CardFsm {
     const dt = this.lastObsT < 0 ? 0 : Math.min(200, Math.max(0, o.t - this.lastObsT));
     this.lastObsT = o.t;
     if (o.found) this.seenAt = o.t;
+    if (o.found || o.quad) this.quadAt = o.t;
     this.missRun = o.found ? 0 : this.missRun + 1;
     const s = this.state;
     if (s === 'locked' || s === 'hold' || s === 'relocalize') {
@@ -192,7 +203,7 @@ export class CardFsm {
     const gone = t - this.seenAt;
     if (this.state === 'locked' && gone > HOLD_AFTER_MS) this.go('hold', t, 'карты не видно — держим по поверхности/гироскопу');
     if (this.state === 'hold' && gone > HOLD_MS) this.go('relocalize', t, 'ищем ту же карту рядом с прогнозом');
-    if (this.state === 'relocalize' && gone > LOST_MS) this.go('lost', t, `карты нет ${LOST_MS / 1000} с`);
+    if (this.state === 'relocalize' && gone > LOST_MS && (t - this.quadAt > QUAD_FRESH_MS || gone > LOST_MAX_MS)) this.go('lost', t, `карты нет ${(gone / 1000).toFixed(0)} с`);
     // воркер молчит (нет ответов) — кандидат живёт дольше
     if (this.state === 'candidate' && gone > 3 * CAND_MISS_MS) this.go(this.everLocked ? 'lost' : 'search', t, 'кандидат пропал');
   }

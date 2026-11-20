@@ -303,6 +303,107 @@ export function poseFromQuad(q: Quad, K: Intrinsics, aspect = CARD_ASPECT): Pose
   return { R, t, err: err / 4 };
 }
 
+/**
+ * Вторая поза той же карты — «зеркальная» (неоднозначность плоской позы, IPPE: Collins & Bartoli 2014). У маленькой
+ * или далёкой карты перспектива слабая, и четыре угла почти одинаково хорошо объясняются двумя позами: настоящей и
+ * отражённой относительно плоскости, перпендикулярной лучу на центр карты. Нормаль второй — по другую сторону луча:
+ * если камера смотрит на стол под 60°, у неё нормаль смотрит «вниз по экрану», и кот висит головой вниз под картой
+ * (запись с iPhone 20.11, 12:35:05–12:35:20). Какая из двух поз настоящая, по углам не понять — решает гравитация
+ * (session.ts). Здесь — только вторая поза: отражение поворота и короткое уточнение по ошибке углов
+ * (Гаусс — Ньютон, 6 параметров). null — второй позы нет (карта крупная, отражение заметно хуже).
+ */
+export function mirrorPose(p: Pose, q: Quad, K: Intrinsics, aspect = CARD_ASPECT): Pose | null {
+  const v = norm(p.t);
+  const refl = (a: number[]) => {
+    const d = a[0] * v[0] + a[1] * v[1] + a[2] * v[2];
+    return [a[0] - 2 * d * v[0], a[1] - 2 * d * v[1], a[2] - 2 * d * v[2]];
+  };
+  const r1 = refl([p.R[0], p.R[3], p.R[6]]), r2 = refl([p.R[1], p.R[4], p.R[7]]);
+  const r3 = cross(r1, r2);
+  let R = [r1[0], r2[0], r3[0], r1[1], r2[1], r3[1], r1[2], r2[2], r3[2]];
+  let t = [...p.t] as [number, number, number];
+  const model = cardModel(aspect);
+  const resid = (R: number[], t: number[]): number[] | null => {
+    const out: number[] = [];
+    for (let i = 0; i < 4; i++) {
+      const pr = projectPoint(R, t, model[i].x, model[i].y, 0, K);
+      if (!pr) return null;
+      out.push(pr.x - q[i].x, pr.y - q[i].y);
+    }
+    return out;
+  };
+  // малый поворот ω (вектор) и сдвиг δ: R ← exp([ω]) R, t ← t + δ
+  const apply = (R: number[], t: number[], x: number[]): [number[], [number, number, number]] => {
+    const [wx, wy, wz] = x;
+    const th = Math.hypot(wx, wy, wz);
+    let E = [1, 0, 0, 0, 1, 0, 0, 0, 1];
+    if (th > 1e-12) {
+      const k = [wx / th, wy / th, wz / th], c = Math.cos(th), s = Math.sin(th), C = 1 - c;
+      E = [
+        c + k[0] * k[0] * C, k[0] * k[1] * C - k[2] * s, k[0] * k[2] * C + k[1] * s,
+        k[1] * k[0] * C + k[2] * s, c + k[1] * k[1] * C, k[1] * k[2] * C - k[0] * s,
+        k[2] * k[0] * C - k[1] * s, k[2] * k[1] * C + k[0] * s, c + k[2] * k[2] * C,
+      ];
+    }
+    const N = new Array(9).fill(0);
+    for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) for (let m = 0; m < 3; m++) N[i * 3 + j] += E[i * 3 + m] * R[m * 3 + j];
+    return [N, [t[0] + x[3], t[1] + x[4], t[2] + x[5]]];
+  };
+  const sse = (r: number[]) => r.reduce((s, x) => s + x * x, 0);
+  let r0 = resid(R, t);
+  if (!r0) return null;
+  const zs = Math.abs(t[2]);
+  const hs = [1e-4, 1e-4, 1e-4, 1e-4 * zs, 1e-4 * zs, 1e-4 * zs];
+  for (let it = 0; it < 6; it++) {
+    // численный якобиан 8 × 6, нормальные уравнения (JᵀJ + λ·diag) x = −Jᵀr
+    const J: number[][] = [];
+    for (let k = 0; k < 6; k++) {
+      const x = [0, 0, 0, 0, 0, 0];
+      x[k] = hs[k];
+      const [R2, t2] = apply(R, t, x);
+      const r2 = resid(R2, t2);
+      if (!r2) return null;
+      J.push(r2.map((v2, i) => (v2 - r0![i]) / hs[k]));
+    }
+    const A: number[][] = [], b: number[] = [];
+    for (let i = 0; i < 6; i++) {
+      A.push([]);
+      for (let j = 0; j < 6; j++) {
+        let s = 0;
+        for (let m = 0; m < 8; m++) s += J[i][m] * J[j][m];
+        A[i].push(s + (i === j ? 1e-6 * (s + 1e-9) : 0));
+      }
+      let s = 0;
+      for (let m = 0; m < 8; m++) s -= J[i][m] * r0[m];
+      b.push(s);
+    }
+    const x = solveLinear(A, b);
+    if (!x) break;
+    const [R2, t2] = apply(R, t, x);
+    const r2 = resid(R2, t2);
+    if (!r2 || sse(r2) >= sse(r0)) break;
+    R = R2;
+    t = t2;
+    r0 = r2;
+  }
+  // ортонормализация после шагов (численно — на всякий случай)
+  const c1 = norm([R[0], R[3], R[6]]), c2n = [R[1], R[4], R[7]];
+  const d = c1[0] * c2n[0] + c1[1] * c2n[1] + c1[2] * c2n[2];
+  const c2 = norm(c2n.map((x, i) => x - d * c1[i]));
+  const c3 = cross(c1, c2);
+  R = [c1[0], c2[0], c3[0], c1[1], c2[1], c3[1], c1[2], c2[2], c3[2]];
+  const rr = resid(R, t);
+  if (!rr) return null;
+  let err = 0;
+  for (let i = 0; i < 4; i++) err += Math.hypot(rr[2 * i], rr[2 * i + 1]);
+  return { R, t, err: err / 4 };
+}
+
+/** нормаль карты (ось +Z модели, «рост» кота) в системе камеры three.js: +Y — вверх по экрану, +Z — к зрителю */
+export function poseNormal(p: Pose): [number, number, number] {
+  return [p.R[2], p.R[5], p.R[8]];
+}
+
 /** точка модели (X, Y, Z) → пиксели изображения при позе (R, t) */
 export function projectPoint(R: number[], t: number[], X: number, Y: number, Z: number, K: Intrinsics): Pt | null {
   const x = R[0] * X + R[1] * Y + R[2] * Z + t[0];

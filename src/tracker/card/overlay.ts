@@ -35,6 +35,8 @@ export const HINT_TEXT: Record<Exclude<Hint, null>, string> = {
   notcard: 'Это не карта',
 };
 
+const NEAR_TEXT = 'Отодвинь телефон чуть дальше';
+
 const MODEL = roundedCardOutline(85.6 / 53.98, 3.18 / 85.6, 6);
 const SNAP_S = 0.38;
 const GLOW_S = 1.1;
@@ -216,11 +218,17 @@ export class CardOverlay {
   private hint: Hint = 'aim';
   private trackState: TrackState = 'search';
   private scanEl: HTMLElement | null = null;
+  /**
+   * Кот уже на экране (сидел на карте в этой сессии, сейчас ждёт у стекла): над кандидатом — только пунктир и кольцо,
+   * без подписей «Держи телефон ровно…»/«Поднеси телефон ближе» и без «Это не карта» (cardTracker.everPlaced).
+   */
+  quietHints = false;
   candidate(pts: Pt[], kind: CandidateKind = 'sber') {
     if (this.state !== 'search' || this.catPlaced) return;
     const now = performance.now();
     if (kind === 'notcard') {
       this.cand = null;
+      if (this.quietHints) return;
       if (!this.notCard || now - this.notCard.at > 5000) this.notCard = { pts, at: now };
       return;
     }
@@ -265,6 +273,21 @@ export class CardOverlay {
     g.globalAlpha = age < 200 ? age / 200 : age > 1200 ? (1500 - age) / 300 : 1;
     const cx = n.pts.reduce((s, p) => s + p.x, 0) / 4, top = Math.min(...n.pts.map((p) => p.y));
     this.pill(MSG.notcard!, cx, top - 8, '#5b6670');
+    g.restore();
+  }
+
+  /** «Отодвинь телефон» — телефон вплотную к карте (cardTracker.nearCheck): пилюля внизу на 2,2 с */
+  private near = -1e9;
+  nearHint() {
+    this.near = performance.now();
+  }
+  private drawNear() {
+    const age = performance.now() - this.near;
+    if (age > 2200) return;
+    const g = this.g;
+    g.save();
+    g.globalAlpha = age < 200 ? age / 200 : age > 1800 ? (2200 - age) / 400 : 1;
+    this.pill([NEAR_TEXT], this.w / 2, this.h * 0.2, '#b35c00');
     g.restore();
   }
 
@@ -330,10 +353,12 @@ export class CardOverlay {
     g.beginPath();
     g.arc(cx, cy, 22, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.max(0.02, k));
     g.stroke();
-    // подпись — причина, почему ещё не сели (или «держи ровно»)
-    const h = this.hint && this.hint !== 'aim' ? this.hint : 'steady';
-    const top = Math.min(...c.pts.map((p) => p.y));
-    this.pill([HINT_TEXT[h]], cx, top - 8, h === 'glare' || h === 'closer' || h === 'farther' ? '#b35c00' : '#157a2c');
+    // подпись — причина, почему ещё не сели (или «держи ровно»); кот уже на экране — без подписи
+    if (!this.quietHints) {
+      const h = this.hint && this.hint !== 'aim' ? this.hint : 'steady';
+      const top = Math.min(...c.pts.map((p) => p.y));
+      this.pill([HINT_TEXT[h]], cx, top - 8, h === 'glare' || h === 'closer' || h === 'farther' ? '#b35c00' : '#157a2c');
+    }
     g.restore();
   }
 
@@ -346,6 +371,7 @@ export class CardOverlay {
     if (this.state === 'search' && this.shown > 0.01) return true;
     if (this.cand && this.trackState === 'candidate' && now - this.cand.at < 600) return true;
     if (this.notCard && now - this.notCard.at < 1500) return true;
+    if (now - this.near < 2200) return true;
     return false;
   }
 
@@ -371,6 +397,7 @@ export class CardOverlay {
     this.drawBurst(dt);
     this.drawCandidate();
     this.drawNotCard();
+    this.drawNear();
     this.drawDebug();
     let alpha = 0;
     let pts = this.outline();
