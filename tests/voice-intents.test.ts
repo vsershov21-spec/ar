@@ -1,5 +1,7 @@
+import { classifyUtterance } from '../src/voice/utterance';
+import { isBad } from '../src/voice/badWords';
 import { describe, it, expect } from 'vitest';
-import { matchIntent, parseIntent, stem, lev, grammarPhrases, NAMES } from '../src/voice/intents';
+import { matchIntent, parseIntent, stem, lev, grammarPhrases, NAMES, isNameLead, answerWords } from '../src/voice/intents';
 
 const m = (s: string, c = {}) => matchIntent(s, c).intent;
 
@@ -84,14 +86,70 @@ describe('интенты: контекст и приоритеты', () => {
   });
   it('имя: по фразе, из словаря, отказ', () => {
     expect(matchIntent('меня зовут тема')).toMatchObject({ intent: 'name', name: 'Тёма', known: true });
-    expect(matchIntent('я Гоша')).toMatchObject({ intent: 'name', name: 'Гоша', known: true });
-    expect(matchIntent('Зигфрид', { expectName: true })).toMatchObject({ intent: 'name', name: 'Зигфрид', known: false });
+    // «я X» / «это X» — имя только в окне имени
+    expect(matchIntent('я Гоша', { expectName: true })).toMatchObject({ intent: 'name', name: 'Гоша', known: true });
+    expect(matchIntent('я Гоша').intent).not.toBe('name');
+    expect(matchIntent('это Гоша').intent).not.toBe('name');
+    // одиночное слово не из словаря — не имя, а «Тебя зовут Зигфрид?» (VoiceEngine.nameStep)
+    expect(matchIntent('Зигфрид', { expectName: true })).toMatchObject({ intent: 'unknown', confirmName: 'Зигфрид' });
     expect(m('не скажу', { expectName: true })).toBe('skip');
     expect(m('секрет', { expectName: true })).toBe('skip');
     expect(m('мне грустно', { expectName: true })).toBe('sad');
   });
   it('parseIntent: change_persona → switch для автомата сценария', () => {
     expect(parseIntent('переоденься').type).toBe('switch');
+  });
+});
+
+describe('окно имени (аудит голоса 20.11)', () => {
+  const ctx = { expectName: true, question: true };
+  it.each(['меня', 'зовут', 'ну', 'да', 'ага', 'это'])('«%s» — не имя', (w) => {
+    const r = matchIntent(w, ctx);
+    expect(r.intent).not.toBe('name');
+    expect(r.confirmName).toBeUndefined();
+  });
+  it('«меня зовут» без имени — начало ответа (слушаем дальше)', () => {
+    expect(isNameLead('меня зовут')).toBe(true);
+    expect(isNameLead('ну меня зовут')).toBe(true);
+    expect(isNameLead('я')).toBe(true);
+    expect(isNameLead('меня зовут Маша')).toBe(false);
+    expect(matchIntent('меня зовут', ctx).intent).not.toBe('name');
+  });
+  it('«да» в окне имени — да, а не имя «Да»', () => expect(matchIntent('да', ctx).intent).toBe('yes'));
+  it('имя из словаря — сразу; с «ё» в грамматике обе формы', () => {
+    expect(matchIntent('Пётр', ctx)).toMatchObject({ intent: 'name', name: 'Пётр', known: true });
+    expect(matchIntent('Алена', ctx)).toMatchObject({ intent: 'name', name: 'Алёна', known: true });
+    const g = grammarPhrases();
+    for (const n of ['петр', 'пётр', 'алена', 'алёна', 'лева', 'лёва']) expect(g).toContain(n);
+  });
+});
+
+describe('отрицание в середине фразы (sad/scared)', () => {
+  it.each(['мне не грустно', 'мне не страшно', 'мне совсем не грустно'])('«%s» — не безопасность', (s) => {
+    expect(['sad', 'scared']).not.toContain(matchIntent(s).intent);
+  });
+  it.each([['мне грустно', 'sad'], ['мне очень грустно', 'sad'], ['мне страшно', 'scared']])('«%s» → %s', (s, i) => expect(matchIntent(s).intent).toBe(i));
+});
+
+describe('короткие ответы в открытом диалоге (utterance.ts)', () => {
+  const base = { unk: 0, now: 100_000, lastUnknownAt: -1e9 } as const;
+  it('«да», «нет», «сдаюсь» короче 300 мс в окне ответа — интент, не шум', () => {
+    for (const text of ['да', 'нет', 'сдаюсь'])
+      expect(classifyUtterance({ ...base, text, speechMs: 180, reason: 'vad', ctx: { question: true } }).kind, text).toBe('intent');
+  });
+  it('ответ загадки из ключей короче порога — не шум', () => {
+    const ctx = { question: true, answers: answerWords() };
+    const w = [...answerWords()][0];
+    expect(classifyUtterance({ ...base, text: w, speechMs: 150, reason: 'window', ctx }).kind).not.toBe('noise');
+    // без ключей — по-прежнему шум по длине
+    expect(classifyUtterance({ ...base, text: 'абв', speechMs: 150, reason: 'window', ctx: { question: true } }).kind).toBe('noise');
+  });
+});
+
+describe('мат в повторялке (badWords.ts)', () => {
+  it('корни ловятся, обычные слова — нет', () => {
+    for (const w of ['блять', 'сука', 'нахуй', 'пиздец', 'жопа', 'дурак']) expect(isBad(w), w).toBe(true);
+    for (const w of ['тебе', 'привет', 'кот', 'мудрый', 'страна', 'дурачиться весело'.split(' ')[1]]) expect(isBad(w), w).toBe(false);
   });
 });
 

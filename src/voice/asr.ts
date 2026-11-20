@@ -239,6 +239,8 @@ export class VoskAsr implements Asr {
   private unkFinal = 0;
   private unkPartial = 0;
   lastUnk = 0;
+  /** слова последней фразы и их уверенность (setWords(true)): нормализованное слово → минимальная conf */
+  private words = new Map<string, number>();
   paused = false;
   gate: (() => boolean) | null = null;
   private held: Float32Array[] = [];
@@ -357,6 +359,7 @@ export class VoskAsr implements Asr {
     this.final = '';
     this.partial = '';
     this.unkFinal = this.unkPartial = this.lastUnk = 0;
+    this.words.clear();
     const micOk = this.mic.acquire();
     const ok = await this.preload();
     if (!(await micOk) || !ok) {
@@ -371,8 +374,19 @@ export class VoskAsr implements Asr {
     }
     const sr = this.mic.asrRate;
     const rec = this.grammar ? new this.model.KaldiRecognizer(sr, JSON.stringify(this.grammar)) : new this.model.KaldiRecognizer(sr);
+    // уверенность по словам: имя, в котором модель не уверена, переспрашиваем (VoiceEngine.nameStep)
+    try {
+      rec.setWords?.(true);
+    } catch {
+      /* старая версия vosk-browser */
+    }
     rec.on('result', (m: any) => {
       const t: string = m.result?.text ?? '';
+      for (const w of (m.result?.result ?? []) as { word?: string; conf?: number }[]) {
+        if (!w?.word || typeof w.conf !== 'number') continue;
+        const k = w.word.toLowerCase().replace(/ё/g, 'е');
+        this.words.set(k, Math.min(this.words.get(k) ?? 1, w.conf));
+      }
       this.unkFinal += (t.match(/\[unk\]/g) ?? []).length;
       this.unkPartial = 0;
       this.partial = ''; // итог сегмента пришёл — его частичный вариант не дублируем
@@ -453,6 +467,10 @@ export class VoskAsr implements Asr {
   abort() {
     this.aborted = true;
     this.stop();
+  }
+
+  wordConf(word: string): number | undefined {
+    return this.words.get(word.toLowerCase().replace(/ё/g, 'е'));
   }
 
   /** модель уже в памяти (тогда recognizeOnce работает быстро) */

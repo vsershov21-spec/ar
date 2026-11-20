@@ -30,7 +30,7 @@ import { MicInput, type MicEvent } from './mic';
 import { makeAsr, VoskAsr, type Asr, type AsrState } from './asr';
 import { EchoMode, type EchoPreset } from './echo';
 import { SoundEvents, Vad, db } from './vad';
-import { grammarPhrases, intentContext, matchIntent, setIntentContext, type IntentMatch } from './intents';
+import { answerWords, grammarPhrases, intentContext, isNameLead, matchIntent, setIntentContext, type IntentMatch } from './intents';
 import { classifyUtterance, type ListenReason } from './utterance';
 import { turn } from './turn';
 
@@ -84,6 +84,10 @@ export interface ListenOpts {
 }
 
 const SELF_MUTE_TAIL_MS = 250;
+/** окно имени: конец фразы — после такой паузы (VAD сам ждёт 400 мс тишины, остальное — здесь): «Меня зовут… Маша» */
+export const NAME_END_PAUSE_MS = 1100;
+/** уверенность Vosk в слове-имени ниже порога — переспрашиваем «Тебя зовут X?» */
+export const NAME_WORD_CONF = 0.6;
 /** окно ответа после реплики-вопроса в «слушаю всегда» (ребёнку 6–13 лет нужно время подумать) */
 export const QUESTION_WINDOW_MS = 8000;
 /** ребёнок заговорил — новые реплики кота ждут (release — когда фраза разобрана) */
@@ -300,6 +304,8 @@ export class VoiceEngine extends Emitter<EngineEvents> {
   /** DirectorDeps.stopListen */
   stopListen() {
     clearTimeout(this.windowTimer);
+    clearTimeout(this.nameEndTimer);
+    this.nameCandidate = null;
     this.echoWindow = false;
     if (this.listenReason === 'window' || this.listenReason === 'barge') this.asr.stop();
     // повтор: между фразами диалог закрывает и снова открывает окно — останавливаемся, только если за 6 с не открыл снова
@@ -388,6 +394,7 @@ export class VoiceEngine extends Emitter<EngineEvents> {
       this.mic.floor.push(f, this.vad.speaking);
       const ev = this.vad.push(f);
       if (ev?.type === 'start' && !this.echo.active) {
+        clearTimeout(this.nameEndTimer); // окно имени: ребёнок продолжил («меня зовут… Маша»)
         turn.userStart();
         // ребёнок заговорил — кот не начинает новую реплику, пока фраза не разобрана
         if (this.mode === 'auto' || this.listening) this.voice.hold(USER_HOLD_MS);
@@ -399,7 +406,11 @@ export class VoiceEngine extends Emitter<EngineEvents> {
         if (this.listening) this.utter.speechMs = Math.max(this.utter.speechMs, ev.durMs);
         const w = this.sound.phraseEnded(ev.durMs, this.vad.stats);
         if (w && !this.echo.active) this.fire('whisper', { meanDb: +(this.vad.stats.sumDb / Math.max(1, this.vad.stats.n)).toFixed(1) });
-        if (this.listenReason === 'window' || this.listenReason === 'barge' || this.listenReason === 'vad') this.asr.stop(); // фраза кончилась — не ждём таймаута
+        if (this.listenReason === 'window' && intentContext().expectName) {
+          // окно имени: пауза конца фразы длиннее (дети делают паузу перед именем)
+          clearTimeout(this.nameEndTimer);
+          this.nameEndTimer = window.setTimeout(() => this.listenReason === 'window' && !this.vad.speaking && this.asr.stop(), NAME_END_PAUSE_MS - this.vad.opts.endSilenceMs);
+        } else if (this.listenReason === 'window' || this.listenReason === 'barge' || this.listenReason === 'vad') this.asr.stop(); // фраза кончилась — не ждём таймаута
       }
       const s = this.sound.push(f);
       // в повторе громкость — часть игры (кот повторит и крик), хлопки/шёпот не отвлекают; в окне ответа — без хлопков
@@ -429,9 +440,54 @@ export class VoiceEngine extends Emitter<EngineEvents> {
       return;
     }
     if (v.kind === 'unknown') this.lastUnknownAt = now;
+    if (this.nameStep(t, v.match)) return;
     // слова вне словаря: в подсказке «…», затем честно — «слышу, но не разобрал»
     this.handleText(t || ECHO_HEARD, 'asr');
     if (!t) this.emit('interim', 'Слышу тебя, но слова не разобрал');
+  }
+
+  /**
+   * Окно имени (кот спросил «Как тебя зовут?»):
+   *  - «меня зовут» / «я» / «это» без имени — слушаем дальше (ребёнок задумался);
+   *  - одно слово не из словаря имён или слово, в котором Vosk не уверен, — переспрашиваем «Тебя зовут X?»
+   *    (подсказкой), «да» — имя, «нет» — слушаем заново.
+   * true — фраза обработана здесь (режиссёру не уходит).
+   */
+  private nameStep(t: string, m: IntentMatch): boolean {
+    const ctx = intentContext();
+    if (!ctx.expectName) {
+      this.nameCandidate = null;
+      return false;
+    }
+    const reopen = (hint: string) => {
+      this.emit('interim', hint);
+      this.voice.hold(USER_HOLD_MS);
+      // окно ещё открыто (таймер окна идёт) — продолжаем слушать
+      setTimeout(() => !this.listening && intentContext().expectName && this.startListening('window'), 0);
+      this.pushState();
+      return true;
+    };
+    const cand = this.nameCandidate;
+    if (cand) {
+      this.nameCandidate = null;
+      if (m.intent === 'yes') {
+        this.handleText(`меня зовут ${cand}`, 'asr');
+        return true;
+      }
+      if (m.intent === 'no') return reopen('Скажи ещё раз, как тебя зовут');
+    }
+    if (isNameLead(t)) {
+      this.st.lastEvent = 'имя: жду продолжения';
+      return reopen('Слушаю…');
+    }
+    const lowConf = m.intent === 'name' && !!m.name && (this.asr.wordConf?.(m.name) ?? 1) < NAME_WORD_CONF;
+    const ask = m.confirmName ?? (lowConf ? m.name : undefined);
+    if (ask) {
+      this.nameCandidate = ask;
+      this.st.lastEvent = `имя: переспрашиваю ${ask}`;
+      return reopen(`Тебя зовут ${ask}? Скажи «да» или «нет»`);
+    }
+    return false;
   }
 
   /** распознанный текст или чип → событие text (app → director.text) */

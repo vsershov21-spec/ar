@@ -9,7 +9,8 @@
  *  5. context: only_after_question — интент работает только в окне ответа на вопрос кота
  *     (окно открывает VoiceEngine.listen() или реплика кота, заканчивающаяся на «?»).
  *  6. Уверенность < 0.6 → unknown.
- * Имя: «меня зовут …», «я …», «зови меня …», а когда кот спросил имя — одиночное слово.
+ * Имя: «меня зовут …», «зови меня …», «моё имя …»; когда кот спросил имя — ещё «я …», «это …» и одиночное слово
+ * (только из словаря имён; другое слово — confirmName: VoiceEngine переспросит «Тебя зовут X?»).
  * Имя из словаря names.ru.txt помечается known=true (кот произносит вслух только такие).
  */
 import data from '../../content/intents.ru.json';
@@ -45,6 +46,8 @@ export interface IntentMatch {
   phrase?: string;
   name?: string;
   known?: boolean;
+  /** окно имени: одно слово не из словаря — возможно имя; переспросить «Тебя зовут X?» */
+  confirmName?: string;
   text: string;
 }
 
@@ -154,8 +157,18 @@ for (const l of namesRaw.split('\n')) {
   if (n && !n.startsWith('#')) NAMES.set(normalize(n), n);
 }
 
-const NAME_PATTERNS = [/(?:^| )меня зовут ([а-яa-z]+)/, /(?:^| )мое имя ([а-яa-z]+)/, /(?:^| )зови меня ([а-яa-z]+)/, /^я ([а-яa-z]+)$/, /^это ([а-яa-z]+)$/];
-const STOP_NAMES = new Set(['не', 'никак', 'тебя', 'кот', 'котик', 'хочу', 'знаю', 'здесь', 'тут', 'боюсь', 'устал', 'устала', 'пошел', 'пошла', 'грустно', 'скажу', 'девочка', 'мальчик', 'тоже']);
+const NAME_PATTERNS = [/(?:^| )меня зовут ([а-яa-z]+)/, /(?:^| )мое имя ([а-яa-z]+)/, /(?:^| )зови меня ([а-яa-z]+)/];
+/** «я Маша», «это Петя» — имя только в окне имени (иначе «я устал», «это круто» становились бы именами) */
+const NAME_PATTERNS_ASKED = [/^я ([а-яa-z]+)$/, /^это ([а-яa-z]+)$/];
+const STOP_NAMES = new Set(['не', 'никак', 'тебя', 'кот', 'котик', 'хочу', 'знаю', 'здесь', 'тут', 'боюсь', 'устал', 'устала', 'пошел', 'пошла', 'грустно', 'скажу', 'девочка', 'мальчик', 'тоже',
+  'меня', 'зовут', 'ну', 'да', 'ага', 'это', 'нет', 'неа', 'а', 'э', 'мм', 'ой', 'вот', 'я', 'мое', 'имя', 'зови']);
+
+/** «меня зовут», «я», «это», «ну меня зовут» — начало ответа без самого имени (окно имени слушает дальше) */
+const NAME_LEADS = new Set(['меня зовут', 'мое имя', 'зови меня', 'я', 'это', 'меня', 'зовут', 'меня зовут это', 'я это']);
+export function isNameLead(raw: string): boolean {
+  const t = normalize(raw).split(' ').filter((w) => w && !['ну', 'а', 'э', 'мм', 'вот', 'ой'].includes(w)).join(' ');
+  return NAME_LEADS.has(t);
+}
 
 function nameOf(w: string): { name: string; known: boolean } | null {
   if (!w || STOP_NAMES.has(w) || w.length < 2) return null;
@@ -170,7 +183,7 @@ export function matchIntent(raw: string, ctx: IntentContext = {}): IntentMatch {
   if (!text) return none;
   const words = text.split(' ');
   // имя по фразе — самый явный сигнал
-  for (const re of NAME_PATTERNS) {
+  for (const re of ctx.expectName ? [...NAME_PATTERNS, ...NAME_PATTERNS_ASKED] : NAME_PATTERNS) {
     const m = text.match(re);
     const n = m && nameOf(m[1]);
     if (n && !RULES.some((r) => SAFETY.has(r.intent) && r.phrases.some((p) => phraseScore(p, words) >= 0.9))) return { intent: 'name', confidence: n.known ? 0.95 : 0.8, ...n, text };
@@ -190,12 +203,14 @@ export function matchIntent(raw: string, ctx: IntentContext = {}): IntentMatch {
     if (SAFETY.has(r.intent) && sc >= 0.74) return { intent: r.intent as IntentId, confidence: Math.min(1, sc), phrase: ph, text };
     if (sc > best.confidence + 1e-9) best = { intent: r.intent as IntentId, confidence: sc, phrase: ph, text };
   }
-  // кот спросил имя: одно-два слова без явного интента — это имя
-  if (ctx.expectName && (best.confidence < 0.85 || best.intent === 'yes')) {
+  // кот спросил имя: одно-два слова без явного интента — имя, но только из словаря имён; другое слово —
+  // «Тебя зовут X?» (VoiceEngine.nameStep), а не «Здравствуй, Ничего!»
+  if (ctx.expectName && best.confidence < 0.85) {
     const ws = words.filter((w) => !STOP_NAMES.has(w));
     if (ws.length >= 1 && ws.length <= 2) {
       const n = nameOf(ws[0]);
-      if (n) return { intent: 'name', confidence: n.known ? 0.9 : 0.65, ...n, text };
+      if (n?.known) return { intent: 'name', confidence: 0.9, ...n, text };
+      if (n && best.confidence < 0.6) return { ...none, confidence: best.confidence, confirmName: n.name };
     }
   }
   if (best.confidence < 0.6) return { ...none, confidence: best.confidence };
@@ -290,7 +305,11 @@ export function grammarPhrases(): string[] {
     for (const raw of r.raw) if (/ё/i.test(raw) && !raw.includes('*')) set.add(raw.toLowerCase().replace(/[^а-яё\s]/g, ' ').replace(/\s+/g, ' ').trim());
   }
   for (const p of REFUSALS) set.add(p.join(' '));
-  for (const n of NAMES.keys()) set.add(n);
+  // имена — и с «е», и с «ё» (Пётр, Алёна, Артём, Сёма): в словаре модели может быть любая форма
+  for (const [n, orig] of NAMES) {
+    set.add(n);
+    if (/ё/i.test(orig)) set.add(orig.toLowerCase());
+  }
   for (const w of riddleWords()) set.add(w);
   for (const w of gameWords()) set.add(w);
   for (const f of CHAT_PHRASES) set.add(normalize(f));

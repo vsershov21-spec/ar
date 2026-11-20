@@ -42,7 +42,9 @@ export function classifyUtterance(u: Utterance): Verdict {
   const match = matchIntent(text, u.ctx);
   // понятая команда — всегда (длительность не важна: «да» короче полсекунды)
   if (text && match.intent !== 'unknown') return { kind: 'intent', match };
-  const deliberate = u.reason === 'ptt';
+  // кнопка — явно; в загадке/мини-игре короткий ответ из ключей («кот», «ёж») — тоже ответ, а не шум по длине
+  // окно имени: слово, похожее на имя («Ян»), — переспросим «Тебя зовут Ян?», а не выбросим как обрывок
+  const deliberate = u.reason === 'ptt' || (!!text && isAnswer(text, u.ctx.answers)) || (!!u.ctx.expectName && !!match.confirmName);
   const asked = !!u.ctx.question || u.reason === 'window';
   if (!text && !u.unk) return { kind: 'noise', why: 'empty' };
   if (!deliberate) {
