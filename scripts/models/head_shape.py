@@ -201,6 +201,21 @@ def main():
     print(f'  min якобиана в {np.round((pm - F.c) / D, 2)} D от центра глаз')
     assert Jd.min() > 0.12, 'поле складывается — уменьшите --k'
 
+    apply_field(g, F, D, IRIS[persona], ('headShape', {'k': kk, **{k_: round(v, 4) for k_, v in F.p.items()}}))
+    g.save(dst)
+
+
+def apply_field(g, F, D, iris=1.0, record=None):
+    """деформировать всё в координатах покоя полем F (F(P), F.jac(P)): тело, ключи (f(p+δ) − f(p)), нормали (якобиан),
+    накладки и дочерние к костям сетки, узлы глаз, кости ушей (+ inverseBindMatrices), точки лица и рамку рта.
+    iris — множитель радужки (irisUV); record = (ключ, значение) — пометка в extras узла Brows. Сохранение — у вызывающего.
+    Используется и scripts/models/face_geom.py (нос меньше)."""
+    j = g.j
+    W, par = world_mats(j)
+    nm = {n.get('name'): i for i, n in enumerate(j['nodes'])}
+    brows = j['nodes'][nm['Brows']]
+    marks = brows['extras']['marks']
+    bi, _ = g.main_mesh()
     done = set()
 
     def deform_positions(ai, M=None):
@@ -297,7 +312,8 @@ def main():
         for kx in ('A', 'B', 'C'):
             ex[kx] = ex[kx] * ks
         # радужка крупнее (на рефах белка почти не видно — не «кукольный» глаз)
-        ex['irisUV'] = [round(v * IRIS[persona], 5) for v in ex['irisUV']]
+        if iris != 1.0:
+            ex['irisUV'] = [round(v * iris, 5) for v in ex['irisUV']]
         sn = j['nodes'][nm['EyeS_' + s]]
         sn['scale'] = [v * ks for v in sn['scale']]
         tn = j['nodes'][nm['Tear_' + s]]
@@ -333,7 +349,8 @@ def main():
     nl = np.array(marks['nose']) + [marks['noseHalfW'], 0, 0]; nr = np.array(marks['nose']) - [marks['noseHalfW'], 0, 0]
     mk['noseHalfW'] = float(np.linalg.norm(F(nl) - F(nr)) / 2)
     brows['extras']['marks'] = mk
-    brows['extras']['headShape'] = {'k': kk, **{k_: round(v, 4) for k_, v in F.p.items()}}
+    if record:
+        brows['extras'][record[0]] = record[1]
     mi = nm.get('MouthD')
     if mi is not None and 'mouth' in j['nodes'][mi].get('extras', {}):
         mo = j['nodes'][mi]['extras']['mouth']
@@ -344,7 +361,6 @@ def main():
         ml, mr = np.array(marks['mouthL']), np.array(marks['mouthR'])
         mo['W'] = float(mo['W'] * np.linalg.norm(F(ml) - F(mr)) / np.linalg.norm(ml - mr))
     print(f'  нос: полуширина {marks["noseHalfW"]:.4f} → {mk["noseHalfW"]:.4f}; рот W ×{np.linalg.norm(F(np.array(marks["mouthL"])) - F(np.array(marks["mouthR"]))) / np.linalg.norm(np.array(marks["mouthL"]) - np.array(marks["mouthR"])):.3f}')
-    g.save(dst)
 
 
 if __name__ == '__main__':
