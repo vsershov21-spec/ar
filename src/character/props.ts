@@ -140,6 +140,10 @@ export class PropRig {
     this.placed.s = s;
     this.placed.sy = sy;
   }
+  /** положение, заданное снаружи сейчас (null — по кисти и клипу) */
+  get placedNow(): { s: number } | null {
+    return this.placed;
+  }
   /** пересобрать процедурный реквизит (размер доски поменялся под кота) */
   rebuild(id: string) {
     const d = PROPS[id];

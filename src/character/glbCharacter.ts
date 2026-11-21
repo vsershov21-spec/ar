@@ -26,6 +26,7 @@ import { PROPS, PropRig } from './props';
 import { ToolIK, type AimRequest } from './toolIK';
 import { BodyCollider, CAT_MM, worstPair, type CollidersJson } from './bodyCollide';
 import { FootPin } from './footPin';
+import { PoseFade } from './poseFade';
 import { curlFingers, lowestPoint, rotWorld as rotW, twoBoneIK, type GroundVolume } from './limbIK';
 import { HOLD_SPECS, holdDuration, holdPose, type HoldFrame, type HoldSpec } from './holdAction';
 import { PropFx } from './propFx';
@@ -255,6 +256,10 @@ export class GlbCharacter implements Character {
   readonly clips = new ClipState();
   /** переходы, темп и слой покоя (animBlend.ts); подготовка клипов — animPrep.ts */
   anim: AnimBlender | null = null;
+  /** плавный выход из слоя позы поверх клипа (предмет, скейт): poseFade.ts */
+  poseFade: PoseFade | null = null;
+  /** предмет уходит уменьшением после cancelAct: поза в системе кисти (или inner), масштаб, время */
+  private propOut: { t: number; dur: number; hand: THREE.Object3D | null; rel: THREE.Matrix4; s0: number } | null = null;
   animInfo = new Map<THREE.AnimationClip, ClipPrepInfo>();
   readonly faceMix = new FaceMixer();
   private playing = '';
@@ -399,6 +404,7 @@ export class GlbCharacter implements Character {
       for (const clip of anims) this.addClip(clip);
       this.addFallbacks();
       if (!raw) this.anim = new AnimBlender(model, (a) => this.animInfo.get(a.getClip()));
+      this.poseFade = new PoseFade(model);
       // одноразовые клипы играют до конца движения, а не по ориентиру каталога
       this.actions.forEach((a, id) => this.clips.realDuration.set(id, this.anim?.realDuration(a) ?? a.getClip().duration));
     }
@@ -543,6 +549,7 @@ export class GlbCharacter implements Character {
   runAct(id: string): number {
     if (!this.model || !this.props) return 0;
     this.cancelAct();
+    this.finishPropOut();
     if (id === 'skate') {
       this.act = { kind: 'skate', id, t: 0, f: skatePose(0), dir: 1, wheel: 0 };
       this.props.rebuild('skateboard');
@@ -564,14 +571,65 @@ export class GlbCharacter implements Character {
   /** прервать действие: предмет убрать, лапа — к клипу */
   cancelAct() {
     if (!this.act) return;
+    const a = this.act;
     this.act = null;
     this.restoreArms();
     this.actFace = null;
     this.propFx.hide();
     if (this.clips.requested === 'idle_breathe' || ACT_CLIPS.has(this.clips.requested)) this.play('idle');
     this.actLook = null;
+    // лапы и ноги — к клипу плавно (poseFade), предмет — уменьшением у кисти (propOut), а не за кадр
+    this.poseFade?.release(0.22);
+    this.startPropOut(a.kind === 'hold' ? a.spec.hand : a.kind === 'skate' && a.f.carry > 0.5 ? 'Right' : null);
+  }
+
+  /** предмет после действия: держится у кисти (или где стоял) и уменьшается за ~0,2 с; затем отпускается */
+  private startPropOut(side: 'Left' | 'Right' | null) {
+    const po = this.props?.object;
+    this.finishPropOut();
+    if (!this.props || !po || !po.visible || !this.props.placedNow) {
+      this.props?.place(null);
+      this.props?.hold(null);
+      return;
+    }
+    const hand = side ? (this.bones.get(side + 'Hand') ?? null) : null;
+    po.updateWorldMatrix(true, false);
+    const rel = new THREE.Matrix4();
+    if (hand) {
+      hand.updateWorldMatrix(true, false);
+      rel.copy(hand.matrixWorld).invert().multiply(po.matrixWorld);
+    } else {
+      this.inner.updateWorldMatrix(true, false);
+      rel.copy(this.inner.matrixWorld).invert().multiply(po.matrixWorld);
+    }
+    this.propOut = { t: 0, dur: 0.2, hand, rel, s0: this.props.placedNow.s };
+  }
+  private finishPropOut() {
+    if (!this.propOut) return;
+    this.propOut = null;
     this.props?.place(null);
     this.props?.hold(null);
+  }
+  private updatePropOut(dt: number) {
+    const o = this.propOut;
+    if (!o || !this.props) return;
+    if (this.act) return void (this.propOut = null);
+    o.t += dt;
+    const k = clamp(o.t / o.dur, 0, 1);
+    if (k >= 1) return this.finishPropOut();
+    const m = new THREE.Matrix4();
+    if (o.hand) {
+      o.hand.updateWorldMatrix(true, false);
+      m.copy(o.hand.matrixWorld).multiply(o.rel);
+    } else {
+      this.inner.updateWorldMatrix(true, false);
+      m.copy(this.inner.matrixWorld).multiply(o.rel);
+    }
+    const p = new THREE.Vector3(), q = new THREE.Quaternion(), sc = new THREE.Vector3();
+    m.decompose(p, q, sc);
+    const qi = this.inner.getWorldQuaternion(new THREE.Quaternion()).invert().multiply(q);
+    const e = 1 - k * k * (3 - 2 * k);
+    this.props.place(this.inner.worldToLocal(p), qi, Math.max(0.011, o.s0 * e));
   }
   /** что сейчас идёт: id и фаза (null — ничего) */
   get actState(): { id: string; phase: string; t: number } | null {
@@ -939,6 +997,7 @@ export class GlbCharacter implements Character {
 
   /** «стук в стекло»: в 3D лапа не тянется, но глаза быстро глядят на точку тапа */
   holdProp(id: string | null, tint: string | null = null) {
+    if (this.propOut) this.finishPropOut();
     this.props?.hold(id, tint);
   }
 
@@ -1153,7 +1212,10 @@ export class GlbCharacter implements Character {
     if (ik.mode !== 'off' || ik.weight > 0.002 || ik.crouch > 0.002) ik.apply(dt, { bones: this.bones, object: this.object, inner: this.inner, axes: this.modelAxes(), rot: (b, a, ang) => this.rotWorld(b, a, ang) });
     // предмет в лапе / скейт — поверх клипа и коррекции тела; затем — пол (ничто не ниже опоры)
     this.applySkate(dt);
+    // снятый слой позы (действие вытеснено, скейт прерван) — лапы и ноги к клипу плавно; снимок показанной позы
+    this.poseFade?.apply(dt);
     this.placeHold(dt);
+    this.updatePropOut(dt);
     if (!this.act) this.propFx.hide();
     this.applyTulle(dt);
     this.groundFinal(dt, cs.cur.id);
@@ -1662,19 +1724,18 @@ export class GlbCharacter implements Character {
   private skatePre(dt: number) {
     const a = this.act;
     if (!a || a.kind !== 'skate') {
-      this.standY = 0;
+      // сошёл с доски (или скейт прерван): высота опоры и крен уходят плавно (~0,12 с), а не за кадр
+      const k = Math.min(1, dt / 0.12);
+      this.standY = Math.abs(this.standY) < 1e-4 ? 0 : this.standY * (1 - k);
       if (this.skateLean) {
-        this.skateLean = 0;
-        this.inner.rotation.x = 0;
+        this.skateLean = Math.abs(this.skateLean) < 1e-4 ? 0 : this.skateLean * (1 - k);
+        this.inner.rotation.x = this.skateLean;
       }
       return;
     }
     a.t += dt;
     skatePose(a.t, a.f);
-    if (a.f.phase === 'done') {
-      this.standY = 0;
-      return this.cancelAct();
-    }
+    if (a.f.phase === 'done') return this.cancelAct();
     this.standY = a.f.standOn + a.f.lift - a.f.crouch * 0.075;
     // тело на доске — клипом Meshy фазы, если он пришёл (стопы, лапы и доску всё равно ведёт skateRig)
     const want = SKATE_BODY[a.f.phase];
