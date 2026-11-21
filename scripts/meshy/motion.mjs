@@ -385,7 +385,12 @@ function makeApi(key) {
         continue;
       }
       if (r.status === 402) throw new Stop(`402: кредиты кончились или нужен платный план (${await errText(r)})`);
-      if (r.status === 401 || r.status === 403) throw new Stop(`${r.status}: ключ не принят (${await errText(r)})`);
+      if (r.status === 401 || r.status === 403) {
+        const msg = await errText(r);
+        // фильтр содержания Meshy (403 explicit content): кредиты не списаны, отклоняем только этот клип
+        if (r.status === 403 && /explicit|content|moderat|policy/i.test(msg)) return { error: `403 фильтр содержания: ${msg}` };
+        throw new Stop(`${r.status}: ключ не принят (${msg})`);
+      }
       if (r.status >= 500) return { uncertain: `${r.status} ${await errText(r)}` };
       return { error: `${r.status} ${await errText(r)}` }; // 400 и т. п.: не принят, кредиты не списаны
     }

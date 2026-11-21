@@ -1431,7 +1431,7 @@
    "replaces": "процедурная опора (holdAction / skateRig / aliveIdle)",
    "trigger": "Зеркальце (Блёстка): тело под шаблон — левую лапу ведёт IK зеркальца, правая поправляет бант",
    "meshy": {
-    "prompt": "Starts standing upright facing forward. The left hand rises beside the left cheek as if holding a hand mirror. The head turns to it and tilts coquettishly side to side twice, hips sway. The right hand pats the top right of the head twice and lowers. A playful lean toward the left hand like a kiss, then hands lower, relaxed standing pose, in place, no turning.",
+    "prompt": "Starts standing upright facing forward. The left hand rises beside the left cheek as if holding a small hand mirror. The head turns toward the hand and tilts gently left and right twice, smiling. The right hand pats the top of the head twice and lowers. A small happy nod toward the left hand, then both hands lower to a relaxed standing pose, in place, no turning.",
     "duration": 5.5,
     "mode": "prime"
    }
@@ -1521,7 +1521,7 @@
    "replaces": "процедурная опора (holdAction / skateRig / aliveIdle)",
    "trigger": "Живой покой Блёстки, петля (слой aliveIdle поверх — вполсилы)",
    "meshy": {
-    "prompt": "Seamless loop. A cute girly character standing in place: slowly shifts weight from leg to leg with gentle hip sway, free knee softly bent, torso counter-sways, head tilts coquettishly to one side then the other, one hand rests on the hip a while, then both hands meet in front of the belly. Feet stay planted, no stepping, no turning.",
+    "prompt": "Seamless loop. A cheerful cartoon character standing in place: slowly shifts weight from one leg to the other, the free knee softly bent, the upper body balances gently, the head tilts to one side then the other, one hand rests at the waist for a while, then both hands meet in front of the tummy. Feet stay planted, no stepping, no turning.",
     "duration": 6.0,
     "mode": "prime"
    }
@@ -1536,7 +1536,7 @@
    "replaces": "процедурная опора (holdAction / skateRig / aliveIdle)",
    "trigger": "Блёстка: кокетливая реакция на тап по голове/щёчке (вместо poke_head «голова вниз»)",
    "meshy": {
-    "prompt": "Starts standing upright facing forward. Pulls the shoulders up shyly, tilts the head to one side with a small giggle bounce, both hands rise to the cheeks, a little hip twist to the side and back, then hands lower to a relaxed standing pose. In place, head stays facing forward, no bowing.",
+    "prompt": "Starts standing upright facing forward. Raises the shoulders shyly, tilts the head to one side with a small giggling bounce, both hands rise to the cheeks, a small turn of the upper body to the side and back, then hands lower to a relaxed standing pose. In place, head stays facing forward, no bowing.",
     "duration": 2.5,
     "mode": "prime"
    }
@@ -1551,7 +1551,7 @@
    "replaces": "процедурная опора (holdAction / skateRig / aliveIdle)",
    "trigger": "Блёстка: радость в такт — руки и ноги вместе (похвала, комплимент)",
    "meshy": {
-    "prompt": "Starts standing upright facing forward. Two small happy bounces with knees bending in rhythm, arms swinging up together in time with the bounces, then hands twirl near the chest and a cute pose with one hand on the hip and the head tilted. Feet return to the same spot, in place, no turning.",
+    "prompt": "Starts standing upright facing forward. Two small happy bounces with knees bending in rhythm, arms swinging up together in time with the bounces, then hands twirl near the chest and a cheerful pose with one hand at the waist and the head tilted. Feet return to the same spot, in place, no turning.",
     "duration": 3.0,
     "mode": "prime"
    }
