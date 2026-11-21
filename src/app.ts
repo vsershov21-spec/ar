@@ -595,7 +595,7 @@ export class App {
   }
   /**
    * Срез редакции (config/edition.ts → config/pilot.ts) и воронка (src/analytics): точки входа одним местом.
-   * pilot.catalog — команда вырезанного действия голосом → «Давай лучше …» пузырём + чипы замены;
+   * pilot.catalog — команда вырезанного действия голосом → «Давай лучше …» пузырём с голосом (pilot_cut) + чипы замены;
    * pilot.switchCooldown — смена кота не чаще раза в 3 мин («Чуть позже!»); pilot.fx — белый список эффектов.
    */
   readonly switchCooldown = new SwitchCooldown(cooldownMs(typeof location !== 'undefined' ? location.search : ''));
@@ -614,7 +614,9 @@ export class App {
         const r = cutRedirect(d.persona.id, h.type, (id) => av.get(id)?.label);
         if (!r) return false;
         d.log(`«${h.type}» — нет в наборе пилота (${r.cut}) → ${r.chips.join(', ')}`);
-        bubble(r.text);
+        // фирменное первым чипом — запись pilot_cut: пузырь вместе с голосом (без записи — немой, как раньше)
+        if (r.event) d.voicedBubble(r.event, r.text);
+        else bubble(r.text);
         this.suggest.prefer(r.chips, performance.now());
         this.kickSuggest();
         return true;

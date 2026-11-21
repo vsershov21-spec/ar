@@ -1,12 +1,14 @@
 // редакция pilot (https://ar.vershov.com/mvp, docs/EDITIONS.md «Пилот»): наборы и лимиты src/config/pilot.ts
 import { describe, it, expect } from 'vitest';
+import fs from 'node:fs';
+import path from 'node:path';
 import fxCatalog from '../content/fx.json';
 import { loadTestContent, dialogsFile } from './helpers/content';
 import { buildCatalog, catalogEnv, moreSection, type CatalogSection } from '../src/ui/actionCatalog';
 import { editionDialogs } from '../src/persona/content';
 import { PERSONA_IDS, type PersonaId } from '../src/persona/types';
 import { ACTION_ROUTE, type ActionId } from '../src/scenario/actions';
-import { PILOT_COMMON, PILOT_SIGNATURE, PILOT_FX, SYSTEM_FX, SWITCH_COOLDOWN_MS, SwitchCooldown, cutAction, cutRedirect, fxAllowed, limitCatalog, pilotItemAllowed } from '../src/config/pilot';
+import { PILOT_COMMON, PILOT_CUT_EVENT, PILOT_CUT_TEXT, PILOT_SIGNATURE, PILOT_FX, SYSTEM_FX, SWITCH_COOLDOWN_MS, SWITCH_LATER_EVENT, SWITCH_LATER_TEXT, SwitchCooldown, cutAction, cutRedirect, fxAllowed, limitCatalog, pilotItemAllowed } from '../src/config/pilot';
 import { Suggester, type SuggestSnapshot } from '../src/scenario/suggest';
 import { groupCatalog } from '../src/ui/catalogGroups';
 
@@ -114,7 +116,20 @@ describe('пилот: голосовые команды вырезанных д�
   it('замена — первым фирменное кота, подпись из каталога', () => {
     const r = cutRedirect('hooligan', 'jump', (id) => (id === 'skate' ? 'Скейт' : undefined))!;
     expect(r.chips[0]).toBe('skate');
-    expect(r.text).toBe('Это я пока не умею. Давай лучше скейт!');
+    // текст = озвученная реплика pilot_cut (фирменное кота), пузырь с голосом
+    expect(r.text).toBe('Это я пока не умею. Давай лучше на скейте покатаюсь!');
+    expect(r.event).toBe(PILOT_CUT_EVENT);
+  });
+  it.each(PERSONA_IDS)('%s: «Это я пока не умею…» и «Чуть позже!» — тексты совпадают с репликами content (озвучка pilot_cut / pilot_switch_later)', (pid) => {
+    const lines = (JSON.parse(fs.readFileSync(path.resolve(__dirname, `../content/personas/${pid}.json`), 'utf8')) as { lines: Record<string, { id: string; text: string }[]> }).lines;
+    expect(lines[PILOT_CUT_EVENT].map((l) => l.text)).toEqual([PILOT_CUT_TEXT[pid]]);
+    expect(lines[SWITCH_LATER_EVENT].map((l) => l.text)).toEqual([SWITCH_LATER_TEXT]);
+    // первый чип замены — всегда фирменное кота: у любой вырезанной команды текст записи
+    for (const it of ['jump', 'sit', 'wave', 'sing', 'stickers', 'rps']) {
+      const r = cutRedirect(pid, it, () => undefined)!;
+      expect(r.chips[0]).toBe(PILOT_SIGNATURE[pid][0]);
+      expect(r.text).toBe(PILOT_CUT_TEXT[pid]);
+    }
   });
   it('чипы замены держатся первыми REDIRECT_MS', () => {
     const available = new Map([['pet', { label: 'Погладить', icon: 'hand' }], ['dance', { label: 'Танец', icon: 'note' }], ['skate', { label: 'Скейт', icon: 'skate' }]]);

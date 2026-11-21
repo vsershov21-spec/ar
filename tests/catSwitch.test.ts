@@ -4,8 +4,8 @@
  * пузырь «Чуть позже!» глотал дедуп 8 с, а на кнопке не было видно, когда смена снова будет можно.
  */
 import { describe, it, expect, afterEach } from 'vitest';
-import { makeDirector } from './helpers/directorHarness';
-import { SwitchCooldown, cooldownMs, laterText, waitLabel, SWITCH_COOLDOWN_MS } from '../src/config/pilot';
+import { loadVoiced, makeDirector } from './helpers/directorHarness';
+import { SwitchCooldown, cooldownMs, laterText, waitLabel, SWITCH_COOLDOWN_MS, SWITCH_LATER_TEXT } from '../src/config/pilot';
 import { wireSwitchCooldown } from '../src/scenario/switchGate';
 import { filterSearch } from '../src/config/edition';
 
@@ -86,7 +86,9 @@ describe('смена кота подряд', () => {
     expect(r2).toEqual({ asked: false, changed: false });
     const l1 = laterBubbles(h, b0);
     expect(l1.length).toBe(1);
-    expect(l1[0].text).toMatch(/Другой кот — через \d+ с/);
+    // запись pilot_switch_later есть (el_batch_all.jsonl) — пузырь её текстом и с голосом; срок — таймером на кнопке
+    expect(l1[0].text).toBe(SWITCH_LATER_TEXT);
+    expect(h.spoken.some((s) => s.id === `${h!.d.persona.id}.pilot_switch_later.01`)).toBe(true);
     // нажали ещё раз через 4 с (пузырь уже ушёл) — снова пузырь, а не тишина (раньше дедуп 8 с глотал)
     b0 = h.bubble.length;
     await h.tick(1000);
@@ -100,8 +102,8 @@ describe('смена кота подряд', () => {
       await h.tick(800);
     }
     expect(laterBubbles(h, b0).length).toBe(0);
-    // голосом тоже «Чуть позже», без смены
-    await h.tick(4000);
+    // голосом тоже «Чуть позже», без смены (голосом одинаковый пузырь — не чаще раза в 8 с: текст записи один и тот же)
+    await h.tick(6000);
     b0 = h.bubble.length;
     h.d.text('давай другого');
     await h.tick(500);
@@ -113,6 +115,25 @@ describe('смена кота подряд', () => {
     expect(await switchOnce(h)).toEqual({ asked: true, changed: true });
     expect(h.d.persona.id).toBe('glitter');
   }, 30_000);
+
+  it('с кулдауном, mp3 «Чуть позже» ещё нет на сервере — немой пузырь со сроком сразу, как раньше', async () => {
+    const voiced = loadVoiced();
+    for (const id of [...voiced.keys()]) if (id.includes('.pilot_')) voiced.delete(id);
+    h = await makeDirector({ memory: mem, voiced });
+    await h.boot();
+    await h.until(() => !h!.d.queue.busy);
+    pilot(h, 60_000);
+    expect(await switchOnce(h)).toEqual({ asked: true, changed: true });
+    const b0 = h.bubble.length, s0 = h.spoken.length;
+    const t0 = h.T();
+    h.d.action('other');
+    await h.tick(100);
+    const l = laterBubbles(h, b0);
+    expect(l.length).toBe(1);
+    expect(l[0].text).toMatch(/Другой кот — через \d+ с/);
+    expect(l[0].t - t0).toBeLessThanOrEqual(0.3);
+    expect(h.spoken.slice(s0).some((s) => /pilot_switch_later/.test(s.id))).toBe(false);
+  });
 
   it('с кулдауном: смену отменили «нет» на наклейках — кулдаун не тратится, следующая смена сразу', async () => {
     h = await makeDirector({ memory: mem });

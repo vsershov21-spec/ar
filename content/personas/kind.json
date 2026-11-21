@@ -651,6 +651,12 @@
       "sound": "chime_soft"
     },
     "mirror": {},
+    "pilot_cut": {
+      "clip": "none"
+    },
+    "pilot_switch_later": {
+      "clip": "none"
+    },
     "home_ball": {
       "clip": "jump"
     },
@@ -3439,6 +3445,22 @@
     "skate": [],
     "cocoa": [],
     "mirror": [],
+    "pilot_cut": [
+      {
+        "id": "kind.pilot_cut.01",
+        "text": "Это я пока не умею. Давай лучше какао попьём!",
+        "emotion": "happy",
+        "face": "happy"
+      }
+    ],
+    "pilot_switch_later": [
+      {
+        "id": "kind.pilot_switch_later.01",
+        "text": "Чуть позже! Давай ещё немного поиграем со мной.",
+        "emotion": "happy",
+        "face": "happy"
+      }
+    ],
     "home_ball": [
       {
         "id": "kind.home_ball.01",

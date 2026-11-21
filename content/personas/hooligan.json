@@ -690,6 +690,12 @@
     },
     "cocoa": {},
     "mirror": {},
+    "pilot_cut": {
+      "clip": "none"
+    },
+    "pilot_switch_later": {
+      "clip": "none"
+    },
     "home_ball": {
       "clip": "jump"
     },
@@ -3568,6 +3574,22 @@
     "skate": [],
     "cocoa": [],
     "mirror": [],
+    "pilot_cut": [
+      {
+        "id": "hooligan.pilot_cut.01",
+        "text": "Это я пока не умею. Давай лучше на скейте покатаюсь!",
+        "emotion": "cheeky",
+        "face": "smirk"
+      }
+    ],
+    "pilot_switch_later": [
+      {
+        "id": "hooligan.pilot_switch_later.01",
+        "text": "Чуть позже! Давай ещё немного поиграем со мной.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      }
+    ],
     "home_ball": [
       {
         "id": "hooligan.home_ball.01",

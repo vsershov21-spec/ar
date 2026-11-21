@@ -2,7 +2,7 @@
  * Срез пилота (редакция pilot, https://ar.vershov.com/mvp; docs/EDITIONS.md «Пилот»): наборы и лимиты одной таблицей,
  * без форков логики. Проверки — в точках входа по флагам из edition.ts:
  *   pilot.catalog        — каталог (actionCatalog.buildCatalog → limitCatalog), чипы кота (из того же каталога) и
- *                          голосовые команды вырезанных действий (director.intentGate → cutRedirect: «Давай лучше …» + чипы);
+ *                          голосовые команды вырезанных действий (director.intentGate → cutRedirect: «Давай лучше …» пузырём с голосом + чипы);
  *   pilot.fx             — белый список эффектов (director.runFx → fxAllowed);
  *   pilot.switchCooldown — смена кота не чаще раза в SWITCH_COOLDOWN_MS (director.switchGate → SwitchCooldown).
  *   card.paint           — «Раскрасить карту» / «Стереть рисунок» в каталоге пилота (PILOT_PAINT, src/card/paint.ts).
@@ -68,14 +68,28 @@ export function cutAction(p: PersonaId, intent: string): ActionId | null {
   return pilotAllowed(p).has(id) ? null : id;
 }
 
-/** «Давай лучше …»: что кот предлагает вместо вырезанного действия (2 чипа из набора кота) */
-export function cutRedirect(p: PersonaId, intent: string, label: (id: ActionId) => string | undefined): { cut: ActionId; text: string; chips: ActionId[] } | null {
+/** озвученная реплика «Это я пока не умею…» (content/src/<кот>.lines.txt, событие pilot_cut; запись ElevenLabs 20.11) */
+export const PILOT_CUT_EVENT = 'pilot_cut';
+/** текст записи pilot_cut — с фирменным действием кота (PILOT_SIGNATURE[кот][0]); тест сверяет с content */
+export const PILOT_CUT_TEXT: Record<PersonaId, string> = {
+  hooligan: 'Это я пока не умею. Давай лучше на скейте покатаюсь!',
+  kind: 'Это я пока не умею. Давай лучше какао попьём!',
+  glitter: 'Это я пока не умею. Давай лучше в зеркальце посмотримся!',
+};
+
+/**
+ * «Давай лучше …»: что кот предлагает вместо вырезанного действия (2 чипа из набора кота). Первый чип — фирменное:
+ * текст = запись pilot_cut (event — пузырь с голосом, director.voicedBubble). Если фирменное само вырезано (чипы
+ * без него) — прежний текст по подписи чипа, event null (немой пузырь: такой записи нет).
+ */
+export function cutRedirect(p: PersonaId, intent: string, label: (id: ActionId) => string | undefined): { cut: ActionId; text: string; chips: ActionId[]; event: string | null } | null {
   const cut = cutAction(p, intent);
   if (!cut) return null;
   // сначала фирменное (его ребёнок мог не знать), потом танец/сальто — похожие на «трюк»
   const chips = [PILOT_SIGNATURE[p][0], 'dance', 'flip', PILOT_SIGNATURE[p][1]].filter((id, i, a) => a.indexOf(id) === i && id !== cut).slice(0, 2) as ActionId[];
+  if (chips[0] === PILOT_SIGNATURE[p][0]) return { cut, text: PILOT_CUT_TEXT[p], chips, event: PILOT_CUT_EVENT };
   const first = (label(chips[0]) ?? 'потанцуем').toLowerCase();
-  return { cut, text: `Это я пока не умею. Давай лучше ${first}!`, chips };
+  return { cut, text: `Это я пока не умею. Давай лучше ${first}!`, chips, event: null };
 }
 
 // ───────────── эффекты ─────────────
@@ -101,7 +115,8 @@ export const fxAllowed = (p: PersonaId, fx: string): boolean => SYSTEM_FX.includ
 // ───────────── смена кота ─────────────
 
 export const SWITCH_COOLDOWN_MS = 180_000;
-/** «Чуть позже» — пузырём (озвученной реплики на это нет) */
+/** «Чуть позже» — озвученная реплика pilot_switch_later (content/src/<кот>.lines.txt, запись ElevenLabs 20.11): пузырь с голосом */
+export const SWITCH_LATER_EVENT = 'pilot_switch_later';
 export const SWITCH_LATER_TEXT = 'Чуть позже! Давай ещё немного поиграем со мной.';
 
 /** смена кота не чаще раза в ms: allow() — можно ли начать сейчас; mark() — смена началась; undo() — её отменили */
@@ -139,7 +154,10 @@ export function waitLabel(ms: number): string {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 }
 
-/** «Чуть позже!» с понятным сроком: «Другой кот — через 3 мин» / «через 40 с» */
+/**
+ * «Чуть позже!» с понятным сроком: «Другой кот — через 3 мин» / «через 40 с» — немой пузырь, пока записи
+ * pilot_switch_later нет на сервере (с записью пузырь = SWITCH_LATER_TEXT, срок — таймером на кнопке «Другой кот»).
+ */
 export function laterText(ms: number): string {
   const s = Math.ceil(ms / 1000);
   const when = s >= 60 ? `через ${Math.ceil(s / 60)} мин` : `через ${Math.max(1, s)} с`;

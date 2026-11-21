@@ -661,6 +661,12 @@
       "clip": "idle_glitter_mirror",
       "sound": "sparkle_swipe"
     },
+    "pilot_cut": {
+      "clip": "none"
+    },
+    "pilot_switch_later": {
+      "clip": "none"
+    },
     "home_ball": {
       "clip": "jump"
     },
@@ -3515,6 +3521,22 @@
     "skate": [],
     "cocoa": [],
     "mirror": [],
+    "pilot_cut": [
+      {
+        "id": "glitter.pilot_cut.01",
+        "text": "Это я пока не умею. Давай лучше в зеркальце посмотримся!",
+        "emotion": "happy",
+        "face": "happy"
+      }
+    ],
+    "pilot_switch_later": [
+      {
+        "id": "glitter.pilot_switch_later.01",
+        "text": "Чуть позже! Давай ещё немного поиграем со мной.",
+        "emotion": "happy",
+        "face": "happy"
+      }
+    ],
     "home_ball": [
       {
         "id": "glitter.home_ball.01",

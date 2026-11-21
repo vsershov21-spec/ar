@@ -206,8 +206,10 @@ export class Director extends Emitter<DirectorEvents> {
   charReady: ((persona: string) => boolean) | null = null;
   /** смену кота сейчас можно начать (пилот: раз в 3 мин); false — «Чуть позже!» без вопроса «Хочешь, я стану другим?» */
   switchReady: (() => boolean) | null = null;
-  /** текст «Чуть позже» (config/pilot.ts); функция — с оставшимся временем («Другой кот — через 2 мин») */
+  /** текст «Чуть позже» без записи (config/pilot.ts); функция — с оставшимся временем («Другой кот — через 2 мин») */
   laterText: string | (() => string) = 'Чуть позже! Давай ещё немного поиграем со мной.';
+  /** событие озвученного «Чуть позже» (pilot_switch_later): запись есть — пузырь её текстом и с голосом, нет — laterText */
+  laterEvent: string | null = null;
   /** пузырь «Чуть позже» на экране до этого момента (повторное нажатие его не дублирует, но и не молчит после) */
   private laterUntil = -1e9;
 
@@ -587,13 +589,36 @@ export class Director extends Emitter<DirectorEvents> {
    * 8 с глотал второе нажатие — «выбор кота не открывается» и тишина); голос/повторы — не чаще раза в 8 с.
    */
   sayLater(byButton = false) {
-    const text = typeof this.laterText === 'function' ? this.laterText() : this.laterText;
+    const ev = this.laterEvent;
+    const voiced = ev ? this.recordedText(ev) : null;
+    const text = voiced ?? (typeof this.laterText === 'function' ? this.laterText() : this.laterText);
     const now = performance.now();
     if (byButton) {
       if (now < this.laterUntil) return this.log('«Чуть позже» уже на экране');
       this.dedupe.forget(text);
     }
-    if (this.bubble(text, 3500)) this.laterUntil = now + 3500;
+    if (ev && voiced ? this.voicedBubble(ev, text) : this.bubble(text, 3500)) this.laterUntil = now + 3500;
+  }
+
+  /**
+   * Пузырь с записью (пилот: pilot_cut «Это я пока не умею…», pilot_switch_later «Чуть позже!»): запись ElevenLabs
+   * события с тем же текстом есть — speakEvent (пузырь вместе с голосом по onStart; запись не готова — ждём её
+   * ≤ VOICE_WARM_WAIT_MS). Записи нет (mp3 ещё не на сервере) или текст другой — немой пузырь сразу, как раньше.
+   * Одинаковый — не чаще раза в 8 с в обоих случаях (perform и bubble сверяют тот же dedupe).
+   */
+  voicedBubble(event: string, text: string, ms = 3500): boolean {
+    const rec = this.recordedText(event);
+    if (rec !== null && normalize(rec) === normalize(text)) return this.speakEvent(event, { force: true });
+    return this.bubble(text, ms);
+  }
+
+  /** текст реплики события, у которой есть запись ElevenLabs (у текущего кота); null — записи нет */
+  private recordedText(event: string): string | null {
+    const vp = this.d.voice as VoicePlayer & { elRecorded?: (p: string, id: string | undefined, t: string, x?: string) => boolean; hasRecordings?: boolean };
+    if (!vp.elRecorded || !vp.hasRecordings) return null;
+    const p = this.persona;
+    const l = this.picker.candidates(p, event, this.state.name).find((c) => !c.text.includes('{') && vp.elRecorded!(p.id, c.id, c.text, c.text));
+    return l ? l.text : null;
   }
   /** пузырь без озвучки (срез редакции, «Чуть позже») — одинаковый не чаще раза в 8 с */
   bubble(text: string, ms = 3500): boolean {
