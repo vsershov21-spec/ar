@@ -104,6 +104,7 @@ export const PARAMS: Record<string, { feature: FeatureId; test?: boolean; keep?:
   dur: { feature: 'debug.flows', test: true },
   rate: { feature: 'debug.flows', test: true },
   zone: { feature: 'debug.flows', test: true }, // ?flow=home&zone=kitchen (src/home)
+  cooldown: { feature: 'debug.flows', test: true }, // ?cooldown=10 — кулдаун смены кота пилота, с (config/pilot.ts cooldownMs); lab и /test
   swatch: { feature: 'card.paint' }, // ?flow=paint&swatch=0..2 — сразу раскраска цветом (src/card/paint.ts)
   bed: { feature: 'home.bed' }, // ?flow=home&zone=bedroom&bed=sleep|wake|night|morning (src/home/bedFlow.ts) — кровать в lab и пилоте
   hour: { feature: 'home.bed' }, // &hour=21 — местный час для кровати (утро, тихий час, вечер)

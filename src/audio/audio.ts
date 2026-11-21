@@ -64,6 +64,17 @@ export class Audio {
         const ctx = this.ctx;
         if (document.visibilityState === 'visible' && ctx && ctx.state !== 'running') void ctx.resume().catch(() => undefined);
       });
+    // iOS: камера/микрофон/звонок переводят контекст в «interrupted», а resume вне жеста может не сработать —
+    // каждое касание (после первого unlock) будит контекст заранее: реплика на это касание звучит без задержки
+    if (typeof document !== 'undefined')
+      document.addEventListener(
+        'pointerdown',
+        () => {
+          const ctx = this.ctx;
+          if (this.unlocked && ctx && ctx.state !== 'running') void ctx.resume().catch(() => undefined);
+        },
+        { capture: true, passive: true },
+      );
   }
 
   async load(url: string) {

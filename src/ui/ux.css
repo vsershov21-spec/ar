@@ -102,3 +102,14 @@
 /* распознавание качается — кольцо вокруг микрофона вместо висящей плашки «Загружаю… N%» */
 .mic-slot.loading::after { content: ''; position: absolute; inset: -5px; border-radius: 50%; pointer-events: none;
   background: conic-gradient(var(--lime) var(--load, 0deg), rgba(255,255,255,.25) 0); -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 3px)); mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 3px)); }
+
+/* кнопка временно недоступна (кулдаун смены кота в пилоте, ui.setActionWait): приглушена и с таймером «2:41» */
+.act-wait { position: relative; }
+.act-wait > span:first-child, .act-wait .cs-ico, .act-wait .tb-ico, .act-wait .sug-ico, .act-wait .act-ico { opacity: .55; filter: grayscale(.6); }
+.act-wait::after {
+  content: attr(data-wait); position: absolute; top: -4px; right: -4px; z-index: 2; pointer-events: none;
+  min-width: 34px; padding: 2px 6px; border-radius: 10px; background: #2f3a4a; color: #fff;
+  font: 700 11px/14px system-ui, -apple-system, sans-serif; font-variant-numeric: tabular-nums; text-align: center;
+  box-shadow: 0 0 0 2px #fff;
+}
+.act-wait.new .cs-ico::after { display: none; }

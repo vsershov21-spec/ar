@@ -43,7 +43,9 @@ export const TUCK_STEPS: readonly BedStep[] = [
 ];
 /** разбудить — обратный порядок: одеяло к изножью → потянуться и сесть на край → спрыгнуть → отойти на место */
 export const WAKE_STEPS: readonly BedStep[] = [
-  { id: 'uncover', clip: 'sleep_loop_bed', ms: 800 },
+  // «Разбудить» отвечал через 0,8 с (бэклог): кот лежал неподвижно, пока сползало одеяло — теперь глаза открываются
+  // сразу (bedFlow uncover: лицо sleepy), а потягивание начинается через 0,25 с, одеяло доезжает уже на нём
+  { id: 'uncover', clip: 'sleep_loop_bed', ms: 250 },
   { id: 'wake_stretch_in_bed', clip: 'wake_stretch_in_bed', ms: 1700 },
   { id: 'hop_out_of_bed', clip: 'hop_out_of_bed', ms: 1000 },
   { id: 'walk_back', clip: 'walk', ms: 1000 },

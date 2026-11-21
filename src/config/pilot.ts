@@ -104,18 +104,44 @@ export const SWITCH_COOLDOWN_MS = 180_000;
 /** «Чуть позже» — пузырём (озвученной реплики на это нет) */
 export const SWITCH_LATER_TEXT = 'Чуть позже! Давай ещё немного поиграем со мной.';
 
-/** смена кота не чаще раза в ms: allow() — можно ли начать сейчас; mark() — смена началась */
+/** смена кота не чаще раза в ms: allow() — можно ли начать сейчас; mark() — смена началась; undo() — её отменили */
 export class SwitchCooldown {
   private last = -Infinity;
-  constructor(private ms = SWITCH_COOLDOWN_MS) {}
+  private prev = -Infinity;
+  constructor(readonly ms = SWITCH_COOLDOWN_MS) {}
   allow(now: number): boolean {
     return now - this.last >= this.ms;
   }
   mark(now: number) {
+    this.prev = this.last;
     this.last = now;
+  }
+  /** смену отменили («нет» на наклейках) — кот прежний, кулдаун не тратится */
+  undo() {
+    this.last = this.prev;
   }
   /** сколько ждать (мс), 0 — можно */
   wait(now: number): number {
     return Math.max(0, this.ms - (now - this.last));
   }
+}
+
+/** ?cooldown=<с> — кулдаун смены кота для lab и страницы /test (config/edition.ts PARAMS): 0 — без кулдауна */
+export function cooldownMs(search: string): number {
+  const v = new URLSearchParams(search).get('cooldown');
+  if (v === null || v === '' || !Number.isFinite(Number(v))) return SWITCH_COOLDOWN_MS;
+  return Math.max(0, Number(v)) * 1000;
+}
+
+/** оставшееся время на кнопке «Другой кот»: «2:41», меньше минуты — «0:09» */
+export function waitLabel(ms: number): string {
+  const s = Math.ceil(ms / 1000);
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+}
+
+/** «Чуть позже!» с понятным сроком: «Другой кот — через 3 мин» / «через 40 с» */
+export function laterText(ms: number): string {
+  const s = Math.ceil(ms / 1000);
+  const when = s >= 60 ? `через ${Math.ceil(s / 60)} мин` : `через ${Math.max(1, s)} с`;
+  return `Чуть позже! Другой кот — ${when}. Давай ещё поиграем со мной.`;
 }

@@ -1170,6 +1170,27 @@ ${TOUR ? OB_TOUR : ''}
     this.bubbleTimer = window.setTimeout(() => this.bubble.classList.remove('show'), 250);
   }
 
+  /**
+   * Кнопка действия временно недоступна (кулдаун смены кота в пилоте): все её копии — лист каталога, колонка «как у Тома»,
+   * чип кота, десктоп-панель — приглушены и показывают таймер (label, «2:41»); null — снова доступна. Кнопки
+   * перерисовываются — app.ts зовёт раз в секунду, новые копии подхватывают метку.
+   */
+  setActionWait(act: string, label: string | null, aria: string | null = null) {
+    if (typeof document === 'undefined') return;
+    const sel = `[data-act="${act}"], [data-item="${act}"], [data-chip="${act}"]`;
+    for (const el of Array.from(document.querySelectorAll<HTMLElement>(sel))) {
+      if (label) {
+        if (el.dataset.wait !== label) el.dataset.wait = label;
+        el.classList.add('act-wait');
+        if (aria) el.setAttribute('aria-description', aria);
+      } else if (el.dataset.wait !== undefined) {
+        delete el.dataset.wait;
+        el.classList.remove('act-wait');
+        el.removeAttribute('aria-description');
+      }
+    }
+  }
+
   private following = false;
   /** пока пузырь виден — держим его над котом / сбоку от головы (кот ходит по карте, карта двигается) */
   private followCat() {

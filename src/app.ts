@@ -21,6 +21,7 @@ import { Input } from './input/input';
 import { UI, posterUrl } from './ui/ui';
 import { buildCatalog, catalogEnv, routeItem, type CatalogItem } from './ui/actionCatalog';
 import { Suggester, VOICE_GATED, type Chip } from './scenario/suggest';
+import { actionEvents, isActionId } from './scenario/actions';
 import { turn } from './voice/turn';
 import { Director, type ActionId } from './director';
 import { HomeMode, prepareHomeFlow, type HomeHost } from './home/homeMode';
@@ -46,7 +47,8 @@ import type { CardSearchEvent } from './tracker/card/overlay';
 
 /** кот выглядывает из нижней плашки поиска карты */
 const PEEK: Record<string, string> = { hooligan: 'video/sprites/hooligan/turn_front.webp', kind: 'video/sprites/kind/turn_front.webp', glitter: 'video/sprites/glitter/pose_wave.webp' };
-import { SWITCH_LATER_TEXT, SwitchCooldown, cutRedirect, fxAllowed } from './config/pilot';
+import { SwitchCooldown, cooldownMs, cutRedirect, fxAllowed, waitLabel } from './config/pilot';
+import { wireSwitchCooldown } from './scenario/switchGate';
 import { track } from './analytics';
 import { startCardPaint, type CardPaint } from './card/paint';
 import { paintBlocked } from './card/paintPlan';
@@ -491,6 +493,30 @@ export class App {
     }
     return this.availCache.map;
   }
+  /**
+   * Прогрев озвучки (iPhone 20.11: «озвучка запаздывает» — запись качалась и декодировалась после нажатия): все варианты
+   * реплик действий кота — сжатыми в кэш при смене кота, реплики двух чипов, которые кот сейчас предлагает, — сразу
+   * декодированными. Лимиты памяти — VoicePlayer (декодированные 12 МБ LRU, сжатые 6 МБ).
+   */
+  private warmKey = '';
+  private warmPersona = '';
+  private warmVoice(chips: Chip[]) {
+    const v = this.voice as typeof this.voice & { warmEvents?: (p: string, ev: string[], o?: { fetch?: number; decode?: number }) => void };
+    if (!v.warmEvents) return;
+    const pid = this.director.persona.id;
+    if (this.warmPersona !== pid) {
+      this.warmPersona = pid;
+      const evs = new Set<string>(['hello_new', 'invite', 'yes', 'no', 'tap_cat', 'tap_screen', 'double_tap', 'swipe']);
+      for (const id of this.available().keys()) if (isActionId(id)) actionEvents(id).forEach((e) => evs.add(e));
+      v.warmEvents(pid, ['hello_new', 'invite'], { fetch: 6, decode: 1 });
+      v.warmEvents(pid, [...evs], { fetch: 6, decode: 0 });
+    }
+    const acts = chips.flatMap((c) => ('action' in c.run && isActionId(c.run.action) ? actionEvents(c.run.action) : []));
+    const key = `${pid}:${acts.join(',')}`;
+    if (key === this.warmKey || !acts.length) return;
+    this.warmKey = key;
+    v.warmEvents(pid, acts, { fetch: 6, decode: 6 });
+  }
   private voiced(ev: string) {
     const d = this.director as unknown as { hasVoiced?: (e: string) => boolean };
     return d.hasVoiced ? d.hasVoiced(ev) : true;
@@ -540,6 +566,7 @@ export class App {
       voiced: (ev) => this.voiced(ev),
     });
     const chips = this.home ? this.home.chips(r.chips) : r.chips;
+    this.warmVoice(chips);
     // раскраска карты: чипы предложения «Раскрась! / Не сейчас»; пока кот рисует или открыт лист цветов — без чипов
     this.ui.setSuggestions(this.paint ? this.paint.chips(chips) : chips);
     // подсказка — один раз на тишину и без немого пузыря: в первые визиты кот говорит её озвученной репликой
@@ -571,20 +598,17 @@ export class App {
    * pilot.catalog — команда вырезанного действия голосом → «Давай лучше …» пузырём + чипы замены;
    * pilot.switchCooldown — смена кота не чаще раза в 3 мин («Чуть позже!»); pilot.fx — белый список эффектов.
    */
-  readonly switchCooldown = new SwitchCooldown();
+  readonly switchCooldown = new SwitchCooldown(cooldownMs(typeof location !== 'undefined' ? location.search : ''));
   private applyEdition() {
     const d = this.director;
     // пузыри среза и «Чуть позже» — через режиссёра: одинаковый не чаще раза в 8 с (оркестратор, запись 20.11)
     const bubble = (text: string) => d.bubble(text, 3500);
-    d.laterText = SWITCH_LATER_TEXT;
+    const laterGate = feature('pilot.switchCooldown') ? wireSwitchCooldown(d, this.switchCooldown, () => performance.now(), () => this.syncSwitchWait()) : null;
+    if (laterGate) window.setInterval(() => this.syncSwitchWait(), 1000);
     this.wireOrchestrator();
     if (feature('pilot.catalog') || feature('pilot.switchCooldown'))
       d.intentGate = (h) => {
-        if (feature('pilot.switchCooldown') && h.type === 'change_persona' && !this.switchCooldown.allow(performance.now())) {
-          d.sayLater();
-          d.log(`смена кота: ещё ${Math.ceil(this.switchCooldown.wait(performance.now()) / 1000)} с (пилот, раз в 3 мин)`);
-          return true;
-        }
+        if (laterGate?.(h.type, !!h.button)) return true;
         if (!feature('pilot.catalog')) return false;
         const av = this.available();
         const r = cutRedirect(d.persona.id, h.type, (id) => av.get(id)?.label);
@@ -593,17 +617,6 @@ export class App {
         bubble(r.text);
         this.suggest.prefer(r.chips, performance.now());
         this.kickSuggest();
-        return true;
-      };
-    if (feature('pilot.switchCooldown')) d.switchReady = () => this.switchCooldown.allow(performance.now());
-    if (feature('pilot.switchCooldown'))
-      d.switchGate = () => {
-        const now = performance.now();
-        if (!this.switchCooldown.allow(now)) {
-          d.sayLater();
-          return false;
-        }
-        this.switchCooldown.mark(now);
         return true;
       };
     if (feature('pilot.fx')) d.fxGate = (pid, fx) => fxAllowed(pid, fx);
@@ -625,6 +638,15 @@ export class App {
         character: () => this.character ?? null, home: () => this.home ?? null, awakeActive: () => !!this.awake?.active,
         kickSuggest: () => this.kickSuggest(), log: (s) => d.log(s),
       });
+  }
+
+  /**
+   * Кулдаун смены кота виден на кнопке: «Другой кот» (каталог, колонка, чип) — приглушена, с таймером «2:41» до
+   * доступности (запись 21.11: «при второй смене кота не открывался выбор» — кнопка молчала 3 мин).
+   */
+  private syncSwitchWait() {
+    const ms = this.switchCooldown.wait(performance.now());
+    this.ui.setActionWait('other', ms > 0 ? waitLabel(ms) : null, ms > 0 ? `Другой кот будет через ${waitLabel(ms)}` : null);
   }
 
   /**

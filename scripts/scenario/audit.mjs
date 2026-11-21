@@ -57,12 +57,12 @@ const install = () => {
   d.on('phase', (p) => rec('phase', { p }));
   const v = app.voice;
   const sp = v.speak.bind(v);
-  v.speak = async (req) => {
+  v.speak = async (req, hooks) => {
     const el = v.elRecorded?.(req.persona, req.lineId, req.template, req.text) ?? false;
     const t = T();
     rec('speak', { id: req.lineId ?? req.template, text: req.text, el });
     try {
-      return await sp(req);
+      return await sp(req, hooks);
     } finally {
       rec('speak_end', { id: req.lineId ?? req.template, dur: +(T() - t).toFixed(2) });
     }

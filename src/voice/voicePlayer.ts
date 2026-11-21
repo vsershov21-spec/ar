@@ -13,7 +13,11 @@
  * НЕ грузятся, а speechSynthesis не трогается вовсе (ни unlock в жесте, ни getVoices, ни cancel: на iOS синтез
  * поднимает свою аудиосессию). Для отладки: ?piper — Piper-записи как запасной голос, ?synth — синтез браузера.
  * Кэш декодированных реплик — LRU по объёму (VOICE_CACHE_BYTES, ~12 МБ ≈ минута звука 48 кГц), предзагрузка —
- * не больше 2 декодирований одновременно, реплика «сейчас» — без очереди.
+ * не больше 2 декодирований одновременно, реплика «сейчас» — без очереди. Плюс кэш сжатых mp3 (RAW_CACHE_BYTES, 6 МБ ≈
+ * 250 реплик): warmEvents() качает все варианты реплик ближайших действий заранее, а декодирует только самые вероятные —
+ * реплика «сейчас» тогда стоит одно декодирование (десятки мс), а не сеть (iPhone 20.11: «озвучка запаздывает»).
+ * Синхронность: speak(req, { onStart }) зовёт onStart в момент, когда звук реально пошёл (с задержкой вывода) —
+ * режиссёр показывает пузырь и «говорящий» клип по нему, а не до сети и декодирования. timings — разбор задержек.
  *
  * Перебивание (barge-in): fadeOut(120) — реплика затухает, очередь DialogQueue сохраняется.
  * Самопрослушивание: onSpeaking(true/false) — VoiceEngine глушит распознавание на время реплики + 250 мс.
@@ -109,11 +113,42 @@ const SLOT_RE = /\{(name|answer)\}/;
 /** кэш декодированных реплик: объём (декодируется в частоту контекста: 3 с ≈ 0,58 МБ) и число записей */
 export const VOICE_CACHE_BYTES = 12 * 1024 * 1024;
 const LRU_MAX = 64;
+/** кэш сжатых mp3 (байты как пришли из сети): ~25 КБ на реплику — все варианты ближайших действий */
+export const RAW_CACHE_BYTES = 6 * 1024 * 1024;
+/** фоновых запросов сжатых записей одновременно */
+const RAW_PARALLEL = 3;
+/** контекст звука не «running» (iOS: interrupted после камеры/микрофона) — ждём resume не дольше */
+const RESUME_WAIT_MS = 250;
+/** конец реплики → приглушение sfx/фона снимается не сразу: следующая реплика подряд не «качает» громкость */
+const DUCK_RELEASE_MS = 300;
+
+/** разбор задержки одной реплики (мс от вызова speak): для стенда и debug-панели */
+export interface VoiceTiming {
+  id?: string;
+  /** performance.now() вызова speak */
+  t0: number;
+  /** ожидание hold (ребёнок говорит) */
+  holdMs: number;
+  /** готовность буфера: 0 — был в кэше декодированным */
+  prepMs: number;
+  /** из них: сеть (0 — сжатый был в кэше) и декодирование */
+  fetchMs: number;
+  decodeMs: number;
+  /** ожидание resume() контекста */
+  resumeMs: number;
+  /** от вызова speak до слышимого звука (с учётом задержки вывода) */
+  startMs: number;
+  /** буфер был готов (декодирован) к моменту speak */
+  warm: boolean;
+  source: string;
+}
 /** одновременно декодируемых предзагрузок */
 const PRELOAD_PARALLEL = 2;
 const qflag = (k: string) => typeof location !== 'undefined' && new URLSearchParams(location.search).has(k);
 
-interface BufEntry { p: Promise<AudioBuffer | null>; bytes: number; dead?: boolean }
+interface BufEntry { p: Promise<AudioBuffer | null>; bytes: number; dead?: boolean; buf?: AudioBuffer | null; fetchMs?: number; decodeMs?: number }
+interface RawEntry { p: Promise<ArrayBuffer | null>; bytes: number; ok?: boolean }
+const wait = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 export class VoicePlayer {
   readonly lip = new LipSync();
@@ -125,6 +160,14 @@ export class VoicePlayer {
   private byText = new Map<string, { persona: string; id: string }>();
   private buffers = new Map<string, BufEntry>();
   private cacheBytes = 0;
+  private raw = new Map<string, RawEntry>();
+  private rawBytes = 0;
+  private duckTimer = 0;
+  /** speak(req, { onStart }) зовёт onStart в момент слышимого старта (режиссёр: пузырь — по нему) */
+  readonly startHook = true;
+  /** последние реплики: из чего сложилась задержка (стенд scripts/bench/voice-latency.mjs, debug) */
+  readonly timings: VoiceTiming[] = [];
+  onTiming: ((t: VoiceTiming) => void) | null = null;
   private inflight = 0;
   private waiting = new Map<string, () => void>();
   private onsets = new WeakMap<AudioBuffer, number>();
@@ -333,6 +376,8 @@ export class VoicePlayer {
 
   cancel() {
     this.gen++;
+    // ничего не звучит — ни остановок, ни end() (раньше очередь и speak гасили дважды: приглушение фона «качалось»)
+    if (!this.speaking && !this.src) return;
     if (this.synthUsed)
       try {
         speechSynthesis.cancel();
@@ -379,8 +424,14 @@ export class VoicePlayer {
     this.speaking = false;
     this.mode = null;
     this.lip.stop();
-    this.audio.duck(false, 'voice');
+    // следующая реплика подряд (перебили реакцией) — приглушение держится, без «качелей» громкости фона
+    clearTimeout(this.duckTimer);
+    this.duckTimer = setTimeout(() => !this.speaking && this.audio.duck(false, 'voice'), DUCK_RELEASE_MS) as unknown as number;
     if (was) this.onSpeaking(false);
+  }
+  private duckOn() {
+    clearTimeout(this.duckTimer);
+    this.audio.duck(true, 'voice');
   }
 
   // ───────────── загрузка звука ─────────────
@@ -406,8 +457,16 @@ export class VoicePlayer {
       if (!ctx) return null;
       this.inflight++;
       try {
-        const data = await fetch(asset(path)).then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(String(r.status)))));
-        const buf = await ctx.decodeAudioData(data);
+        const t0 = performance.now();
+        const had = !!this.raw.get(path)?.ok;
+        const data = await this.fetchRaw(path);
+        if (!data) return null;
+        const t1 = performance.now();
+        // decodeAudioData отдаёт (detach) свой ArrayBuffer — сжатый остаётся в кэше копией
+        const buf = await ctx.decodeAudioData(data.slice(0));
+        entry.fetchMs = had ? 0 : t1 - t0;
+        entry.decodeMs = performance.now() - t1;
+        entry.buf = buf;
         if (!entry.dead && this.buffers.get(path) === entry) {
           entry.bytes = buf.length * buf.numberOfChannels * 4;
           this.cacheBytes += entry.bytes;
@@ -427,6 +486,59 @@ export class VoicePlayer {
       if (!b && this.buffers.get(path) === entry) this.drop(path);
     });
     return entry.p;
+  }
+
+  /** фоновая докачка сжатых: не больше RAW_PARALLEL запросов сразу (реплика «сейчас» идёт мимо очереди) */
+  private rawQueue: string[] = [];
+  private rawInflight = 0;
+  private prefetchRaw(path: string) {
+    if (this.raw.has(path) || this.buffers.has(path) || this.rawQueue.includes(path)) return;
+    this.rawQueue.push(path);
+    this.pumpRaw();
+  }
+  private pumpRaw() {
+    while (this.rawInflight < RAW_PARALLEL && this.rawQueue.length) {
+      const path = this.rawQueue.shift()!;
+      if (this.raw.has(path)) continue;
+      this.rawInflight++;
+      void this.fetchRaw(path).finally(() => {
+        this.rawInflight--;
+        this.pumpRaw();
+      });
+    }
+  }
+
+  /** сжатый mp3 из кэша / сети (LRU по объёму RAW_CACHE_BYTES) */
+  private fetchRaw(path: string): Promise<ArrayBuffer | null> {
+    const hit = this.raw.get(path);
+    if (hit) {
+      this.raw.delete(path);
+      this.raw.set(path, hit);
+      return hit.p;
+    }
+    const e: RawEntry = { p: Promise.resolve(null), bytes: 0 };
+    e.p = fetch(asset(path))
+      .then((r) => (r.ok ? r.arrayBuffer() : null))
+      .catch(() => null)
+      .then((b) => {
+        if (!b) {
+          if (this.raw.get(path) === e) this.raw.delete(path);
+          return null;
+        }
+        e.ok = true;
+        if (this.raw.get(path) === e) {
+          e.bytes = b.byteLength;
+          this.rawBytes += e.bytes;
+          while (this.raw.size > 1 && this.rawBytes > RAW_CACHE_BYTES) {
+            const k = this.raw.keys().next().value!;
+            this.rawBytes -= this.raw.get(k)!.bytes;
+            this.raw.delete(k);
+          }
+        }
+        return b;
+      });
+    this.raw.set(path, e);
+    return e.p;
   }
 
   private promote(path: string) {
@@ -458,7 +570,7 @@ export class VoicePlayer {
 
   /** для debug/стенда: сколько декодированного звука держим */
   cacheStats() {
-    return { entries: this.buffers.size, mb: +(this.cacheBytes / 1048576).toFixed(2), inflight: this.inflight, queued: this.waiting.size };
+    return { entries: this.buffers.size, mb: +(this.cacheBytes / 1048576).toFixed(2), rawEntries: this.raw.size, rawMb: +(this.rawBytes / 1048576).toFixed(2), inflight: this.inflight, queued: this.waiting.size };
   }
 
   private clip(e: ClipEntry, low = false) {
@@ -605,16 +717,80 @@ export class VoicePlayer {
 
   /** предзагрузка ближайших событий: по max штук на событие (id реплик вида persona.event.NN) */
   preloadEvents(persona: string, events: string[], max = 2) {
-    void this.usePersona(persona).then((m) => {
-      const all = new Set([...Object.keys(m?.lines ?? {}), ...Object.keys(this.el).filter((id) => id.startsWith(`${persona}.`) && (this.el[id].kind ?? 'line') === 'line')]);
+    this.warmEvents(persona, events, { fetch: max, decode: max });
+  }
+
+  /** записи ElevenLabs (реплики целиком) характера по событию: persona → event → id (строится один раз на манифест) */
+  private elByEvent: { of: object; m: Map<string, Map<string, string[]>> } | null = null;
+  private elEventIds(persona: string, ev: string): string[] {
+    if (this.elByEvent?.of !== this.el) {
+      const m = new Map<string, Map<string, string[]>>();
+      for (const [id, e] of Object.entries(this.el)) {
+        if ((e.kind ?? 'line') !== 'line') continue;
+        const [p, evt] = id.split('.');
+        if (!m.has(p)) m.set(p, new Map());
+        const pm = m.get(p)!;
+        if (!pm.has(evt)) pm.set(evt, []);
+        pm.get(evt)!.push(id);
+      }
+      for (const pm of m.values()) for (const ids of pm.values()) ids.sort();
+      this.elByEvent = { of: this.el, m };
+    }
+    return this.elByEvent.m.get(persona)?.get(ev) ?? [];
+  }
+
+  /**
+   * Прогрев реплик ближайших действий: все варианты события (до fetch штук) — сжатыми в кэш, первые decode — сразу
+   * декодированными (реплика «сейчас» без сети; самые вероятные — и без декодирования). Повторный вызов бесплатен.
+   */
+  warmEvents(persona: string, events: string[], o: { fetch?: number; decode?: number } = {}) {
+    const nf = o.fetch ?? 6, nd = o.decode ?? 1;
+    const go = (m: PersonaVoice | null) => {
       for (const ev of events) {
-        const ids = [...all].filter((id) => id.split('.')[1] === ev).sort().slice(0, max);
-        ids.forEach((id) => {
-          const e = this.el[id] ?? m?.lines[id];
-          if (e) void this.clip(e, true);
+        const el = this.elEventIds(persona, ev).map((id) => this.el[id]);
+        const piper = el.length ? [] : Object.keys(m?.lines ?? {}).filter((id) => id.split('.')[1] === ev).sort().map((id) => m!.lines[id]);
+        [...el, ...piper].slice(0, Math.max(nf, nd)).forEach((e, i) => {
+          if (i < nd) void this.clip(e, true);
+          else this.prefetchRaw(`voice/${e.f}`);
         });
       }
-    });
+    };
+    if (this.hasRecordings && !this.piperFlag) return go(null);
+    void this.usePersona(persona).then(go);
+  }
+
+  /** реплика уже декодирована (speak начнёт звук без ожидания) */
+  isWarm(req: SpeakRequest): boolean {
+    const el = this.elFor(req);
+    const ok = (e?: ClipEntry) => !e || !!this.buffers.get(`voice/${e.f}`)?.buf;
+    if (el?.kind === 'line') return ok(el.e);
+    if (el?.kind === 'parts') return ok(el.a) && ok(el.v) && ok(el.b);
+    return false;
+  }
+
+  /** подготовить реплику «сейчас» (сеть + декодирование без очереди предзагрузки); промис — когда готова */
+  warmLine(req: SpeakRequest): Promise<void> {
+    const el = this.elFor(req);
+    const list = el?.kind === 'line' ? [el.e] : el?.kind === 'parts' ? [el.a, el.v, el.b] : [];
+    return Promise.all(list.filter(Boolean).map((e) => this.clip(e!))).then(() => undefined);
+  }
+
+  /** сколько стоил буфер записи (последнее декодирование): сеть, декодирование */
+  private costOf(req: SpeakRequest): { fetchMs: number; decodeMs: number } {
+    const el = this.elFor(req);
+    const list = el?.kind === 'line' ? [el.e] : el?.kind === 'parts' ? [el.a, el.v, el.b] : [];
+    let fetchMs = 0, decodeMs = 0;
+    for (const e of list) {
+      const b = e && this.buffers.get(`voice/${e.f}`);
+      if (b) (fetchMs = Math.max(fetchMs, b.fetchMs ?? 0)), (decodeMs += b.decodeMs ?? 0);
+    }
+    return { fetchMs, decodeMs };
+  }
+
+  private record(t: VoiceTiming) {
+    this.timings.push(t);
+    if (this.timings.length > 64) this.timings.shift();
+    this.onTiming?.(t);
   }
 
   // ───────────── перебивание: пауза перед следующей репликой ─────────────
@@ -661,21 +837,54 @@ export class VoicePlayer {
     await this.speak({ persona: o.persona, template: `echo:${text}`, text, pitch: Math.min(2, Math.max(0.5, Math.pow(2, o.pitchSemitones / 12))), rate: o.rate });
   }
 
-  async speak(req: SpeakRequest): Promise<void> {
+  /**
+   * Сказать реплику. hooks.onStart — в момент, когда звук реально пошёл (запись: старт буфера + задержка вывода;
+   * синтез — onstart; без звука/без записи — сразу): по нему режиссёр показывает пузырь (пузырь = голос).
+   */
+  async speak(req: SpeakRequest, hooks: { onStart?: () => void } = {}): Promise<void> {
     this.cancel();
     const gen = this.gen;
+    const t0 = performance.now();
+    let started = false;
+    const start = () => {
+      if (started || gen !== this.gen) return;
+      started = true;
+      hooks.onStart?.();
+    };
     if (this.held) await new Promise<void>((r) => this.holdWaiters.push(r));
     if (gen !== this.gen) return;
+    const holdMs = performance.now() - t0;
     // звук выключен: реплика «звучит» молча столько же, сколько запись, — пузырь успевают прочитать.
     // Раньше speak возвращался сразу и пузырь гас через 250 мс (QA-стенд, docs/qa/BUGS.md)
-    if (this.muted) return this.silentLine(req, gen);
+    if (this.muted) {
+      start();
+      return await this.silentLine(req, gen);
+    }
+    const warm = this.isWarm(req);
+    const tp = performance.now();
     const prep = await this.prepare(req).catch(() => null);
     if (gen !== this.gen) return;
+    const prepMs = performance.now() - tp;
     const ctx = this.audio.ctx;
+    // iOS: контекст «interrupted»/«suspended» (камера, микрофон, звонок) — буфер стартует, а звука нет до resume
+    let resumeMs = 0;
+    if (prep && ctx && ctx.state !== 'running') {
+      const tr = performance.now();
+      await Promise.race([ctx.resume().catch(() => undefined), wait(RESUME_WAIT_MS)]);
+      resumeMs = performance.now() - tr;
+      if (gen !== this.gen) return;
+    }
     const out = this.audio.voiceOut();
     if (prep && ctx && out) {
       this.last = { id: req.lineId, source: `${this.lastSource}${this.lipStrategy === 'amp' ? '+amp' : ''}`, text: req.text };
-      return this.playPrepared(ctx, out, prep, gen, 'file');
+      const { fetchMs, decodeMs } = warm ? { fetchMs: 0, decodeMs: 0 } : this.costOf(req);
+      const timing: VoiceTiming = { id: req.lineId, t0, holdMs, prepMs, fetchMs, decodeMs, resumeMs, startMs: 0, warm, source: this.lastSource };
+      return await this.playPrepared(ctx, out, prep, gen, 'file', (leadMs) => {
+        timing.startMs = performance.now() - t0 + leadMs;
+        this.record(timing);
+        if (leadMs > 12) setTimeout(start, leadMs);
+        else start();
+      });
     }
     if (!this.synthAllowed) {
       // записи нет (или не скачалась), синтез на сайте с живой озвучкой не используем — молчим
@@ -683,7 +892,7 @@ export class VoicePlayer {
       return;
     }
     this.last = { id: req.lineId, source: 'synth', text: req.text };
-    return this.synth(req, gen);
+    return await this.synth(req, gen, start);
   }
 
   /** длина реплики, с: по записи (манифест), иначе — как живая речь (0,45 с + 1 с на 14 символов), не меньше 1,2 с */
@@ -715,7 +924,7 @@ export class VoicePlayer {
     return this.playPrepared(ctx, out, { buf, cues: c, offset: 0 }, gen, 'echo');
   }
 
-  private playPrepared(ctx: AudioContext, out: AudioNode, p: Prepared, gen: number, mode: 'file' | 'echo') {
+  private playPrepared(ctx: AudioContext, out: AudioNode, p: Prepared, gen: number, mode: 'file' | 'echo', onStart?: (leadMs: number) => void) {
     return new Promise<void>((resolve) => {
       const s = ctx.createBufferSource();
       s.buffer = p.buf;
@@ -726,7 +935,7 @@ export class VoicePlayer {
       this.gain = g;
       this.speaking = true;
       this.mode = mode;
-      this.audio.duck(true, 'voice');
+      this.duckOn();
       this.onSpeaking(true);
       const startAt = ctx.currentTime + 0.01;
       // часы cues идут от вызова playCues; звук начнётся через delay (+ задержка декодера MP3)
@@ -748,10 +957,13 @@ export class VoicePlayer {
         resolve();
       };
       s.start(startAt);
+      // слышно через: до startAt + задержка декодера MP3 (offset) + задержка вывода (iOS — десятки мс)
+      const outLat = Math.min(0.2, Math.max(0, (ctx as AudioContext & { outputLatency?: number }).outputLatency || ctx.baseLatency || 0));
+      onStart?.(Math.max(0, (startAt - ctx.currentTime + p.offset + outLat) * 1000));
     });
   }
 
-  private synth(req: SpeakRequest, gen: number) {
+  private synth(req: SpeakRequest, gen: number, onStart?: () => void) {
     if (typeof speechSynthesis === 'undefined') return Promise.resolve();
     this.pickSynthVoice();
     this.synthUsed = true;
@@ -772,9 +984,10 @@ export class VoicePlayer {
         if (gen !== this.gen || this.speaking) return;
         this.speaking = true;
         this.mode = 'synth';
-        this.audio.duck(true, 'voice');
+        this.duckOn();
         this.onSpeaking(true);
         this.lip.playCues(cuesFromText(req.text, estimateSpeechSec(req.text, req.rate)), () => performance.now() / 1000);
+        onStart?.();
       };
       u.onend = finish;
       u.onerror = finish;

@@ -156,7 +156,7 @@ export function qaInstall(gpu) {
   d.on('phase', (p) => push('phase', { p }));
   const v = app.voice;
   const sp = v.speak.bind(v);
-  v.speak = async (req) => {
+  v.speak = async (req, hooks) => {
     let el = false;
     try {
       el = v.elRecorded?.(req.persona, req.lineId, req.template, req.text) ?? false;
@@ -164,7 +164,7 @@ export function qaInstall(gpu) {
     const t0 = RT();
     push('speak', { id: req.lineId ?? req.template, text: req.text, el, persona: req.persona });
     try {
-      return await sp(req);
+      return await sp(req, hooks);
     } finally {
       push('speak_end', { id: req.lineId ?? req.template, dur: RT() - t0 });
     }

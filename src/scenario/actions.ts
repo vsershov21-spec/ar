@@ -56,3 +56,21 @@ export const isActionId = (s: string): s is ActionId => s in ACTION_ROUTE;
 
 /** «Усыпи»: через столько мс кот сам просыпается (если ребёнок за это время ничего не сделал) */
 export const SLEEP_WAKE_MS = 6500;
+
+/** реплики начала игр / сцен, которые кнопка вызывает не своим именем события */
+const SAY_EVENTS: Record<string, string[]> = {
+  change_persona: ['switch_ask', 'switch_start', 'shake_prompt'],
+  emo_game: ['emo_start'],
+  rps: ['rps_start'],
+  simon: ['simon_start'],
+};
+
+/**
+ * События реплик, которыми кот ответит на кнопку (для прогрева озвучки: VoicePlayer.warmEvents). Касание — событие
+ * касания (pet → stroke), команда — событие интента (dance → dance), игры — реплика начала игры.
+ */
+export function actionEvents(id: ActionId): string[] {
+  const r = ACTION_ROUTE[id] as ActionRoute;
+  if ('touch' in r) return [r.touch];
+  return SAY_EVENTS[r.say] ?? [r.say];
+}

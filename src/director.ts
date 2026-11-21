@@ -37,7 +37,13 @@ import { track } from './analytics';
 import { LineDedupe, Orchestrator } from './scenario/orchestrator';
 import { RIDE_FROM, RIDE_TO } from './character/skateTiming';
 
-export type DirectorEvents = { log: string; phase: string; persona: PersonaId; game: { id: string; start: boolean }; named: boolean };
+export type DirectorEvents = {
+  log: string; phase: string; persona: PersonaId; game: { id: string; start: boolean }; named: boolean;
+  /** реплика пошла (звук слышен) — пузырь показан в этот момент */
+  line_start: { id: string; at: number };
+  /** смена кота кончилась: changed — кот другой (false — отменили «нет» / сменили на того же) */
+  switch_done: { changed: boolean };
+};
 
 export interface DirectorDeps {
   tracker: Tracker;
@@ -103,6 +109,11 @@ const LOOP_KEEP = /^(idle|sleep_loop|walk|run|purr_stroke)/;
 const LOOP_MAX_MS = 3000;
 /** «Погладить»/«Обнять» кнопкой: столько мурчит, потом покой */
 const BUTTON_PURR_MS = 3200;
+/**
+ * Запись реплики ещё не декодирована: реакция и пузырь ждут её не дольше (дальше — реакция сразу, пузырь всё равно
+ * по старту звука). Прогрев (app.ts warmVoice) держит записи ближайших действий готовыми — обычно ожидания нет.
+ */
+export const VOICE_WARM_WAIT_MS = 300;
 const DANCE_MAX_MS = 8000;
 /** реплика зовёт ребёнка говорить — без микрофона не звучит (speakEvent); события тишины и подсказок */
 const SAY_INVITE = /(^|[\s«"(])(скажи|скажешь|говори|повторяй за мной|спроси)(?=[\s,.!?»"]|$)/i;
@@ -195,8 +206,10 @@ export class Director extends Emitter<DirectorEvents> {
   charReady: ((persona: string) => boolean) | null = null;
   /** смену кота сейчас можно начать (пилот: раз в 3 мин); false — «Чуть позже!» без вопроса «Хочешь, я стану другим?» */
   switchReady: (() => boolean) | null = null;
-  /** текст «Чуть позже» (config/pilot.ts) */
-  laterText = 'Чуть позже! Давай ещё немного поиграем со мной.';
+  /** текст «Чуть позже» (config/pilot.ts); функция — с оставшимся временем («Другой кот — через 2 мин») */
+  laterText: string | (() => string) = 'Чуть позже! Давай ещё немного поиграем со мной.';
+  /** пузырь «Чуть позже» на экране до этого момента (повторное нажатие его не дублирует, но и не молчит после) */
+  private laterUntil = -1e9;
 
   /** у кота есть настоящий клип Meshy с этим id (GlbCharacter.clipSource) */
   private isMeshy(id: string): boolean {
@@ -315,6 +328,7 @@ export class Director extends Emitter<DirectorEvents> {
     if (prev.phase === 'switching' && r.state.phase !== 'switching' && this.switchTok) {
       this.orch.done(this.switchTok);
       this.switchTok = 0;
+      this.emit('switch_done', { changed: r.state.persona !== prev.persona });
     }
     if (r.state.phase !== this.state.phase) this.emit('phase', r.state.phase);
     if (!prev.dialog && r.state.dialog) this.emit('game', { id: r.state.dialog.id, start: true });
@@ -439,6 +453,7 @@ export class Director extends Emitter<DirectorEvents> {
         return this.dispatch({ type: 'interaction', kind: 'wake_up' });
       }
       this.childAct();
+      this.releaseHold();
       if (/^(stroke|tap_cat|poke|double_tap|treat)/.test(kind)) this.coachDone();
     }
     // тап по поверхности карты (не по коту) → кот идёт в эту точку (локомоция)
@@ -485,10 +500,11 @@ export class Director extends Emitter<DirectorEvents> {
     }
     track('action', { id }); // воронка (src/analytics): id кнопки, без текста
     this.childAct();
+    this.releaseHold();
     this.coachDone();
     this.activity();
     // «Другой кот» раньше срока — сразу «Чуть позже!» (один раз), без вопроса «Хочешь, я стану другим котом?»
-    if (id === 'other' && this.switchReady && !this.switchReady()) return this.sayLater();
+    if (id === 'other' && this.switchReady && !this.switchReady()) return this.sayLater(true);
     const ord = this.orch.request(id);
     if (ord.verdict !== 'start') return;
     // реплики прошлых действий, ещё ждущие в очереди, — не звучат поверх нового
@@ -554,9 +570,30 @@ export class Director extends Emitter<DirectorEvents> {
   private purrTimer = 0;
   private switchTok = 0;
 
-  /** «Чуть позже!» — пузырём, не чаще раза в 8 с */
-  sayLater() {
-    this.bubble(this.laterText, 3500);
+  /**
+   * Касание или кнопка — ребёнок не говорит с котом: реплики не ждут «hold» VoiceEngine (VAD принял стук пальца /
+   * шум за начало фразы — ответ на кнопку ждал до 5 с разбора «фразы», пузырь висел без голоса).
+   */
+  private releaseHold() {
+    const v = this.d.voice as VoicePlayer & { held?: boolean; release?: () => void };
+    if (v.held && v.release) {
+      v.release();
+      this.log('касание — реплики не ждут разбора фразы (hold снят)');
+    }
+  }
+
+  /**
+   * «Чуть позже!» — пузырём. Кнопка (byButton): пузырь показывается каждый раз, когда его нет на экране (раньше дедуп
+   * 8 с глотал второе нажатие — «выбор кота не открывается» и тишина); голос/повторы — не чаще раза в 8 с.
+   */
+  sayLater(byButton = false) {
+    const text = typeof this.laterText === 'function' ? this.laterText() : this.laterText;
+    const now = performance.now();
+    if (byButton) {
+      if (now < this.laterUntil) return this.log('«Чуть позже» уже на экране');
+      this.dedupe.forget(text);
+    }
+    if (this.bubble(text, 3500)) this.laterUntil = now + 3500;
   }
   /** пузырь без озвучки (срез редакции, «Чуть позже») — одинаковый не чаще раза в 8 с */
   bubble(text: string, ms = 3500): boolean {
@@ -1164,27 +1201,46 @@ export class Director extends Emitter<DirectorEvents> {
       this.log(`🔇 нет записи ${lineId} — пропуск`);
       return;
     }
-    if (visuals) this.playVisual({ clip: pk.clip, fx: pk.fx ? [pk.fx] : [], sound: pk.sound, face: pk.face, ev: pk.event });
-    else this.face(pk.face);
-    // пузырь живёт ровно столько, сколько звучит реплика (скрывается в конце, а не по таймеру длины текста)
-    const shown = this.bubbleText(pk);
-    this.d.ui.say(shown, p.name, p.id, 60_000);
-    this.emit('log', `🗨 ${lineId}: ${pk.text}`);
-    if (pk.event === 'meet_skills') this.startCoach();
-    const prevClip = this.character.currentClip;
-    // покой — и вариант покоя (idle_look_around…): кот начинает «говорить» телом
-    const talk = /^idle/.test(prevClip) && !this.d.stage.walking && !this.bodyBusy?.() && !this.actBusy();
-    if (talk) this.character.play('talk', { loop: true });
     const v = p.voice;
     const req: SpeakRequest & { lineId: string; piperVoice: string; pitchSemitones: number; emotion: string } = {
       persona: p.id, template, text: pk.text, pitch: semis(v.pitchSemitones), rate: v.rate,
       lineId, piperVoice: v.piperVoice, pitchSemitones: v.pitchSemitones, emotion: pk.line.emotion,
     };
+    // пузырь = голос (iPhone 20.11: «озвучка запаздывает» — пузырь и реакция шли до сети и декодирования mp3).
+    // Запись ещё не декодирована — ждём её не дольше VOICE_WARM_WAIT_MS (реакция и звук вместе), пузырь и «говорящий»
+    // клип — в момент слышимого старта звука (VoicePlayer.speak onStart). Плеер без onStart (стенды) — как раньше, сразу.
+    const sv = this.d.voice as VoicePlayer & { startHook?: boolean; isWarm?: (r: SpeakRequest) => boolean; warmLine?: (r: SpeakRequest) => Promise<void> };
+    const hooked = !!sv.startHook;
+    if (hooked && sv.isWarm && sv.warmLine && !sv.isWarm(req)) {
+      const mine = this.queue.current;
+      const t0 = performance.now();
+      await Promise.race([sv.warmLine(req).catch(() => undefined), wait(VOICE_WARM_WAIT_MS)]);
+      if (this.queue.current !== mine) return; // пока грузилась — перебили: не звучим поверх новой
+      this.log(`⏱ ${lineId}: запись готовилась ${Math.round(performance.now() - t0)} мс`);
+    }
+    if (visuals) this.playVisual({ clip: pk.clip, fx: pk.fx ? [pk.fx] : [], sound: pk.sound, face: pk.face, ev: pk.event });
+    else this.face(pk.face);
+    // пузырь живёт ровно столько, сколько звучит реплика (скрывается в конце, а не по таймеру длины текста)
+    const shown = this.bubbleText(pk);
+    this.emit('log', `🗨 ${lineId}: ${pk.text}`);
+    if (pk.event === 'meet_skills') this.startCoach();
+    let talk = false;
+    let on = false;
+    const show = () => {
+      if (on) return;
+      on = true;
+      this.d.ui.say(shown, p.name, p.id, 60_000);
+      this.emit('line_start', { id: lineId, at: performance.now() });
+      // покой — и вариант покоя (idle_look_around…): кот начинает «говорить» телом
+      talk = /^idle/.test(this.character.currentClip) && !this.d.stage.walking && !this.bodyBusy?.() && !this.actBusy();
+      if (talk) this.character.play('talk', { loop: true });
+    };
+    if (!hooked) show();
     try {
-      await this.d.voice.speak(req);
+      await (this.d.voice.speak as (r: SpeakRequest, h?: { onStart?: () => void }) => Promise<void>)(req, { onStart: show });
     } finally {
       this.lastCatEnd = performance.now();
-      this.d.ui.hideBubble?.(shown);
+      if (on) this.d.ui.hideBubble?.(shown);
       if (talk && this.character.currentClip === 'talk') this.character.play('idle');
       // лицо реплики — на время реплики: сон и мурчание держат своё (их снимает пробуждение / конец глажки)
       if (pk.face && this.lineFace === pk.face && !this.dozing && !/purr|sleep/.test(pk.face)) {
@@ -1487,7 +1543,10 @@ export class Director extends Emitter<DirectorEvents> {
     const ch = this.character;
     const tok = this.orch.token;
     const own = tok ? this.queue.current?.owner === tok || this.queue.pending.some((it) => it.owner === tok) : false;
-    const busy = this.actBusy() || own || (!!ch && !/^(idle|talk)$/.test(ch.currentClip)) || this.d.stage.walking;
+    // смена кота держит оркестратор, пока экран заклеен (ждём встряску до 15 с): раньше «switch» кончался через
+    // 1,2 с «тело в покое», и кнопки запускались поверх наклеек
+    const switching = !!this.switchTok && this.state.phase === 'switching';
+    const busy = switching || this.actBusy() || own || (!!ch && !/^(idle|talk)$/.test(ch.currentClip)) || this.d.stage.walking;
     const next = this.orch.tick(busy);
     if (next) this.action(next);
     const df = this.deferred;
