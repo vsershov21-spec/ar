@@ -1404,8 +1404,31 @@ export class GlbCharacter implements Character {
     });
   }
   private slewEnd(key: string, names: readonly string[], dt: number, on: boolean) {
-    if (!on || !(dt > 0)) {
+    if (!(dt > 0)) {
       this.slewMem.delete(key);
+      return;
+    }
+    // слой выключился (живой покой ушёл в 0, пока реакция): поправка, отстававшая из-за предела скорости, уходит к нулю
+    // с тем же пределом, а не за кадр (иначе — рывок 35–50 рад/с через 0,3 с после каждой реакции Блёстки)
+    if (!on) {
+      const mem = this.slewMem.get(key);
+      if (!mem) return;
+      const lim = SLEW_RATE * dt;
+      let left = false, touched = false;
+      names.forEach((n, i) => {
+        const b = this.bones.get(n);
+        if (!b) return;
+        const prev = mem[i];
+        const a = 2 * Math.acos(Math.min(1, Math.abs(prev.w)));
+        if (a < 1e-3) return prev.identity();
+        // слой в этом кадре ничего не менял (b = клип): показываем остаток прошлой поправки, уменьшенный на предел
+        prev.slerp(IDQ, Math.min(1, lim / a));
+        b.quaternion.premultiply(prev);
+        touched = true;
+        if (2 * Math.acos(Math.min(1, Math.abs(prev.w))) >= 1e-3) left = true;
+      });
+      if (touched) this.object.updateMatrixWorld(true);
+      if (!left) this.slewMem.delete(key);
       return;
     }
     let mem = this.slewMem.get(key);
