@@ -233,6 +233,11 @@ export function disposeObject(root: THREE.Object3D) {
   for (const g of geos) g.dispose();
 }
 
+/** кости слоя «предмет в лапе» (applyHold) и предел скорости его поправки, рад/с */
+const HOLD_SLEW = ['Spine1', 'Spine2', 'Neck', 'Head', 'LeftShoulder', 'RightShoulder', 'LeftArm', 'RightArm', 'LeftForeArm', 'RightForeArm', 'LeftHand', 'RightHand'] as const;
+const SLEW_RATE = 12;
+const IDQ = new THREE.Quaternion();
+
 export class GlbCharacter implements Character {
   readonly kind = 'glb' as const;
   readonly object = new THREE.Group();
@@ -1204,7 +1209,9 @@ export class GlbCharacter implements Character {
     // иначе поправка позы (потягивание лёжа) или поворот головы вносили руку обратно в тело
     // клип-контакт (закрыть уши, плакать, почесать, наушники…): лапы ложатся на поверхность, а не тонут
     // предмет в лапе (holdAction.ts): IK лапы ко рту/лицу — до коррекции тела, чтобы предплечье не входило в шарф
+    this.slewBegin(HOLD_SLEW);
     this.applyHold(dt);
+    this.slewEnd('hold', HOLD_SLEW, dt, this.act?.kind === 'hold');
     this.collider?.setClip(cs.cur.id, this.actions.get(cs.cur.id)?.getClip().name);
     this.collider?.apply(dt);
     // раскраска карты: присед, наклон, лапа с баллончиком / кистью к точке на карте — после клипа и тела; реквизит — следом
@@ -1344,6 +1351,47 @@ export class GlbCharacter implements Character {
   readonly holdDbg = { stretch: 1, miss: 0, clav: 0, want: new THREE.Vector3(), got: new THREE.Vector3() };
   private holdF: { f: HoldFrame; side: 'Left' | 'Right'; off: THREE.Vector3; q: THREE.Quaternion; top: THREE.Vector3; look: THREE.Vector3 | null; hl: number } | null = null;
 
+  /**
+   * Ограничение скорости слоя позы поверх клипа (предмет в лапе): поправка слоя по кости (после · до⁻¹) за кадр
+   * меняется не быстрее SLEW_RATE — разворот IK, смена цели, флип кисти не дают рывка; слой выключен — память пуста.
+   */
+  private slewQ: THREE.Quaternion[] = [];
+  private slewMem = new Map<string, THREE.Quaternion[]>();
+  private slewBegin(names: readonly string[]) {
+    names.forEach((n, i) => {
+      const b = this.bones.get(n);
+      (this.slewQ[i] ??= new THREE.Quaternion()).copy(b ? b.quaternion : IDQ);
+    });
+  }
+  private slewEnd(key: string, names: readonly string[], dt: number, on: boolean) {
+    if (!on || !(dt > 0)) {
+      this.slewMem.delete(key);
+      return;
+    }
+    let mem = this.slewMem.get(key);
+    const first = !mem;
+    if (!mem) this.slewMem.set(key, (mem = names.map(() => new THREE.Quaternion())));
+    const lim = SLEW_RATE * dt;
+    let touched = false;
+    names.forEach((n, i) => {
+      const b = this.bones.get(n);
+      if (!b) return;
+      const d = b.quaternion.clone().multiply(this.slewQ[i].clone().invert());
+      if (d.w < 0) d.set(-d.x, -d.y, -d.z, -d.w);
+      const prev = mem![i];
+      if (!first) {
+        const step = 2 * Math.acos(Math.min(1, Math.abs(prev.dot(d))));
+        if (step > lim) {
+          d.copy(prev).slerp(d, lim / step);
+          b.quaternion.copy(d).multiply(this.slewQ[i]);
+          touched = true;
+        }
+      }
+      prev.copy(d);
+    });
+    if (touched) this.object.updateMatrixWorld(true);
+  }
+
   private lastClav = 0;
   private restoreArms() {
     for (const [b, p] of this.armRest) b.position.copy(p);
@@ -1391,19 +1439,36 @@ export class GlbCharacter implements Character {
     return s;
   }
 
-  /** повернуть кисть: пальцы — по fd, ладонь (подушечки) — по pn (оба в системе кота), вес w */
-  private orientHand(H: THREE.Object3D, side: 'Left' | 'Right', fdL: THREE.Vector3, pnL: THREE.Vector3, w: number) {
+  /**
+   * повернуть кисть: пальцы — по fd, ладонь (подушечки) — по pn (оба в системе кота), вес w. key — слой (ось и знак
+   * поворота около 180° берутся прошлого кадра: иначе при частичном весе кисть перескакивала на другую сторону — 89 рад/с
+   * у банта, аудит 21.11)
+   */
+  private orientMem = new Map<string, { ax: THREE.Vector3; sg: number; t: number }>();
+  private orientHand(H: THREE.Object3D, side: 'Left' | 'Right', fdL: THREE.Vector3, pnL: THREE.Vector3, w: number, key: string = side) {
     const m1 = this.inner.getObjectByName('mixamorig' + side + 'HandMiddle1');
     if (!m1 || w <= 0.01) return;
     const obj = this.object;
     const dirW = (v: THREE.Vector3) => v.clone().transformDirection(obj.matrixWorld);
+    let mem = this.orientMem.get(key);
+    if (!mem || this.time - mem.t > 0.2) this.orientMem.set(key, (mem = { ax: new THREE.Vector3(), sg: 0, t: this.time }));
+    mem.t = this.time;
     H.updateWorldMatrix(true, true);
     const hp = H.getWorldPosition(new THREE.Vector3());
     const curF = m1.getWorldPosition(new THREE.Vector3()).sub(hp).normalize();
     const wantF = dirW(fdL);
     const ang = Math.acos(clamp(curF.dot(wantF), -1, 1));
     const ax = curF.clone().cross(wantF);
-    if (ax.lengthSq() > 1e-10) rotW(H, ax.normalize(), ang * w);
+    // почти 180°: ось из векторного произведения неустойчива — ось прошлого кадра (спроецированная поперёк curF)
+    if (ang > 2.5 && mem.ax.lengthSq() > 0.5) {
+      const pa = mem.ax.clone().addScaledVector(curF, -mem.ax.dot(curF));
+      if (pa.lengthSq() > 1e-6) ax.copy(pa);
+    }
+    if (ax.lengthSq() > 1e-10) {
+      ax.normalize();
+      mem.ax.copy(ax);
+      rotW(H, ax, ang * w);
+    }
     const pnLocal = this.palmN.get(side) ?? new THREE.Vector3(0, 0, 1);
     const curN = pnLocal.clone().applyQuaternion(H.getWorldQuaternion(new THREE.Quaternion()));
     const wantN = dirW(pnL);
@@ -1414,7 +1479,10 @@ export class GlbCharacter implements Character {
       curN.normalize();
       wantN.normalize();
       const r = Math.acos(clamp(curN.dot(wantN), -1, 1));
-      const sg = Math.sign(curN.clone().cross(wantN).dot(fw)) || 1;
+      let sg = Math.sign(curN.clone().cross(wantN).dot(fw)) || 1;
+      // около 180° знак скачет от кадра к кадру — держим прошлый
+      if (r > 2.5 && mem.sg) sg = mem.sg;
+      mem.sg = sg;
       rotW(H, fw, sg * r * w);
     }
   }
@@ -1447,12 +1515,14 @@ export class GlbCharacter implements Character {
       return this.cancelAct();
     }
     const spec = a.spec, side = spec.hand, sx = side === 'Right' ? -1 : 1;
-    // лапа с предметом (и лапа у банта) — без выталкивания BodyCollider: цели IK подобраны вне тела
-    const ex = this.collider?.exempt;
-    if (ex) {
-      ex.clear();
-      if (f.w > 0.3) ex.add(side);
-      if (f.bow > 0.3) ex.add(side === 'Left' ? 'Right' : 'Left');
+    // лапа с предметом — без выталкивания BodyCollider (цели IK подобраны вне тела), но весом по весу позы, а не
+    // порогом: исключение входит и уходит плавно (EXEMPT_FADE); плечо и предплечье выводит из одежды разворот локтя
+    // (кисть на месте). Лапа у банта — под коррекцией: ладонь ложится на бант, а не в голову
+    const col = this.collider;
+    if (col) {
+      col.exempt.clear();
+      const k = clamp((f.w - 0.1) / 0.5, 0, 1);
+      col.exemptTo[side] = k * k * (3 - 2 * k);
     }
     const S = this.bones.get(side + 'Arm'), E = this.bones.get(side + 'ForeArm'), H = this.bones.get(side + 'Hand');
     if (!S || !E || !H) return;
@@ -1531,7 +1601,7 @@ export class GlbCharacter implements Character {
     const pole = dirW(spec.use === 'look' ? V(sx, -0.3, -0.35) : V(sx, 0.75, -0.15)).normalize();
     const ws = obj.getWorldScale(new THREE.Vector3()).y || 1;
     this.holdDbg.miss = twoBoneIK(S, E, H, wristW, pole, W) / ws;
-    this.orientHand(H, side, fd, pn, W);
+    this.orientHand(H, side, fd, pn, W, 'hold');
     this.fist(side, f.grip * (spec.use === 'pop' ? 0.75 : spec.use === 'sip' ? 0.85 : 0.95));
     // 4. вторая лапа — поправить бант (зеркальце)
     if (spec.use === 'look' && f.bow > 0.01) {
@@ -1547,7 +1617,7 @@ export class GlbCharacter implements Character {
         const w2 = toW(tgt.clone().addScaledVector(fd2, -0.5 * hl));
         this.reachAssist(os, w2, f.bow);
         twoBoneIK(S2, E2, H2, w2, dirW(V(ox, 0.5, -0.2)).normalize(), f.bow);
-        this.orientHand(H2, os, fd2, pn2, f.bow);
+        this.orientHand(H2, os, fd2, pn2, f.bow, 'bow');
         this.fist(os, 0.35 * f.bow, 0.3);
       }
     }
@@ -1684,7 +1754,7 @@ export class GlbCharacter implements Character {
       fd.addScaledVector(pn, -fd.dot(pn)).normalize();
       const wrist = obj.localToWorld(palm.clone().addScaledVector(fd, -0.5 * hl));
       twoBoneIK(S, E, H, wrist, pole.normalize().transformDirection(obj.matrixWorld), W * 0.92);
-      this.orientHand(H, side, fd, pn, W * 0.85);
+      this.orientHand(H, side, fd, pn, W * 0.85, 'alive' + side);
       this.fist(side, 0.3 * W, 0.3);
     }
   }

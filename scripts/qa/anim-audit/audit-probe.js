@@ -96,6 +96,14 @@ export function extraProbe() {
       q2.copy(q1); q1.copy(b.quaternion);
     });
     r.jit = +jit.toFixed(2);
+    // --trace "выражение" (audit.mjs): своё значение в кадр (отладка правки)
+    if (window.__rxTraceFn) {
+      try {
+        r.tr = window.__rxTraceFn(app);
+      } catch (e) {
+        r.tr = 'ERR ' + String(e).slice(0, 60);
+      }
+    }
     r.jitB = jb;
     return r;
   };

@@ -11,6 +11,7 @@
 //   node scripts/qa/anim-audit/audit.mjs --focus "hooligan/st_treat_cancel:800-1300:33" — кадры подряд вокруг рывка
 //   node scripts/qa/anim-audit/audit.mjs --meshy /srv/ar-extra/models/anims/meshy     — клипы Meshy с сервера
 //   --out DIR — куда класть raw/ и sheets/ (по умолчанию bench-out/anim-audit)
+//   --trace "JS от app" — своё значение в каждый кадр (frame.tr), node spikes.cjs <tag> cat/id --all — кадры подряд
 //
 //   node scripts/qa/reactions.mjs                    — сборка pilot (VITE_EDITION=pilot) + прогон всех котов
 //   node scripts/qa/reactions.mjs --no-build         — без пересборки (bench-out/reactions/dist уже есть)
@@ -61,6 +62,8 @@ const PERF = Number(arg('--cpu', 0));
 /** --focus "cat/id:t0-t1[:step],..." — кадры листа подряд в окне (доказательство рывка/проникновения) */
 const FOCUS = Object.fromEntries(arg('--focus', '').split(',').filter(Boolean).map((x) => { const [k, w, st] = x.split(':'); const [a, b] = w.split('-').map(Number); return [k, { a, b, st: Number(st || 33) }]; }));
 const FOCUS_ON = Object.keys(FOCUS).length > 0;
+/** --trace "JS-выражение от app" — значение в каждый кадр (frame.tr; spikes.cjs его печатает) */
+const TRACE = arg('--trace', '');
 const MESHY_DIR = arg('--meshy', '') ? path.resolve(arg('--meshy')) : '';
 /**
  * порог проникновения руки/ноги в тело или одежду после коррекции BodyCollider, мм на карте — больше = «плохо» (19.11:
@@ -245,6 +248,7 @@ async function runCat(browser, cat) {
   }
   const cal = await page.evaluate(installProbe);
   await page.evaluate(extraProbe);
+  if (TRACE) await page.evaluate((x) => (window.__rxTraceFn = new Function('app', `return (${x})`)), TRACE);
   const durs = await page.evaluate(() => Object.fromEntries([...window.__app.character.clips.realDuration]));
   const avail = await page.evaluate(() => { const c = window.__app.character; return [...new Set([...(c.actions?.keys?.() ?? []), ...(c.aliased?.keys?.() ?? [])])]; });
   log(`[${cat}] клипов: ${avail.length}; idle: ${avail.filter((k) => /^idle/.test(k)).join(',')}`);

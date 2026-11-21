@@ -173,6 +173,12 @@ const ARM_COST = 30;
  * в наушниках v1 (поза «наушники»: 99 % кадров > 1 мм против 1 % без него) — запястье почти не трогаем
  */
 const HAND_COST = 1e6;
+/** вход/выход веса исключения лапы из коррекции, с */
+const EXEMPT_FADE = 0.18;
+/** разворот локтя исключённой лапы: шаг поиска, рад; предел, рад; скорость, рад/с */
+const SWIVEL_STEP = 0.18;
+const SWIVEL_MAX = 1.4;
+const SWIVEL_RATE = 5.4;
 /** вход/выход веса контакта, с */
 const CONTACT_FADE = 0.1;
 /** клипы, где лапы по замыслу лежат на голове, ушах, наушниках, щеке (контакт вместо проникновения) */
@@ -403,6 +409,18 @@ export class BodyCollider {
    * вне тела, а выталкивание уводило кружку от рта на 0,2 роста (стенд 20.11); замер (measurePairs) — как обычно
    */
   exempt = new Set<'Left' | 'Right'>();
+  /**
+   * вес исключения стороны 0..1 (цель — exempt или exemptTo; входит и уходит за EXEMPT_FADE): поправка лапы — с весом
+   * (1 − w), без прыжка, когда исключение снимается (зеркальце, бант, конец действия с предметом)
+   */
+  readonly exemptW = { Left: 0, Right: 0 };
+  /** цель веса исключения на этот кадр (applyHold: по весу позы предмета); exempt.has — то же, что 1 */
+  readonly exemptTo = { Left: 0, Right: 0 };
+  /**
+   * разворот локтя исключённой лапы вокруг оси «плечо — запястье» (рад): кисть с предметом на месте, плечо и
+   * предплечье — из дуги наушников, шарфа, шеи (точка стороны с наименьшей суммой квадратов глубин, ≤ SWIVEL_RATE)
+   */
+  readonly swivelA = { Left: 0, Right: 0 };
 
   constructor(
     private root: THREE.Object3D,
@@ -892,6 +910,17 @@ export class BodyCollider {
     // вес контакта: входит и уходит за CONTACT_FADE (dt = 0 — проверка клипа: сразу)
     const cw = this.contactOn ? 1 : 0;
     this.contactW = dt > 0 ? this.contactW + Math.max(-dt / CONTACT_FADE, Math.min(dt / CONTACT_FADE, cw - this.contactW)) : cw;
+    // вес исключения сторон: к цели плавно (dt = 0 — сразу); полностью исключённая — как раньше, без коррекции
+    for (const side of ['Left', 'Right'] as const) {
+      const to = this.exempt.has(side) ? 1 : Math.max(0, Math.min(1, this.exemptTo[side]));
+      const w = this.exemptW[side];
+      this.exemptW[side] = dt > 0 ? w + Math.max(-dt / EXEMPT_FADE, Math.min(dt / EXEMPT_FADE, to - w)) : to;
+      this.exemptTo[side] = 0;
+    }
+    const off = this.offSides;
+    off.clear();
+    if (this.exemptW.Left > 0.999) off.add('Left');
+    if (this.exemptW.Right > 0.999) off.add('Right');
     if (!this.enabled || !this.proxies.length) return;
     this.root.updateMatrixWorld(true);
     this.prepare();
@@ -900,7 +929,7 @@ export class BodyCollider {
     for (const n of ['LeftArm', 'LeftForeArm', 'LeftHand', 'RightArm', 'RightForeArm', 'RightHand', 'LeftUpLeg', 'RightUpLeg']) {
       const b = this.bone(n);
       if (!b) continue;
-      if (this.exempt.size && /Arm|Hand/.test(n) && this.exempt.has(n.startsWith('Left') ? 'Left' : 'Right')) {
+      if (off.size && /Arm|Hand/.test(n) && off.has(n.startsWith('Left') ? 'Left' : 'Right')) {
         this.held.delete(b);
         continue;
       }
@@ -926,13 +955,13 @@ export class BodyCollider {
     }
     // 0. клип-контакт: ближайшая к голове/наушникам точка лапы, зависшая над поверхностью, — на поверхность
     // (два шага: поворот считается в линейном приближении)
-    if (surf && this.contactW > 0) for (const side of ['Left', 'Right'] as const) if (!this.exempt.has(side)) for (let k = 0; k < 2; k++) this.pull(side, rs);
+    if (surf && this.contactW > 0) for (const side of ['Left', 'Right'] as const) if (!off.has(side)) for (let k = 0; k < 2; k++) this.pull(side, rs);
     // рука далеко от головы (ни одного прокси головы рядом) — как раньше, точками на осях (мягкий вход, проверено стендом:
     // общий шаг по торсу/бёдрам/юбке в танце, сальто, прыжке давал «щелчки» 17–26 рад/с); у головы — точки поверхности
     const sides = (['Left', 'Right'] as const).map((side) => {
       const chain = surf && this.nearCheap(side, rs) && this.near(side, rs * (SURF_MARGIN + NEAR + CONTACT_BAND)).length > 0;
-      const off = this.exempt.has(side);
-      return { side, arm: false, stop: !chain || off, chain: chain || off, prev: 0, stall: 0, steps: 0 };
+      const ex = off.has(side);
+      return { side, arm: false, stop: !chain || ex, chain: chain || ex, prev: 0, stall: 0, steps: 0 };
     });
     const chainSide = { L: sides[0].chain, R: sides[1].chain };
     // 1. выталкивание: за итерацию — точки на осях (локоть, плечо, ноги) о первый прокси, в который вошли; кисть и
@@ -972,7 +1001,7 @@ export class BodyCollider {
         const pt = it >= 6 && p0.alt ? { ...p0, bone: p0.alt.bone, joint: p0.alt.joint } : p0;
         if (done.has(pt.bone) || done.has(pt.bone.parent!)) continue;
         if (this.legacy && LEG.test(pt.group)) continue;
-        if (this.exempt.size && !LEG.test(pt.group) && this.exempt.has(pt.group[0] === 'L' ? 'Left' : 'Right')) continue;
+        if (off.size && !LEG.test(pt.group) && off.has(pt.group[0] === 'L' ? 'Left' : 'Right')) continue;
         // рука у головы — целиком в pushChain; иначе — по осям, без прокси головы (их рядом нет)
         if (pt.surf && chainSide[pt.group[0] as 'L' | 'R']) continue;
         const mg = pt.hand && this.inPocket(pt.p) ? 0 : (LEG.test(pt.group) ? this.legMargin : this.margin) * rs;
@@ -1006,11 +1035,85 @@ export class BodyCollider {
       if (a > MAX_CORR) use.slerp(new THREE.Quaternion(), 1 - MAX_CORR / a);
       if (angOf(use) < 1e-5) this.held.delete(b);
       else this.held.set(b, use.clone());
+      // сторона частично исключена (вход/выход исключения): поправка — с весом (1 − w)
+      const ew = /Arm|Hand/.test(b.name) ? this.exemptW[/Left/.test(b.name) ? 'Left' : 'Right'] : 0;
+      if (ew > 1e-3) use = use.clone().slerp(sQid, ew);
       if (use !== corr || a > MAX_CORR) changed.push(b);
       b.quaternion.copy(use).multiply(q0);
     }
     // поправку сгладили — матрицы только поддеревьев этих костей (не всего кота)
     for (const b of changed) b.updateMatrixWorld(true);
+    // 3. исключённая лапа (предмет): локоть — вокруг оси «плечо — запястье» из одежды и шеи, кисть не двигается
+    for (const side of ['Left', 'Right'] as const) this.swivel(side, rs, dt);
+  }
+
+  private offSides = new Set<'Left' | 'Right'>();
+  private swivelS = { Left: { n: 0, goal: null as number | null }, Right: { n: 0, goal: null as number | null } };
+
+  /**
+   * Разворот локтя исключённой лапы (вес исключения > 0): плечо поворачивается вокруг оси «плечо — запястье» (кисть на
+   * оси — на месте), кисть — обратно (её поворот в мире не меняется). Угол — поиском по соседям прошлого (±SWIVEL_STEP)
+   * по сумме квадратов глубин точек стороны (с зазором), не быстрее SWIVEL_RATE; без исключения — к нулю.
+   */
+  private swivel(side: 'Left' | 'Right', rs: number, dt: number) {
+    const ew = this.exemptW[side];
+    const arm = this.bone(side + 'Arm'), hand = this.bone(side + 'Hand');
+    if (!arm || !hand || !this.samples.length || this.legacy) return;
+    const prev = this.swivelA[side];
+    if (ew < 0.01 && Math.abs(prev) < 1e-3) {
+      this.swivelA[side] = 0;
+      return;
+    }
+    const S = new THREE.Vector3().setFromMatrixPosition(arm.matrixWorld);
+    const ax = new THREE.Vector3().setFromMatrixPosition(hand.matrixWorld).sub(S);
+    if (ax.lengthSq() < 1e-12) return;
+    ax.normalize();
+    const q0 = arm.quaternion.clone(), hq = hand.getWorldQuaternion(new THREE.Quaternion());
+    const pq = new THREE.Quaternion(), hpq = new THREE.Quaternion();
+    const set = (th: number) => {
+      arm.parent!.matrixWorld.decompose(tv2, pq, tv3);
+      const local = pq.clone().invert().multiply(new THREE.Quaternion().setFromAxisAngle(ax, th)).multiply(pq);
+      arm.quaternion.copy(local).multiply(q0);
+      arm.updateMatrixWorld(true);
+      hand.parent!.getWorldQuaternion(hpq);
+      hand.quaternion.copy(hpq.invert().multiply(hq));
+      hand.updateMatrixWorld(true);
+    };
+    const cost = (th: number) => {
+      set(th);
+      return this.evalSide(side, rs, null).f / (rs * rs) + 2e-6 * th * th;
+    };
+    let best = prev, bc = Infinity;
+    if (ew >= 0.01 && dt > 0) {
+      const step = Math.min(SWIVEL_STEP, SWIVEL_RATE * dt);
+      for (const th of [prev, prev - step / 3, prev + step / 3, prev - step, prev + step]) {
+        if (Math.abs(th) > SWIVEL_MAX) continue;
+        const c = cost(th);
+        if (c < bc - 1e-12) [best, bc] = [th, c];
+      }
+      // местный минимум с остатком (предплечье в шарфе у рта): раз в 4 кадра — обзор всего диапазона; лучше заметно —
+      // туда, но с той же скоростью
+      const st = this.swivelS[side];
+      if (bc > 1e-6 && ++st.n % 4 === 0) {
+        let gb = best, gc = bc;
+        for (let th = -SWIVEL_MAX; th <= SWIVEL_MAX + 1e-6; th += 0.35) {
+          const c = cost(th);
+          if (c < gc * 0.6) [gb, gc] = [th, c];
+        }
+        st.goal = gb !== best ? gb : null;
+      }
+      if (st.goal !== null) {
+        if (Math.abs(st.goal - prev) < step) st.goal = null;
+        else {
+          const th = prev + Math.sign(st.goal - prev) * step;
+          const c = cost(th);
+          if (c < bc * 1.5) [best, bc] = [th, c];
+          else st.goal = null;
+        }
+      }
+    } else best = prev - Math.sign(prev) * Math.min(Math.abs(prev), SWIVEL_RATE * Math.max(dt, 1 / 30));
+    this.swivelA[side] = best;
+    set(best * Math.min(1, ew * 1.5 + (ew < 0.01 ? 1 : 0)));
   }
 
   /** строки ограничений текущего шага коррекции (по 6 чисел: 5 коэффициентов и глубина) */
@@ -1303,6 +1406,7 @@ export class BodyCollider {
   /** сбросить память сглаживания (проверка клипа, смена кота) */
   reset() {
     this.held.clear();
+    this.swivelA.Left = this.swivelA.Right = 0;
   }
 
   /**
