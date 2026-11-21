@@ -238,6 +238,8 @@ const HOLD_SLEW = ['Spine1', 'Spine2', 'Neck', 'Head', 'LeftShoulder', 'RightSho
 const SLEW_RATE = 12;
 /** кости живого покоя (applyAlive): корпус, голова, лапы, ноги */
 const ALIVE_SLEW = ['Hips', 'Spine1', 'Spine2', 'Head', 'LeftArm', 'RightArm', 'LeftForeArm', 'RightForeArm', 'LeftHand', 'RightHand', 'LeftUpLeg', 'RightUpLeg', 'LeftLeg', 'RightLeg'] as const;
+/** кости слоя скейта (applySkate): стопы на деке, лапы для баланса, лапа с доской, корпус */
+const SKATE_SLEW = ['Spine1', 'LeftArm', 'RightArm', 'RightForeArm', 'RightHand', 'LeftUpLeg', 'RightUpLeg', 'LeftLeg', 'RightLeg', 'LeftFoot', 'RightFoot'] as const;
 const IDQ = new THREE.Quaternion();
 
 export class GlbCharacter implements Character {
@@ -1227,7 +1229,9 @@ export class GlbCharacter implements Character {
     this.collider?.setClip(cs.cur.id, this.actions.get(cs.cur.id)?.getClip().name);
     this.collider?.apply(dt);
     // предмет в лапе / скейт — поверх клипа и коррекции тела; затем — пол (ничто не ниже опоры)
+    this.slewBegin(SKATE_SLEW);
     this.applySkate(dt);
+    this.slewEnd('skate', SKATE_SLEW, dt, this.act?.kind === 'skate');
     // снятый слой позы (действие вытеснено, скейт прерван) — лапы и ноги к клипу плавно; снимок показанной позы
     this.poseFade?.apply(dt);
     this.placeHold(dt);

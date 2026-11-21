@@ -93,7 +93,30 @@ function air(k: number) {
   return k < 0.3 || k > 0.85 ? 0 : Math.sin(((k - 0.3) / 0.55) * Math.PI);
 }
 
+/** стык фаз: первые BLEND_S с фазы значения тянутся от конца прошлой (smoothstep) — без ступенек приседа, рук, крена */
+const BLEND_S = 0.14;
+const NUM: (keyof SkateFrame)[] = ['pitch', 'roll', 'boardScale', 'carry', 'spin', 'standOn', 'lift', 'crouch', 'feetW', 'push', 'sweep', 'feetUp', 'kick', 'arms', 'leanK', 'lookDown', 'spark'];
+const prevF = newSkateFrame();
+
 export function skatePose(t: number, out?: SkateFrame): SkateFrame {
+  const f = rawSkatePose(t, out);
+  if (f.phase === 'done') return f;
+  const i = ORDER.indexOf(f.phase as (typeof ORDER)[number]);
+  const into = f.k * SKATE_T[ORDER[i]];
+  if (i <= 0 || into >= BLEND_S) return f;
+  rawSkatePose(t - into - 1e-4, prevF);
+  const w = ss(into / BLEND_S);
+  const F = f as unknown as Record<string, number>, P = prevF as unknown as Record<string, number>;
+  // оборот кикфлипа (2π) ≡ 0: от ближайшего
+  const TAU = Math.PI * 2;
+  P.roll -= Math.round((P.roll - F.roll) / TAU) * TAU;
+  for (const k of NUM) F[k as string] = P[k as string] + (F[k as string] - P[k as string]) * w;
+  f.board.lerpVectors(prevF.board, f.board.clone(), w);
+  f.hand.lerpVectors(prevF.hand, f.hand.clone(), w);
+  return f;
+}
+
+function rawSkatePose(t: number, out?: SkateFrame): SkateFrame {
   const f = out ?? newSkateFrame();
   let acc = 0;
   let ph: SkatePhase = 'done', k = 1;
@@ -117,8 +140,9 @@ export function skatePose(t: number, out?: SkateFrame): SkateFrame {
   };
   switch (ph) {
     case 'conjure': {
-      // из искры в лапе: растёт с кручением (два оборота, замедляясь), лапа поднимается к боку
-      f.carry = 1;
+      // из искры в лапе: растёт с кручением (два оборота, замедляясь), лапа поднимается к боку (за первую четверть —
+      // раньше за кадр: 29 рад/с)
+      f.carry = ss(k / 0.25);
       f.hand.copy(HAND_SIDE).add(new THREE.Vector3(0, -0.06 * (1 - ss(k)), 0));
       f.boardScale = Math.min(1, ss(k / 0.7) * 1.06);
       f.spin = Math.PI * 4 * (1 - ss(k));
@@ -169,7 +193,7 @@ export function skatePose(t: number, out?: SkateFrame): SkateFrame {
       // присед → щелчок хвостом (нос вверх) → в воздухе вместе → ровно на колёса, амортизация
       const a = air(k);
       onBoard();
-      f.crouch = k < 0.3 ? 0.4 + 0.4 * ss(k / 0.3) : k < 0.85 ? 0.8 * (1 - ss((k - 0.3) / 0.2)) + 0.15 : 0.15 + 0.5 * Math.sin(((k - 0.85) / 0.15) * Math.PI);
+      f.crouch = k < 0.3 ? 0.4 + 0.4 * ss(k / 0.3) : k < 0.85 ? 0.15 + 0.65 * (1 - ss((k - 0.3) / 0.2)) : 0.15 + 0.3 * Math.sin(((k - 0.85) / 0.15) * Math.PI);
       f.lift = a * 0.11;
       f.board.y = a * 0.11;
       f.pitch = k < 0.3 ? 0 : 0.45 * Math.sin(Math.min(1, (k - 0.3) / 0.35) * Math.PI) * (1 - ss((k - 0.5) / 0.25)) + (k < 0.4 ? 0.2 * ss((k - 0.3) / 0.1) : 0);
@@ -181,7 +205,7 @@ export function skatePose(t: number, out?: SkateFrame): SkateFrame {
       // кикфлип: в воздухе доска — оборот вокруг длинной оси, стопы поднимаются над декой и ловят её
       const a = air(k);
       onBoard();
-      f.crouch = k < 0.3 ? 0.4 + 0.4 * ss(k / 0.3) : k < 0.85 ? 0.8 * (1 - ss((k - 0.3) / 0.2)) + 0.15 : 0.15 + 0.5 * Math.sin(((k - 0.85) / 0.15) * Math.PI);
+      f.crouch = k < 0.3 ? 0.4 + 0.4 * ss(k / 0.3) : k < 0.85 ? 0.15 + 0.65 * (1 - ss((k - 0.3) / 0.2)) : 0.15 + 0.3 * Math.sin(((k - 0.85) / 0.15) * Math.PI);
       f.lift = a * 0.15;
       f.board.y = a * 0.1;
       f.pitch = k < 0.3 ? 0 : 0.3 * Math.sin(Math.min(1, (k - 0.3) / 0.2) * Math.PI) * (1 - ss((k - 0.4) / 0.15));
