@@ -938,6 +938,12 @@ export class GlbCharacter implements Character {
   }
 
   play(clip: ClipName, opts: PlayOptions = {}) {
+    // шлепок наклейки: серия наклеек и реакция режиссёра зовут его в одном–двух кадрах (смена кота) — второй вызов
+    // в первые 0,25 с того же шлепка не перезапускает дорожку
+    if (clip === 'sticker_slap' && !opts.onEnd) {
+      const cs = this.clips;
+      if ((cs.cur.id === clip && cs.cur.t < 0.25) || cs.queued?.name === clip) return;
+    }
     // сцены «какао» / «зеркальце» (инициатива режиссёра, дом, реакции) — шаблоном «держать предмет», а не клипом-опорой
     // с реквизитом на смещении от кисти (на листе 20.11 зеркальце висело над лапой)
     const tpl = SCENE_HOLD[clip];

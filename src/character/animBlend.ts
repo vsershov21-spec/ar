@@ -171,7 +171,8 @@ export class AnimBlender {
         if (s.hasPos) s.offP.copy(s.lastP).sub(s.b.position);
       }
       // большой разрыв позы — дольше: пиковая скорость затухания ≈ 1,9 (snappy 1,5)·разрыв/длительность ≤ ~10 рад/с
-      this.dur = Math.max(this.dur, Math.min(0.6, jump * (this.snap ? 0.15 : 0.19)));
+      // тычки (poke_*: голова, щёчка, «Почесать») — сами быстрые клипы: переход чуть длиннее, иначе на стыке 11–14 рад/с
+      this.dur = Math.max(this.dur, Math.min(0.6, jump * (this.snap ? (/^poke_/.test(this.playing) ? 0.21 : 0.15) : 0.19)));
       this.log.push({ at: +this.time.toFixed(2), from: this.from, to: this.playing, dur: +this.dur.toFixed(2), jump: +jump.toFixed(2) });
       if (this.log.length > 30) this.log.shift();
       this.t = 0;
