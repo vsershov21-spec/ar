@@ -147,7 +147,8 @@ export class AnimBlender {
     const inf = this.info(a);
     let s = inf?.timeScale ?? 1;
     if ((id === 'walk' || id === 'run') && moveSpeed > 0 && inf?.footSpeed && inf.footSpeed > 0.05) {
-      s = THREE.MathUtils.clamp(moveSpeed / inf.footSpeed, 0.6, 1.6);
+      // шире, чем раньше (0,6–1,6): раскраска водит медленно и тормозит на разворотах — шаг клипа обгонял ход
+      s = THREE.MathUtils.clamp(moveSpeed / inf.footSpeed, 0.25, 1.8);
     } else if (idle) s *= 0.92 + this.rnd() * 0.16;
     return s;
   }

@@ -4,7 +4,7 @@
  * до 25 мм за тычок). Здесь — коррекция корня: пока стопа стоит (низко над опорой и почти не движется по высоте),
  * её точку запоминаем, а всё тело сдвигаем по горизонтали так, чтобы стопа осталась на месте; тело при этом покачивается
  * над лапами, как при живом переносе веса. Когда опоры нет (шаг, прыжок) — сдвиг плавно уходит к нулю; при долгой
- * опоре — медленно (≤ 3 мм/с) возвращается к центру, чтобы кот не уползал со своего места.
+ * опоре — медленно (≤ 1 мм/с: быстрее — это и было «скольжение» на стенде) возвращается к центру, чтобы кот не уползал со своего места.
  * Единицы — система кота (рост 1, лапы в 0). Чистая логика без three.js — tests/footPin.test.ts.
  */
 export interface FootPinConfig {
@@ -20,7 +20,7 @@ export interface FootPinConfig {
   creep: number;
 }
 
-export const FOOT_PIN: FootPinConfig = { plantY: 0.035, plantVy: 0.3, maxOff: 0.14, releaseS: 0.3, creep: 0.03 };
+export const FOOT_PIN: FootPinConfig = { plantY: 0.035, plantVy: 0.3, maxOff: 0.14, releaseS: 0.3, creep: 0.01 };
 
 interface FootState {
   /** точка, где стопа стоит (в системе кота, уже со сдвигом) */
@@ -36,6 +36,12 @@ export class FootPin {
   z = 0;
   private feet: FootState[] = [];
   constructor(private cfg: FootPinConfig = FOOT_PIN) {}
+
+  /** точка опоры стопы i (система кота, со сдвигом тела), если стопа стоит; иначе null — IK стоп (GlbCharacter.pinFeet) */
+  anchor(i: number): { x: number; z: number } | null {
+    const f = this.feet[i];
+    return f?.planted ? { x: f.ax, z: f.az } : null;
+  }
 
   reset() {
     this.feet = [];

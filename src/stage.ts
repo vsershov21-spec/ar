@@ -124,6 +124,8 @@ export class Stage {
   private walkSide: 0 | 1 | -1 = 0;
   /** скорость текущей прогулки, если задана (раскраска — короткий быстрый шаг между точками у края) */
   private walkSpeedNow: number | null = null;
+  /** скорость шага прошлого кадра (ширин карты в секунду) */
+  private stepSpeed = 0;
   /** стоя — лицом к этой точке карты, а не к зрителю (раскраска: кот смотрит туда, где рисует); null — к зрителю */
   faceTo: THREE.Vector2 | null = null;
   constrainToCard = true;
@@ -347,6 +349,8 @@ export class Stage {
       // шагает, когда уже почти развернулся по ходу (не едет боком/задом)
       const err = Math.abs(Math.atan2(Math.sin(this.walkYaw - this.yaw), Math.cos(this.walkYaw - this.yaw)));
       const step = (this.walkSpeedNow ?? this.cfg.walkSpeed) * dt * clamp((Math.cos(err) - 0.2) / 0.7, 0.15, 1);
+      // настоящая скорость (с замедлением на развороте) — под неё темп клипа ходьбы, иначе лапы едут (раскраска: 56–112 мм)
+      this.stepSpeed = dt > 0 ? step / dt : 0;
       if (len <= step) {
         this.pos.copy(this.walkTarget);
         this.walkTarget = null;
@@ -393,7 +397,7 @@ export class Stage {
     if (this.character) {
       this.character.object.userData.tilt = this.cfg.billboardTilt * (1 - this.t);
       // скорость шага в ростах кота в секунду — 3D-кот подгоняет под неё темп клипа ходьбы
-      this.character.object.userData.moveSpeed = this.walkTarget ? (this.walkSpeedNow ?? this.cfg.walkSpeed) / Math.max(0.01, this.cfg.height) : 0;
+      this.character.object.userData.moveSpeed = this.walkTarget ? this.stepSpeed / Math.max(0.01, this.cfg.height) : 0;
     }
 
     // тень: под лапами, пропадает у стекла

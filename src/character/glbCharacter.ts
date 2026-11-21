@@ -82,6 +82,9 @@ export const MESHY_PEN_MAX_MM = 5;
  * (прокси одежды и головы, кисти, стопы, колени) не ниже плоскости опоры. Кроме намеренных поз: уход в карту,
  * появление из карты, сон и кровать (их высоту ведёт сцена).
  */
+/** поправка стопы к точке опоры: не дальше (доли роста), скорость поворота бедра (рад/с) */
+const FOOT_FIX_MAX = 0.12;
+const FOOT_FIX_RATE = 6;
 /** позы лёжа: пол держит тело (не ниже опоры), а не снимается, как для нырка */
 const LYING = /sleep|lie_|fall_asleep/;
 /** намеренно ниже опоры (нырок в карту, появление, уход) */
@@ -2017,14 +2020,57 @@ export class GlbCharacter implements Character {
     [L, R].forEach((b, i) => {
       const p = this.object.worldToLocal(b.getWorldPosition(this.tLocal));
       this.footBuf[i][0] = p.x;
-      this.footBuf[i][1] = p.y;
+      // высота стопы над её высотой стоя (сустав стопы выше подошвы на footR): иначе стоящая лапа у моделей с высоким
+      // суставом считалась «поднятой» и опора то включалась, то нет — лапы ехали
+      this.footBuf[i][1] = p.y - (this.footR.get(i ? 'RightFoot' : 'LeftFoot') ?? 0);
       this.footBuf[i][2] = p.z;
     });
     const off = this.footPin.update(dt, this.footBuf, enabled);
     this.inner.position.x = off.x;
     this.inner.position.z = off.z;
     this.inner.updateMatrixWorld(true);
+    // стопы по отдельности: сдвиг корня — среднее по опорным лапам; остаток каждой (стойка шире/уже в клипе — танец,
+    // игра с хвостом, обнять себя) — поворотом бедра так, чтобы стопа вернулась к своей точке опоры. Одна кость
+    // (без IK колена: у почти прямой ноги колено «переворачивалось» — рывки 70–90 рад/с); остаток по горизонтали,
+    // высота — как в клипе. Поправка держится и уходит плавно (вход/выход 0,15 с, ≤ FOOT_FIX_RATE рад/с)
+    [L, R].forEach((F, i) => {
+      const U = this.bones.get(i ? 'RightUpLeg' : 'LeftUpLeg');
+      if (!U) return;
+      const an = enabled ? this.footPin.anchor(i) : null;
+      const st = this.footFix[i];
+      let want = 0;
+      if (an) {
+        const hip = this.object.worldToLocal(U.getWorldPosition(new THREE.Vector3()));
+        const cur = this.object.worldToLocal(F.getWorldPosition(new THREE.Vector3()));
+        const tgt = new THREE.Vector3(an.x, cur.y, an.z);
+        const d = tgt.clone().sub(cur);
+        if (d.length() > FOOT_FIX_MAX) d.setLength(FOOT_FIX_MAX);
+        tgt.copy(cur).add(d);
+        const a = cur.sub(hip), b = tgt.sub(hip);
+        if (a.lengthSq() > 1e-8 && b.lengthSq() > 1e-8) {
+          const q = new THREE.Quaternion().setFromUnitVectors(a.normalize(), b.normalize());
+          st.axis.set(q.x, q.y, q.z);
+          if (st.axis.lengthSq() > 1e-12) {
+            st.axis.normalize();
+            want = 2 * Math.acos(clamp(q.w, -1, 1));
+          }
+        }
+      }
+      // угол поправки — к цели не быстрее FOOT_FIX_RATE; нет опоры — к нулю
+      const lim = FOOT_FIX_RATE * dt;
+      st.ang += clamp(want - st.ang, -lim, lim);
+      if (!an) st.ang = Math.max(0, st.ang);
+      if (st.ang < 1e-4) return;
+      // ось — в системе кота → мир
+      const axW = st.axis.clone().transformDirection(this.object.matrixWorld);
+      rotW(U, axW, st.ang);
+      U.updateMatrixWorld(true);
+    });
   }
+  private footFix = [
+    { ang: 0, axis: new THREE.Vector3(1, 0, 0) },
+    { ang: 0, axis: new THREE.Vector3(1, 0, 0) },
+  ];
 
   /** хвост и уши: сброс к покою и вторичная анимация TailRig поверх тела */
   private applyTailEars(dt: number, faceEars: number, facePresetId = this.faceMix.preset) {
