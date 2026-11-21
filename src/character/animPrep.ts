@@ -414,16 +414,21 @@ export async function prepareClipsAsync(model: THREE.Object3D, space: THREE.Obje
   const names = nodeNames(model);
   const pr = groundProbe(model, space);
   const info = new Map<THREE.AnimationClip, ClipPrepInfo>();
-  let t = performance.now();
+  let t = performance.now(), n = 0;
   for (const c of clips) {
     prepareOne(c, names, pr, opts, info);
-    if (performance.now() - t > 12) {
+    // пауза — по времени (12 мс) или каждые PREP_CHUNK клипов: смена кота идёт, пока старый ещё на экране, и кадр
+    // не должен ждать всю библиотеку (аудит 21.11: 108 миксеров замера опоры в одном кадре, 38–58 мс при ЦП ×4)
+    if (performance.now() - t > 12 || ++n % PREP_CHUNK === 0) {
       await yieldToBrowser();
       t = performance.now();
     }
   }
   return info;
 }
+
+/** клипов подготовки за один отрезок (между паузами для браузера) */
+const PREP_CHUNK = 3;
 
 /** уступить главный поток (не setTimeout: в фоне он тормозится до 1 с) */
 function yieldToBrowser(): Promise<void> {
