@@ -703,7 +703,8 @@ export class BedFlow {
     const Rg = (n: string) => (n === 'Head' ? 0.11 : /Hips|Spine/.test(n) ? 0.09 : 0.05) * hgt;
     let minY = Infinity;
     // лапы опоры свисают ниже корпуса («на коленях») — опора по корпусу и ногам, лапы уходят под одеяло
-    for (const n in P) if (!/Head|Arm|Hand/.test(n)) minY = Math.min(minY, P[n].y - Rg(n));
+    // голова — тоже (лицом в матрас — нельзя, аудит 21.11); на подушке она и так выше
+    for (const n in P) if (!/Arm|Hand/.test(n)) minY = Math.min(minY, P[n].y - Rg(n));
     const f = this.fit, g = 0.25 * this.lieW;
     const spot = bed?.spot ?? new THREE.Vector3(bedroomX() + BED.dx + 0.1, BED.top, BED.z);
     f.lift = clampR(f.lift + (BED.top + 0.01 - minY) * g, -0.25, 0.5);

@@ -82,6 +82,14 @@ export const MESHY_PEN_MAX_MM = 5;
  * (прокси одежды и головы, кисти, стопы, колени) не ниже плоскости опоры. Кроме намеренных поз: уход в карту,
  * появление из карты, сон и кровать (их высоту ведёт сцена).
  */
+/** позы лёжа: пол держит тело (не ниже опоры), а не снимается, как для нырка */
+const LYING = /sleep|lie_|fall_asleep/;
+/** намеренно ниже опоры (нырок в карту, появление, уход) */
+const DIVE_LOW = /dive|appear|goodbye|run_home|sink|fall_off/;
+/** опора «сна» на карте (клубок носом в пол) — кладём на бок */
+const LIE_ON_SIDE = /^(sleep_loop|fall_asleep)$/;
+/** на бок: голова вправо (+X), живот и морда к зрителю — как поза опоры в кровати (bedFlow LIE: yaw π/2, крен −π/2) */
+const LIE_Q = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, Math.PI / 2, -Math.PI / 2, 'YXZ'));
 export const INTENDED_LOW = /dive|appear|goodbye|run_home|sink|sleep|bed|lie_|fall_off/;
 /** допуск (доли роста): меньше — не поднимаем (стопы стоят «в ноль» с погрешностью клипа) */
 const GROUND_EPS = 0.006;
@@ -1258,11 +1266,21 @@ export class GlbCharacter implements Character {
   /** опора действия (дека скейта) и прыжок: высота корня до клипа и IK */
   private standY = 0;
   private groundClamp(dt: number, id: string) {
-    void dt;
-    void id;
     // база кадра: опора действия; подъём над полом (ground clamp) — после всех поправок позы (groundFinal)
     this.inner.position.y = this.standY;
+    // дрёма на карте опорой sleep_loop («клубок на коленях носом в пол» — спиной к камере, аудит 21.11): кот ложится
+    // на бок животом и мордой к зрителю (как в кровати); настоящий клип сна (Meshy) лежит сам; кровать (poseTweak) —
+    // своя поза. Вход и выход — за ~0,6 с; пол (groundFinal) держит тело на карте
+    const want = LIE_ON_SIDE.test(id) && !this.poseTweak && this.clipSource(id) !== 'meshy' ? 1 : 0;
+    const was = this.lieSide;
+    this.lieSide = clamp(this.lieSide + (want ? dt / 0.6 : -dt / 0.6), 0, 1);
+    if (this.lieSide > 0 || was > 0) {
+      const e = this.lieSide * this.lieSide * (3 - 2 * this.lieSide);
+      this.inner.quaternion.copy(IDQ).slerp(LIE_Q, e);
+    }
   }
+  /** доля «лёг на бок» (дрёма опорой на карте) */
+  private lieSide = 0;
 
   /** объёмы тела для пола: прокси BodyCollider (голова, торс, одежда) + сферы кистей, предплечий, коленей, стоп */
   private groundVolumes(): GroundVolume[] {
@@ -1331,7 +1349,10 @@ export class GlbCharacter implements Character {
    */
   private groundFinal(dt: number, id: string) {
     let want = 0;
-    if (!INTENDED_LOW.test(id) && !this.poseTweak) {
+    // лёжа (сон, дрёма на карте) — тоже не ниже опоры (раньше пол для них снимался: тело на 17–20 мм в карте);
+    // нырок в карту, появление, уход — по замыслу ниже
+    const lying = LYING.test(id) || this.lieSide > 0.01;
+    if ((!INTENDED_LOW.test(id) || (lying && !DIVE_LOW.test(id))) && !this.poseTweak) {
       this.inner.updateMatrixWorld(true);
       const lp = lowestPoint(this.groundVolumes(), this.object);
       if (Number.isFinite(lp.y)) {
@@ -1791,11 +1812,17 @@ export class GlbCharacter implements Character {
     this.tulleD.addScaledVector(this.tulleV, h).clampLength(0, 0.035);
     this.aliveDbg.tulle = this.tulleD.length();
     this.object.updateMatrixWorld(true);
+    // лёжа (кровать, дрёма на боку) пачка не стоит торчком: подол оседает вниз по миру (до 0,07 роста), по мере того
+    // как ось тела ложится
+    const hipUp = new THREE.Vector3(0, 1, 0).applyQuaternion(this.inner.getWorldQuaternion(new THREE.Quaternion()));
+    const upW = new THREE.Vector3(0, 1, 0);
+    const lie = clamp((0.7 - hipUp.dot(upW)) / 0.6, 0, 1);
+    const droop = this.object.worldToLocal(this.object.getWorldPosition(new THREE.Vector3()).add(upW.multiplyScalar(-0.07 * lie * (this.object.getWorldScale(new THREE.Vector3()).y || 1))));
     for (const { mesh, m } of this.tulle) {
       mesh.updateWorldMatrix(true, false);
       const inv = mesh.matrixWorld.clone().invert();
       const o = this.object.localToWorld(p.clone());
-      const a = o.clone().applyMatrix4(inv), b = this.object.localToWorld(p.clone().add(this.tulleD)).applyMatrix4(inv);
+      const a = o.clone().applyMatrix4(inv), b = this.object.localToWorld(p.clone().add(this.tulleD).add(droop)).applyMatrix4(inv);
       m.sway.value.copy(b.sub(a));
       // рябь — 0,0025 роста в единицах меша
       const unit = this.object.localToWorld(p.clone().add(new THREE.Vector3(0.0025, 0, 0))).applyMatrix4(inv).distanceTo(a);
