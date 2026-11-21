@@ -173,6 +173,12 @@ const ARM_COST = 30;
  * в наушниках v1 (поза «наушники»: 99 % кадров > 1 мм против 1 % без него) — запястье почти не трогаем
  */
 const HAND_COST = 1e6;
+/** гистерезис тёплого старта: рука в зазоре + эта полоса (доли роста) — поправка прошлого кадра держится без затухания */
+const HOLD_BAND = 0.006;
+/** гистерезис не держит поправку, если рука с ней глубже этого в зазоре (доли роста) */
+const HOLD_STALE = 0.003;
+/** разгон отпускания поправки руки, рад/с² */
+const RELEASE_ACC = 25;
 /** вход/выход веса исключения лапы из коррекции, с */
 const EXEMPT_FADE = 0.18;
 /** разворот локтя исключённой лапы: шаг поиска, рад; предел, рад; скорость, рад/с */
@@ -942,16 +948,36 @@ export class BodyCollider {
     const k = dt > 0 && !this.legacy ? 1 - Math.exp(-dt / 0.08) : 1;
     const warm = dt > 0 && !this.legacy && this.held.size > 0;
     if (warm) {
+      // гистерезис: сначала поправка прошлого кадра целиком; рука стороны ещё касается (точки в зазоре + полоса
+      // HOLD_BAND) — поправку держим как есть: решатель не «отпускает и толкает заново» каждый кадр (пинг-понг у юбки и
+      // торса — дрожь рук Блёстки в покое 3–8° за кадр, аудит 21.11); отошла дальше полосы — гаснет, как раньше
       for (const [b, q0] of before) {
         const h = this.held.get(b);
-        if (!h) continue;
-        // доля затухания: k, но поворот за кадр не больше MAX_DECAY·dt
-        const f = Math.min(k, (MAX_DECAY * dt) / Math.max(angOf(h), 1e-9));
-        const dec = sQ2.copy(h).slerp(sQid, f);
-        b.quaternion.copy(dec).multiply(q0);
+        if (h) b.quaternion.copy(h).multiply(q0);
       }
       for (const b of before.keys()) if (this.held.has(b)) b.updateMatrixWorld(true);
       this.prepare();
+      const touch = { L: this.touching('Left', rs), R: this.touching('Right', rs) };
+      // отпускание руки — с разгоном (скорость затухания растёт RELEASE_ACC рад/с², не выше MAX_DECAY): без ступеньки
+      // 0,13 рад за кадр, когда рука на миг вышла из полосы касания
+      for (const sd of ['L', 'R'] as const) this.release[sd] = touch[sd] ? 0 : Math.min(MAX_DECAY, this.release[sd] + RELEASE_ACC * dt);
+      let any = false;
+      for (const [b, q0] of before) {
+        const h = this.held.get(b);
+        if (!h) continue;
+        const arm = /Arm|Hand/.test(b.name);
+        const sd = /Left/.test(b.name) ? 'L' : 'R';
+        if (arm && touch[sd]) continue;
+        // доля затухания: k, но поворот за кадр не больше MAX_DECAY·dt (рука — разгон отпускания)
+        const f = Math.min(k, ((arm ? this.release[sd] : MAX_DECAY) * dt) / Math.max(angOf(h), 1e-9));
+        const dec = sQ2.copy(h).slerp(sQid, f);
+        b.quaternion.copy(dec).multiply(q0);
+        any = true;
+      }
+      if (any) {
+        for (const b of before.keys()) if (this.held.has(b)) b.updateMatrixWorld(true);
+        this.prepare();
+      }
     }
     // 0. клип-контакт: ближайшая к голове/наушникам точка лапы, зависшая над поверхностью, — на поверхность
     // (два шага: поворот считается в линейном приближении)
@@ -1038,7 +1064,7 @@ export class BodyCollider {
       // сторона частично исключена (вход/выход исключения): поправка — с весом (1 − w)
       const ew = /Arm|Hand/.test(b.name) ? this.exemptW[/Left/.test(b.name) ? 'Left' : 'Right'] : 0;
       if (ew > 1e-3) use = use.clone().slerp(sQid, ew);
-      if (use !== corr || a > MAX_CORR) changed.push(b);
+      changed.push(b);
       b.quaternion.copy(use).multiply(q0);
     }
     // поправку сгладили — матрицы только поддеревьев этих костей (не всего кота)
@@ -1048,6 +1074,42 @@ export class BodyCollider {
   }
 
   private offSides = new Set<'Left' | 'Right'>();
+  /** скорость отпускания поправки руки стороны, рад/с (гистерезис тёплого старта) */
+  private release = { L: 0, R: 0 };
+
+  /**
+   * Рука стороны касается (точки поверхности или на осях — в зазоре + HOLD_BAND от прокси, к которым они относятся)?
+   * Для гистерезиса тёплого старта.
+   */
+  private touching(side: 'Left' | 'Right', rs: number): boolean {
+    if (!this.held.size) return false;
+    // поправка прошлого кадра уже не держит (рука глубоко в зазоре: клип ушёл, поправка устарела) — не держим, пусть
+    // гаснет и решатель ищет заново (иначе рука «застревала» в юбке — 17–22 мм на смехе Блёстки)
+    if (this.evalSide(side, rs, null).maxD > HOLD_STALE * rs) return false;
+    const band = HOLD_BAND * rs;
+    const cand = this.samples.length ? this.near(side, rs * (SURF_MARGIN + HOLD_BAND)) : [];
+    for (const sm of this.samples) {
+      if (sm.side !== side) continue;
+      const mg = this.surfMargin(sm, rs) + band;
+      for (const px of cand) {
+        if (!this.relevantS(sm, px)) continue;
+        const lim = (px.wr ?? 0) + mg;
+        if (px.wc && px.wc.distanceToSquared(sm.p) > lim * lim) continue;
+        if (proxyDepth(px, sm.p, mg, undefined, sm.hand ? undefined : this.ringSide(px, sm.p), true, RING_MIN) > 0) return true;
+      }
+    }
+    for (const pt of this.points(side)) {
+      if (LEG.test(pt.group)) continue;
+      const mg = (pt.hand && this.inPocket(pt.p) ? 0 : this.margin * rs) + band;
+      for (const px of this.proxies) {
+        const lim = (px.wr ?? 0) + mg;
+        if (px.wc && px.wc.distanceToSquared(pt.p) > lim * lim) continue;
+        if (!this.relevant(pt, px)) continue;
+        if (proxyDepth(px, pt.p, mg, undefined, undefined, true) > 0) return true;
+      }
+    }
+    return false;
+  }
   private swivelS = { Left: { n: 0, goal: null as number | null }, Right: { n: 0, goal: null as number | null } };
 
   /**

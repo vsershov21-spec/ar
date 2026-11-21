@@ -236,6 +236,8 @@ export function disposeObject(root: THREE.Object3D) {
 /** кости слоя «предмет в лапе» (applyHold) и предел скорости его поправки, рад/с */
 const HOLD_SLEW = ['Spine1', 'Spine2', 'Neck', 'Head', 'LeftShoulder', 'RightShoulder', 'LeftArm', 'RightArm', 'LeftForeArm', 'RightForeArm', 'LeftHand', 'RightHand'] as const;
 const SLEW_RATE = 12;
+/** кости живого покоя (applyAlive): корпус, голова, лапы, ноги */
+const ALIVE_SLEW = ['Hips', 'Spine1', 'Spine2', 'Head', 'LeftArm', 'RightArm', 'LeftForeArm', 'RightForeArm', 'LeftHand', 'RightHand', 'LeftUpLeg', 'RightUpLeg', 'LeftLeg', 'RightLeg'] as const;
 const IDQ = new THREE.Quaternion();
 
 export class GlbCharacter implements Character {
@@ -1076,7 +1078,10 @@ export class GlbCharacter implements Character {
       this.anim?.post(dt, cs, this.model ?? this.object);
       this.groundClamp(dt, cs.cur.id);
       this.pinFeet(dt, cs.cur.id);
+      // живой покой Блёстки — не быстрее SLEW_RATE на кость (вход/выход слоя, флип кисти, смена позы рук)
+      this.slewBegin(ALIVE_SLEW);
       this.applyAlive(dt);
+      this.slewEnd('alive', ALIVE_SLEW, dt, this.aliveW > 0.001);
     } else {
       this.lift = 0;
       this.mixer?.update(dt);
