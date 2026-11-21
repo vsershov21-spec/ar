@@ -931,6 +931,8 @@ export class GlbCharacter implements Character {
     // сцены «какао» / «зеркальце» (инициатива режиссёра, дом, реакции) — шаблоном «держать предмет», а не клипом-опорой
     // с реквизитом на смещении от кисти (на листе 20.11 зеркальце висело над лапой)
     const tpl = SCENE_HOLD[clip];
+    // раскраска (в лапе баллончик / кисть): сцену с предметом не начинаем — кисть «пили» фазами чашки (аудит 21.11)
+    if (tpl && (this.toolIK.mode !== 'off' || this.props?.holding)) return void this.clips.play('idle_breathe', { ...opts, loop: true });
     if (tpl && !this.act && this.model && this.runAct(tpl)) return;
     this.clips.play(clip, opts);
   }
@@ -1217,11 +1219,13 @@ export class GlbCharacter implements Character {
     this.slewBegin(HOLD_SLEW);
     this.applyHold(dt);
     this.slewEnd('hold', HOLD_SLEW, dt, this.act?.kind === 'hold');
-    this.collider?.setClip(cs.cur.id, this.actions.get(cs.cur.id)?.getClip().name);
-    this.collider?.apply(dt);
-    // раскраска карты: присед, наклон, лапа с баллончиком / кистью к точке на карте — после клипа и тела; реквизит — следом
+    // раскраска карты: присед, наклон, лапа с баллончиком / кистью к точке на карте — после клипа, ДО коррекции тела:
+    // лапу с инструментом коллайдер тоже выводит из торса, капюшона, юбки (раньше — 9–17 мм в 55–61 % кадров, аудит
+    // 21.11); сопло всё равно смотрит в точку (PropRig.aim — после позы)
     const ik = this.toolIK;
     if (ik.mode !== 'off' || ik.weight > 0.002 || ik.crouch > 0.002) ik.apply(dt, { bones: this.bones, object: this.object, inner: this.inner, axes: this.modelAxes(), rot: (b, a, ang) => this.rotWorld(b, a, ang) });
+    this.collider?.setClip(cs.cur.id, this.actions.get(cs.cur.id)?.getClip().name);
+    this.collider?.apply(dt);
     // предмет в лапе / скейт — поверх клипа и коррекции тела; затем — пол (ничто не ниже опоры)
     this.applySkate(dt);
     // снятый слой позы (действие вытеснено, скейт прерван) — лапы и ноги к клипу плавно; снимок показанной позы

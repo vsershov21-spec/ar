@@ -385,6 +385,8 @@ export class CardPaint {
     const aspect = this.h.tracker.aspect;
     const plan = choreograph(art, TEX_W, TEX_H, aspect, style.tool, WALK_SPEED);
     const ch = this.h.character();
+    // действие с предметом (какао, зеркальце — в том числе спонтанное) — снять: в лапе будет инструмент
+    (ch as { cancelAct?: () => void } | null)?.cancelAct?.();
     const meshyArm = ch?.clipSource?.(style.tool === 'spray' ? 'paint_spray' : 'paint_brush') === 'meshy';
     this.run = {
       style, swatch, others, saved, plan, i: 0, t: 0, begun: false, total: 0,

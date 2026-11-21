@@ -53,6 +53,18 @@ export class ToolIK {
   private v5 = new THREE.Vector3();
   private ax = new THREE.Vector3();
   private feet = [new THREE.Vector3(), new THREE.Vector3()];
+  /**
+   * цель кисти лапы в осях персонажа — сглаженно при смене режима (aim ↔ carry ↔ dip ↔ shake ↔ raise): раньше цель
+   * менялась за кадр при весе ≈ 1 (смена мазка, банка) — рывок лапы 84–93 рад/с (аудит 21.11). Уходит вес — цель
+   * остаётся прежней (лапа к клипу по весу, а не через позу «над головой»)
+   */
+  private wl = new THREE.Vector3();
+  private hasW = false;
+  /** наклон и разворот корпуса — сглаженно (раньше разворот обнулялся за кадр, когда пропадала цель) */
+  private leanS = 0;
+  private twistS = 0;
+  /** знак доворота локтя (около 180° — прошлого кадра) */
+  private poleSg = 0;
   /** куда сейчас должно смотреть сопло (мир) — для PropRig.aim; null — реквизит как в клипе */
   readonly aimPoint = new THREE.Vector3();
   aimW = 0;
@@ -78,11 +90,14 @@ export class ToolIK {
     this.t += dt;
     const armOn = r.mode === 'aim' || r.mode === 'dip' || r.mode === 'shake' || r.mode === 'raise';
     const wantW = armOn ? clamp(r.weight ?? 1, 0, 1) : 0;
-    this.w += (wantW - this.w) * Math.min(1, dt / 0.16);
+    // вес: к цели экспоненциально (τ 0,16 с), но не быстрее 4/с — вход в позу без рывка
+    this.w += clamp((wantW - this.w) * Math.min(1, dt / 0.16), -4 * dt, 4 * dt);
     const wantC = r.mode === 'off' ? 0 : clamp(r.crouch ?? 0, 0, 1);
     this.crouchK += (wantC - this.crouchK) * Math.min(1, dt / 0.2);
     if (this.w < 0.002 && this.crouchK < 0.002) {
       this.aimW = 0;
+      this.hasW = false;
+      this.leanS = this.twistS = 0;
       return;
     }
     const obj = c.object;
@@ -125,6 +140,11 @@ export class ToolIK {
       // точка справа (−X) — разворот вправо; правая лапа и так справа: доворот меньше
       twist = clamp(Math.atan2(this.tl.x + 0.12, Math.max(0.05, this.tl.z)) * 0.45, -0.5, 0.5) * this.w;
     }
+    const kb = 1 - Math.exp(-dt / 0.15);
+    this.leanS += clamp((lean - this.leanS) * kb, -2 * dt, 2 * dt);
+    this.twistS += clamp((twist - this.twistS) * kb, -2 * dt, 2 * dt);
+    lean = this.leanS;
+    twist = this.twistS;
     const sp = [['Spine', 0.38], ['Spine1', 0.34], ['Spine2', 0.28]] as const;
     for (const [n, k] of sp) {
       const b = c.bones.get(n);
@@ -154,11 +174,30 @@ export class ToolIK {
       this.aimW = this.w;
     } else if (r.mode === 'shake') {
       const k = Math.sin(this.t * Math.PI * 2 * SHAKE_HZ);
-      obj.localToWorld(wt.set(-0.15, 0.6 + 0.05 * k, 0.24 + 0.012 * k));
+      // у груди, ниже дуги наушников и шарфа (раньше 0,6 — предплечье в наушниках Хулигана, 9 мм)
+      obj.localToWorld(wt.set(-0.16, 0.5 + 0.04 * k, 0.28 + 0.012 * k));
       this.aimW = 0;
-    } else {
+    } else if (r.mode === 'raise') {
       obj.localToWorld(wt.set(-0.2, 1.02, 0.14));
       this.aimW = 0;
+    } else {
+      // carry / off: вес уходит — лапа к клипу от прошлой цели
+      if (this.hasW) obj.localToWorld(wt.copy(this.wl));
+      else wt.copy(wv);
+      this.aimW = 0;
+    }
+    // цель кисти — сглаженно в осях персонажа (τ 0,1 с, не быстрее 1,6 роста/с); тряска (7 Гц) — как есть
+    {
+      const wl = obj.worldToLocal(this.v5.copy(wt));
+      if (!this.hasW) this.wl.copy(wl);
+      else if (r.mode !== 'shake' || this.wl.distanceTo(wl) > 0.08) {
+        const step = this.ax.copy(wl).sub(this.wl).multiplyScalar(1 - Math.exp(-dt / 0.1));
+        const mx = 1.6 * dt;
+        if (step.length() > mx) step.setLength(mx);
+        this.wl.add(step);
+      } else this.wl.copy(wl);
+      this.hasW = true;
+      obj.localToWorld(wt.copy(this.wl));
     }
     const sw = this.v5.copy(wt).sub(s);
     if (sw.length() > reach) wt.copy(s).addScaledVector(sw.normalize(), reach);
@@ -191,7 +230,9 @@ export class ToolIK {
       off.normalize();
       pole.normalize();
       const pa = Math.acos(clamp(off.dot(pole), -1, 1));
-      const sgn = Math.sign(off.clone().cross(pole).dot(sw2)) || 1;
+      let sgn = Math.sign(off.clone().cross(pole).dot(sw2)) || 1;
+      if (pa > 2.6 && this.poleSg) sgn = this.poleSg;
+      this.poleSg = sgn;
       c.rot(S, sw2, sgn * pa * 0.7 * this.w);
     }
     this.dbg.wt.copy(wt);
