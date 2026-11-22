@@ -89,12 +89,12 @@ BAK="$CF.bak.$(date +%s)"; cp "$CF" "$BAK"; echo "бэкап: $BAK"
 rollback() {
   echo "ОТКАТ на $BAK: $1"
   cp "$BAK" "$CF"
-  caddy validate --config "$CF" >/dev/null 2>&1 && systemctl reload caddy && echo "откат: CADDY OK"
+  caddy validate --adapter caddyfile --config "$CF" >/dev/null 2>&1 && systemctl reload caddy && echo "откат: CADDY OK"
 }
 
 # 2) проверка и reload
-if ! caddy validate --config "$NEW" >/dev/null 2>&1; then
-  echo "CADDY FAIL (validate) — файл не меняю:"; caddy validate --config "$NEW" 2>&1 | tail -5
+if ! caddy validate --adapter caddyfile --config "$NEW" >/dev/null 2>&1; then
+  echo "CADDY FAIL (validate) — файл не меняю:"; caddy validate --adapter caddyfile --config "$NEW" 2>&1 | tail -5
   rm -f "$NEW"; exit 1
 fi
 cat "$NEW" > "$CF"; rm -f "$NEW"

@@ -25,6 +25,7 @@ git -C $Q/repo fetch -q --depth 1 origin "$REF" && git -C $Q/repo reset -q --har
 cd $Q/repo && git log --oneline -1
 [ -z "$AUDIT_OUT" ] || rm -rf bench-out/anim-audit
 npm ci --no-audit --no-fund >/dev/null
+for d in $Q/chrome/chrome/linux-*; do [ -x "$d/chrome-linux64/chrome" ] || rm -rf "$d"; done
 npx -y @puppeteer/browsers install chrome@stable --path $Q/chrome >/dev/null
 export CHROME=$(ls -d $Q/chrome/chrome/linux-*/chrome-linux64/chrome | tail -1); echo "CHROME=$CHROME"
 echo "клипов Meshy: $(ls $MESHY/*.glb 2>/dev/null | wc -l)"
