@@ -304,6 +304,8 @@ export class CardTracker extends TrackerBase implements Tracker {
         recName,
       );
     }
+    this.worker?.terminate();
+    this.busy = false;
     this.worker = new Worker(new URL('./card/worker.ts', import.meta.url), { type: 'module' });
     this.worker.onmessage = (e: MessageEvent<CardWorkerOut>) => this.onResult(e.data);
     this.worker.onerror = (e) => console.warn('[card] worker', e.message);
@@ -319,6 +321,9 @@ export class CardTracker extends TrackerBase implements Tracker {
     this.running = false;
     this.worker?.terminate();
     this.worker = null;
+    // кадр, отправленный в убитый воркер, не вернётся: без сброса после «На карту» (дом → карта) новый воркер не получал
+    // ни одного кадра — карта не находилась никогда, кот «Алё, а карта где?» (E2E 22.11, через раз)
+    this.busy = false;
     const s = this.video?.srcObject as MediaStream | null;
     s?.getTracks().forEach((t) => t.stop());
     this.video?.remove();
