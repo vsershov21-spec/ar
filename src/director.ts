@@ -111,6 +111,17 @@ const LOOP_MAX_MS = 3000;
 /** «Погладить»/«Обнять» кнопкой: столько мурчит, потом покой */
 const BUTTON_PURR_MS = 3200;
 /**
+ * Фирменное действие кнопкой (скейт, какао, зеркальце) — у событий skate / cocoa / mirror реплик нет («без слов»,
+ * content/events.json), и кот выполнял их молча (E2E 22.11: выглядит мёртво). Говорит уже записанную реплику близкого
+ * события — новых записей нет: нет записи на сервере — молчит, как раньше (perform: «нет записи — пропуск»).
+ * at — доля длины действия: какао — после глотка (рот не занят кружкой), скейт и зеркальце — в начале.
+ */
+export const ACT_VOICE: Record<string, { ids: readonly string[]; at: number }> = {
+  skate: { ids: ['hooligan.filler.06', 'hooligan.how_are_you.02'], at: 0 },
+  cocoa: { ids: ['kind.home_cocoa.01', 'kind.home_cocoa.02'], at: 0.8 },
+  mirror: { ids: ['glitter.silence.02'], at: 0 },
+};
+/**
  * Запись реплики ещё не декодирована: реакция и пузырь ждут её не дольше (дальше — реакция сразу, пузырь всё равно
  * по старту звука). Прогрев (app.ts warmVoice) держит записи ближайших действий готовыми — обычно ожидания нет.
  */
@@ -658,6 +669,8 @@ export class Director extends Emitter<DirectorEvents> {
     if (!dur) return false;
     this.actUntil = performance.now() + dur * 1000;
     this.log(`🎬 ${act}: ${dur.toFixed(1)} с (шаблон тела)`);
+    const av = ACT_VOICE[act];
+    if (av && !this.hasVoiced(act)) this.actTimers.push(window.setTimeout(() => this.actVoice(act), Math.max(300, av.at * dur * 1000)));
     if (act === 'skate') {
       // сторона проезда (нос доски) — до того, как доску поставят: меньше упора в край карты
       this.skateDir = this.skateArc(1).clip <= this.skateArc(-1).clip ? 1 : -1;
@@ -665,6 +678,14 @@ export class Director extends Emitter<DirectorEvents> {
       this.actTimers.push(window.setTimeout(() => this.rideArc(), RIDE_FROM * 1000));
     }
     return true;
+  }
+
+  /** реплика к фирменному действию (ACT_VOICE): только своего кота, без клипа и эффекта реплики — тело ведёт runAct */
+  private actVoice(act: string) {
+    const ids = (ACT_VOICE[act]?.ids ?? []).filter((id) => id.startsWith(this.persona.id + '.'));
+    if (!ids.length) return;
+    const pk = this.picker.byId(this.d.content.personas, ids[Math.floor(Math.random() * ids.length)], { name: this.state.name });
+    if (pk) this.enqueue({ ...pk, priority: 1, interruptible: true }, false);
   }
 
   /**
