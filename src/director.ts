@@ -686,11 +686,36 @@ export class Director extends Emitter<DirectorEvents> {
     for (let i = 1; i <= 4; i++) {
       const th = (i / 4) * 1.05;
       const raw = p0.clone().addScaledVector(d, R * Math.sin(th)).addScaledVector(n, R * 0.5 * (1 - Math.cos(th)));
-      const c = st.clampTarget(raw.clone());
+      const c = this.keepOnScreen(p0, st.clampTarget(raw.clone()));
       clip += c.distanceTo(raw);
       pts.push(c);
     }
     return { pts, clip };
+  }
+
+  /**
+   * Точка проезда — так, чтобы кот остался на экране (E2E 22.11: после скейта Хулиган уезжал за правый край и стоял
+   * там — карта у края кадра): ноги не ближе SCREEN_MARGIN ширины экрана к его краю, иначе точка подтягивается к p0.
+   */
+  private keepOnScreen(p0: THREE.Vector2, c: THREE.Vector2): THREE.Vector2 {
+    const st = this.d.stage, { w, h } = this.d.size();
+    if (!w || !h) return c;
+    const a = st.anchor;
+    a.updateMatrixWorld(true);
+    const v = new THREE.Vector3();
+    const off = (p: THREE.Vector2) => {
+      v.set(p.x, p.y, st.cfg.footZ ?? 0).applyMatrix4(a.matrixWorld).project(st.camera);
+      const x = ((v.x + 1) / 2) * w, y = ((1 - v.y) / 2) * h, m = w * 0.22;
+      return x < m || x > w - m || y < h * 0.15 || y > h * 0.85;
+    };
+    if (!off(c) || off(p0)) return c;
+    let lo = 0, hi = 1;
+    for (let k = 0; k < 10; k++) {
+      const t = (lo + hi) / 2;
+      if (off(p0.clone().lerp(c, t))) hi = t;
+      else lo = t;
+    }
+    return p0.clone().lerp(c, lo);
   }
   private skateDir: 1 | -1 = 1;
 
