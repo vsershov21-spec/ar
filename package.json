@@ -22,7 +22,8 @@
     "voice:piper": "node scripts/voice/piper.mjs",
     "video-manifest": "node scripts/video-manifest.mjs",
     "voice:eleven": "node scripts/voice/eleven.mjs",
-    "qa": "node scripts/qa/run.mjs"
+    "qa": "node scripts/qa/run.mjs",
+    "e2e:pilot": "node scripts/qa/e2e/run.mjs"
   },
   "keywords": [],
   "author": "",
