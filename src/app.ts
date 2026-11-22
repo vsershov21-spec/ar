@@ -1203,6 +1203,17 @@ export class App {
     this.zoneCache = { x, y, t: now, zone };
     return zone;
   }
+  /** точка экрана (px) внутри найденной карты (углы — CardTracker.view.quad); нет карты — false */
+  private onCardQuad(x: number, y: number): boolean {
+    const q = (this.tracker as unknown as { view?: { quad?: { x: number; y: number }[] } | null }).view?.quad;
+    if (!q || q.length !== 4 || !this.tracker.isTracking) return false;
+    let inside = false;
+    for (let i = 0, j = 3; i < 4; j = i++) {
+      const a = q[i], b = q[j];
+      if (a.y > y !== b.y > y && x < ((b.x - a.x) * (y - a.y)) / (b.y - a.y) + a.x) inside = !inside;
+    }
+    return inside;
+  }
   private ray = new THREE.Raycaster();
   private rayPt = new THREE.Vector2();
   private zoneCache: { x: number; y: number; t: number; zone: TouchZone | null } | null = null;
@@ -1279,7 +1290,9 @@ export class App {
     // рисуем пальцем (steam_draw: туман забирает касания, пока не растает); свайп — царапины по стеклу (claws)
     const glass = () => feature('glass.gestures') && d.state.appeared && !this.home?.active && !d.state.dialog;
     i.on('longpress', (p) => {
-      if (d.state.appeared && !this.home?.active && this.ui.pressMenu(p.x, p.y)) return;
+      // меню «Пересадить» — только на коте или на карте; мимо них — запотевшее стекло (иначе с трекером карты меню
+      // перехватывало любое долгое нажатие и туман пальцем не включался никогда — E2E 22.11)
+      if (d.state.appeared && !this.home?.active && (p.onCat || this.onCardQuad(p.x, p.y)) && this.ui.pressMenu(p.x, p.y)) return;
       if (glass() && !p.onCat && this.fogBoard) {
         // туман на весь экран, рисуем пальцем (feature glass.fogDraw, ui/fogBoard.ts)
         d.activity();
