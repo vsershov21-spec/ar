@@ -6,6 +6,23 @@
       "args": [],
       "maxCredits": 0,
       "note": "Без генерации: выгрузить все готовые клипы Meshy (slim GLB + manifest) в server-out/out/latest/meshy для просмотра"
+    },
+    {
+      "id": "caddy-encode-1",
+      "kind": "script",
+      "ref": "e530a7ade2ac2effddce6a914397b0440145a20f",
+      "path": "scripts/deploy/caddy-encode.sh",
+      "timeoutMin": 15
+    },
+    {
+      "id": "status-1",
+      "kind": "status"
+    },
+    {
+      "id": "audit-meshy-1",
+      "kind": "audit",
+      "ref": "e530a7ade2ac2effddce6a914397b0440145a20f",
+      "timeoutMin": 120
     }
   ]
 }
