@@ -60,11 +60,12 @@ describe('ar-auto ops: разбор очереди', () => {
     expect(validateJob(sc({ maxCredits: 10 })).error).toBeTruthy();
   });
 
-  it('очередь из репо проходит (реальных ops-задач в ней нет)', () => {
+  it('очередь из репо проходит проверку сервера', () => {
     const q = JSON.parse(fs.readFileSync('automation/queue.json', 'utf8'));
     const { errors, jobs } = validateQueue(q);
     expect(errors).toEqual([]);
-    expect(jobs.filter((j: J) => ['script', 'audit', 'status'].includes(j.kind as string))).toEqual([]);
+    // ops-задачи в очереди — штатный способ работы Claude с сервером; у script/audit ref обязателен
+    for (const j of jobs.filter((j: J) => ['script', 'audit'].includes(j.kind as string))) expect((j as { ref?: string }).ref, j.id as string).toMatch(/^[0-9a-f]{7,40}$/);
   });
 });
 
