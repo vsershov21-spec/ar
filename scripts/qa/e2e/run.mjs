@@ -116,11 +116,14 @@ for (const t of tests) {
 await browser.close();
 await server.close();
 
-// 404: ассеты, которых нет на стенде, но есть на сервере (модель Vosk — .gitignore); остальное — провал прогона
-const NOT_IN_REPO = /\/models\/vosk-ru-small\//;
+// 404: ассеты, которых нет на стенде, но есть на сервере; остальное — провал прогона
+//   модель Vosk (public/models/vosk-ru-small*, .gitignore) и клипы Meshy (/models/anims/meshy — кладёт attach-extra с
+//   сервера сборки) — вне репозитория; props/bed.glb — необязательная модель кровати (home/room.ts пробует её, нет —
+//   процедурная кровать; 404 и на проде)
+const NOT_IN_REPO = /\/models\/(vosk-ru-small[^/]*\/|anims\/meshy\/|props\/bed\.glb$)/;
 const miss = [...new Set(server.requests.filter((r) => r.status === 404).map((r) => r.path.split('?')[0]))];
 const bad404 = miss.filter((p) => !NOT_IN_REPO.test(p));
-if (bad404.length) results.push({ name: '10_no_404', title: 'нет 404 (кроме модели Vosk вне репозитория)', ok: false, sec: 0, error: `404: ${bad404.slice(0, 8).join(', ')}`, notes: [], errors: [] });
+if (!only.length || bad404.length) results.push({ name: '10_no_404', title: 'нет 404 (кроме ассетов вне репозитория: Vosk, Meshy; необязательной bed.glb)', ok: !bad404.length, sec: 0, error: bad404.length ? `404: ${bad404.slice(0, 8).join(', ')}` : null, notes: [], errors: [] });
 
 const pass = results.filter((r) => r.ok).length;
 fs.writeFileSync(path.join(OUT, 'report.json'), JSON.stringify({ at: new Date().toISOString(), pass, total: results.length, results, errors: allErrors }, null, 2));
