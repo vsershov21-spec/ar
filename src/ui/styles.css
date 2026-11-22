@@ -283,6 +283,9 @@ canvas.gl.glitch { --gshift: 8px; animation: glitch .68s steps(1) infinite;
   backdrop-filter: var(--blur); -webkit-backdrop-filter: var(--blur); color: var(--white); font-size: var(--fs-s); font-weight: 600; line-height: 1.4;
   text-align: center; box-shadow: var(--sh-2); z-index: 20; animation: rise var(--t-med) var(--ease); }
 body > .toast { position: fixed; }
+/* тост — только сообщение: касания проходят к чипам и кнопкам под ним (E2E 22.11: «Нет доступа к микрофону» 5 с
+   закрывал чипы «Давай!» / «Не надо» — нажатия пропадали) */
+.toast { pointer-events: none; }
 
 @keyframes pop { 0% { transform: scale(.7); opacity: 0; } 70% { transform: scale(1.04); } 100% { transform: none; opacity: 1; } }
 @keyframes rise { from { opacity: 0; transform: translateY(12px); } }
