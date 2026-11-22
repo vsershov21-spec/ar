@@ -10,6 +10,7 @@
 //   node scripts/qa/anim-audit/audit.mjs --no-build --tag perf4 --cpu 4 --no-sheets   — CDP-замедление ЦП ×4 (класс телефона)
 //   node scripts/qa/anim-audit/audit.mjs --focus "hooligan/st_treat_cancel:800-1300:33" — кадры подряд вокруг рывка
 //   node scripts/qa/anim-audit/audit.mjs --meshy /srv/ar-extra/models/anims/meshy     — клипы Meshy с сервера
+//   --clips meshy --only 'clip_*' — каждый загруженный клип Meshy сам по себе (character.play), без сценария
 //   --out DIR — куда класть raw/ и sheets/ (по умолчанию bench-out/anim-audit)
 //   --trace "JS от app" — своё значение в каждый кадр (frame.tr), node spikes.cjs <tag> cat/id --all — кадры подряд
 //
@@ -65,6 +66,8 @@ const FOCUS_ON = Object.keys(FOCUS).length > 0;
 /** --trace "JS-выражение от app" — значение в каждый кадр (frame.tr; spikes.cjs его печатает) */
 const TRACE = arg('--trace', '');
 const MESHY_DIR = arg('--meshy', '') ? path.resolve(arg('--meshy')) : '';
+/** --clips a,b|meshy — сценарии clip_<id>: клип сам по себе (character.play), «meshy» — все загруженные клипы Meshy кота */
+const CLIPS = arg('--clips', '');
 /**
  * порог проникновения руки/ноги в тело или одежду после коррекции BodyCollider, мм на карте — больше = «плохо» (19.11:
  * кисть и предплечье у головы меряются по точкам поверхности лапы, цель ≤ 1 мм)
@@ -108,6 +111,7 @@ function scenarios(cat, durs = {}) {
     { id: 'rest', dur: 6000, steps: [] },
     { id: 'rest_noalive', dur: 6000, steps: [{ op: 'js', at: 0, label: 'aliveOff', code: 'app.character.aliveOff = true' }], after: 'app.character.aliveOff = false' },
     { id: 'look_noalive', dur: 6000, steps: [{ op: 'js', at: 0, label: 'aliveOff', code: 'app.character.aliveOff = true' }, { op: 'js', at: 300, label: 'play', code: "app.character.play('idle_look_around')" }], after: 'app.character.aliveOff = false' },
+    ...(durs.__clips ?? []).map((k) => ({ id: 'clip_' + k, dur: Math.round(Math.min(9000, Math.max(3500, (durs[k] ?? 2.5) * 1000 + 1500))), steps: [{ op: 'js', at: 300, label: 'play ' + k, code: `app.character.play('${k}')` }] })),
     ...IDLES.map((k) => ({ id: 'idleclip_' + k, dur: Math.round(Math.max(4000, (durs[k] ?? 3) * 1000 + 1500)), steps: [{ op: 'js', at: 300, label: 'play ' + k, code: `app.character.play('${k}')` }] })),
     { id: 'zone_head', dur: 4000, steps: [{ op: 'tap', at: 300, bone: 'Head', dy: -0.04 }] },
     { id: 'zone_cheek', dur: 4000, steps: [{ op: 'tap', at: 300, bone: 'Head', dx: 0.15, dy: 0.04 }] },
@@ -259,6 +263,7 @@ async function runCat(browser, cat) {
   const avail = await page.evaluate(() => { const c = window.__app.character; return [...new Set([...(c.actions?.keys?.() ?? []), ...(c.aliased?.keys?.() ?? [])])]; });
   log(`[${cat}] клипов: ${avail.length}; idle: ${avail.filter((k) => /^idle/.test(k)).join(',')}`);
   durs.__avail = avail;
+  durs.__clips = CLIPS === 'meshy' ? (meshy ?? []).filter((m) => m.state === 'loaded').map((m) => m.id) : CLIPS ? CLIPS.split(',') : [];
   log(`[${cat}] калибровка`, JSON.stringify(cal));
   const results = [];
   const want = (id) => !ONLY || ONLY.includes(id);
