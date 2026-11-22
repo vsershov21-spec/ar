@@ -23,6 +23,19 @@
       "kind": "audit",
       "ref": "e530a7ade2ac2effddce6a914397b0440145a20f",
       "timeoutMin": 120
+    },
+    {
+      "id": "caddy-encode-2",
+      "kind": "script",
+      "ref": "82710b6887e4548ff9ce58f227d3b4ba4694a136",
+      "path": "scripts/deploy/caddy-encode.sh",
+      "timeoutMin": 15
+    },
+    {
+      "id": "audit-meshy-2",
+      "kind": "audit",
+      "ref": "82710b6887e4548ff9ce58f227d3b4ba4694a136",
+      "timeoutMin": 120
     }
   ]
 }
