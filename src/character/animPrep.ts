@@ -188,15 +188,24 @@ export function prepareClip(clip: THREE.AnimationClip, names: Set<string>, opts:
     res += qc.angleTo(qa.fromArray(s.v, i * 4));
     stp += angleAt(s.v, i, i - 1);
   }
-  info.noise = stp > 1e-6 ? res / stp : 0;
+  // шум исходника из пакета движений (scripts/build/anim-pack.mjs: после прореживания ключей кривые глаже — σ брался бы
+  // меньше, чем у исходных кривых); монтаж cut и клипы без пакета — как раньше, по своим кривым
+  const pn = (clip.userData as { prepNoise?: unknown } | undefined)?.prepNoise;
+  info.noise = typeof pn === 'number' ? pn : stp > 1e-6 ? res / stp : 0;
 
   // 3. одноразовый: срезать неподвижное начало/конец (порог 0,05 рад от крайнего кадра), запас 0,1/0,15 с
   if (!loop && body.length) {
     const dev = (i: number, ref: number) => body.reduce((m, s) => Math.max(m, angleAt(s.v, i, ref)), 0);
+    // границы по исходным кривым из пакета движений (prepTrim: [a, b, n]) — иначе по своим
+    const hint = (clip.userData as { prepTrim?: unknown } | undefined)?.prepTrim;
+    const h = Array.isArray(hint) && hint.length === 3 && hint[2] === n ? (hint as number[]) : null;
     let a = 0;
-    while (a < n - 1 && dev(a, 0) < 0.05) a++;
     let b = n - 1;
-    while (b > a && dev(b, n - 1) < 0.05) b--;
+    if (h) [a, b] = [h[0], h[1]];
+    else {
+      while (a < n - 1 && dev(a, 0) < 0.05) a++;
+      while (b > a && dev(b, n - 1) < 0.05) b--;
+    }
     a = Math.max(0, a - Math.round(0.1 * fps));
     b = Math.min(n - 1, b + Math.round(0.15 * fps));
     if (b - a < Math.round(0.4 * fps)) [a, b] = [0, n - 1];

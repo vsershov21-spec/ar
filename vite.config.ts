@@ -1,6 +1,8 @@
 import { defineConfig } from 'vite';
 // модели сжимаются при сборке (meshopt + KTX2), исходники public/models не меняются — scripts/build/model-opt.mjs
-import { modelOpt } from './scripts/build/vite-model-opt.mjs';
+import { earlyModelScript, modelOpt } from './scripts/build/vite-model-opt.mjs';
+import { ASSETS } from './src/config';
+import { variantGlb } from './src/character/modelVariant';
 import { existsSync, readdirSync } from 'node:fs';
 import { featureIn, parseEdition } from './src/config/edition';
 import { quickSplash } from './src/quick/splash';
@@ -17,9 +19,19 @@ function quickSplashPlugin() {
     name: 'ar-quick-splash',
     transformIndexHtml: {
       order: 'post' as const,
-      handler(html: string) {
+      handler(html: string, ctx: { bundle?: Record<string, { fileName: string }> }) {
         if (!featureIn(parseEdition(process.env.VITE_EDITION), 'intro.quick')) return html;
         if (!html.includes('<div id="app"></div>')) return html;
+        // опыт ?early=1: модель кота, стартовые движения и транскодер текстур — качать с первого байта страницы
+        // (scripts/build/vite-model-opt.mjs earlyModelScript; по умолчанию выключен — замеры в docs/qa/ui/quick/SPEED.md)
+        const base = process.env.SUB_BASE ?? process.env.LAB_BASE ?? '/';
+        const transcoder = Object.values(ctx?.bundle ?? {}).map((f) => f.fileName).filter((f) => /basis_transcoder[^/]*\.(wasm|js)$/.test(f)).map((f) => base + f);
+        const early = earlyModelScript({
+          assetBase: process.env.VITE_ASSET_BASE || base, storagePrefix: process.env.VITE_STORAGE_PREFIX ?? '',
+          glbByPersona: ASSETS.glbByPersona, v2: (p: string) => variantGlb(p, 'v2'), anims: ASSETS.glbAnims, transcoder,
+        });
+        // сразу за <meta charset> (кодировка — в первых 1024 байтах), до стилей и бандла
+        if (early) html = /<meta charset[^>]*>/i.test(html) ? html.replace(/(<meta charset[^>]*>)/i, `$1\n    ${early}`) : html.replace('<head>', `<head>\n    ${early}`);
         const css: string[] = [];
         const head = html.replace(/\s*<link rel="stylesheet"[^>]*>/g, (m) => (css.push(m.trim()), ''));
         const splash = quickSplash({ consent: parseConsentMode(process.env.VITE_CONSENT_MODE), policyUrl: PRIVACY_POLICY_URL });

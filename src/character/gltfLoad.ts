@@ -35,3 +35,12 @@ export function makeGltfLoader(): GLTFLoader {
   }
   return loader;
 }
+
+/**
+ * Транскодер Basis (js + wasm, ~0,25 МБ) — качать сразу, вместе с моделью кота, а не после неё: иначе он встаёт в
+ * очередь только когда модель уже скачана и начался разбор текстур (лишние 0,2–1,4 с до кота на 4G).
+ */
+export function warmTranscoder() {
+  makeGltfLoader(); // создаёт общий KTX2Loader (нужен рендерер — App регистрирует его в конструкторе)
+  void ktx2?.init().catch(() => undefined);
+}

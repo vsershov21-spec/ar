@@ -17,8 +17,13 @@ import crypto from 'node:crypto';
 import { Worker, isMainThread, parentPort, workerData } from 'node:worker_threads';
 import { fileURLToPath } from 'node:url';
 
+/**
+ * Текстуры больше MAX_TEX px — уменьшаются до него перед KTX2 (2048² → 1024²: на экране телефона кот 300–600 px,
+ * атлас всего тела 1024² — тот же вид, сверка docs/qa/ui/quick/SPEED.md; −1,3 МБ на кота). AR_TEX_MAX=2048 — как было.
+ */
+const MAX_TEX = Number(process.env.AR_TEX_MAX) || 1024;
 /** меняется при любой правке алгоритма — сбрасывает кэш */
-export const PIPELINE = 'v1-etc1s-q255-min1024-meshopt-filter';
+export const PIPELINE = `v1-etc1s-q255-min1024-meshopt-filter${MAX_TEX !== 2048 ? `-max${MAX_TEX}` : ''}`;
 /** меньше 1024 px KTX2 выходит тяжелее JPEG, а памяти такие текстуры почти не занимают — оставляем как есть */
 const MIN_KTX = 1024;
 
@@ -58,8 +63,16 @@ async function optimizeBuffer(input) {
       : isColor
         ? { isPerceptual: true, isSetKTX2SRGBTransferFunc: true }
         : { isPerceptual: false, isSetKTX2SRGBTransferFunc: false };
-    const out = await encodeToKTX2(img, { isUASTC: false, qualityLevel: 255, compressionLevel: 2, generateMipmap: true, enableDebug: false, imageDecoder: decode, ...opts });
-    log.push(`${tex.getName() || 'tex'} ${size[0]}² ${isNormal ? 'normal' : isColor ? 'color' : 'linear'} ${(img.byteLength / 1024) | 0}K→${(out.byteLength / 1024) | 0}K`);
+    // больше MAX_TEX — уменьшить (Lanczos, без потерь при перекодировании: PNG); нормали после усреднения — как есть
+    // (Basis в режиме normal map их нормирует)
+    let src = img, w = size[0], h = size[1];
+    if (Math.max(w, h) > MAX_TEX) {
+      const k = MAX_TEX / Math.max(w, h);
+      [w, h] = [Math.round(w * k), Math.round(h * k)];
+      src = new Uint8Array(await sharp(Buffer.from(img)).resize(w, h, { kernel: 'lanczos3' }).png({ compressionLevel: 1 }).toBuffer());
+    }
+    const out = await encodeToKTX2(src, { isUASTC: false, qualityLevel: 255, compressionLevel: 2, generateMipmap: true, enableDebug: false, imageDecoder: decode, ...opts });
+    log.push(`${tex.getName() || 'tex'} ${size[0]}²${w !== size[0] ? `→${w}²` : ''} ${isNormal ? 'normal' : isColor ? 'color' : 'linear'} ${(img.byteLength / 1024) | 0}K→${(out.byteLength / 1024) | 0}K`);
     tex.setImage(out).setMimeType('image/ktx2');
     ktx++;
   }
@@ -67,6 +80,11 @@ async function optimizeBuffer(input) {
   doc.createExtension(EXTMeshoptCompression).setRequired(true).setEncoderOptions({ method: EXTMeshoptCompression.EncoderMethod.FILTER });
   const out = await io.writeBinary(doc);
   return { out: Buffer.from(out.buffer, out.byteOffset, out.byteLength), log };
+}
+
+/** папка кэша сборки (или null — кэша нет); её же берут пакеты движений (vite-model-opt.mjs) */
+export function modelCacheDir() {
+  return cacheDir();
 }
 
 function cacheDir() {

@@ -29,7 +29,7 @@ import { NAMES, normalize, matchIntent } from './voice/intents';
 import { personaMeta } from './character/personaMeta';
 import { CardMonitor, LumaSampler, cardScreenFrac, type CardEvent } from './tracker/cardMonitor';
 import { perf, AdaptiveQuality, type QualityLevel } from './core/perf';
-import { prefetchModel, warmModel } from './core/modelUrl';
+import { prefetchModel, prefetchSettled, warmModel } from './core/modelUrl';
 import { variantGlb } from './character/modelVariant';
 import { loadMemory } from './scenario/memory';
 import { progressReady } from './progress';
@@ -208,7 +208,9 @@ export class App {
     this.engine = new VoiceEngine(this.audio, this.voice, { asr: p.asr, mode: p.mic, grammar: new URLSearchParams(location.search).get('grammar') !== '0' });
     // быстрый старт: онбординг ждёт только контент и манифест озвучки; звуки эффектов (~0,3 МБ) догружаются
     // за ним (до «Открыть камеру» их не играем), модель — сразу как онбординг на экране
-    const sfx = this.audio.load(ASSETS.sfx);
+    // Быстрый вход: звуки эффектов — после байтов кота (модель и стартовые движения первыми делят полосу с кодом и
+    // трекером; до посадки эффекты не звучат); сценарий их не ждёт
+    const sfx = this.quick ? prefetchSettled().then(() => this.audio.load(ASSETS.sfx)) : this.audio.load(ASSETS.sfx);
     sfx.catch(() => undefined);
     const [content] = await Promise.all([loadContent(), this.voice.load(ASSETS.voice)]);
 
@@ -298,6 +300,9 @@ export class App {
         anchor: this.tracker.anchor, aspect: this.tracker.aspect, stage: this.stage, character: () => this.character ?? null, audio: this.audio,
         root: this.root, camera: this.tracker.camera, renderer: this.renderer, log: (s) => this.director?.log(s), persona: () => this.director.persona.id,
       });
+      // быстрый вход: звуки пробуждения — сразу за байтами кота (сцена может начаться, как только кот готов: карту
+      // ищем параллельно), а не после его разбора
+      if (this.quick) void prefetchSettled().then(() => this.awake?.sounds.load());
       // свечение, искры и «Ого!» при находке карты — теперь в сцене пробуждения
       const ov = (this.tracker as unknown as { overlay?: { quiet: boolean } }).overlay;
       if (ov) ov.quiet = true;
@@ -316,7 +321,7 @@ export class App {
     this.applyEdition();
     await this.setCharacterMode(p.character);
     this.awake?.warm(this.scene); // шейдеры и текстуры сцены пробуждения — заранее (без рывка на «ПУФ»)
-    await sfx;
+    if (!this.quick) await sfx;
     perf.mark('char');
     this.wireFx();
     // озвучка: манифест текущего характера и первые реплики сценария — заранее
@@ -367,6 +372,8 @@ export class App {
     if (own) prefetchModel(variantGlb(own), priority);
     prefetchModel(ASSETS.glbAnims, priority);
     void import('./character/glbCharacter').catch(() => undefined);
+    // транскодер текстур KTX2 — параллельно с моделью (иначе он ждёт конца её загрузки)
+    void import('./character/gltfLoad').then((m) => m.warmTranscoder()).catch(() => undefined);
   }
 
   /** слой эффектов: звук, точки кота, лог, характер (палитра, fxTuning, наклейки из content/src/*.meta.json) */
@@ -1027,6 +1034,29 @@ export class App {
     this.applyQuality(this.quality.current, this.quality.level);
     this.quality.pause();
     this.precompile();
+    this.kickDeferred(ch);
+  }
+
+  /**
+   * Остальные движения и клипы Meshy (GlbCharacter.loadDeferred) — после посадки: когда пробуждение кончилось и
+   * сценарий пошёл дальше (+1,5 с), а не во время поиска карты и «ПУФ» — там полоса и процессор нужны коту и трекеру.
+   * Кот уже на карте (смена образа) — сразу; карты так и нет — через 30 с. Клип, которого ещё нет, догрузка берёт сама.
+   */
+  private kickDeferred(ch: Character) {
+    const load = (ch as Character & { loadDeferred?: () => Promise<void> }).loadDeferred;
+    if (typeof load !== 'function') return;
+    let done = false;
+    const go = (ms: number) =>
+      setTimeout(() => {
+        if (done || this.character !== ch) return;
+        done = true;
+        off();
+        void load.call(ch);
+      }, ms);
+    const landed = (ph: string) => ph !== 'start' && ph !== 'scanning' && ph !== 'appear';
+    const off = this.director.on('phase', (ph) => landed(ph) && go(1500));
+    if (landed(this.director.state.phase)) go(0);
+    go(30_000);
   }
 
   /**
@@ -1325,6 +1355,10 @@ export class App {
    * Отказ — экран заставки «Без камеры кот не увидит карту»; wake() потом пробует камеру заново.
    */
   private earlyVideo: Promise<void> | null = null;
+  /** быстрый вход: поиск карты, начатый до готовности приложения (preWakeCamera) */
+  private earlySearch: Promise<boolean> | null = null;
+  /** когда ранний поиск нашёл карту (воронка card_landed — подписка приложения могла появиться позже находки) */
+  private earlyFoundAt: number | null = null;
   private preWakeCamera() {
     const tv = this.tracker as unknown as { startVideo?: () => Promise<void>; withAudio?: boolean };
     if (this.earlyVideo || typeof tv.startVideo !== 'function') return;
@@ -1332,7 +1366,18 @@ export class App {
     const p = tv.startVideo();
     this.earlyVideo = p;
     p.then(
-      () => this.quick?.search(),
+      () => {
+        this.quick?.search();
+        // поиск карты — сразу, параллельно с загрузкой кота (воркер трекера, не главный поток); wake() его подхватит
+        if (!this.earlySearch) this.tracker.onFound(() => (this.earlyFoundAt ??= performance.now()));
+        this.earlySearch ??= this.tracker.start().then(
+          () => true,
+          (e) => {
+            console.warn('[tracker] ранний поиск', e);
+            return false;
+          },
+        );
+      },
       () => {
         this.earlyVideo = null; // wake() откроет камеру заново (поток заставки с ошибкой — она уже показала экран отказа)
         if (this.quick) this.quick.earlyFailed = true;
@@ -1414,7 +1459,13 @@ export class App {
       // подсказка про мышь — один раз и только без касаний (телефон, iPad)
       if (this.orbitView && !isTouchDevice()) setTimeout(() => (this.hideOrbitHint = showOrbitHint(this.root)), 1500);
       track('card_search_start', { ms: performance.now() }, true);
-      await this.tracker.start();
+      // быстрый вход: поиск уже идёт с заставки — карта могла найтись, пока грузился кот (событие было до «wake»)
+      const search = this.earlySearch;
+      this.earlySearch = null;
+      if (search && (await search)) {
+        if (this.earlyFoundAt !== null) track('card_landed', { ms: this.earlyFoundAt }, true);
+        if (this.tracker.isTracking) this.director.dispatch({ type: 'card_found' });
+      } else await this.tracker.start();
       openMic();
       this.resize();
     } catch (e) {

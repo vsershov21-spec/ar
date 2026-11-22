@@ -16,7 +16,14 @@ export class AwakeAudio {
 
   constructor(private audio: Audio) {}
 
-  async load(url = 'sounds/awake.json') {
+  private loadP: Promise<void> | null = null;
+
+  /** спрайт звуков; повторный вызов — та же загрузка (app.ts зовёт заранее, warm — ещё раз) */
+  load(url = 'sounds/awake.json'): Promise<void> {
+    return (this.loadP ??= this.doLoad(url));
+  }
+
+  private async doLoad(url: string) {
     try {
       const r = await fetch(asset(url));
       const j = (await r.json()) as { src: string[]; sprite: Record<string, [number, number]> };

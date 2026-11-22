@@ -40,6 +40,25 @@
   `.cache/model-opt/` в рабочей папке сборки (или `$AR_MODEL_CACHE`). Сеть и root не нужны.
 - Ошибка сжатия не роняет сборку — модель остаётся исходной. `AR_MODEL_OPT=0 npm run build` — выключить.
 - Вручную: `node scripts/build/model-opt.mjs public/models/kind_v1.glb --out /tmp/kind.glb`.
+- Текстуры больше 1024 px уменьшаются до 1024² (на экране телефона — тот же вид, сверка
+  `docs/qa/ui/quick/SPEED.md`); `AR_TEX_MAX=2048` — как было.
+- Библиотека движений `anims_v1.glb` → `dist/models/opt/anims_v1.start.<хэш>.glb` (покой, пробуждение, знакомство,
+  касания — с ним кот садится на карту) и `anims_v1.rest.<хэш>.glb` (догружается после посадки):
+  `scripts/build/anim-pack.mjs`, список — `src/character/animPacks.ts`. Секунды, тоже с кэшем.
+
+### Сжатие ответов (Caddy)
+
+Модели и движения сжаты meshopt — поверх нужен gzip/zstd сервера, а `encode` Caddy по умолчанию `.glb` не жмёт.
+Разово (root, в фоне; блоки `/mvp`, `/lab`, `/api/progress` не трогаются, при ошибке — откат):
+
+```bash
+REF=<коммит>; curl -fsSL https://raw.githubusercontent.com/vsershov21-spec/ar/$REF/scripts/deploy/caddy-encode.sh -o /tmp/caddy-encode.sh \
+  && nohup bash /tmp/caddy-encode.sh >/tmp/caddy-encode.log 2>&1 &
+sleep 20; cat /tmp/caddy-encode.log
+```
+
+В логе — `Content-Encoding` (zstd/gzip) и байты без/со сжатием у модели кота, пакета движений, транскодера и main.js;
+`DRY=1 bash /tmp/caddy-encode.sh` — только показать новый блок.
 
 ### Страницы /test и /test/admin
 

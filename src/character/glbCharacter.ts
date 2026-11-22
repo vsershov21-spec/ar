@@ -11,12 +11,13 @@ import type { Character, ClipName, Emote, PlayOptions, TouchZone } from './types
 import { procFor, type ProcPose } from './procedural';
 import type { Persona } from '../persona/types';
 import { asset, clamp } from '../core/util';
-import { fetchModel, modelUrl } from '../core/modelUrl';
+import { animRestUrl, fetchModel, fetchUrl, modelUrl } from '../core/modelUrl';
 import { makeGltfLoader } from './gltfLoad';
 import { type MouthShape, type Viseme } from '../lipsync/visemes';
 import { FaceLife } from './faceLife';
 import { ClipState } from './clipState';
 import { clipDef, CUT_CLIPS, FALLBACK_CLIPS, MESHY_IDS, meshyDef } from './clips';
+import { TRIPO_ALIAS } from './tripoAlias';
 import { prepareClipsAsync, spliceClip, trimStill, type ClipPrepInfo } from './animPrep';
 import { loadMeshyClips, meshyStatus, meshyWanted, skelFrom, type Skel } from './meshyClips';
 import { feature } from '../config/edition';
@@ -113,58 +114,24 @@ const HP_B = new THREE.Vector3();
 const HP_P = new THREE.Vector3();
 
 
+// пресеты Tripo → id каталога — в tripoAlias.ts (его же читает сборка: стартовый пакет движений, animPacks.ts)
+export { TRIPO_ALIAS } from './tripoAlias';
+
+/** клип монтажа cut: результат, темп поверх animPrep, имя исходника в GLB */
+export interface CutClip {
+  clip: THREE.AnimationClip;
+  speed?: number;
+  src?: string;
+}
+
 /**
- * Пресеты Tripo (скелет Mixamo) → id каталога content/animations.json. Клип из GLB с таким именем
- * регистрируется под нашим id (если под этим id ещё ничего нет). Первый подходящий выигрывает.
+ * Клипы пакета движений — в порядке исходной библиотеки (extras.libIndex от scripts/build/anim-pack.mjs): от порядка
+ * зависит, какой пресет Tripo займёт id каталога (первый псевдоним выигрывает), и какой из одноимённых клипов играет.
  */
-export const TRIPO_ALIAS: Record<string, string[]> = {
-  idle: ['idle_breathe'],
-  standing_relax: ['sit_idle'],
-  look_around: ['idle_look_around'],
-  stretch: ['idle_stretch'],
-  warm_up: ['idle_hooligan_skate'],
-  walk: ['walk'],
-  run: ['run'],
-  jump: ['jump', 'celebrate'],
-  jump_down: ['appear_jump_in'],
-  flip: ['flip'],
-  turn: ['turn_left', 'turn_right'],
-  sit: ['sit_down'],
-  fall: ['fall_off_card', 'tumble'],
-  dive: ['dive_out'],
-  greet_01: ['wave'],
-  greet_02: ['point_button'],
-  wave_goodbye_01: ['wave_goodbye'],
-  laugh_01: ['laugh', 'sticker_react'],
-  laugh_02: ['talk_excited'],
-  cheer: ['celebrate', 'proud'],
-  clap: ['clap'],
-  scared_01: ['surprised', 'wake_startle'],
-  frightened: ['flinch', 'cover_ears'],
-  cry: ['cry'],
-  depressed: ['sad'],
-  hug: ['comfort', 'idle_kind_hug_self', 'hug_screen'],
-  fold_arms: ['offended'],
-  swagger: ['idle_hooligan_headphones'],
-  complain_01: ['talk_casual'],
-  agree: ['listen'],
-  bow: ['bow'],
-  heart_pose: ['idle_glitter_mirror'],
-  sing_01: ['sing'],
-  dance_01: ['dance_hooligan'],
-  dance_02: ['dance_kind'],
-  dance_03: ['dance_glitter', 'idle_glitter_twirl'],
-  dance_04: ['dance_04'],
-  dance_05: ['dance_05'],
-  dance_06: ['dance_06'],
-  play_mobile_game: ['card'],
-  wait: ['think'],
-  frustrated_01: ['dizzy'],
-  defeat_02: ['tumble'],
-  scratch: ['shy'],
-  afraid: ['shy'],
-  'knock on glass': ['knock_glass'],
-};
+function byLibIndex(clips: THREE.AnimationClip[]): THREE.AnimationClip[] {
+  const at = (c: THREE.AnimationClip) => (c.userData as { libIndex?: number } | undefined)?.libIndex;
+  return clips.every((c) => typeof at(c) === 'number') ? [...clips].sort((a, b) => at(a)! - at(b)!) : clips;
+}
 
 /** постоянный минимум весов лица по характеру (поверх пресета; хмурость его гасит) */
 const PERSONA_FACE: Record<string, Record<string, number>> = {
@@ -393,26 +360,32 @@ export class GlbCharacter implements Character {
     });
 
     let anims = gltf.animations;
-    // общая библиотека движений (тот же скелет Mixamo): Добряк и Блёстка берут клипы Хулигана
+    // общая библиотека движений (тот же скелет Mixamo): Добряк и Блёстка берут клипы Хулигана.
+    // В сборке она поделена на пакеты (src/character/animPacks.ts): здесь — стартовый (покой, пробуждение, знакомство,
+    // касания), остальное — loadDeferred() после посадки кота
+    let lib: THREE.AnimationClip[] = [];
     if (this.animsUrl && this.animsUrl !== this.url) {
       try {
         const libUrl = modelUrl(this.animsUrl);
-        const lib = await makeGltfLoader().parseAsync(await fetchModel(this.animsUrl), asset(libUrl).replace(/[^/]*$/, ''));
-        anims = [...anims, ...lib.animations];
+        lib = byLibIndex((await makeGltfLoader().parseAsync(await fetchModel(this.animsUrl), asset(libUrl).replace(/[^/]*$/, ''))).animations);
+        this.restUrl = animRestUrl(this.animsUrl);
       } catch (e) {
         console.warn('[glb] библиотека анимаций не загрузилась', e);
       }
     }
+    anims = [...anims, ...lib];
     if (anims.length) {
       this.mixer = new THREE.AnimationMixer(model);
       // перепривязка, сглаживание, обрезка, швы петель, высота корня, темп (animPrep.ts)
       // ?anim=raw — как было (для сравнения в debug)
       const raw = typeof location !== 'undefined' && /[?&]anim=raw/.test(location.search);
+      this.rawPrep = raw;
+      // сырые копии (до animPrep) — монтаж cut из полной библиотеки, когда догрузится остальное
+      if (this.restUrl) this.rawClips = anims.map((c) => c.clone());
       // монтаж по каталогу (cut): короткие реакции из длинных T2M-клипов — до подготовки, из сырого клипа
       const cuts = raw ? [] : GlbCharacter.cutClips(anims);
-      anims = [...anims, ...cuts.map((c) => c.clip)];
       if (!raw) {
-        this.animInfo = await prepareClipsAsync(model, this.inner, anims, {
+        this.animInfo = await prepareClipsAsync(model, this.inner, [...anims, ...cuts.map((c) => c.clip)], {
           isLoop: (n) => GlbCharacter.aliasIds(n).some((id) => clipDef(id)?.loop),
           keepSpeed: (n) => /dance|run|jump|flip|dive|fall|tumble|celebrate|cheer/.test(n),
         });
@@ -421,15 +394,16 @@ export class GlbCharacter implements Character {
         const inf = this.animInfo.get(clip);
         if (inf && speed) inf.timeScale *= speed;
       }
-      for (const clip of anims) this.addClip(clip);
-      this.addFallbacks();
+      this.ownClips = gltf.animations;
+      this.libClips = lib;
+      this.cutList = cuts;
+      // блендер — до регистрации: длительность одноразовых клипов (realDuration) считает он
       if (!raw) this.anim = new AnimBlender(model, (a) => this.animInfo.get(a.getClip()));
+      this.registerClips();
       this.poseFade = new PoseFade(model);
-      // одноразовые клипы играют до конца движения, а не по ориентиру каталога
-      this.actions.forEach((a, id) => this.clips.realDuration.set(id, this.anim?.realDuration(a) ?? a.getClip().duration));
     }
-    // клипы Meshy (lab): лениво, после того как кот уже стоит; ?meshy=0 — без них
-    if (this.mixer && meshyWanted(feature('anims.meshy'))) void this.loadMeshy();
+    // остальные движения и клипы Meshy — лениво: loadDeferred() после посадки кота (app.ts), или когда попросят клип,
+    // которого ещё нет; без пакетов — только Meshy (как раньше)
     this.setFaceObj('usual');
     this.furTone.attach(model);
     // фатин Блёстки с разметкой (models/v2/glitter_p1.glb): сетка, золотые блёстки и полоса по подолу
@@ -725,6 +699,99 @@ export class GlbCharacter implements Character {
     }
   }
 
+  /** клипы модели, библиотеки (по её порядку) и монтажа — всё, что зарегистрировано (для перерегистрации) */
+  private ownClips: THREE.AnimationClip[] = [];
+  private libClips: THREE.AnimationClip[] = [];
+  private cutList: CutClip[] = [];
+  /** сырые копии клипов модели и стартового пакета (монтаж из полной библиотеки) */
+  private rawClips: THREE.AnimationClip[] | null = null;
+  private rawPrep = false;
+  /** остальные движения (пакет «остальное») — ещё не загружены */
+  private restUrl: string | null = null;
+  private deferredP: Promise<void> | null = null;
+
+  /**
+   * Регистрация в порядке полной загрузки: клипы модели, библиотека, монтаж (cut), опоры (fallback), сверху — клипы
+   * Meshy. Повторный вызов (догрузили остальное) даёт ту же раскладку, что и загрузка всей библиотеки сразу; уже
+   * играющий клип не сбивается (AnimBlender держит своё действие до смены id).
+   */
+  private registerClips() {
+    const meshy = new Map<string, THREE.AnimationAction>();
+    for (const id of this.meshy) {
+      const a = this.actions.get(id);
+      if (a) meshy.set(id, a);
+    }
+    this.actions.clear();
+    this.aliased.clear();
+    this.procedural.clear();
+    for (const c of this.ownClips) this.addClip(c);
+    for (const c of this.libClips) this.addClip(c);
+    for (const c of this.cutList) this.addClip(c.clip);
+    this.addFallbacks();
+    for (const [id, a] of meshy) {
+      this.actions.set(id, a);
+      this.aliased.delete(id);
+    }
+    // одноразовые клипы играют до конца движения, а не по ориентиру каталога
+    this.actions.forEach((a, id) => {
+      if (!this.meshy.has(id)) this.clips.realDuration.set(id, this.anim?.realDuration(a) ?? a.getClip().duration);
+    });
+  }
+
+  /** остальные движения ещё грузятся (клипа может не быть — играет опора / заглушка, как раньше без клипа) */
+  get deferredPending() {
+    return !!this.restUrl;
+  }
+
+  /**
+   * Догрузка после посадки кота: пакет «остальное» (src/character/animPacks.ts) — прореживание, монтаж, регистрация,
+   * затем клипы Meshy (lab, пилот). Повторный вызов — тот же промис. Зовёт app.ts (после посадки или по таймеру) и
+   * play(), если попросили клип, которого ещё нет.
+   */
+  loadDeferred(): Promise<void> {
+    this.deferredP ??= (async () => {
+      const url = this.restUrl;
+      if (url && this.mixer && this.model) {
+        try {
+          const buf = await fetchUrl(url, 'low');
+          const rest = byLibIndex((await makeGltfLoader().parseAsync(buf, asset(url).replace(/[^/]*$/, ''))).animations);
+          if (!this.mixer || !this.model) return; // кота сменили, пока качали
+          const model = this.model;
+          // монтаж cut — из полной сырой библиотеки (исходник мог прийти только сейчас); готовый — тот же, если исходник тот же
+          const all = byLibIndex([...(this.rawClips ?? []), ...rest.map((c) => c.clone())]);
+          const was = new Map(this.cutList.map((c) => [c.clip.name, c]));
+          const cuts = this.rawPrep ? [] : GlbCharacter.cutClips(all).map((c) => (was.get(c.clip.name)?.src === c.src ? was.get(c.clip.name)! : c));
+          const fresh = cuts.filter((c) => !this.cutList.includes(c));
+          if (!this.rawPrep) {
+            const info = await prepareClipsAsync(model, this.inner, [...rest, ...fresh.map((c) => c.clip)], {
+              isLoop: (n) => GlbCharacter.aliasIds(n).some((id) => clipDef(id)?.loop),
+              keepSpeed: (n) => /dance|run|jump|flip|dive|fall|tumble|celebrate|cheer/.test(n),
+            });
+            if (!this.mixer || this.model !== model) return;
+            info.forEach((v, k) => this.animInfo.set(k, v));
+            for (const { clip, speed } of fresh) {
+              const inf = this.animInfo.get(clip);
+              if (inf && speed) inf.timeScale *= speed;
+            }
+          }
+          this.libClips = byLibIndex([...this.libClips, ...rest]);
+          this.cutList = cuts;
+          this.rawClips = null;
+          this.restUrl = null;
+          this.registerClips();
+          this.setIdles();
+          console.info(`[glb] движения: +${rest.length} клипов (всего ${this.libClips.length})`);
+        } catch (e) {
+          this.restUrl = null;
+          console.warn('[glb] остальные движения не загрузились', e);
+        }
+      }
+      // клипы Meshy (lab, пилот): после остальных движений; ?meshy=0 — без них
+      if (this.mixer && meshyWanted(feature('anims.meshy'))) await this.loadMeshy();
+    })();
+    return this.deferredP;
+  }
+
   /**
    * Клипы каталога, которых ещё нет в библиотеке (поле fallback в content/animations.json: кровать, сон в кровати…):
    * играет клип-опора, а путь корня и поправки поз добавляет сцена (poseTweak). Своё имя в GLB важнее — пришёл
@@ -910,16 +977,16 @@ export class GlbCharacter implements Character {
    * Tripo, который по TRIPO_ALIAS играет этот id. Новый клип называется id и регистрируется последним — своё имя
    * важнее и исходника, и псевдонима.
    */
-  static cutClips(anims: THREE.AnimationClip[]): { clip: THREE.AnimationClip; speed?: number }[] {
+  static cutClips(anims: THREE.AnimationClip[]): CutClip[] {
     const byKey = new Map<string, THREE.AnimationClip>();
     for (const c of anims) byKey.set(c.name.toLowerCase().replace(/^.*\|/, ''), c);
-    const out: { clip: THREE.AnimationClip; speed?: number }[] = [];
+    const out: CutClip[] = [];
     for (const d of CUT_CLIPS) {
       const cut = d.cut!;
       const alias = Object.keys(TRIPO_ALIAS).find((k) => TRIPO_ALIAS[k].includes(d.id) && byKey.has(k));
       const src = byKey.get(cut.src ?? '') ?? byKey.get(d.id) ?? (alias ? byKey.get(alias) : undefined);
       if (!src) continue;
-      out.push({ clip: spliceClip(src, cut.keep, d.id), speed: cut.speed });
+      out.push({ clip: spliceClip(src, cut.keep, d.id), speed: cut.speed, src: src.name });
     }
     return out;
   }
@@ -941,6 +1008,8 @@ export class GlbCharacter implements Character {
   }
 
   play(clip: ClipName, opts: PlayOptions = {}) {
+    // клипа ещё нет (остальные движения не догружены) — догрузить сейчас; пока — как без клипа (опора / заглушка)
+    if (this.restUrl && !this.actions.has(clip)) void this.loadDeferred();
     // шлепок наклейки: серия наклеек и реакция режиссёра зовут его в одном–двух кадрах (смена кота) — второй вызов
     // в первые 0,25 с того же шлепка не перезапускает дорожку
     if (clip === 'sticker_slap' && !opts.onEnd) {

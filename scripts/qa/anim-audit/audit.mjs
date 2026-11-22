@@ -237,6 +237,12 @@ async function runCat(browser, cat) {
     log(`  [${cat}] Meshy: загружено ${k('loaded')}, нет ${k('missing')}, отвергнуто ${k('rejected')}`);
     for (const m of meshy) if (m.state === 'rejected') log(`    ✗ ${m.id}: ${m.reason}`);
   }
+  // остальные движения (пакет «остальное», GlbCharacter.loadDeferred — после посадки) — до замеров и списка клипов:
+  // иначе клип из него сыграл бы опорой; в сборке без пакетов — сразу
+  await page.evaluate(async () => {
+    const c = window.__app.character;
+    if (c?.deferredPending && c.loadDeferred) await c.loadDeferred();
+  });
   // кадры листа — только 3D и эффекты (интерфейс прячется на время снимка)
   await page.addStyleTag({ content: 'html.rxshot *{visibility:hidden!important} html.rxshot canvas{visibility:visible!important}' });
   // ручное время: дальше кадр = 1/30 с
