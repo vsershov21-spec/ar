@@ -1,6 +1,6 @@
 import { describe, expect, it, beforeEach } from 'vitest';
 import * as THREE from 'three';
-import { normBone, parseManifest, retargetClip, skelFrom, loadMeshyClips, resetMeshyCache, meshyWanted } from '../src/character/meshyClips';
+import { normBone, parseManifest, retargetClip, skelFrom, loadMeshyClips, resetMeshyCache, meshyWanted, meshyStatus, PILOT_MESHY_OFF } from '../src/character/meshyClips';
 import { GlbCharacter } from '../src/character/glbCharacter';
 
 const bone = (name: string, parent: THREE.Object3D, pos: [number, number, number], q = new THREE.Quaternion()) => {
@@ -178,5 +178,37 @@ describe('meshyClips: загрузка и замена опоры', () => {
     expect(ch.actions.get('get_into_bed')!.getClip().name).toBe('get_into_bed');
     expect(ch.actions.get('jump')!.getClip().name).toBe('jump');
     expect(ch.externalClips.map((e) => e.id)).toEqual(['get_into_bed']);
+  });
+});
+
+describe('meshyClips: блок-лист пилота', () => {
+  beforeEach(() => resetMeshyCache());
+
+  it('выключенный id не грузится и не регистрируется (играет прежний клип), остальные — как раньше', async () => {
+    const t = target();
+    const got: string[] = [];
+    const host = { skel: skelFrom(t.root), addExternalClip: async (id: string) => void got.push(id) };
+    const s = source();
+    const clip = new THREE.AnimationClip('Armature|meshy', 2, [new THREE.QuaternionKeyframeTrack('mixamorigSpine.quaternion', [0, 2], [0, 0, 0, 1, 0, 0, 0, 1])]);
+    const asked: string[] = [];
+    const r = await loadMeshyClips(host, {
+      fetchJson: async () => ({ clips: [{ id: 'bad_clip', file: 'bad_clip.glb' }, { id: 'good_clip', file: 'good_clip.glb' }] }),
+      loadGlb: async (u) => (asked.push(u), { scene: s.scene, animations: [clip] }),
+      blocked: { bad_clip: 'уходит под пол' },
+    });
+    expect(r).toEqual(['good_clip']);
+    expect(got).toEqual(['good_clip']);
+    expect(asked.some((u) => u.includes('bad_clip'))).toBe(false);
+    expect(meshyStatus.get('bad_clip')).toMatchObject({ state: 'rejected', reason: 'выключен в пилоте: уходит под пол' });
+  });
+
+  it('PILOT_MESHY_OFF: id клипов (манифест), у каждого причина; новые тела «с предметом», скейт и спрей — выключены', () => {
+    for (const [id, why] of Object.entries(PILOT_MESHY_OFF)) {
+      expect(id).toMatch(/^[a-z0-9_]+$/);
+      expect(why.length, id).toBeGreaterThan(3);
+    }
+    for (const id of ['hold_sip_body', 'hold_treat_body', 'hold_mirror_body', 'skate_hop_on', 'skate_cruise', 'skate_ollie_air', 'skate_hop_off', 'spray_low_sweep']) {
+      expect(PILOT_MESHY_OFF[id], id).toBeTruthy();
+    }
   });
 });

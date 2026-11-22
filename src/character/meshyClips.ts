@@ -239,6 +239,31 @@ export function parseManifest(j: unknown): MeshyEntry[] {
   return out;
 }
 
+/**
+ * Клипы Meshy, выключенные в пилоте (/mvp): на стенде аудита (scripts/qa/anim-audit, прогон 22.11 с клипами сервера)
+ * дают ребёнку видимый брак — уход под пол, руку сквозь тело, рывок, скольжение — или выглядят хуже процедурной версии.
+ * Не перегенерируем: в пилоте их просто не грузим, играет опора / процедурная версия (как без клипа). id → причина
+ * (таблица — docs/qa/anim-audit/2026-11-22_meshy.md). В lab грузятся как раньше.
+ */
+export const PILOT_MESHY_OFF: Readonly<Record<string, string>> = {
+  // скейт по фазам: рука сквозь торс/дугу наушников 7–11,5 мм в 22–70 % кадров (процедурная версия — 2 мм)
+  skate_hop_on: 'рука сквозь торс 9 мм в половине кадров',
+  skate_cruise: 'рука сквозь торс 11,5 мм в 22 % кадров',
+  skate_ollie_air: 'предплечье сквозь наушники 7,8 мм в 70 % кадров',
+  skate_hop_off: 'рука сквозь торс 9,7 мм в 26 % кадров',
+  // тела «с предметом»: хуже процедурной версии
+  hold_sip_body: 'Какао: рывок 58 рад/с, предплечье сквозь капюшон 10,5 мм',
+  hold_treat_body: 'Угостить: плечо сквозь шарф/наушники > 5 мм в 1,5–3 раза чаще процедурной версии',
+  hold_mirror_body: 'Зеркальце: кисть в голове 8,6 мм (процедурная — 0)',
+  // раскраска Хулигана
+  spray_low_sweep: 'Раскраска: рывок 78–91 рад/с, предплечье сквозь наушники 7,6 мм',
+  paint_spray: 'стоит боком/спиной к зрителю в 31 % кадров (своя версия — 0 %)',
+  // покой
+  idle_glitter_twirl: 'кисть в юбке 7,1 мм, спиной к зрителю чаще своей версии (31 % против 12 %)',
+  idle_look_around: 'отворачивается от зрителя > 60° в 6–8 % кадров (своя версия — 0 %)',
+  sit_down: 'тело уходит под пол на 5,4 мм',
+};
+
 /** включено ли: lab (feature) и не ?meshy=0 */
 export function meshyWanted(on: boolean, search = typeof location !== 'undefined' ? location.search : ''): boolean {
   return on && new URLSearchParams(search).get('meshy') !== '0';
@@ -337,6 +362,8 @@ let manifestP: Promise<MeshyEntry[]> | null = null;
 export interface LoadDeps {
   /** ожидаемые id (clips.MESHY_IDS): чего нет в манифесте — «missing» */
   expected?: readonly string[];
+  /** выключенные id (PILOT_MESHY_OFF в пилоте): не грузим, статус «rejected» с причиной — играет прежний клип */
+  blocked?: Readonly<Record<string, string>>;
   /** петля клипа: правило каталога (meshy.loop) главнее манифеста */
   loopOf?: (id: string, manifestLoop: boolean) => boolean;
   fetchJson: (url: string) => Promise<unknown | null>;
@@ -377,6 +404,11 @@ export async function loadMeshyClips(host: ExternalClipHost, deps: LoadDeps, bas
   const done: string[] = [];
   const errs = new Map<string, string>();
   for (const e of list) {
+    const off = deps.blocked && Object.prototype.hasOwnProperty.call(deps.blocked, e.id) ? deps.blocked[e.id] : null;
+    if (off !== null) {
+      setStatus({ id: e.id, state: 'rejected', reason: `выключен в пилоте: ${off}` });
+      continue;
+    }
     const url = base + e.file;
     if (!cache.has(url))
       cache.set(url, deps.loadGlb(url).then(parse).catch((err) => {

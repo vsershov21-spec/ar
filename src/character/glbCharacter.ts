@@ -19,8 +19,8 @@ import { ClipState } from './clipState';
 import { clipDef, CUT_CLIPS, FALLBACK_CLIPS, MESHY_IDS, meshyDef } from './clips';
 import { TRIPO_ALIAS } from './tripoAlias';
 import { prepareClipsAsync, spliceClip, trimStill, type ClipPrepInfo } from './animPrep';
-import { loadMeshyClips, meshyStatus, meshyWanted, skelFrom, type Skel } from './meshyClips';
-import { feature } from '../config/edition';
+import { loadMeshyClips, meshyStatus, meshyWanted, PILOT_MESHY_OFF, skelFrom, type Skel } from './meshyClips';
+import { feature, IS_PILOT } from '../config/edition';
 import { AnimBlender } from './animBlend';
 import { TailRig, type TailOutput } from './tailRig';
 import { PROPS, PropRig } from './props';
@@ -828,6 +828,8 @@ export class GlbCharacter implements Character {
         },
         log: (m) => console.info(m),
         expected: MESHY_IDS,
+        // пилот: клипы с браком на стенде аудита не грузим (играет опора / процедурная версия)
+        blocked: IS_PILOT ? PILOT_MESHY_OFF : undefined,
         // петля — по правилу каталога (meshy.loop из спеки), иначе манифест
         loopOf: (id, l) => clipDef(id)?.meshy?.loop ?? l,
       });
