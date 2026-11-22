@@ -12,9 +12,11 @@ export const TAGS = {
   shy: '[shyly]', proud: '[proudly]', annoyed: '[annoyed]', playful: '[playfully]', whisper: '[whispers]', sleepy: '[sleepily]',
   offended: '[sulking]', worried: '[worried]', curious: '[curious]', tender: '[softly]', bored: '[bored]', confused: '[confused]',
 };
-export const tagFor = (emotion) => TAGS[emotion] ?? '';
+// Поправки по котам: у Добряка «мягко/шёпотом» звучало вкрадчиво («маньячно», продакт 22.11) — вместо [softly] тёплая интонация.
+export const TAGS_BY_PERSONA = { kind: { caring: '[warmly]', tender: '[warmly]' } };
+export const tagFor = (emotion, persona) => TAGS_BY_PERSONA[persona]?.[emotion] ?? TAGS[emotion] ?? '';
 /** текст, который уходит в ElevenLabs: пометка + текст для синтеза */
-export const elText = (l) => [tagFor(l.emotion), spoken(l.text)].filter(Boolean).join(' ');
+export const elText = (l) => [tagFor(l.emotion, l.persona), spoken(l.text)].filter(Boolean).join(' ');
 /** тот же хэш, что писал первый прогон (150 реплик): текст с пометкой + голос + модель + версия */
 export const elHash = (text, voiceId, model) => crypto.createHash('sha1').update([text, voiceId, model, 'el1'].join('\u0001')).digest('hex').slice(0, 8);
 export const safeName = (id) => id.replace(/[^a-zA-Zа-яА-ЯёЁ0-9._~-]/g, '_');
@@ -85,8 +87,8 @@ export function buildJobs(root, { model: modelOverride } = {}) {
     const b = rawB.trim().replace(/^[,.!?…\s]+/, '');
     const parts = [a && 'a', b && 'b'].filter(Boolean);
     const common = { kind: 'part', line: l.id, slot: m[1], tpl: l.text, parts, event: l.event, emotion: l.emotion };
-    if (a) push(l.persona, { ...common, id: `${l.id}~a`, part: 'a', t: a, plain: spoken(a), text: elText({ emotion: l.emotion, text: a }) });
-    if (b) push(l.persona, { ...common, id: `${l.id}~b`, part: 'b', lead, t: b, plain: spoken(b), text: elText({ emotion: l.emotion, text: b }) });
+    if (a) push(l.persona, { ...common, id: `${l.id}~a`, part: 'a', t: a, plain: spoken(a), text: elText({ emotion: l.emotion, persona: l.persona, text: a }) });
+    if (b) push(l.persona, { ...common, id: `${l.id}~b`, part: 'b', lead, t: b, plain: spoken(b), text: elText({ emotion: l.emotion, persona: l.persona, text: b }) });
   }
   let riddles = {};
   try {
@@ -102,7 +104,7 @@ export function buildJobs(root, { model: modelOverride } = {}) {
       if (r.answer) answers[p].add(r.answer);
       for (const l of answerTpl.filter((x) => x.persona === p)) {
         const t = l.text.replace('{answer}', r.answer);
-        push(p, { id: `${l.id}@${r.id}`, kind: 'line', event: l.event, emotion: l.emotion, tpl: l.text, t, plain: spoken(t), text: elText({ emotion: l.emotion, text: t }) });
+        push(p, { id: `${l.id}@${r.id}`, kind: 'line', event: l.event, emotion: l.emotion, tpl: l.text, t, plain: spoken(t), text: elText({ emotion: l.emotion, persona: p, text: t }) });
       }
     }
   }
