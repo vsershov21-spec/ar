@@ -9,6 +9,10 @@ list=""
 while [ $# -ge 2 ]; do
   name=$1; url=$2; shift 2
   url=${url//%3F/?}; url=${url//%26/&}   # очередь ar-auto не пускает ? и & в аргументах — передаём %3F/%26
+  # короткая форма (аргумент ar-auto ≤ 200 символов): <generated_voice_id>:<Expires>:<Signature>
+  if [[ $url =~ ^([A-Za-z0-9]{10,40}):([0-9]{9,12}):([A-Za-z0-9_=+/-]{10,80})$ ]]; then
+    v=${BASH_REMATCH[1]}; url="https://elevenlabsusercontent.com/database/workspace/${EL_WS:-ee8d6b435d55468fbb2f07692a9f1da9}/generated_voice/$v/sample/$v/audio.mp3?Expires=${BASH_REMATCH[2]}&KeyName=assets-cdn-key-1&Signature=${BASH_REMATCH[3]}"
+  fi
   [[ $name =~ ^[a-z0-9_-]{1,40}$ ]] || { echo "плохое имя: $name"; exit 2; }
   [[ $url =~ ^https://elevenlabsusercontent\.com/ ]] || { echo "url не elevenlabsusercontent.com: $name"; exit 2; }
   curl -fsS --max-time 60 -o "$D/$name.mp3.tmp" "$url" && mv "$D/$name.mp3.tmp" "$D/$name.mp3"
