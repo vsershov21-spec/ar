@@ -36,6 +36,27 @@
       "kind": "audit",
       "ref": "82710b6887e4548ff9ce58f227d3b4ba4694a136",
       "timeoutMin": 120
+    },
+    {
+      "id": "voice-preview-1",
+      "kind": "script",
+      "ref": "bbc9dbf99a3b3efd5769bd8ad2ea7dc3cc11db71",
+      "path": "scripts/deploy/voice-preview.sh",
+      "args": [
+        "dobryak_1_spokoyny",
+        "uEibyhkDUw8ccHq9jUO3:1795359600:_Pz-ZGiFLvqSMjdL0zz4DT704ZU=",
+        "dobryak_2_spokoyny",
+        "yeNrgCHKM06d9XRhRlIW:1795359600:DSh016WbMuVB9z0tT--D282OxZU=",
+        "dobryak_3_spokoyny",
+        "fYCAwnYKzCl1fQHjfyRP:1795359600:tDWjvwO035ElODKmjQ5FNsKfdBU=",
+        "dobryak_4_energichny",
+        "dWUXgLr3xXVJzPcvoGMl:1795359600:TdsJc4g84kxhWSnFd4BZwWD6HSs=",
+        "dobryak_5_energichny",
+        "4uoAWA5lGmLKEWpm8QMV:1795359600:y3kJeYPyxsTjAA-Xqf5dJbmxl2M=",
+        "dobryak_6_energichny",
+        "nrDDckraMcifi2Jru1IO:1795359600:kqgDZ5acL1m2411PpKJjgZRogds="
+      ],
+      "timeoutMin": 10
     }
   ]
 }
