@@ -8,6 +8,7 @@ mkdir -p "$D"
 list=""
 while [ $# -ge 2 ]; do
   name=$1; url=$2; shift 2
+  url=${url//%3F/?}; url=${url//%26/&}   # очередь ar-auto не пускает ? и & в аргументах — передаём %3F/%26
   [[ $name =~ ^[a-z0-9_-]{1,40}$ ]] || { echo "плохое имя: $name"; exit 2; }
   [[ $url =~ ^https://elevenlabsusercontent\.com/ ]] || { echo "url не elevenlabsusercontent.com: $name"; exit 2; }
   curl -fsS --max-time 60 -o "$D/$name.mp3.tmp" "$url" && mv "$D/$name.mp3.tmp" "$D/$name.mp3"
