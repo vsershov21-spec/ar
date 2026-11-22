@@ -12,7 +12,11 @@ Claude ◀── git fetch server-out ◀── push out/<id>/… (токен co
 ```
 
 Код: `scripts/automation/` (`ar-auto.mjs` — node 22 без зависимостей, `ar-auto.sh`, `ar-auto.service`/`.timer`,
-`install.sh`). Тесты проверки очереди и бюджета — `tests/automation.test.ts`.
+`install.sh`, `enqueue.mjs` — постановка задачи и чтение результатов для Claude). Тесты — `tests/automation.test.ts`,
+`tests/automationOps.test.ts`.
+
+**Служебные задачи** `script` (скрипт из репо по белому списку, на коммите `ref`), `audit` (стенд аудита анимаций) и
+`status` (снимок сервера), а также модель безопасности — в [docs/automation/README.md](../docs/automation/README.md).
 
 ## Установка (один раз, владелец, root на swe)
 
@@ -23,14 +27,15 @@ Claude ◀── git fetch server-out ◀── push out/<id>/… (токен co
 2. На swe:
 
 ```bash
-REF=<sha коммита>; curl -fsSL https://raw.githubusercontent.com/vsershov21-spec/ar/$REF/scripts/automation/install.sh -o /tmp/ar-auto-install.sh && sudo REF=$REF bash /tmp/ar-auto-install.sh
+REF=<sha коммита>; curl -fsSL https://raw.githubusercontent.com/vsershov21-spec/ar/$REF/scripts/automation/install.sh -o /root/ar-auto-install.sh && sudo REF=$REF bash /root/ar-auto-install.sh
+sudo ar-auto selftest     # проверка: токен, право записи, очередь, dry-run задачи status (ничего не выгружает)
 ```
 
 Скрипт спросит токен (ввод не виден, проверит его запросом к GitHub), создаст `/etc/ar-auto.env` (600, root),
 положит код в `/opt/ar-auto` (ровно из коммита `REF` — сам себя из `main` не обновляет), выполнит первый прогон
 (задача `mirror-meshy` выгружает все готовые клипы), включит таймер и покажет статус. Повторный запуск с новым `REF` —
 обновление кода; токен и лимиты не трогает. Сменить токен — удалить строку `GH_TOKEN=` в `/etc/ar-auto.env` и запустить
-установку снова.
+установку снова (или `ROTATE=1` в той же команде).
 
 Команды на сервере: `sudo ar-auto status` (последние задачи, траты за сегодня), `sudo ar-auto tick` (не ждать таймер),
 `journalctl -u ar-auto -n 50`, `journalctl -u ar-auto-job-meshy -n 100`. Остановить всё — `systemctl disable --now ar-auto.timer`.
@@ -46,7 +51,7 @@ REF=<sha коммита>; curl -fsSL https://raw.githubusercontent.com/vsershov2
 | поле | что |
 |---|---|
 | `id` | уникальный, `[a-z0-9][a-z0-9._-]{0,63}`; выполняется **один раз** — повтор = новая задача с новым id |
-| `kind` | `meshy` → `scripts/meshy/motion-run.sh --go …`; `tripo` → `scripts/tripo/props-run.sh --go …`; `eleven` → `scripts/voice/el-run.sh …` |
+| `kind` | `meshy` → `scripts/meshy/motion-run.sh --go …`; `tripo` → `scripts/tripo/props-run.sh --go …`; `eleven` → `scripts/voice/el-run.sh …`; `script` / `audit` / `status` — см. [docs/automation](../docs/automation/README.md) |
 | `args` | только пары «флаг значение» из белого списка: meshy `--only`, `--redo`, `--set`; tripo `--only`; eleven `--only`. Значения — id через запятую (`[a-z0-9_]`), `--set` — `p0`/`p1`/`p2`/`all` |
 | `maxCredits` | потолок задачи: кредиты Meshy/Tripo, **символы** для ElevenLabs |
 | `note` | комментарий (в summary) |

@@ -73,6 +73,8 @@ sleep 20; cat /tmp/caddy-encode.log
 Meshy / Tripo / ElevenLabs запускаются на swe по очереди `automation/queue.json` из `main` (таймер `ar-auto.timer`,
 раз в 5 мин, root), результаты — в ветке `server-out` (`out/<id>/`, `out/latest/meshy/`). После задачи, изменившей
 `/srv/ar-extra`, ar-auto сам делает `systemctl start ar-update` — пустой коммит для пересборки не нужен.
+Служебные задачи той же очереди — `script` (скрипт из репо по белому списку на коммите `ref`), `audit`, `status` —
+и модель безопасности: [docs/automation/README.md](automation/README.md).
 Установка, лимиты, формат задач — [automation/README.md](../automation/README.md).
 
 ## Логи и откат

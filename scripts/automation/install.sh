@@ -1,36 +1,50 @@
 #!/usr/bin/env bash
-# Разовая установка ar-auto на swe (root). Повторный запуск — обновление кода до REF (env-файл не трогает).
-#   REF=<sha>; curl -fsSL https://raw.githubusercontent.com/vsershov21-spec/ar/$REF/scripts/automation/install.sh -o /tmp/ar-auto-install.sh && sudo REF=$REF bash /tmp/ar-auto-install.sh
-# Что делает: /opt/ar-auto (код из коммита REF), /etc/ar-auto.env (токен GitHub спрашивает скрыто, лимиты по умолчанию),
-# /var/lib/ar-auto (состояние), юниты ar-auto.service + ar-auto.timer (раз в 5 мин), первый прогон, статус.
+# Установка / обновление ar-auto на swe (root). Идемпотентно: повторный запуск с новым REF — обновление кода,
+# токен и лимиты в /etc/ar-auto.env не трогает (сменить токен — ROTATE=1).
+#   REF=<sha>; curl -fsSL https://raw.githubusercontent.com/vsershov21-spec/ar/$REF/scripts/automation/install.sh -o /root/ar-auto-install.sh && sudo REF=$REF bash /root/ar-auto-install.sh
+# Проверка после установки (отдельно, ничего не выполняет и не выгружает): sudo ar-auto selftest
+# Что делает: /opt/ar-auto (код ровно из коммита REF), /etc/ar-auto.env (токен GitHub — скрытый ввод, лимиты по умолчанию),
+# /var/lib/ar-auto (состояние, отметки выполненных задач), юниты ar-auto.service + ar-auto.timer (раз в 5 мин),
+# первый прогон, статус. Документация: automation/README.md, docs/automation/README.md.
 set -euo pipefail
 [ "$(id -u)" = 0 ] || { echo "нужен root: sudo REF=… bash $0"; exit 3; }
 REF=${REF:-${1:-}}
 [[ "$REF" =~ ^[0-9a-f]{40}$ ]] || { echo "нужен REF=<полный sha коммита> (40 символов)"; exit 3; }
-RAW=https://raw.githubusercontent.com/vsershov21-spec/ar/$REF
+REPO=vsershov21-spec/ar
+RAW=https://raw.githubusercontent.com/$REPO/$REF
 ENVF=/etc/ar-auto.env
-for c in node git curl systemctl systemd-run; do command -v $c >/dev/null || { echo "нет $c"; exit 3; }; done
+D=/opt/ar-auto
+FILES="ar-auto.sh ar-auto.mjs ar-auto.service ar-auto.timer"
+for c in node git curl tar nice systemctl systemd-run; do command -v $c >/dev/null || { echo "нет $c"; exit 3; }; done
 [ "$(node -p 'process.versions.node.split(".")[0]')" -ge 22 ] || { echo "node $(node -v): нужен 22+"; exit 3; }
+command -v ionice >/dev/null || echo "   (нет ionice — тяжёлые задачи пойдут только с nice)"
 
-echo "1/5 код из $REF → /opt/ar-auto"
-install -d -m 700 /opt/ar-auto /var/lib/ar-auto
-for f in ar-auto.sh ar-auto.mjs ar-auto.service ar-auto.timer; do
-  curl -fsSL "$RAW/scripts/automation/$f" -o "/opt/ar-auto/$f.new"
+echo "1/5 код из $REF → $D"
+install -d -m 700 "$D" /var/lib/ar-auto
+STG=$(mktemp -d "$D/.stage.XXXXXX")
+trap 'rm -rf "$STG"' EXIT
+for f in $FILES; do curl -fsSL "$RAW/scripts/automation/$f" -o "$STG/$f"; done
+# проверка синтаксиса до подмены: node --check смотрит на расширение — проверяем именно .mjs (не .new)
+for f in $FILES; do
+  case "$f" in
+    *.mjs) node --check "$STG/$f" ;;
+    *.sh) bash -n "$STG/$f" ;;
+  esac
 done
-cp /opt/ar-auto/ar-auto.mjs.new /opt/ar-auto/check.mjs && node --check /opt/ar-auto/check.mjs && rm -f /opt/ar-auto/check.mjs
-for f in ar-auto.sh ar-auto.mjs ar-auto.service ar-auto.timer; do mv -f "/opt/ar-auto/$f.new" "/opt/ar-auto/$f"; done
-chmod 700 /opt/ar-auto/ar-auto.sh
-printf 'PATH=%q\n' "$PATH" > /opt/ar-auto/runtime.env
-echo "$REF" > /opt/ar-auto/REF
-ln -sfn /opt/ar-auto/ar-auto.sh /usr/local/bin/ar-auto
+for f in $FILES; do install -m 600 "$STG/$f" "$D/$f"; done
+chmod 700 "$D/ar-auto.sh"
+printf 'PATH=%q\n' "$PATH" > "$D/runtime.env"
+echo "$REF" > "$D/REF"
+ln -sfn "$D/ar-auto.sh" /usr/local/bin/ar-auto
 
 echo "2/5 $ENVF"
-if ! grep -q '^GH_TOKEN=.' "$ENVF" 2>/dev/null; then
-  echo "Нужен fine-grained токен GitHub: только репозиторий vsershov21-spec/ar, Contents: Read and write."
+if [ "${ROTATE:-0}" = 1 ] || ! grep -q '^GH_TOKEN=.' "$ENVF" 2>/dev/null; then
+  echo "Нужен fine-grained токен GitHub: только репозиторий $REPO, Contents: Read and write (см. docs/automation/README.md)."
   read -rsp 'GH_TOKEN (ввод не виден): ' T; echo
+  T=$(printf '%s' "$T" | tr -d '[:space:]')
   [ -n "$T" ] || { echo "пустой токен"; exit 3; }
-  # заголовок — через stdin, чтобы токен не был виден в списке процессов
-  code=$(printf 'Authorization: Bearer %s\n' "$T" | curl -s -o /dev/null -w '%{http_code}' -H @- https://api.github.com/repos/vsershov21-spec/ar)
+  # заголовок — через stdin (-H @-), чтобы токен не был виден в списке процессов
+  code=$(printf 'Authorization: Bearer %s\n' "$T" | curl -s -o /dev/null -w '%{http_code}' -H @- "https://api.github.com/repos/$REPO")
   [ "$code" = 200 ] || { unset T; echo "токен не подошёл (GitHub ответил $code)"; exit 3; }
   ( umask 077
     { printf 'GH_TOKEN=%s\n' "$T"
@@ -48,21 +62,22 @@ if ! grep -q '^GH_TOKEN=.' "$ENVF" 2>/dev/null; then
     } > "$ENVF.new" )
   unset T
   mv -f "$ENVF.new" "$ENVF"
+  echo "   токен сохранён"
 else
-  echo "   уже есть (токен не меняю; сменить — удалить строку GH_TOKEN и запустить снова)"
+  echo "   уже есть (токен не меняю; сменить — ROTATE=1 и та же команда)"
 fi
 chown root:root "$ENVF"; chmod 600 "$ENVF"
 
-echo "3/5 первый прогон (очередь из main; mirror-meshy выгружает клипы в server-out)"
-/opt/ar-auto/ar-auto.sh tick --wait || echo "   прогон завершился с ошибкой — см. выше"
+echo "3/5 первый прогон (очередь из main)"
+"$D/ar-auto.sh" tick --wait || echo "   прогон завершился с ошибкой — см. выше"
 
 echo "4/5 юниты (таймер раз в 5 мин)"
-cp /opt/ar-auto/ar-auto.service /opt/ar-auto/ar-auto.timer /etc/systemd/system/
+install -m 644 "$D/ar-auto.service" "$D/ar-auto.timer" /etc/systemd/system/
 systemctl daemon-reload
 systemctl enable --now ar-auto.timer >/dev/null
 
 echo "5/5 статус"
-/opt/ar-auto/ar-auto.sh status
+"$D/ar-auto.sh" status
 systemctl cat ar-update.service >/dev/null 2>&1 && echo "ar-update.service найден — пересборка после генераций: systemctl start ar-update" \
   || echo "ВНИМАНИЕ: ar-update.service не найден — задайте AUTO_REBUILD_CMD в $ENVF"
-echo "Готово. Результаты: https://github.com/vsershov21-spec/ar/tree/server-out/out · статус: sudo ar-auto status · лог таймера: journalctl -u ar-auto -n 50"
+echo "Готово. Проверка: sudo ar-auto selftest · результаты: https://github.com/$REPO/tree/server-out/out · лог: journalctl -u ar-auto -n 50"

@@ -2,9 +2,10 @@
 // ar-auto: очередь генераций из GitHub → запуск на сервере swe → результаты обратно в ветку server-out.
 // Node 22, без зависимостей. Запускается от root таймером ar-auto.timer (раз в 5 мин), см. automation/README.md.
 //
-//   ar-auto tick [--wait]   — забрать automation/queue.json из main (по sha), запустить по одной задаче каждого вида
+//   ar-auto tick [--wait]   — забрать automation/queue.json из main (по sha), запустить по одной задаче каждой полосы
 //   ar-auto run-job <id>    — выполнить задачу (вызывает tick через systemd-run, юнит ar-auto-job-<вид>)
 //   ar-auto status          — последние задачи, траты за сегодня, что идёт сейчас
+//   ar-auto selftest        — проверка установки: токен, очередь, право записи, dry-run задачи status (без push)
 //   ar-auto push            — выгрузить накопленное в server-out
 //   ar-auto mirror          — обновить out/latest/meshy и выгрузить
 //
@@ -12,12 +13,20 @@
 // на провайдера (/etc/ar-auto.env) проверяются до запуска и передаются скриптам как жёсткий лимит; одновременно —
 // не больше одной задачи каждого вида; токен GitHub читается из файла и передаётся git только через окружение,
 // в логи и выгрузку не попадает (как и ключи Meshy/ElevenLabs); в server-out уходят только файлы под out/.
+// Служебные задачи script / audit / status (полоса ops, по одной; скрипты — по белому списку из репо, на коммите ref
+// из истории main, чистое окружение, nice/ionice, таймаут гасит группу процессов) — docs/automation/README.md.
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { spawn, spawnSync } from 'node:child_process';
 
-export const KINDS = ['meshy', 'tripo', 'eleven'];
+/** генерации у провайдеров (кредиты, дневные лимиты) — у каждого вида своя «полоса», идут параллельно */
+export const PROVIDER_KINDS = ['meshy', 'tripo', 'eleven'];
+/** служебные задачи (docs/automation/README.md): скрипт из репо, аудит анимаций, снимок состояния — одна полоса «ops» */
+export const OPS_KINDS = ['script', 'audit', 'status'];
+export const KINDS = [...PROVIDER_KINDS, ...OPS_KINDS];
+export const LANES = [...PROVIDER_KINDS, 'ops'];
+export const laneOf = (kind) => (OPS_KINDS.includes(kind) ? 'ops' : kind);
 /** белый список: флаг → проверка значения */
 export const ALLOWED = {
   meshy: { '--only': /^[a-z0-9_]+(,[a-z0-9_]+)*$/, '--redo': /^[a-z0-9_]+(,[a-z0-9_]+)*$/, '--set': /^(p0|p1|p2|all)(,(p0|p1|p2))*$/ },
@@ -30,7 +39,97 @@ export const JOB_HARD_MAX = { meshy: 2000, tripo: 2000, eleven: 200000 };
 export const DEFAULT_CAPS = { meshy: 400, tripo: 400, eleven: 20000 };
 export const FINAL = new Set(['done', 'failed', 'rejected']);
 
-// ───────────────────────── чистые функции (tests/automation.test.ts) ─────────────────────────
+// ── служебные задачи: белый список скриптов, аргументы, окружение ──
+/** коммит задачи: sha 7–40 (короткий раскрывается через GitHub API и обязан быть в истории main) */
+export const REF_RE = /^[0-9a-f]{7,40}$/;
+/** скрипты, которые можно запускать задачей kind "script" (пути в репо; ** — любое число папок) */
+export const SCRIPT_WHITELIST = [
+  'scripts/deploy/*.sh',
+  'scripts/qa/**/server-run.sh',
+  'scripts/voice/el-run.sh',
+  'scripts/meshy/motion-run.sh',
+  'scripts/meshy/props-run.sh',
+  'scripts/tripo/props-run.sh',
+];
+/** glob → regex: сегмент пути — [a-z0-9][a-z0-9_-]* (без точек в начале, без ..), ** — ноль и больше папок */
+export function globToRe(g) {
+  const SEG = '[a-z0-9][a-z0-9_-]*';
+  let re = '';
+  for (const s of g.split('/')) {
+    if (s === '**') re += `(?:${SEG}/)*`;
+    else re += s.split('*').map((x) => x.replace(/[.+?^${}()|[\]\\]/g, '\\$&')).join(SEG) + '/';
+  }
+  return new RegExp('^' + re.slice(0, -1) + '$');
+}
+const WHITELIST_RE = SCRIPT_WHITELIST.map(globToRe);
+/** путь скрипта из белого списка (никаких .., абсолютных путей, скрытых файлов) */
+export function scriptAllowed(p) {
+  if (typeof p !== 'string' || p.length > 160 || p.includes('..') || p.includes('//')) return false;
+  return WHITELIST_RE.some((re) => re.test(p));
+}
+/** аргумент: без пробелов, кавычек, $, `, ;, |, &, переводов строк (exec без shell, но скрипты бывают неаккуратны) */
+export const ARG_RE = /^[A-Za-z0-9._,:=/@+%-]{0,200}$/;
+/** окружение задачи: только эти ключи; REF — только равный ref задачи (его ar-auto всё равно ставит сам) */
+export const ENV_ALLOWED = { DRY: /^[01]$/, VERBOSE: /^[01]$/, REF: REF_RE };
+export const OPS_TIMEOUT = { script: { def: 30, max: 120 }, audit: { def: 120, max: 120 }, status: { def: 5, max: 5 } };
+export const AUDIT_SCRIPT = 'scripts/qa/anim-audit/server-run.sh';
+export const AUDIT_SHEETS_MAX = 20 * 1024 * 1024;
+
+/** скрипты провайдеров через kind "script" — только без трат (план); генерация — kind meshy/tripo/eleven с бюджетом */
+export function scriptArgsPolicy(p, args) {
+  if ((p === 'scripts/meshy/motion-run.sh' || p.endsWith('/props-run.sh')) && args.includes('--go'))
+    return `${p} с --go тратит кредиты — только задачей kind ${p.includes('meshy/motion') ? 'meshy' : 'tripo'} (maxCredits, дневной лимит)`;
+  if (p === 'scripts/voice/el-run.sh' && !args.includes('--plan')) return 'el-run.sh — только с --plan; синтез — задачей kind eleven (maxCredits = символы)';
+  return null;
+}
+
+function validateOps(j, id) {
+  const kind = j.kind;
+  const note = typeof j.note === 'string' ? j.note.slice(0, 300) : '';
+  const lim = OPS_TIMEOUT[kind];
+  const t = j.timeoutMin ?? lim.def;
+  if (!Number.isInteger(t) || t < 1 || t > lim.max) return { error: `${id}: timeoutMin — целое 1…${lim.max}` };
+  if (j.maxCredits !== undefined && j.maxCredits !== 0) return { error: `${id}: ${kind} не тратит кредиты — maxCredits не нужен` };
+  let ref = null;
+  if (kind !== 'status' || j.ref !== undefined) {
+    if (typeof j.ref !== 'string' || !REF_RE.test(j.ref)) return { error: `${id}: ref обязателен — sha коммита (7–40 символов [0-9a-f])` };
+    ref = j.ref;
+  }
+  const args = j.args ?? [];
+  if (!Array.isArray(args) || args.some((a) => typeof a !== 'string')) return { error: `${id}: args — массив строк` };
+  if (args.length > 40) return { error: `${id}: args — не больше 40` };
+  const env = j.env ?? {};
+  if (!env || typeof env !== 'object' || Array.isArray(env)) return { error: `${id}: env — объект { "КЛЮЧ": "значение" }` };
+  if (kind !== 'script' && (args.length || Object.keys(env).length || j.path !== undefined)) return { error: `${id}: у ${kind} нет path/args/env` };
+  let p = null;
+  if (kind === 'script') {
+    p = j.path;
+    if (!scriptAllowed(p)) return { error: `${id}: path ${JSON.stringify(p)} не в белом списке (${SCRIPT_WHITELIST.join(', ')})` };
+    for (const a of args) if (!ARG_RE.test(a)) return { error: `${id}: аргумент ${JSON.stringify(a.slice(0, 40))} — только [A-Za-z0-9._,:=/@+%-], до 200 символов` };
+    for (const [k, v] of Object.entries(env)) {
+      if (!Object.hasOwn(ENV_ALLOWED, k)) return { error: `${id}: env ${k} не разрешён (можно: ${Object.keys(ENV_ALLOWED).join(' ')})` };
+      if (typeof v !== 'string' || !ENV_ALLOWED[k].test(v)) return { error: `${id}: env ${k}=${JSON.stringify(String(v).slice(0, 40))} не прошло проверку` };
+      if (k === 'REF' && !(v.startsWith(ref) || ref.startsWith(v))) return { error: `${id}: env REF должен совпадать с ref задачи` };
+    }
+    const pol = scriptArgsPolicy(p, args);
+    if (pol) return { error: `${id}: ${pol}` };
+  }
+  const job = { id, kind, ref, args: [...args], env: { ...env }, timeoutMin: t, maxCredits: 0, note };
+  if (p) job.path = p;
+  return { job };
+}
+
+/** сравнение ref…main через GitHub API: ref годится, только если он предок main (или сам main) */
+export const refStatusOk = (status) => status === 'ahead' || status === 'identical';
+
+/** окружение скрипта: чистое (без окружения ar-auto), REF и *_RAW — на коммит задачи, плюс разрешённые ключи задачи */
+export function scriptEnv({ sha, job, rawBase, home = '/root', path: p = '/usr/local/bin:/usr/bin:/bin', work }) {
+  const env = { PATH: p, HOME: home, LANG: 'C.UTF-8', LC_ALL: 'C.UTF-8', DEBIAN_FRONTEND: 'noninteractive' };
+  for (const [k, v] of Object.entries(job.env ?? {})) if (Object.hasOwn(ENV_ALLOWED, k)) env[k] = v;
+  Object.assign(env, { REF: sha, AR_AUTO_JOB: job.id, MESHY_RAW: `${rawBase}/${sha}`, TRIPO_RAW: `${rawBase}/${sha}`, EL_REF: sha });
+  if (work) Object.assign(env, { EL_WORK: `${work}/el-work`, EL_LOG: `${work}/el-run.log` });
+  return env;
+}
 
 /** одна задача очереди → { job } или { error } */
 export function validateJob(j, seen = new Set()) {
@@ -39,6 +138,7 @@ export function validateJob(j, seen = new Set()) {
   if (typeof id !== 'string' || !ID_RE.test(id)) return { error: `id ${JSON.stringify(id)}: нужно [a-z0-9._-], до 64 символов` };
   if (seen.has(id)) return { error: `${id}: повтор id` };
   if (!KINDS.includes(j.kind)) return { error: `${id}: kind ${JSON.stringify(j.kind)} — только ${KINDS.join('|')}` };
+  if (OPS_KINDS.includes(j.kind)) return validateOps(j, id);
   const args = j.args ?? [];
   if (!Array.isArray(args) || args.some((a) => typeof a !== 'string')) return { error: `${id}: args — массив строк` };
   if (args.length % 2) return { error: `${id}: args парами «флаг значение»` };
@@ -117,12 +217,12 @@ export function decide({ job, estimate, spent, cap }) {
 }
 
 /**
- * следующая задача вида: первая по порядку очереди, не завершённая; отложенная из-за лимита — только в новый день.
+ * следующая задача полосы (вид провайдера или ops): первая по порядку очереди, не завершённая; отложенная из-за лимита — только в новый день.
  * Пока первая отложена, следующие того же вида ждут (порядок важен).
  */
-export function pickNext(jobs, recs, kind, day) {
+export function pickNext(jobs, recs, lane, day) {
   for (const job of jobs) {
-    if (job.kind !== kind) continue;
+    if (laneOf(job.kind) !== lane) continue;
     const r = recs[job.id];
     if (!r) return job;
     if (FINAL.has(r.status)) continue;
@@ -143,7 +243,9 @@ export function redact(text, secrets = []) {
     .replace(/\b(sk|tsk)_[A-Za-z0-9_-]{16,}/g, '***')
     .replace(/(authorization:\s*(basic|bearer|token)\s+)\S+/gi, '$1***')
     .replace(/(xi-api-key:\s*)\S+/gi, '$1***')
-    .replace(/(https?:\/\/)[^\s/@:]+:[^\s/@]+@/g, '$1***@');
+    .replace(/(https?:\/\/)[^\s/@:]+:[^\s/@]+@/g, '$1***@')
+    .replace(/\b((?:[A-Z0-9_]*(?:API_KEY|TOKEN|SECRET|PASSWORD))\s*[=:]\s*["']?)[^\s"',;]{6,}/g, '$1***')
+    .replace(/("(?:api[_-]?key|apikey|access[_-]?token|token|secret|password)"\s*:\s*")[^"]{6,}(")/gi, '$1***$2');
 }
 
 /** путь внутри выгрузки: только out/…, без .., без странных символов */
@@ -238,8 +340,25 @@ function loadEnv() {
       return '';
     }
   };
-  SECRETS = [ENV.GH_TOKEN, ...Object.values(parseEnv(read('/etc/ar-meshy.env'))), read('/var/lib/vershov-commander/.elevenlabs_key').trim()].filter(Boolean);
+  SECRETS = [ENV.GH_TOKEN, ...Object.values(parseEnv(read('/etc/ar-meshy.env'))), read('/var/lib/vershov-commander/.elevenlabs_key').trim(), ...tripoSecrets()].filter(Boolean);
   for (const d of [VAR, STAGE, JOBS, LOGS, WORK]) fs.mkdirSync(d, { recursive: true, mode: 0o700 });
+}
+/** ключ Tripo CLI (~/.tripo у root): все строковые значения подлиннее — в список маскировки */
+function tripoSecrets() {
+  const out = [];
+  const dir = path.join(process.env.HOME || '/root', '.tripo');
+  try {
+    for (const f of fs.readdirSync(dir)) {
+      const p = path.join(dir, f);
+      if (!fs.statSync(p).isFile() || fs.statSync(p).size > 65536) continue;
+      out.push(...secretLike(fs.readFileSync(p, 'utf8')));
+    }
+  } catch { /* нет tripo — нечего маскировать */ }
+  return out;
+}
+/** из текста конфига — значения, похожие на ключи (≥ 16 символов без пробелов) */
+export function secretLike(text) {
+  return [...String(text).matchAll(/[A-Za-z0-9_\-.]{16,}/g)].map((m) => m[0]).filter((x) => /\d/.test(x) && /[A-Za-z]/.test(x) && !/^(https?|tripo|default|config)/i.test(x));
 }
 const caps = () => dailyCaps(ENV);
 const num = (k, d) => (/^\d+$/.test(ENV[k] ?? '') ? Number(ENV[k]) : d);
@@ -419,6 +538,17 @@ function walk(dir, base = dir, out = []) {
   }
   return out;
 }
+/** последняя линия защиты перед push: все текстовые файлы выгрузки ещё раз через маскировку */
+export const TEXT_EXT = /\.(txt|md|json|log|csv|html)$/i;
+function redactTree(dir) {
+  for (const rel of walk(dir)) {
+    if (!TEXT_EXT.test(rel)) continue;
+    const f = path.join(dir, rel);
+    if (fsize(f) > 8 * 1024 * 1024) continue;
+    const t = fs.readFileSync(f, 'utf8'), r = redact(t, SECRETS);
+    if (r !== t) fs.writeFileSync(f, r);
+  }
+}
 /** храним не больше 100 папок задач (старые удаляются из выгрузки) */
 function pruneStage() {
   const ids = fs.readdirSync(STAGE).filter((d) => !['latest', '_server', '_queue', 'status.json'].includes(d));
@@ -478,6 +608,7 @@ async function push(msg = 'ar-auto') {
         pruneStage();
         for (const e of fs.readdirSync(tmp)) if (e !== '.git') fs.rmSync(path.join(tmp, e), { recursive: true, force: true });
         fs.cpSync(STAGE, path.join(tmp, 'out'), { recursive: true });
+        redactTree(path.join(tmp, 'out'));
         fs.writeFileSync(path.join(tmp, 'out', 'README.txt'), 'Выгрузка сервера swe (scripts/automation/ar-auto.mjs). Ветка перезаписывается одним коммитом. См. automation/README.md в main.\n');
         git(['add', '-A'], tmp);
         const files = git(['ls-files'], tmp).stdout.split('\n').filter(Boolean);
@@ -514,10 +645,14 @@ async function push(msg = 'ar-auto') {
 function stageJob(rec, logFile) {
   const d = stageDir(rec.id);
   const { job, ...rest } = rec;
-  writeJson(path.join(d, 'summary.json'), { ...rest, kind: job.kind, args: job.args, maxCredits: job.maxCredits, note: job.note });
+  const ops = OPS_KINDS.includes(job.kind);
+  const extra = ops ? { ref: job.ref, path: job.path, env: job.env, timeoutMin: job.timeoutMin } : {};
+  writeJson(path.join(d, 'summary.json'), JSON.parse(redact(JSON.stringify({ ...rest, kind: job.kind, args: job.args, maxCredits: job.maxCredits, ...extra, note: job.note }), SECRETS)));
   if (logFile && fs.existsSync(logFile)) {
     const lines = redact(fs.readFileSync(logFile, 'utf8'), SECRETS).split('\n');
-    fs.writeFileSync(path.join(d, 'log.txt'), lines.slice(-300).join('\n'));
+    let tailTxt = lines.slice(ops ? -2000 : -300).join('\n');
+    if (tailTxt.length > 1024 * 1024) tailTxt = tailTxt.slice(-1024 * 1024);
+    fs.writeFileSync(path.join(d, 'log.txt'), tailTxt);
   }
   dirty();
 }
@@ -653,6 +788,265 @@ async function jobEleven(rec, log, ctx) {
   };
 }
 
+// ───────────────────────── служебные задачи: script / audit / status ─────────────────────────
+
+class RefError extends Error {}
+async function ghJson(p) {
+  const r = await fetch(`${API}${p}`, { headers: ghHeaders(), signal: AbortSignal.timeout(30000) });
+  if (r.status === 404 || r.status === 422) throw new RefError(`GitHub API ${r.status} на ${p.replace(/\/repos\/[^/]+\/[^/]+/, '')}`);
+  if (!r.ok) throw new Error(`GitHub API ${r.status}`);
+  return r.json();
+}
+/** ref задачи → полный sha; только коммит из истории main (защита от коммитов форков и посторонних веток) */
+async function verifyRef(ref, mainSha) {
+  const c = await ghJson(`/repos/${OWNER_REPO}/commits/${ref}`);
+  const sha = c?.sha;
+  if (!/^[0-9a-f]{40}$/.test(sha ?? '') || !sha.startsWith(ref)) throw new RefError(`ref ${ref}: коммит не найден`);
+  if (sha === mainSha) return sha;
+  const cmp = await ghJson(`/repos/${OWNER_REPO}/compare/${sha}...${mainSha}`);
+  if (!refStatusOk(cmp?.status)) throw new RefError(`ref ${ref.slice(0, 12)} не в истории main (compare: ${cmp?.status})`);
+  return sha;
+}
+
+let IONICE;
+/** тяжёлое — с пониженным приоритетом ЦП и диска */
+function niceArgv(argv) {
+  if (IONICE === undefined) IONICE = spawnSync('ionice', ['-c', '2', '-n', '7', 'true']).status === 0;
+  return IONICE ? ['nice', '-n', '10', 'ionice', '-c', '2', '-n', '7', ...argv] : ['nice', '-n', '10', ...argv];
+}
+function killGroup(pid) {
+  for (const sig of ['SIGTERM', 'SIGKILL']) {
+    try {
+      process.kill(-pid, sig);
+    } catch {
+      try {
+        process.kill(pid, sig);
+      } catch { /* уже нет */ }
+    }
+    if (sig === 'SIGTERM') spawnSync('sleep', ['10']);
+  }
+}
+/** запуск своей группой процессов: по дедлайну гасится вся группа; вывод — в лог (с маскировкой) */
+function runGroup(argv, { env, log, cwd, deadline }) {
+  return new Promise((resolve) => {
+    const p = spawn(argv[0], argv.slice(1), { env, cwd, detached: true, stdio: ['ignore', 'pipe', 'pipe'] });
+    let out = '', timedOut = false;
+    const on = (c) => {
+      const s = c.toString();
+      out += s;
+      if (out.length > 4e6) out = out.slice(-2e6);
+      fs.appendFileSync(log, redact(s, SECRETS));
+    };
+    p.stdout.on('data', on);
+    p.stderr.on('data', on);
+    const t = setTimeout(() => ((timedOut = true), killGroup(p.pid)), Math.max(1000, deadline - Date.now()));
+    p.on('close', (code) => (clearTimeout(t), resolve({ code: code ?? -1, out, timedOut })));
+    p.on('error', (e) => (clearTimeout(t), resolve({ code: -1, out: out + e.message, timedOut })));
+  });
+}
+/** дождаться фонового процесса скрипта до дедлайна; true — не дождались (группа погашена) */
+async function waitPidUntil(pid, deadline, log, label) {
+  let n = 0;
+  while (alive(pid)) {
+    if (Date.now() > deadline) {
+      logTo(log, `${label}: таймаут — останавливаю группу процессов ${pid}`);
+      killGroup(pid);
+      return true;
+    }
+    await sleep(15000);
+    if (++n % 40 === 0) logTo(log, `${label}: ещё идёт (${Math.round((n * 15) / 60)} мин)`);
+  }
+  return false;
+}
+const AUDIT_LOG = process.env.AUTO_AUDIT_LOG || '/root/ar-qa/anim-audit.log';
+/** лог, куда пишет скрипт, ушедший в фон (его хвост попадает в log.txt задачи) */
+function bgLogOf(p) {
+  if (p === 'scripts/meshy/motion-run.sh') return path.join(CMDR, 'meshy.log');
+  if (p === AUDIT_SCRIPT) return AUDIT_LOG;
+  return null;
+}
+function opsDir(id) {
+  const d = path.join(WORK, 'ops', id);
+  fs.rmSync(d, { recursive: true, force: true });
+  fs.mkdirSync(d, { recursive: true, mode: 0o700 });
+  return d;
+}
+/** запуск скрипта из репо на коммите sha: nice/ionice, чистое окружение, дедлайн, фон дожидается */
+async function runRepoScript({ job, sha, rel, log, extraEnv = {} }) {
+  const dir = opsDir(job.id);
+  const script = await fetchScript(sha, rel, path.join(dir, path.basename(rel)));
+  const env = { ...scriptEnv({ sha, job, rawBase: rawUrl('').replace(/\/$/, ''), path: process.env.PATH, work: dir }), ...extraEnv };
+  const deadline = Date.now() + job.timeoutMin * 60000;
+  const bgLog = rel === 'scripts/voice/el-run.sh' ? env.EL_LOG : bgLogOf(rel);
+  const off = bgLog ? fsize(bgLog) : 0;
+  logTo(log, `${rel} @ ${sha.slice(0, 12)} · args ${JSON.stringify(job.args)} · env ${JSON.stringify(job.env)} · таймаут ${job.timeoutMin} мин`);
+  const r = await runGroup(niceArgv(['bash', script, ...job.args]), { env, log, cwd: dir, deadline });
+  let timedOut = r.timedOut;
+  const pid = parseBgPid(r.out);
+  const bg = !!pid && alive(pid);
+  if (bg) timedOut = (await waitPidUntil(pid, deadline, log, rel)) || timedOut;
+  let bgText = '';
+  if (bgLog) {
+    bgText = readFrom(bgLog, bgLog === AUDIT_LOG && bg ? 0 : off);
+    if (bgText) fs.appendFileSync(log, redact(`\n----- ${bgLog} -----\n${bgText}`, SECRETS));
+  }
+  return { code: r.code, out: r.out, timedOut, bg, bgText, dir };
+}
+
+async function jobScript(rec, log) {
+  const { job } = rec;
+  const sha = await verifyRef(job.ref, rec.sha);
+  rec.refSha = sha;
+  const r = await runRepoScript({ job, sha, rel: job.path, log });
+  if (/Уже идёт/.test(r.out) && !r.bg) return { decision: { action: 'defer', reason: 'скрипт сообщил «Уже идёт» — повтор на следующем tick' }, busy: true };
+  const ok = !r.timedOut && r.code === 0;
+  return {
+    status: ok ? 'done' : 'failed', credits: 0,
+    reason: r.timedOut ? `таймаут ${job.timeoutMin} мин — группа процессов остановлена` : r.code !== 0 ? `код выхода ${r.code}` : r.bg ? 'скрипт работал в фоне; итог — в log.txt' : undefined,
+    files: { log: `out/${job.id}/log.txt`, exitCode: r.code, background: r.bg, sha },
+  };
+}
+
+/** результаты аудита → out/<id>/: таблицы и отчёт (md), сводки json, листы — одним архивом, если ≤ 20 МБ */
+export function auditPick(names) {
+  const md = names.filter((f) => /^(table|idle)_[A-Za-z0-9_.-]+\.md$/.test(f) || f === 'REACTIONS_audit.md' || f === 'REPORT.md' || f === 'compare.md');
+  const json = names.filter((f) => /^summary_[A-Za-z0-9_.-]+\.json$/.test(f));
+  return { md, json };
+}
+async function jobAudit(rec, log) {
+  const { job } = rec;
+  const sha = await verifyRef(job.ref, rec.sha);
+  rec.refSha = sha;
+  if (pgrep('anim-audit/audit.mjs')) return { decision: { action: 'defer', reason: 'аудит уже идёт (ручной запуск)' }, busy: true };
+  const res = path.join(WORK, 'ops', `${job.id}-res`);
+  fs.rmSync(res, { recursive: true, force: true });
+  const r = await runRepoScript({ job, sha, rel: AUDIT_SCRIPT, log, extraEnv: { AUDIT_OUT: res } });
+  if (/Уже идёт/.test(r.out) && !r.bg) return { decision: { action: 'defer', reason: 'аудит уже идёт' }, busy: true };
+  const finished = /=== \S+ готово:/.test(r.bgText);
+  const base = path.join(res, 'anim-audit');
+  const dst = stageDir(job.id);
+  const names = fs.existsSync(base) ? fs.readdirSync(base) : [];
+  const { md, json } = auditPick(names);
+  const files = [];
+  for (const f of [...md, ...json]) {
+    const src = path.join(base, f);
+    if (!fs.statSync(src).isFile() || fs.statSync(src).size > 5 * 1024 * 1024) continue;
+    const name = f === 'REACTIONS_audit.md' && !names.includes('REPORT.md') ? 'REPORT.md' : f;
+    fs.writeFileSync(path.join(dst, name), redact(fs.readFileSync(src, 'utf8'), SECRETS));
+    files.push(`out/${job.id}/${name}`);
+  }
+  let sheets = { count: 0 };
+  const sd = path.join(base, 'sheets');
+  if (fs.existsSync(sd)) {
+    const pngs = fs.readdirSync(sd).filter((f) => /^[A-Za-z0-9_.-]+\.png$/.test(f));
+    sheets.count = pngs.length;
+    if (pngs.length) {
+      const tgz = path.join(r.dir, 'sheets.tar.gz');
+      const t = spawnSync('tar', ['-czf', tgz, '-C', base, ...pngs.map((f) => `sheets/${f}`)], { env: { ...process.env, GZIP: '-9' } });
+      const size = t.status === 0 ? fsize(tgz) : 0;
+      sheets.bytes = size;
+      if (size && size <= AUDIT_SHEETS_MAX) fs.copyFileSync(tgz, path.join(dst, 'sheets.tar.gz')), files.push(`out/${job.id}/sheets.tar.gz`), (sheets.file = `out/${job.id}/sheets.tar.gz`);
+      else sheets.skipped = size ? `архив ${Math.round(size / 1048576)} МБ > 20 МБ — листы на сервере: ${sd}` : 'tar не удался';
+    }
+  }
+  const ok = !r.timedOut && finished && md.length > 0;
+  return {
+    status: ok ? 'done' : 'failed', credits: 0,
+    reason: r.timedOut ? `таймаут ${job.timeoutMin} мин — прогон остановлен` : !finished ? 'прогон не дошёл до «готово» (см. log.txt)' : !md.length ? 'нет таблиц в результатах' : undefined,
+    files: { list: files, sheets, sha, serverDir: base },
+  };
+}
+
+// ── status: снимок состояния без секретов ──
+const SITE = () => (ENV.AUTO_SITE && /^https:\/\/[a-z0-9.-]+$/.test(ENV.AUTO_SITE) ? ENV.AUTO_SITE : 'https://ar.vershov.com');
+export const STATUS_URLS = ['/', '/mvp/', '/lab/', '/api/progress/health', '/models/anims/meshy/manifest.json'];
+export const STATUS_UNITS = ['caddy', 'ar-progress', 'ar-update', 'ar-auto.timer'];
+const HEADER_KEEP = /^(HTTP\/|content-type|content-length|content-encoding|cache-control|last-modified|etag|location):?/i;
+/** заголовки ответа: только безопасные строки (без cookie и прочего) */
+export function keepHeaders(text) {
+  return String(text).split(/\r?\n/).filter((l) => HEADER_KEEP.test(l.trim())).map((l) => l.trim()).slice(0, 12);
+}
+/** счётчик записей манифеста любого вида: массив, { clips|lines|items|entries: [] } или объект-словарь */
+export function manifestCount(m) {
+  if (Array.isArray(m)) return m.length;
+  if (!m || typeof m !== 'object') return null;
+  for (const k of ['clips', 'lines', 'items', 'entries', 'files']) if (Array.isArray(m[k])) return m[k].length;
+  for (const k of ['clips', 'lines', 'items', 'entries', 'files']) if (m[k] && typeof m[k] === 'object') return Object.keys(m[k]).length;
+  return Object.keys(m).length;
+}
+function sh(cmd, args, timeout = 15000) {
+  const r = spawnSync(cmd, args, { encoding: 'utf8', timeout, env: { PATH: process.env.PATH, LANG: 'C.UTF-8' } });
+  if (r.error) return `(${cmd}: ${r.error.code ?? r.error.message})`;
+  return redact(`${r.stdout ?? ''}${r.stderr ?? ''}`.trim(), SECRETS).slice(0, 20000);
+}
+function dirStat(dir, re) {
+  try {
+    const f = fs.readdirSync(dir).filter((x) => re.test(x));
+    return { files: f.length, bytes: f.reduce((s, x) => s + fsize(path.join(dir, x)), 0) };
+  } catch {
+    return null;
+  }
+}
+function collectStatus() {
+  const osr = parseEnv((() => {
+    try {
+      return fs.readFileSync('/etc/os-release', 'utf8');
+    } catch {
+      return '';
+    }
+  })());
+  const tail = (f, n) => {
+    try {
+      return redact(fs.readFileSync(f, 'utf8').split('\n').slice(-n - 1).join('\n'), SECRETS);
+    } catch (e) {
+      return `(нет ${f}: ${e.code})`;
+    }
+  };
+  const voiceDir = mp3List().dir;
+  const s = {
+    at: now(),
+    host: { hostname: sh('hostname', []), os: osr.PRETTY_NAME ?? null, kernel: sh('uname', ['-sr']), uptime: sh('uptime', ['-p']) },
+    versions: {
+      node: process.version, npm: sh('npm', ['-v']), git: sh('git', ['--version']), caddy: sh('caddy', ['version']).split('\n')[0],
+      systemd: sh('systemctl', ['--version']).split('\n')[0], arAuto: (() => {
+        try {
+          return fs.readFileSync('/opt/ar-auto/REF', 'utf8').trim();
+        } catch {
+          return null;
+        }
+      })(),
+    },
+    disk: [...new Set(sh('df', ['-hP', '/', '/srv', '/var', '/opt', '/root']).split('\n'))],
+    memory: sh('free', ['-m']).split('\n'),
+    services: Object.fromEntries(STATUS_UNITS.map((u) => [u, (spawnSync('systemctl', ['is-active', u], { encoding: 'utf8', timeout: 10000 }).stdout ?? '').trim().split('\n')[0] || 'unknown'])),
+    release: fs.existsSync('/srv/ar/current') ? fs.realpathSync('/srv/ar/current') : null,
+    updateLog: tail('/srv/ar/update.log', 40).split('\n'),
+    manifests: {
+      meshy: { manifest: manifestCount(readJson(path.join(MESHY_DIR, 'manifest.json'), null)), ...(dirStat(MESHY_DIR, /\.glb$/) ?? {}) },
+      voice: { dir: voiceDir, manifest: manifestCount(readJson(path.join(voiceDir, 'manifest.json'), null)), mp3: [...mp3List().files].length },
+      props: dirStat(PROPS_DIR, /\.glb$/),
+    },
+    urls: Object.fromEntries(STATUS_URLS.map((u) => [u, keepHeaders(sh('curl', ['-sSI', '-m', '15', '-H', 'Accept-Encoding: gzip, zstd', SITE() + u], 25000))])),
+  };
+  const L = [`# Состояние swe · ${s.at}`, '', `- ОС: ${s.host.os} · ${s.host.kernel} · ${s.host.uptime}`, `- node ${s.versions.node} · npm ${s.versions.npm} · ${s.versions.git} · caddy ${s.versions.caddy} · ar-auto ${s.versions.arAuto ?? '—'}`, `- релиз: ${s.release ?? '—'}`, '', '## Сервисы', ''];
+  for (const [u, v] of Object.entries(s.services)) L.push(`- ${u}: **${v}**`);
+  L.push('', '## Диски', '', '```', ...s.disk, '```', '', '## Память', '', '```', ...s.memory, '```', '', '## Манифесты', '');
+  L.push(`- Meshy: в манифесте ${s.manifests.meshy.manifest ?? '—'}, glb ${s.manifests.meshy.files ?? '—'} (${Math.round((s.manifests.meshy.bytes ?? 0) / 1024)} КБ)`);
+  L.push(`- Голос (${s.manifests.voice.dir}): в манифесте ${s.manifests.voice.manifest ?? '—'}, mp3 ${s.manifests.voice.mp3}`);
+  L.push(`- Предметы: glb ${s.manifests.props?.files ?? '—'}`, '', '## URL (curl -I)', '');
+  for (const [u, h] of Object.entries(s.urls)) L.push(`- \`${u}\`: ${h.join(' · ') || '(нет ответа)'}`);
+  L.push('', '## /srv/ar/update.log (хвост)', '', '```', ...s.updateLog, '```', '');
+  return { json: s, md: redact(L.join('\n'), SECRETS) };
+}
+async function jobStatus(rec) {
+  const { json, md } = collectStatus();
+  const dst = stageDir(rec.job.id);
+  fs.writeFileSync(path.join(dst, 'status.json'), redact(JSON.stringify(json, null, 2), SECRETS) + '\n');
+  fs.writeFileSync(path.join(dst, 'status.md'), md);
+  const bad = Object.entries(json.services).filter(([, v]) => v !== 'active').map(([u, v]) => `${u}=${v}`);
+  return { status: 'done', credits: 0, reason: bad.length ? `не active: ${bad.join(', ')}` : undefined, files: { list: [`out/${rec.job.id}/status.md`, `out/${rec.job.id}/status.json`] } };
+}
+
 async function runJob(id) {
   loadEnv();
   const rec = loadRec(id);
@@ -661,7 +1055,8 @@ async function runJob(id) {
   const log = path.join(LOGS, `${id}.log`);
   const { job } = rec;
   const day = dayOf();
-  const cap = caps()[job.kind];
+  const cap = caps()[job.kind] ?? 0;
+  const ops = OPS_KINDS.includes(job.kind);
   const others = Object.values(allRecs()).filter((r) => r.id !== id);
   const ctx = {
     spent: spentToday(others, job.kind, day), cap,
@@ -674,13 +1069,15 @@ async function runJob(id) {
   Object.assign(rec, { status: 'starting', started: now(), day, attempts: (rec.attempts ?? 0) + 1 });
   delete rec.reason;
   saveRec(rec);
-  logTo(log, `задача ${id} (${job.kind} ${job.args.join(' ')}) · sha ${rec.sha.slice(0, 7)} · maxCredits ${job.maxCredits} · сегодня потрачено ${ctx.spent}/${cap}`);
+  if (ops) logTo(log, `задача ${id} (${job.kind}${job.path ? ' ' + job.path : ''}) · очередь ${rec.sha.slice(0, 7)} · ref ${job.ref ?? '—'} · таймаут ${job.timeoutMin} мин`);
+  else logTo(log, `задача ${id} (${job.kind} ${job.args.join(' ')}) · sha ${rec.sha.slice(0, 7)} · maxCredits ${job.maxCredits} · сегодня потрачено ${ctx.spent}/${cap}`);
   let res;
   try {
-    if (!isMirror(job) && pgrep(busyPattern[job.kind])) res = { decision: { action: 'defer', reason: 'идёт ручной запуск того же вида' }, busy: true };
-    else res = await ({ meshy: jobMeshy, tripo: jobTripo, eleven: jobEleven })[job.kind](rec, log, ctx);
+    if (!ops && !isMirror(job) && pgrep(busyPattern[job.kind])) res = { decision: { action: 'defer', reason: 'идёт ручной запуск того же вида' }, busy: true };
+    else res = await ({ meshy: jobMeshy, tripo: jobTripo, eleven: jobEleven, script: jobScript, audit: jobAudit, status: jobStatus })[job.kind](rec, log, ctx);
   } catch (e) {
-    res = { status: 'failed', credits: rec.reserved ?? 0, reason: `ошибка ar-auto: ${e.message}` };
+    if (e instanceof RefError) res = { status: 'rejected', credits: 0, reason: e.message };
+    else res = { status: 'failed', credits: rec.reserved ?? 0, reason: `ошибка ar-auto: ${e.message}` };
   }
   if (res.decision) {
     const a = res.decision.action;
@@ -717,9 +1114,9 @@ function statusObj() {
   const day = dayOf(), c = caps();
   return {
     day, caps: c,
-    spentToday: Object.fromEntries(KINDS.map((k) => [k, spentToday(recs, k, day)])),
-    running: KINDS.filter((k) => workerActive(k)),
-    jobs: recs.slice(0, 60).map((r) => ({ id: r.id, kind: r.job?.kind, status: r.status, credits: r.credits ?? r.reserved ?? null, unit: r.unit, reason: r.reason, queuedAt: r.queuedAt, finished: r.finished, sha: r.sha?.slice(0, 7) })),
+    spentToday: Object.fromEntries(PROVIDER_KINDS.map((k) => [k, spentToday(recs, k, day)])),
+    running: LANES.filter((k) => workerActive(k)),
+    jobs: recs.slice(0, 60).map((r) => ({ id: r.id, kind: r.job?.kind, status: r.status, credits: r.credits ?? r.reserved ?? null, unit: r.unit, reason: r.reason, queuedAt: r.queuedAt, finished: r.finished, sha: r.sha?.slice(0, 7), ...(r.job?.ref ? { ref: r.job.ref, path: r.job.path } : {}) })),
   };
 }
 function stageStatus(extra = {}) {
@@ -733,14 +1130,16 @@ function stageStatus(extra = {}) {
   return true;
 }
 
-function workerActive(kind) {
-  if (hasSystemd()) return unitActive(`ar-auto-job-${kind}.service`);
-  const pid = Number(readJson(path.join(VAR, `worker-${kind}.json`), {}).pid);
+function workerActive(lane) {
+  if (hasSystemd()) return unitActive(`ar-auto-job-${lane}.service`);
+  const pid = Number(readJson(path.join(VAR, `worker-${lane}.json`), {}).pid);
   return alive(pid);
 }
 function spawnWorker(kind, id) {
   if (hasSystemd()) {
-    const r = spawnSync('systemd-run', ['--unit', `ar-auto-job-${kind}`, '--collect', '--quiet', '--property=RuntimeMaxSec=12h', '--setenv=HOME=/root', '--setenv=PATH=' + process.env.PATH, SELF, 'run-job', id], { encoding: 'utf8' });
+    // полоса ops (скрипты, аудит): пониженный приоритет ЦП и диска на весь юнит
+    const prio = kind === 'ops' ? ['--property=Nice=10', '--property=IOSchedulingClass=best-effort', '--property=IOSchedulingPriority=7'] : [];
+    const r = spawnSync('systemd-run', ['--unit', `ar-auto-job-${kind}`, '--collect', '--quiet', '--property=RuntimeMaxSec=12h', ...prio, '--setenv=HOME=/root', '--setenv=PATH=' + process.env.PATH, SELF, 'run-job', id], { encoding: 'utf8' });
     if (r.status !== 0) say(`${kind}: systemd-run: ${(r.stderr || '').trim()}`);
     return r.status === 0;
   }
@@ -794,7 +1193,7 @@ async function tickLocked() {
   const recs = allRecs();
   // задачи, прерванные перезагрузкой/сбоем: не начатые — снова в очередь, начатые — failed (оплаченное повторяет только новая задача)
   for (const r of Object.values(recs)) {
-    if (!['queued', 'starting', 'running'].includes(r.status) || workerActive(r.job.kind)) continue;
+    if (!['queued', 'starting', 'running'].includes(r.status) || workerActive(laneOf(r.job.kind))) continue;
     if (r.status === 'queued' && Date.now() - Date.parse(r.queuedAt) < 120000) continue;
     if (r.status === 'queued') delete recs[r.id], fs.rmSync(recFile(r.id), { force: true });
     else {
@@ -805,7 +1204,7 @@ async function tickLocked() {
   }
   const day = dayOf();
   const started = [];
-  for (const kind of KINDS) {
+  for (const kind of LANES) {
     if (workerActive(kind)) continue;
     const job = pickNext(jobs, recs, kind, day);
     if (!job) continue;
@@ -822,11 +1221,58 @@ async function tickLocked() {
   return started;
 }
 
+/** ar-auto selftest: проверка установки без выполнения задач и без push (dry-run на тестовой задаче status) */
+async function selftest() {
+  loadEnv();
+  let fail = 0;
+  const ok = (cond, label, extra = '') => (console.log(`${cond ? 'OK  ' : 'FAIL'} ${label}${extra ? ' — ' + extra : ''}`), cond || fail++);
+  ok(Number(process.versions.node.split('.')[0]) >= 22, `node ${process.version}`);
+  ok(!!ENV.GH_TOKEN, `токен в ${ENV_FILE}`);
+  let sha = null;
+  try {
+    sha = await latestSha();
+    ok(true, 'GitHub API: main', sha.slice(0, 12));
+  } catch (e) {
+    ok(false, 'GitHub API: main', e.message);
+  }
+  if (sha) {
+    try {
+      const t = await fetchText(`${rawUrl(sha)}/automation/queue.json`);
+      const { jobs, errors } = validateQueue(t ? JSON.parse(t) : { jobs: [] });
+      ok(errors.length === 0, `очередь: задач ${jobs.length}`, errors.slice(0, 3).join(' | '));
+      const s = await fetchText(`${rawUrl(sha)}/${AUDIT_SCRIPT}`);
+      ok(!!s, `скрипт из белого списка читается по sha (${AUDIT_SCRIPT})`);
+      ok((await verifyRef(sha.slice(0, 7), sha)) === sha, 'ref → полный sha, проверка «в истории main»');
+    } catch (e) {
+      ok(false, 'очередь/ref', e.message);
+    }
+  }
+  // право записи: git push --dry-run в server-out (GitHub проверяет права, ветку не меняет)
+  const tmp = fs.mkdtempSync(path.join(WORK, 'selftest-'));
+  try {
+    git(['init', '-q'], tmp);
+    const tree = git(['write-tree'], tmp).stdout.trim();
+    const c = git(['commit-tree', tree, '-m', 'selftest'], tmp).stdout.trim();
+    const r = git(['push', '--dry-run', '-q', GIT_URL, `${c}:refs/heads/${BRANCH}-selftest`], tmp);
+    ok(r.status === 0, 'токен: право записи (git push --dry-run)', redact(r.stderr, SECRETS).trim().slice(0, 200));
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+  const { md, json } = collectStatus();
+  const leaked = SECRETS.filter((x) => x.length >= 8 && (md.includes(x) || JSON.stringify(json).includes(x)));
+  ok(leaked.length === 0, 'снимок status без секретов');
+  console.log('\n----- dry-run задачи status (не выгружается) -----\n' + md);
+  if (hasSystemd()) ok(unitActive('ar-auto.timer'), 'ar-auto.timer активен');
+  console.log(fail ? `\nИТОГ: ошибок ${fail}` : '\nИТОГ: всё в порядке');
+  process.exitCode = fail ? 1 : 0;
+}
+
 function status() {
   loadEnv();
   const s = statusObj();
   console.log(`ar-auto · ${s.day} (UTC)`);
-  for (const k of KINDS) console.log(`  ${k.padEnd(7)} сегодня ${s.spentToday[k]} / ${s.caps[k]}${k === 'eleven' ? ' симв.' : ' кр.'}${s.running.includes(k) ? ' · идёт задача' : ''}`);
+  for (const k of PROVIDER_KINDS) console.log(`  ${k.padEnd(7)} сегодня ${s.spentToday[k]} / ${s.caps[k]}${k === 'eleven' ? ' симв.' : ' кр.'}${s.running.includes(k) ? ' · идёт задача' : ''}`);
+  console.log(`  ops     script/audit/status${s.running.includes('ops') ? ' · идёт задача' : ''}`);
   console.log('последние задачи:');
   for (const j of s.jobs.slice(0, 15)) console.log(`  ${String(j.finished ?? j.queuedAt ?? '').slice(0, 16)}  ${j.status.padEnd(9)} ${j.kind.padEnd(7)} ${j.id}${j.credits != null ? ` · ${j.credits}` : ''}${j.reason ? ` · ${j.reason}` : ''}`);
   if (!s.jobs.length) console.log('  (пока нет)');
@@ -852,11 +1298,12 @@ if (isMain) {
     tick: () => tick(process.argv.includes('--wait')),
     'run-job': () => (ID_RE.test(arg ?? '') ? runJob(arg) : say('run-job <id>')),
     status: async () => status(),
+    selftest: () => selftest(),
     push: async () => (loadEnv(), push('ar-auto: ручная выгрузка')),
     mirror: async () => (loadEnv(), stageMeshyMirror(), push('ar-auto: зеркало Meshy')),
   }[cmd];
   if (!go) {
-    console.log('ar-auto tick [--wait] | run-job <id> | status | push | mirror');
+    console.log('ar-auto tick [--wait] | run-job <id> | status | selftest | push | mirror');
     process.exit(cmd ? 1 : 0);
   }
   go().catch((e) => {
