@@ -2262,7 +2262,12 @@ export class GlbCharacter implements Character {
 
   /** зона: ближайшая к точке попадания кость (щека — голова сбоку от морды) */
   hitZone(ray: THREE.Raycaster): TouchZone | null {
-    return this.zoneAtPoint(HIT_MESH || !this.capsules.length ? this.meshPoint(ray) : this.hitProxy(ray) ?? ray.intersectObject(this.hitBox, false)[0]?.point ?? null);
+    if (HIT_MESH || !this.capsules.length) return this.zoneAtPoint(this.meshPoint(ray));
+    // мимо капсул, но внутри габаритного бокса (край меха, уши, юбка… или пустота рядом с головой: бокс 0,55 роста
+    // шире силуэта — у Добряка точка в 170 px левее головы считалась «головой», E2E 22.11) — проверяем лучом по сетке:
+    // дорого, но только для таких касаний; мимо бокса — сразу «не на коте»
+    const p = this.hitProxy(ray) ?? (ray.intersectObject(this.hitBox, false).length ? (this.model ? ray.intersectObject(this.model, true)[0]?.point ?? null : null) : null);
+    return this.zoneAtPoint(p);
   }
 
   /** старый путь — луч по скинованной сетке (дорого; ?hit=mesh и сверка в QA-стенде) */
