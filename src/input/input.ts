@@ -8,6 +8,7 @@ import { ShakeDetector, SilenceTimer, type Pt } from './gestures';
 import { TouchInterpreter, type TouchEvent } from './interpreter';
 import type { TouchZone } from '../character/types';
 import type { OrbitPointers } from './orbit';
+import { takeEarlyMotion } from '../quick/early';
 
 export type InputEvents = {
   /** тап по коту: zone и событие tap_cat_head / … / tap_cat */
@@ -228,8 +229,11 @@ export class Input extends Emitter<InputEvents> {
     const DME = (window as any).DeviceMotionEvent;
     const DOE = (window as any).DeviceOrientationEvent;
     const reqs: Promise<string>[] = [];
-    if (DME?.requestPermission) reqs.push(DME.requestPermission().catch(() => 'denied'));
-    if (DOE?.requestPermission) reqs.push(DOE.requestPermission().catch(() => 'denied'));
+    // быстрый вход (src/quick): заставка уже спросила в жесте — ждём её ответ (вне жеста iOS не спросит)
+    const early = takeEarlyMotion();
+    if (early) reqs.push(early.then((ok) => (ok ? 'granted' : 'denied')));
+    else if (DME?.requestPermission) reqs.push(DME.requestPermission().catch(() => 'denied'));
+    if (!early && DOE?.requestPermission) reqs.push(DOE.requestPermission().catch(() => 'denied'));
     const p = reqs.length ? Promise.all(reqs).then((r) => r[0] === 'granted') : Promise.resolve(typeof DME !== 'undefined');
     return p.then((ok) => {
       this.motionGranted = ok;

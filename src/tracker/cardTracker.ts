@@ -23,6 +23,7 @@ import type { TrackState } from './card/fsm';
 import { perf } from '../core/perf';
 import { trackerLuma } from './cardMonitor';
 import { CardRecorder, recRequested } from './cardRecorder';
+import { takeEarlyCamera } from '../quick/early';
 
 export interface CardView {
   /** углы карты (TL, TR, BR, BL) в px экрана */
@@ -148,6 +149,8 @@ export class CardTracker extends TrackerBase implements Tracker {
 
   /** Камера: вызывать прямо из обработчика жеста (iOS требует user gesture для getUserMedia/play). */
   async startVideo(): Promise<void> {
+    // повтор после отказа в камере (быстрый вход, «Попробовать ещё раз»): пустой прошлый <video> — убрать
+    if (this.video && !this.video.srcObject) this.video.remove();
     const video = document.createElement('video');
     video.setAttribute('autoplay', '');
     video.setAttribute('muted', '');
@@ -175,7 +178,20 @@ export class CardTracker extends TrackerBase implements Tracker {
     const hd = new URLSearchParams(location.search).get('cam') === '720';
     const vc: MediaTrackConstraints = { facingMode: 'environment', width: { ideal: hd ? 1280 : 960 }, height: { ideal: hd ? 720 : 540 }, frameRate: { ideal: 30 } };
     let stream: MediaStream | null = null;
-    if (withAudio) {
+    // быстрый вход (src/quick/splash.ts): заставка уже открыла камеру (+ микрофон) в жесте теми же ограничениями
+    const early = takeEarlyCamera();
+    if (early) {
+      const r = await early;
+      if (r.error) throw Object.assign(new Error(r.error.message), { name: r.error.name, early: true });
+      if (r.stream) {
+        const at = r.stream.getAudioTracks();
+        if (withAudio) this.audioStream = at.length ? new MediaStream(at) : null;
+        else at.forEach((t) => t.stop());
+        if (r.mic) this.debug('заставка: камера+микрофон вместе не вышло (' + r.mic + ') — камера отдельно');
+        stream = new MediaStream(r.stream.getVideoTracks());
+      }
+    }
+    if (!stream && withAudio) {
       const aec = new URLSearchParams(location.search).get('aec') !== '0';
       try {
         stream = await navigator.mediaDevices.getUserMedia({ video: vc, audio: { echoCancellation: aec, noiseSuppression: aec, autoGainControl: false, channelCount: 1 } });

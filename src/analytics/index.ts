@@ -8,12 +8,16 @@
  */
 import { EDITION, feature } from '../config/edition';
 import { getDeviceId, safeStorage } from '../progress/device';
+import { quickBridge } from '../quick/early';
 
 export const EVENTS = [
   'open', 'onboarding_done', 'camera_granted', 'card_landed', 'awake_done', 'named', 'action', 'game_start', 'game_end',
   'cat_switch', 'home_enter', 'sleep', 'wake', 'card_lost', 'sberkids_click', 'session_end',
   // раскраска карты (src/card/paint.ts)
   'paint_offer', 'paint_start', 'paint_done', 'paint_erase',
+  // быстрый вход (feature 'intro.quick', src/quick): воронка по шагам, ms — от начала навигации
+  'page_open', 'splash_shown', 'cta_tap', 'camera_denied', 'camera_retry', 'mic_granted', 'mic_denied', 'terms_open',
+  'card_search_start', 'card_found', 'cat_awake', 'first_action',
 ] as const;
 export type EventName = (typeof EVENTS)[number];
 
@@ -21,6 +25,19 @@ type Kind = 'num' | 'id';
 /** свойства события: только эти ключи и типы (остальное выбрасывается) */
 export const PROPS: Partial<Record<EventName, Record<string, Kind>>> = {
   card_landed: { ms: 'num' },
+  camera_granted: { ms: 'num' },
+  page_open: { ms: 'num' },
+  splash_shown: { ms: 'num' },
+  cta_tap: { ms: 'num', early: 'num' },
+  camera_denied: { ms: 'num' },
+  camera_retry: { ms: 'num' },
+  mic_granted: { ms: 'num' },
+  mic_denied: { ms: 'num' },
+  terms_open: { ms: 'num' },
+  card_search_start: { ms: 'num' },
+  card_found: { ms: 'num' },
+  cat_awake: { ms: 'num' },
+  first_action: { ms: 'num', id: 'id' },
   action: { id: 'id' },
   game_start: { id: 'id' },
   game_end: { id: 'id' },
@@ -32,6 +49,40 @@ export const PROPS: Partial<Record<EventName, Record<string, Kind>>> = {
   paint_start: { color: 'id' },
 };
 const ID_RE = /^[a-z0-9_:.-]{1,32}$/i;
+
+/**
+ * Шаги воронки входа под прежними именами: событие → его имя в воронке входа (раз за сессию, с ms от навигации).
+ * Старые события остаются как были (сводка за прошлые дни сравнима).
+ */
+export const ALIAS: Partial<Record<EventName, EventName>> = { open: 'page_open', card_landed: 'card_found', awake_done: 'cat_awake', action: 'first_action' };
+/** события только раз за сессию (и из очереди заставки, и из приложения — второе отбрасывается) */
+export const ONCE: ReadonlySet<string> = new Set(['page_open', 'splash_shown', 'cta_tap', 'camera_granted', 'mic_granted', 'mic_denied', 'card_search_start', 'card_found', 'cat_awake', 'first_action']);
+
+/**
+ * Метка источника из QR (?src=<банк/точка>): только латиница и цифры, до 32 символов, иначе — нет метки.
+ * Сохраняется (localStorage ar.src, 30 дней): ребёнок открыл ссылку из истории без метки — сессия всё равно «из точки».
+ * Это не персональные данные: метка — точка раздачи QR, одна на всех детей.
+ */
+export const SRC_RE = /^[A-Za-z0-9]{1,32}$/;
+export const SRC_TTL_MS = 30 * 86_400_000;
+export function readSrc(search: string, store: Pick<Storage, 'getItem' | 'setItem'> | null, now = Date.now()): string | null {
+  const v = new URLSearchParams(search).get('src');
+  if (v !== null && SRC_RE.test(v)) {
+    try {
+      store?.setItem('ar.src', JSON.stringify({ v, at: now }));
+    } catch {
+      /* приватный режим */
+    }
+    return v;
+  }
+  try {
+    const s = JSON.parse(store?.getItem('ar.src') ?? 'null') as { v?: string; at?: number } | null;
+    if (s && typeof s.v === 'string' && SRC_RE.test(s.v) && typeof s.at === 'number' && now - s.at < SRC_TTL_MS) return s.v;
+  } catch {
+    /* битая запись — без метки */
+  }
+  return null;
+}
 
 export type Props = Record<string, string | number>;
 
@@ -55,6 +106,10 @@ export interface AnalyticsOptions {
   now?: () => number;
   /** не больше стольких событий за сессию (и сервер режет по устройству) */
   max?: number;
+  /** метка источника из QR (readSrc) — в каждое событие */
+  src?: string | null;
+  /** мс от начала навигации (шаги воронки входа) */
+  clock?: () => number;
 }
 
 export const ENDPOINT = '/api/progress/event';
@@ -75,12 +130,16 @@ export class Analytics {
     const ev = sanitize(name, props);
     if (!ev || this.n >= (this.o.max ?? 400)) return false;
     this.n++;
-    const body = JSON.stringify({ device: this.o.device, edition: this.o.edition, name: ev.name, props: ev.props, ts: (this.o.now ?? Date.now)() });
+    const body = JSON.stringify({ device: this.o.device, edition: this.o.edition, name: ev.name, props: ev.props, ts: (this.o.now ?? Date.now)(), ...(this.o.src ? { src: this.o.src } : {}) });
+    let ok = false;
     try {
-      return this.o.send(ENDPOINT, body);
+      ok = this.o.send(ENDPOINT, body);
     } catch {
-      return false;
+      ok = false;
     }
+    const alias = ALIAS[ev.name];
+    if (alias) this.track(alias, { ms: this.o.clock?.() ?? 0, ...(ev.props.id ? { id: ev.props.id } : {}) }, true);
+    return ok;
   }
   /** сколько секунд идёт сессия */
   seconds() {
@@ -100,13 +159,30 @@ export function analyticsEnabled(search = typeof location !== 'undefined' ? loca
 export function bootAnalytics(): Analytics {
   if (inst) return inst;
   if (!analyticsEnabled()) return (inst = NOOP);
+  let store: Storage | null = null;
+  try {
+    store = localStorage;
+  } catch {
+    store = null;
+  }
   inst = new Analytics({
     device: getDeviceId(safeStorage()),
     edition: EDITION,
     send: (url, body) => navigator.sendBeacon(url, new Blob([body], { type: 'text/plain' })),
+    src: readSrc(location.search, store),
+    clock: () => performance.now(),
   });
   (window as unknown as { __analytics: Analytics }).__analytics = inst;
   inst.track('open', {}, true);
+  // быстрый вход: шаги, которые заставка (src/quick/splash.ts) записала до бандла, и дальше — сразу
+  const q = quickBridge();
+  if (q) {
+    const a = inst;
+    for (const [n, p] of q.ev.splice(0)) a.track(n as EventName, p, ONCE.has(n));
+    q.track = (n, p) => {
+      a.track(n as EventName, p, ONCE.has(n));
+    };
+  }
   let ended = false;
   const end = () => {
     if (ended) return;
@@ -123,5 +199,5 @@ export function bootAnalytics(): Analytics {
 
 /** событие воронки (до bootAnalytics и без аналитики — ничего) */
 export function track(name: EventName, props: Record<string, unknown> = {}, once = false): void {
-  inst?.track(name, props, once);
+  inst?.track(name, props, once || ONCE.has(name));
 }

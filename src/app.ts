@@ -44,6 +44,7 @@ import { KidsOffer } from './ui/kidsOffer';
 import { FogBoard } from './ui/fogBoard';
 import { CardSearch, SEARCH_LINES } from './ui/cardSearch';
 import type { CardSearchEvent } from './tracker/card/overlay';
+import { QUICK_SEARCH_LINES, hintCaption, quickEntry } from './quick/entry';
 
 /** кот выглядывает из нижней плашки поиска карты */
 const PEEK: Record<string, string> = { hooligan: 'video/sprites/hooligan/turn_front.webp', kind: 'video/sprites/kind/turn_front.webp', glitter: 'video/sprites/glitter/pose_wave.webp' };
@@ -138,6 +139,8 @@ export class App {
   private micPressedAt = -1e9;
   /** детский поиск карты (feature 'intro.search', ui/cardSearch.ts) */
   cardSearch: CardSearch | null = null;
+  /** быстрый вход (feature 'intro.quick', src/quick): заставка в index.html вместо онбординга; null — онбординг как был */
+  readonly quick = quickEntry();
   private clock = new THREE.Clock();
   private elapsed = 0;
   fps = 0;
@@ -170,6 +173,9 @@ export class App {
 
   async init() {
     const p = this.params;
+    // быстрый вход: модель кота и движения — первыми, сразу со старта (раньше — после контента и озвучки);
+    // ребёнок за это время читает заставку и даёт разрешения
+    if (this.quick) this.prefetchCat('high');
     prepareHomeFlow(); // ?flow=home — без знакомства, до режиссёра (src/home)
     this.quality.onChange = (lvl, i) => this.applyQuality(lvl, i);
     document.addEventListener('visibilitychange', () => this.quality.pause());
@@ -185,6 +191,8 @@ export class App {
     }
     this.root.appendChild(this.renderer.domElement);
     this.tracker = await this.makeTracker(p.tracker);
+    // быстрый вход: нажали «Узнать, кто там» — камера сразу, пока догружаются кот и сценарий
+    this.quick?.preWake(() => this.preWakeCamera());
     this.tracker.attachRenderer?.(this.renderer);
     this.scene.add(this.tracker.anchor);
     this.scene.add(new THREE.HemisphereLight(0xffffff, 0x8899aa, 2.2));
@@ -261,15 +269,11 @@ export class App {
       },
     }, { micSupported: this.engine.asr.supported, posterUrl: posterUrl() });
     perf.mark('ui');
+    // быстрый вход: онбординг UI не показываем — экран один, заставка (src/quick/splash.ts)
+    if (this.quick) this.ui.root.querySelector('.start')?.classList.add('hidden');
     // модель выбранного характера и библиотека движений: качаются, пока ребёнок листает онбординг
     // (код 3D-персонажа — параллельно, а не после звуков и режиссёра)
-    if (p.character === 'glb' && !new URLSearchParams(location.search).get('glb')) {
-      const sp = new URLSearchParams(location.search), qc = sp.get('cat') ?? sp.get('char');
-      const own = (ASSETS.glbByPersona as Record<string, string>)[(isPersonaId(qc) ? qc : loadMemory().persona) ?? PERSONA_IDS[0]];
-      if (own) prefetchModel(variantGlb(own), 'high');
-      prefetchModel(ASSETS.glbAnims, 'high');
-      void import('./character/glbCharacter').catch(() => undefined);
-    }
+    this.prefetchCat('high');
     this.ui.setMicMode(this.engine.mode);
     if (this.desktopView) this.ui.setWakeLabel('Позвать кота'); // без камеры: кнопка не обещает камеру
     if (typeof (this.tracker as unknown as { reanchor?: unknown }).reanchor === 'function') this.tracker.onFound(() => this.ui.showReanchor(true));
@@ -351,6 +355,18 @@ export class App {
     this.resize();
     this.renderer.setAnimationLoop(() => this.frame());
     runFlow(this);
+    // быстрый вход: нажатие на заставке (раньше или сейчас) → wake
+    this.quick?.ready({ wake: () => void this.wake(), log: (s) => this.director.log(s) });
+  }
+
+  /** модель кота (по памяти/адресу) и библиотека движений — в загрузку заранее; повторный вызов ничего не качает */
+  private prefetchCat(priority: 'high' | 'low') {
+    if (this.params.character !== 'glb' || new URLSearchParams(location.search).get('glb')) return;
+    const sp = new URLSearchParams(location.search), qc = sp.get('cat') ?? sp.get('char');
+    const own = (ASSETS.glbByPersona as Record<string, string>)[(isPersonaId(qc) ? qc : loadMemory().persona) ?? PERSONA_IDS[0]];
+    if (own) prefetchModel(variantGlb(own), priority);
+    prefetchModel(ASSETS.glbAnims, priority);
+    void import('./character/glbCharacter').catch(() => undefined);
   }
 
   /** слой эффектов: звук, точки кота, лог, характер (палитра, fxTuning, наклейки из content/src/*.meta.json) */
@@ -791,6 +807,8 @@ export class App {
           const r = this.ui.catRect();
           return r ? { l: r.cx - r.half * 0.75, r: r.cx + r.half * 0.75, t: r.top, b: r.headY + (r.bottom - r.headY) * 0.2 } : null;
         },
+        // быстрый вход: экраны «что можно делать» прежнего тура — подписями к кнопкам прямо в игре
+        caption: this.quick ? (b) => hintCaption(b) : undefined,
       });
     if (feature('sberkids.offer'))
       this.kidsOffer = new KidsOffer({
@@ -836,17 +854,22 @@ export class App {
     if (scan && em) {
       // без статичной рамки по центру («прицел» спорил с настоящей картой): плашка снизу, лапки — по самой карте
       scan.classList.add('kid', 'free');
-      em.innerHTML = `<img class="scan-peek" alt="" src="${asset(PEEK[this.director.persona.id] ?? PEEK.kind)}"><em></em>`;
+      if (this.quick) scan.classList.add('quick');
+      // быстрый вход: кота до пробуждения не показываем — в плашке только глаза из темноты
+      em.innerHTML = this.quick
+        ? '<i class="scan-eyes" aria-hidden="true"><b></b><b></b></i><em></em>'
+        : `<img class="scan-peek" alt="" src="${asset(PEEK[this.director.persona.id] ?? PEEK.kind)}"><em></em>`;
       const txt = em.querySelector('em') as HTMLElement;
+      const lines = this.quick ? QUICK_SEARCH_LINES : SEARCH_LINES;
       let i = 0;
-      txt.textContent = SEARCH_LINES[0];
+      txt.textContent = lines[0];
       window.setInterval(() => {
         if (scan.classList.contains('hidden') || scan.style.visibility === 'hidden') return;
-        i = (i + 1) % SEARCH_LINES.length;
+        i = (i + 1) % lines.length;
         txt.classList.remove('swap');
         void txt.offsetWidth;
         txt.classList.add('swap');
-        txt.textContent = SEARCH_LINES[i];
+        txt.textContent = lines[i];
       }, 4000);
       this.director.on('persona', (id) => {
         const img = em.querySelector('img');
@@ -1297,12 +1320,36 @@ export class App {
     (window as unknown as { __orbit?: OrbitView }).__orbit = view;
   }
 
+  /**
+   * Быстрый вход: камера до готовности приложения (только видео трекера; поиск, сценарий и микрофон — в wake()).
+   * Отказ — экран заставки «Без камеры кот не увидит карту»; wake() потом пробует камеру заново.
+   */
+  private earlyVideo: Promise<void> | null = null;
+  private preWakeCamera() {
+    const tv = this.tracker as unknown as { startVideo?: () => Promise<void>; withAudio?: boolean };
+    if (this.earlyVideo || typeof tv.startVideo !== 'function') return;
+    if ('withAudio' in tv) tv.withAudio = typeof navigator !== 'undefined' && !!navigator.mediaDevices?.getUserMedia; // = MicInput.supported
+    const p = tv.startVideo();
+    this.earlyVideo = p;
+    p.then(
+      () => this.quick?.search(),
+      () => {
+        this.earlyVideo = null; // wake() откроет камеру заново (поток заставки с ошибкой — она уже показала экран отказа)
+        if (this.quick) this.quick.earlyFailed = true;
+      },
+    );
+  }
+
   /** «Разбудить кота»: всё, что требует жеста в iOS, — синхронно в начале обработчика */
+  private wakeTries = 0;
   async wake() {
+    const quick = this.quick;
+    // быстрый вход, «Попробовать ещё раз» после отказа в камере: только камера заново (звук, датчики, распознавание — уже)
+    const retry = this.wakeTries++ > 0;
     track('onboarding_done', {}, true);
     // аудиосессия iOS — один раз и сразу «с микрофоном», если он будет: потом её никто не переключает
     this.audio.unlock(this.engine.mic.supported);
-    this.voice.unlock();
+    if (!retry) this.voice.unlock();
     // «слушаю всегда»: микрофон — ПОСЛЕ камеры (два getUserMedia одновременно на iOS рвут видео)
     let micAsked = false;
     const openMic = () => {
@@ -1314,35 +1361,44 @@ export class App {
     // не на «экономии трафика»
     // Не во время поиска карты: распаковка модели (воркер Vosk, WASM) на iPhone забирала процессор у трекера —
     // посадка шла медленнее. Начинаем через 1,5 с после посадки кота (или через 25 с, если карты так и нет).
-    if (!(navigator as any).connection?.saveData) {
+    if (!retry && !(navigator as any).connection?.saveData) {
       // скачивание (health-проверка + архив в HTTP-кэш) — сразу с жеста: пока ищем карту, модель уже едет по сети;
-      // распаковка в воркере (тяжёлая для процессора) — как раньше, после посадки
-      void this.engine.asr.prefetch?.();
+      // распаковка в воркере (тяжёлая для процессора) — как раньше, после посадки.
+      // Быстрый вход: и скачивание — после посадки (45 МБ на медленной сети отнимали полосу у модели кота, озвучки
+      // и пробуждения — кот на карте позже); первое «скажи» подождёт, кнопки работают сразу
+      if (!quick) void this.engine.asr.prefetch?.();
       let started = false;
       const go = () => {
         if (started) return;
         started = true;
         off();
+        if (quick) void this.engine.asr.prefetch?.();
         void this.engine.asr.preload?.();
       };
-      const off = this.tracker.onFound(() => setTimeout(go, 1500));
-      setTimeout(go, 25_000);
+      const off = this.tracker.onFound(() => setTimeout(go, quick ? 4000 : 1500));
+      setTimeout(go, quick ? 40_000 : 25_000);
     }
-    if (this.audio.maybeSilentSwitch) setTimeout(() => this.ui.toast('Не слышно кота? Проверь переключатель «Без звука» сбоку iPhone и громкость.', 5000), 2500);
+    if (!retry && this.audio.maybeSilentSwitch) setTimeout(() => this.ui.toast('Не слышно кота? Проверь переключатель «Без звука» сбоку iPhone и громкость.', 5000), 2500);
     // десктоп-просмотр: датчиков нет — не спрашиваем; микрофон — только по кнопке
     const desk = this.desktopView;
-    const sensors = desk ? Promise.resolve(false) : this.input.requestSensors();
+    const sensors = desk || retry ? Promise.resolve(this.input.motionGranted) : this.input.requestSensors();
     if (desk) {
       micAsked = true;
       this.input.motionGranted = false;
     }
-    this.ui.setStartBusy(desk ? 'Зову кота…' : 'Включаю камеру…');
+    if (quick) quick.busy(true);
+    else this.ui.setStartBusy(desk ? 'Зову кота…' : 'Включаю камеру…');
     try {
       const tv = this.tracker as unknown as { startVideo?: () => Promise<void>; withAudio?: boolean; audioStream?: MediaStream | null };
       // iOS: камера и микрофон одним запросом — второй getUserMedia за микрофоном рвёт видео
       if ('withAudio' in tv) tv.withAudio = this.engine.mic.supported;
-      if (typeof tv.startVideo === 'function') await tv.startVideo();
-      track('camera_granted', {}, true);
+      // быстрый вход: камера могла уже пойти до готовности приложения (preWakeCamera)
+      const early = this.earlyVideo;
+      this.earlyVideo = null;
+      if (early) await early;
+      else if (typeof tv.startVideo === 'function') await tv.startVideo();
+      track('camera_granted', { ms: performance.now() }, true);
+      if (tv.withAudio) track(tv.audioStream ? 'mic_granted' : 'mic_denied', { ms: performance.now() }, true);
       this.engine.mic.adopt(tv.audioStream ?? null);
       openMic();
       void sensors.then((ok) => {
@@ -1353,14 +1409,23 @@ export class App {
           setTimeout(() => this.ui.toast('Чтобы кот стоял на месте, когда карта вне кадра, разреши «Движение и ориентация»: закрой вкладку, открой снова и нажми «Разрешить»', 7000), 6000);
       });
       this.ui.hideStart();
+      quick?.hide();
       this.director.dispatch({ type: 'wake' });
       // подсказка про мышь — один раз и только без касаний (телефон, iPad)
       if (this.orbitView && !isTouchDevice()) setTimeout(() => (this.hideOrbitHint = showOrbitHint(this.root)), 1500);
+      track('card_search_start', { ms: performance.now() }, true);
       await this.tracker.start();
       openMic();
       this.resize();
     } catch (e) {
       console.error(e);
+      if (quick) {
+        // быстрый вход: понятный экран «Без камеры кот не увидит карту» + как включить + «Попробовать ещё раз»
+        // отказ в потоке заставки она уже записала сама (src/quick/splash.ts)
+        if (!(e as { early?: boolean } | null)?.early) track('camera_denied', { ms: performance.now() });
+        quick.denied(e);
+        return;
+      }
       openMic();
       this.ui.hideStart();
       this.ui.error('Камера не включилась', 'Разреши доступ к камере в настройках браузера и попробуй ещё раз.');

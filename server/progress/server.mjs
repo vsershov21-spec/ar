@@ -40,12 +40,19 @@ export const LIMITS = {
 };
 
 /** события воронки и их свойства (тот же список — src/analytics/index.ts EVENTS/PROPS); всё прочее — 400 */
-export const FUNNEL = ['open', 'onboarding_done', 'camera_granted', 'card_landed', 'awake_done', 'named', 'action', 'game_start', 'game_end', 'cat_switch', 'home_enter', 'sleep', 'wake', 'card_lost', 'sberkids_click', 'session_end', 'paint_offer', 'paint_start', 'paint_done', 'paint_erase'];
+export const FUNNEL = ['open', 'onboarding_done', 'camera_granted', 'card_landed', 'awake_done', 'named', 'action', 'game_start', 'game_end', 'cat_switch', 'home_enter', 'sleep', 'wake', 'card_lost', 'sberkids_click', 'session_end', 'paint_offer', 'paint_start', 'paint_done', 'paint_erase',
+  // быстрый вход (intro.quick): шаги воронки входа, ms — от начала навигации
+  'page_open', 'splash_shown', 'cta_tap', 'camera_denied', 'camera_retry', 'mic_granted', 'mic_denied', 'terms_open', 'card_search_start', 'card_found', 'cat_awake', 'first_action'];
 const EVENT_PROPS = {
   card_landed: { ms: 'num' }, action: { id: 'id' }, game_start: { id: 'id' }, game_end: { id: 'id' }, cat_switch: { to: 'id' },
   home_enter: { reason: 'id' }, card_lost: { count: 'num' }, sberkids_click: { kind: 'id' }, session_end: { sec: 'num' },
   paint_start: { color: 'id' },
+  camera_granted: { ms: 'num' }, page_open: { ms: 'num' }, splash_shown: { ms: 'num' }, cta_tap: { ms: 'num', early: 'num' }, camera_denied: { ms: 'num' },
+  camera_retry: { ms: 'num' }, mic_granted: { ms: 'num' }, mic_denied: { ms: 'num' }, terms_open: { ms: 'num' }, card_search_start: { ms: 'num' },
+  card_found: { ms: 'num' }, cat_awake: { ms: 'num' }, first_action: { ms: 'num', id: 'id' },
 };
+/** метка источника из QR (?src=, src/analytics readSrc): латиница и цифры до 32 символов; хранится в props.src (формат строк не меняется) */
+export const SRC_RE = /^[A-Za-z0-9]{1,32}$/;
 const PROP_ID_RE = /^[a-z0-9_:.-]{1,32}$/i;
 /** свойства события: только известные ключи, числа 0…10⁷, строки-id; остальное (имена, тексты, данные карты) — выбрасывается */
 export function cleanProps(name, props) {
@@ -197,26 +204,51 @@ export async function createProgressServer(opts = {}) {
     if (typeof b.edition !== 'string' || !EDITION_RE.test(b.edition)) throw new HttpError(400, 'edition');
     if (!FUNNEL.includes(b.name)) throw new HttpError(400, 'name');
     if (!rEvent.hit(device)) throw new HttpError(429, 'rate limit');
-    store.addEvent({ ts: now(), device, edition: b.edition, name: b.name, props: cleanProps(b.name, b.props) });
+    const props = cleanProps(b.name, b.props);
+    if (typeof b.src === 'string' && SRC_RE.test(b.src)) props.src = b.src;
+    store.addEvent({ ts: now(), device, edition: b.edition, name: b.name, props });
   }
 
-  /** воронка по дням (UTC) и редакциям: событие → { n — сколько раз, devices — сколько устройств } */
-  function stats(days) {
+  /**
+   * воронка по дням (UTC) и редакциям: событие → { n — сколько раз, devices — сколько устройств }.
+   * bySrc (добавлено, rows не менялись) — то же в разрезе метки источника из QR (props.src; без метки — src: null);
+   * ?src=<метка> — rows и bySrc только по этой метке (src=none — события без метки).
+   */
+  function stats(days, onlySrc = null) {
     const since = now() - days * DAY;
-    const by = new Map();
-    for (const e of store.eventRows(since)) {
-      const day = new Date(e.ts).toISOString().slice(0, 10);
-      const key = `${day}|${e.edition}`;
-      let r = by.get(key);
-      if (!r) by.set(key, (r = { day, edition: e.edition, events: {} }));
+    const by = new Map(), bySrc = new Map(), srcs = new Map();
+    const add = (map, key, base, e) => {
+      let r = map.get(key);
+      if (!r) map.set(key, (r = { ...base, events: {} }));
       const c = (r.events[e.name] ??= { n: 0, devices: new Set() });
       c.n++;
       c.devices.add(e.device);
+    };
+    for (const e of store.eventRows(since)) {
+      let props = e.props;
+      if (typeof props === 'string') {
+        try {
+          props = JSON.parse(props);
+        } catch {
+          props = {};
+        }
+      }
+      const src = props && typeof props.src === 'string' && SRC_RE.test(props.src) ? props.src : null;
+      if (onlySrc && (onlySrc === 'none' ? src !== null : src !== onlySrc)) continue;
+      const day = new Date(e.ts).toISOString().slice(0, 10);
+      add(by, `${day}|${e.edition}`, { day, edition: e.edition }, e);
+      add(bySrc, `${day}|${e.edition}|${src ?? ''}`, { day, edition: e.edition, src }, e);
+      if (src) srcs.set(src, (srcs.get(src) ?? new Set()).add(e.device));
     }
-    const rows = [...by.values()]
-      .sort((a, b) => (a.day === b.day ? a.edition.localeCompare(b.edition) : b.day.localeCompare(a.day)))
-      .map((r) => ({ day: r.day, edition: r.edition, events: Object.fromEntries(Object.entries(r.events).map(([k, v]) => [k, { n: v.n, devices: v.devices.size }])) }));
-    return { since, days, funnel: FUNNEL, rows };
+    const order = (a, b) => (a.day === b.day ? a.edition.localeCompare(b.edition) || String(a.src ?? '').localeCompare(String(b.src ?? '')) : b.day.localeCompare(a.day));
+    const out = (r) => ({ ...r, events: Object.fromEntries(Object.entries(r.events).map(([k, v]) => [k, { n: v.n, devices: v.devices.size }])) });
+    const rows = [...by.values()].sort(order).map(out);
+    return {
+      since, days, funnel: FUNNEL, rows,
+      bySrc: [...bySrc.values()].sort(order).map(out),
+      srcs: [...srcs].map(([src, d]) => ({ src, devices: d.size })).sort((a, b) => b.devices - a.devices),
+      ...(onlySrc ? { src: onlySrc } : {}),
+    };
   }
 
   /** токен администратора: Authorization: Bearer … или ?token= (для ссылки со страницы /test/admin) */
@@ -296,7 +328,8 @@ export async function createProgressServer(opts = {}) {
       const auth = String(req.headers.authorization ?? '').replace(/^Bearer\s+/i, '') || url.searchParams.get('token') || '';
       checkAdmin(req, auth);
       const days = Math.max(1, Math.min(90, Number(url.searchParams.get('days')) || 14));
-      return [200, stats(days)];
+      const sq = url.searchParams.get('src');
+      return [200, stats(days, sq && (sq === 'none' || SRC_RE.test(sq)) ? sq : null)];
     }
 
     let mm = p.match(/^\/api\/progress\/admin\/code\/([^/]+)$/);

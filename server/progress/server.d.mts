@@ -18,6 +18,7 @@ export interface ProgressServer {
 }
 export const LIMITS: { dataBytes: number; bodyBytes: number; keys: number; sessions: number; eventsPerSession: number; eventLen: number; eventsPerMin: number; eventBytes: number };
 export const FUNNEL: string[];
+export const SRC_RE: RegExp;
 export function cleanProps(name: string, props: unknown): Record<string, string | number>;
 export class RateLimiter {
   constructor(max: number, windowMs: number, now?: () => number);

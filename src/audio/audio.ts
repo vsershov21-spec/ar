@@ -15,6 +15,7 @@
  */
 import { Howl, Howler } from 'howler';
 import { asset } from '../core/util';
+import { earlyAudioContext, shareAudioContext } from '../quick/early';
 
 export type Category = 'sfx' | 'voice' | 'ambience';
 const DUCK = Math.pow(10, -8 / 20); // −8 дБ ≈ 0.4
@@ -47,7 +48,9 @@ export class Audio {
       try {
         const q = new URLSearchParams(location.search).get('latency');
         const AC = window.AudioContext ?? (window as any).webkitAudioContext;
-        const ctx: AudioContext = new AC({ latencyHint: (q as AudioContextLatencyCategory) || 'playback' });
+        // быстрый вход (src/quick): заставка уже создала и разбудила контекст в жесте — берём его, а не второй
+        const ctx: AudioContext = earlyAudioContext() ?? new AC({ latencyHint: (q as AudioContextLatencyCategory) || 'playback' });
+        shareAudioContext(ctx);
         H.ctx = ctx;
         H.usingWebAudio = true;
         H.masterGain = ctx.createGain();

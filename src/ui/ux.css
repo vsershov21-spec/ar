@@ -113,3 +113,14 @@
   box-shadow: 0 0 0 2px #fff;
 }
 .act-wait.new .cs-ico::after { display: none; }
+
+/* быстрый вход (feature 'intro.quick', src/quick): подпись к подсказке «нажми сюда» — смысл прежних экранов тура */
+.hintp-cap { position: absolute; left: 0; top: 0; z-index: 9; pointer-events: none; max-width: 230px; padding: 8px 12px; border-radius: 14px;
+  background: rgba(16,32,24,.92); color: #fff; font: 700 15px/1.2 -apple-system, system-ui, sans-serif; box-shadow: 0 6px 18px rgba(0,0,0,.3), 0 0 0 2px #c6ff3a; }
+.scan.quick span { white-space: normal; width: max-content; max-width: min(88vw, 360px); line-height: 1.2; }
+.hintp-cap.hidden { display: none; }
+/* поиск карты без кота: в плашке только глаза из темноты (кот — лишь в катсцене пробуждения) */
+.scan .scan-eyes { position: relative; flex: none; width: 46px; height: 30px; border-radius: 999px; background: #020604; display: inline-flex; align-items: center; justify-content: center; gap: 9px; box-shadow: 0 0 0 2px rgba(33,160,56,.7); }
+.scan .scan-eyes b { width: 9px; height: 10px; border-radius: 50%; background: radial-gradient(circle at 50% 45%, #fbffd0, #c6ff3a 60%, #7bd800); box-shadow: 0 0 8px #c6ff3a; animation: scanBlink 3.8s infinite; }
+@keyframes scanBlink { 0%, 44%, 50%, 100% { transform: scaleY(1); } 47% { transform: scaleY(.1); } }
+@media (prefers-reduced-motion: reduce) { .scan .scan-eyes b { animation: none; } }

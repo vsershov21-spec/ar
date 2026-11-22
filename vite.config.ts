@@ -2,6 +2,32 @@ import { defineConfig } from 'vite';
 // модели сжимаются при сборке (meshopt + KTX2), исходники public/models не меняются — scripts/build/model-opt.mjs
 import { modelOpt } from './scripts/build/vite-model-opt.mjs';
 import { existsSync, readdirSync } from 'node:fs';
+import { featureIn, parseEdition } from './src/config/edition';
+import { quickSplash } from './src/quick/splash';
+import { PRIVACY_POLICY_URL, parseConsentMode } from './src/config/consent';
+
+/**
+ * Быстрый вход (feature 'intro.quick', src/quick/splash.ts): заставка — прямо в index.html редакции (lab, pilot; dev = lab),
+ * до бандла. Стили приложения переезжают в <body> ПОСЛЕ заставки: в <head> они блокировали бы её первый кадр
+ * (а in-body stylesheet блокирует только то, что ниже). MVP-корень — без изменений. Режим согласия — config/consent.ts
+ * (или VITE_CONSENT_MODE на сборке).
+ */
+function quickSplashPlugin() {
+  return {
+    name: 'ar-quick-splash',
+    transformIndexHtml: {
+      order: 'post' as const,
+      handler(html: string) {
+        if (!featureIn(parseEdition(process.env.VITE_EDITION), 'intro.quick')) return html;
+        if (!html.includes('<div id="app"></div>')) return html;
+        const css: string[] = [];
+        const head = html.replace(/\s*<link rel="stylesheet"[^>]*>/g, (m) => (css.push(m.trim()), ''));
+        const splash = quickSplash({ consent: parseConsentMode(process.env.VITE_CONSENT_MODE), policyUrl: PRIVACY_POLICY_URL });
+        return head.replace('<div id="app"></div>', `${splash}\n    ${css.join('\n    ')}\n    <div id="app"></div>`);
+      },
+    },
+  };
+}
 
 // страницы сборки: index.html + все test/**/index.html (/test, /test/admin — сброс прогресса, server/progress)
 function pages(dir = 'test', out: Record<string, string> = { main: 'index.html' }) {
@@ -29,7 +55,7 @@ const LAB_DIR = !!SUB;
 export default defineConfig({
   base: LAB_DIR ? (process.env.SUB_BASE ?? process.env.LAB_BASE ?? `/${SUB}/`) : (process.env.BASE_PATH ?? './'),
   publicDir: LAB_DIR ? false : 'public',
-  plugins: [modelOpt({ emit: !LAB_DIR })],
+  plugins: [modelOpt({ emit: !LAB_DIR }), quickSplashPlugin()],
   build: {
     target: 'es2020',
     chunkSizeWarningLimit: 6000,

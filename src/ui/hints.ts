@@ -121,9 +121,11 @@ export interface FaceBox { l: number; r: number; t: number; b: number }
 export class HintPointer {
   readonly el: HTMLDivElement;
   private hand: HTMLElement;
+  /** подпись «что делает кнопка» (быстрый вход: смысл прежних экранов тура — в игре) */
+  private cap: HTMLElement;
   private target: HTMLElement | null = null;
   private raf = 0;
-  constructor(private root: HTMLElement, private face: () => FaceBox | null) {
+  constructor(private root: HTMLElement, private face: () => FaceBox | null, private caption: (b: HTMLElement) => string | null = () => null) {
     const el = document.createElement('div');
     el.className = 'hintp hidden';
     el.setAttribute('aria-hidden', 'true');
@@ -131,6 +133,11 @@ export class HintPointer {
     root.appendChild(el);
     this.el = el;
     this.hand = el.querySelector('.hintp-hand') as HTMLElement;
+    // подпись — отдельным слоем (не внутри .hintp: та сдвинута в центр кнопки)
+    this.cap = document.createElement('div');
+    this.cap.className = 'hintp-cap hidden';
+    this.cap.setAttribute('aria-hidden', 'true');
+    root.appendChild(this.cap);
   }
   get on() {
     return !!this.target;
@@ -139,6 +146,9 @@ export class HintPointer {
     this.target = b;
     b.classList.add('hint-on');
     this.el.classList.remove('hidden');
+    const t = this.caption(b);
+    this.cap.textContent = t ?? '';
+    this.cap.classList.toggle('hidden', !t);
     this.place();
     cancelAnimationFrame(this.raf);
     const loop = () => {
@@ -153,6 +163,7 @@ export class HintPointer {
     this.target = null;
     cancelAnimationFrame(this.raf);
     this.el.classList.add('hidden');
+    this.cap.classList.add('hidden');
   }
   private place() {
     const b = this.target;
@@ -175,6 +186,14 @@ export class HintPointer {
     const hx = cx + dx + (left ? 0 : -48), hy = cy + dy;
     if (f && hx < f.r && hx + 48 > f.l && hy < f.b && hy + 48 > f.t) dy += f.b - hy + 4;
     this.hand.style.transform = `translate(${dx}px, ${dy}px) scaleX(${left ? 1 : -1})`;
+    if (!this.cap.classList.contains('hidden')) {
+      // подпись: над кнопкой (нижняя половина экрана) или под ней; внутри экрана по горизонтали
+      const H = this.root.clientHeight, cw = this.cap.offsetWidth, ch = this.cap.offsetHeight;
+      const x = Math.max(8, Math.min(W - cw - 8, cx - cw / 2));
+      // у нижнего дока над кнопкой — ряд чипов кота: подпись выше него
+      const y = cy > H - 170 ? cy - d / 2 - ch - 74 : cy > H / 2 ? cy - d / 2 - ch - 10 : cy + d / 2 + 52;
+      this.cap.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`;
+    }
   }
 }
 
@@ -196,6 +215,8 @@ export interface HintsHost {
   busy(): boolean;
   home(): boolean;
   face(): FaceBox | null;
+  /** подпись к кнопке подсказки (null — без подписи) */
+  caption?(b: HTMLElement): string | null;
   log?(s: string): void;
 }
 
@@ -223,7 +244,7 @@ export class HintsController {
   private current: HintId | null = null;
   constructor(private h: HintsHost, store?: Pick<Storage, 'getItem' | 'setItem'> | null) {
     this.marks = new SessionMarks('sber-ar-cat:hints', store === undefined ? undefined : store);
-    this.pointer = new HintPointer(h.root, () => h.face());
+    this.pointer = new HintPointer(h.root, () => h.face(), (b) => h.caption?.(b) ?? null);
     // любое касание: подсказка уходит, отсчёт бездействия заново
     document.addEventListener('pointerdown', () => this.onTouch(), true);
     this.timer = window.setInterval(() => this.tick(), 500);

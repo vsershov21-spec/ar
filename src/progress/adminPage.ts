@@ -43,7 +43,8 @@ async function stats() {
   box.textContent = '…';
   try {
     const days = Number($<HTMLInputElement>('days').value) || 14;
-    const r = await fetch(`/api/progress/stats?days=${days}`, { headers: { Authorization: 'Bearer ' + token.value.trim() }, cache: 'no-store' });
+    const src = $<HTMLInputElement>('src').value.trim();
+    const r = await fetch(`/api/progress/stats?days=${days}${/^([A-Za-z0-9]{1,32}|none)$/.test(src) ? `&src=${src}` : ''}`, { headers: { Authorization: 'Bearer ' + token.value.trim() }, cache: 'no-store' });
     const j = await r.json().catch(() => ({}));
     if (!r.ok) {
       box.textContent = r.status === 401 ? 'Неверный токен.' : r.status === 503 ? 'На сервере не задан PROGRESS_ADMIN_TOKEN.' : `Ошибка ${r.status}: ${j.error ?? ''} (сервис прогресса обновлён? scripts/deploy/pilot-setup.sh)`;
@@ -59,7 +60,10 @@ async function stats() {
     const body = names
       .map((n) => `<tr><td>${esc(n)}</td>${rows.map((x) => (x.events[n] ? `<td>${x.events[n].n} / ${x.events[n].devices}</td>` : '<td>—</td>')).join('')}</tr>`)
       .join('');
-    box.innerHTML = `<table>${head}${body}</table>`;
+    // разрез по точкам раздачи QR (?src=, docs/ANALYTICS.md): сколько устройств пришло с каждой
+    const srcs = (j.srcs ?? []) as { src: string; devices: number }[];
+    const by = srcs.length ? `<p>Точки (src): ${srcs.map((x) => `${esc(x.src)} — ${x.devices} устр.`).join(', ')}</p>` : '';
+    box.innerHTML = `${by}<table>${head}${body}</table>`;
   } catch (e) {
     box.textContent = 'Сервер прогресса недоступен: ' + String(e);
   }
