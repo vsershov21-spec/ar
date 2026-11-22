@@ -87,7 +87,7 @@ export const IDLE_PLAN: readonly { at: number; step: IdleStep }[] = [
 /** что кот предлагает сам — по кругу (узлы диалога offer в content/dialogs.json) */
 const ALL_OFFERS = ['riddle', 'rps', 'echo', 'emo', 'dance', 'simon'] as const;
 /** редакция без новых мини-игр (src/config/edition.ts, games.new) — кот их не предлагает */
-export const OFFERS: readonly (typeof ALL_OFFERS)[number][] = feature('games.new') ? ALL_OFFERS : ALL_OFFERS.filter((o) => !(NEW_GAMES as readonly string[]).includes(o));
+export const OFFERS: readonly (typeof ALL_OFFERS)[number][] = (feature('games.new') ? ALL_OFFERS : ALL_OFFERS.filter((o) => !(NEW_GAMES as readonly string[]).includes(o))).filter((o) => o !== 'echo' || feature('games.echo'));
 
 export class IdleLadder {
   private since: number;

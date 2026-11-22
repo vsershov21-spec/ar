@@ -30,11 +30,11 @@ describe('пилот: каталог на кота — ровно 8 общих +
     const p = content.personas.get(pid)!;
     const secs = buildCatalog(p, env, PILOT);
     const acts = ids(secs);
-    const want = [...PILOT_COMMON, ...PILOT_SIGNATURE[pid], 'riddle', 'echo', 'other'];
+    const want = [...PILOT_COMMON, ...PILOT_SIGNATURE[pid], 'riddle', 'other'];
     expect(new Set(acts)).toEqual(new Set(want));
-    expect(acts).toHaveLength(13);
+    expect(acts).toHaveLength(12);
     // действий кота — ровно 10
-    expect(acts.filter((a) => !['riddle', 'echo', 'other'].includes(a))).toHaveLength(10);
+    expect(acts.filter((a) => !['riddle', 'other'].includes(a))).toHaveLength(10);
     // ни «Эмоций», ни «Скажи мне», ни наклеек
     expect(secs.map((s) => s.id)).not.toContain('emotions');
     expect(secs.map((s) => s.id)).not.toContain('say');
@@ -106,7 +106,7 @@ describe('пилот: голосовые команды вырезанных д�
       for (const c of r!.chips) expect(pilotItemAllowed(pid, c), c).toBe(true);
     }
     // в наборе и разговор — как обычно
-    for (const it of ['flip', 'dance', 'riddle', 'echo_start', 'change_persona', 'hello', 'joke', 'compliment', 'sad', 'name_ask', 'yes', 'no', 'unknown']) expect(cutAction(pid, it), it).toBeNull();
+    for (const it of ['flip', 'dance', 'riddle', 'change_persona', 'hello', 'joke', 'compliment', 'sad', 'name_ask', 'yes', 'no', 'unknown']) expect(cutAction(pid, it), it).toBeNull();
   });
   it('«надуй пузырь» (gum): у Добряка и Блёстки — их фирменное, у Хулигана (жвачка) — вне набора', () => {
     expect(cutAction('kind', 'gum')).toBeNull();

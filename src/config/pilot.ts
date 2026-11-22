@@ -28,7 +28,7 @@ export const PILOT_SIGNATURE: Record<PersonaId, readonly ActionId[]> = {
 };
 
 /** игры пилота + «Другой кот» */
-export const PILOT_GAMES: readonly ActionId[] = ['riddle', 'echo', 'other'];
+export const PILOT_GAMES: readonly ActionId[] = ['riddle', 'other'];
 
 /** все действия кота в пилоте: 8 общих + 2 фирменных (без игр и «Другого кота») */
 export const pilotActions = (p: PersonaId): ActionId[] => [...PILOT_COMMON, ...PILOT_SIGNATURE[p]];

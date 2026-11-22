@@ -121,11 +121,11 @@ describe('tomModel: каждое действие пилота — не боль
         expect(model.left.map((i) => i.id)).toEqual(['pet', 'scratch', 'tickle', 'hug', 'paw', 'treat']);
         expect(model.right.slice(0, 2).map((i) => i.id)).toEqual(['dance', 'flip']);
         expect(model.right.map((i) => i.id)).toEqual(expect.arrayContaining([...PILOT_SIGNATURE[pid], 'ui:paint', 'other']));
-        expect(model.games.map((i) => i.id)).toEqual(['riddle', 'echo']);
+        expect(model.games.map((i) => i.id)).toEqual(['riddle']);
         expect(model.home?.id).toBe(home ? 'home:back' : 'home:go');
         for (const s of SCREENS) {
           const plan = tomLayout({ w: s.w, h: s.h, safe: s.safe, left: model.left.length, right: model.right.length, room: !!home }, cats(s.w, s.h)[0].cat);
-          const want = [...PILOT_COMMON, ...PILOT_SIGNATURE[pid], 'riddle', 'echo', 'other', 'ui:paint', home ? 'home:back' : 'home:go', 'ui:micmode', ...(home ? [] : ['ui:reanchor']), ...model.room.map((i) => i.id)];
+          const want = [...PILOT_COMMON, ...PILOT_SIGNATURE[pid], 'riddle', 'other', 'ui:paint', home ? 'home:back' : 'home:go', 'ui:micmode', ...(home ? [] : ['ui:reanchor']), ...model.room.map((i) => i.id)];
           for (const id of want) expect(tapsTo(model, plan, id), `${id} (${s.w}×${s.h})`).toBeLessThanOrEqual(2);
           // и вообще всё из каталога (кроме комнат — они стрелками): ничего не потерялось
           for (const it of groups.flatMap((g) => g.items)) if (!it.id.startsWith('zone:') && !(home && it.id === 'ui:reanchor')) expect(tapsTo(model, plan, it.id), it.id).toBeLessThanOrEqual(2);

@@ -6,6 +6,7 @@
  * app.ts говорит её озвученной репликой кота (событие help) или показывает пальцем на чип.
  * Чистая логика без DOM: снимок состояния → { chips, hint }. Рисует ui.ts, снимок собирает app.ts.
  */
+import { feature } from '../config/edition';
 import type { ActionId } from './actions';
 
 export type ChipRun = { action: ActionId } | { say: string };
@@ -73,7 +74,7 @@ export const FIRST_VISITS = 2;
 export const FIRST_VISIT_PLAY_MS = 180_000;
 
 /** мини-игры: их кот предлагает первыми (новых игр может не быть у характера/в сборке — фильтр по каталогу) */
-const GAMES: string[] = ['riddle', 'dance', 'echo', 'rps', 'emo', 'simon'];
+const GAMES: string[] = ['riddle', 'dance', 'echo', 'rps', 'emo', 'simon'].filter((g) => g !== 'echo' || feature('games.echo'));
 /** что ещё кот может предложить (по порядку — от самого «вау» к редкому) */
 const POOL: string[] = ['treat', 'tickle', 'flip', 'trick', 'sing', 'bubbles', 'sticker', 'jump', 'draw', 'laugh', 'hug', 'wave', 'scratch', 'paw', 'knock', 'glass', 'surprise', 'dizzy', 'other'];
 /** подписи от лица кота (где подпись каталога звучит не как предложение) */

@@ -3,6 +3,7 @@
  * и исполняет команды: реплики, звуки, эффекты, клипы, интерфейс, таймеры, окна ответа микрофона.
  * Кто сейчас кот — знает только PersonaContext: реплики, голос, idle, трюк, наклейки берутся оттуда.
  */
+import { feature } from './config/edition';
 import * as THREE from 'three';
 import { Emitter } from './core/emitter';
 import { initialState, makeScenarioConfig, step, type Action, type Heard, type ScenarioConfig, type ScenarioEvent, type ScenarioState, type InteractionKind } from './scenario/machine';
@@ -1626,6 +1627,7 @@ export class Director extends Emitter<DirectorEvents> {
    * только микрофон (повтор без распознавания). Остальное — кнопками.
    */
   voiceOk(what: string): boolean {
+    if (what === 'echo' && !feature('games.echo')) return false;
     const v = this.d.voiceIn?.();
     if (!v) return true;
     if (what === 'echo') return v.mic;

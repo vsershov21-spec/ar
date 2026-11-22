@@ -44,6 +44,7 @@ export const FEATURES = {
   meet: { mvp: true, lab: true, pilot: true, note: 'знакомство: имя, первая встреча (dialogs intro)' },
   'play.free': { mvp: true, lab: true, pilot: true, note: 'свободная игра и каталог «Что умеет кот» (actionCatalog)' },
   'games.base': { mvp: true, lab: true, pilot: true, note: 'загадка и повторялка (dialogs riddle, echo)' },
+  'games.echo': { mvp: true, lab: true, pilot: false, note: 'повторялка (echo): в пилоте выключена — кот говорит записанным голосом ElevenLabs, повтор голоса ребёнка с ним не вяжется (решение продакта 22.11)' },
   'silence.doze': { mvp: true, lab: true, pilot: true, note: 'лестница тишины и дрёма (director)' },
   'cat.switch': { mvp: true, lab: true, pilot: true, note: 'смена кота: «Другой кот», встряска' },
   // ── новое, уже в MVP (точка проверки есть) ──
