@@ -217,6 +217,8 @@ const SLEW_RATE = 12;
 /** кости живого покоя (applyAlive): корпус, голова, лапы, ноги */
 const ALIVE_SLEW = ['Hips', 'Spine1', 'Spine2', 'Head', 'LeftArm', 'RightArm', 'LeftForeArm', 'RightForeArm', 'LeftHand', 'RightHand', 'LeftUpLeg', 'RightUpLeg', 'LeftLeg', 'RightLeg'] as const;
 /** кости слоя скейта (applySkate): стопы на деке, лапы для баланса, лапа с доской, корпус */
+/** лапа с инструментом в раскраске (toolIK) вместе с коррекцией тела */
+const TOOL_SLEW = ['RightArm', 'RightForeArm', 'RightHand'] as const;
 const SKATE_SLEW = ['Spine1', 'LeftArm', 'RightArm', 'RightForeArm', 'RightHand', 'LeftUpLeg', 'RightUpLeg', 'LeftLeg', 'RightLeg', 'LeftFoot', 'RightFoot'] as const;
 const IDQ = new THREE.Quaternion();
 
@@ -1313,7 +1315,13 @@ export class GlbCharacter implements Character {
     // лапу с инструментом коллайдер тоже выводит из торса, капюшона, юбки (раньше — 9–17 мм в 55–61 % кадров, аудит
     // 21.11); сопло всё равно смотрит в точку (PropRig.aim — после позы)
     const ik = this.toolIK;
-    if (ik.mode !== 'off' || ik.weight > 0.002 || ik.crouch > 0.002) ik.apply(dt, { bones: this.bones, object: this.object, inner: this.inner, axes: this.modelAxes(), rot: (b, a, ang) => this.rotWorld(b, a, ang) });
+    const ikOn = ik.mode !== 'off' || ik.weight > 0.002 || ik.crouch > 0.002;
+    // лапа с баллончиком у Хулигана — с пределом скорости слоя: в приседе IK прыгал у дуги наушников (рывок RightArm
+    // 40–90 рад/с, аудит 22.11). У Добряка и Блёстки рывка нет, а с пределом кисть Блёстки отстаёт в юбке при ходьбе
+    // — у них без предела, как было
+    this.slewBegin(TOOL_SLEW);
+    if (ikOn) ik.apply(dt, { bones: this.bones, object: this.object, inner: this.inner, axes: this.modelAxes(), rot: (b, a, ang) => this.rotWorld(b, a, ang) });
+    this.slewEnd('tool', TOOL_SLEW, dt, ikOn && ik.weight > 0.002 && this.personaId === 'hooligan');
     this.collider?.setClip(cs.cur.id, this.actions.get(cs.cur.id)?.getClip().name);
     this.collider?.apply(dt);
     // предмет в лапе / скейт — поверх клипа и коррекции тела; затем — пол (ничто не ниже опоры)
