@@ -217,6 +217,8 @@ export interface HintsHost {
   face(): FaceBox | null;
   /** подпись к кнопке подсказки (null — без подписи) */
   caption?(b: HTMLElement): string | null;
+  /** кнопку сейчас не показывать (микрофон, когда голос недоступен: «Скажи коту что-нибудь» без микрофона — E2E 22.11) */
+  skip?(b: HTMLElement): boolean;
   log?(s: string): void;
 }
 
@@ -305,7 +307,7 @@ export class HintsController {
   private targets(id: HintId): HTMLElement[] {
     const out: HTMLElement[] = [];
     for (const sel of TARGETS[id] ?? []) {
-      const b = [...this.h.root.querySelectorAll<HTMLElement>(sel)].find((x) => visible(x));
+      const b = [...this.h.root.querySelectorAll<HTMLElement>(sel)].find((x) => visible(x) && !this.h.skip?.(x));
       if (b && !out.includes(b)) out.push(b);
       if (out.length >= (id === 'tour' ? 3 : 1)) break;
     }

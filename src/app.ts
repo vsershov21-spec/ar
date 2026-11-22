@@ -816,6 +816,8 @@ export class App {
         },
         // быстрый вход: экраны «что можно делать» прежнего тура — подписями к кнопкам прямо в игре
         caption: this.quick ? (b) => hintCaption(b) : undefined,
+        // микрофон запрещён или распознавание недоступно — палец на микрофон не зовём
+        skip: (b) => b.matches('.mic') && !(this.engine.voiceIn().mic && this.engine.voiceIn().asr),
       });
     if (feature('sberkids.offer'))
       this.kidsOffer = new KidsOffer({
@@ -1445,6 +1447,9 @@ export class App {
       track('camera_granted', { ms: performance.now() }, true);
       if (tv.withAudio) track(tv.audioStream ? 'mic_granted' : 'mic_denied', { ms: performance.now() }, true);
       this.engine.mic.adopt(tv.audioStream ?? null);
+      // микрофон запретили в общем запросе с камерой — сказать сразу (тост) и не звать говорить
+      const micErr = (this.tracker as unknown as { micError?: string | null }).micError;
+      if (tv.withAudio && !tv.audioStream && micErr) this.engine.mic.markDenied(micErr);
       openMic();
       void sensors.then((ok) => {
         this.director.log(`датчики: ${desk ? 'десктоп-просмотр' : ok ? 'да' : 'нет'}`);

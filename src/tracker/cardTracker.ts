@@ -146,6 +146,12 @@ export class CardTracker extends TrackerBase implements Tracker {
    */
   withAudio = false;
   audioStream: MediaStream | null = null;
+  /**
+   * Камера открылась, а микрофон — нет (имя ошибки getUserMedia: NotAllowedError…): App.wake сообщает об этом
+   * микрофону (MicInput.markDenied) — без этого запрет, полученный в общем запросе, забывался: тоста «нет доступа к
+   * микрофону» не было, и кот звал «Скажи…» (E2E 22.11, scripts/qa/e2e).
+   */
+  micError: string | null = null;
 
   /** Камера: вызывать прямо из обработчика жеста (iOS требует user gesture для getUserMedia/play). */
   async startVideo(): Promise<void> {
@@ -188,6 +194,7 @@ export class CardTracker extends TrackerBase implements Tracker {
         if (withAudio) this.audioStream = at.length ? new MediaStream(at) : null;
         else at.forEach((t) => t.stop());
         if (r.mic) this.debug('заставка: камера+микрофон вместе не вышло (' + r.mic + ') — камера отдельно');
+        if (withAudio && r.mic && !at.length) this.micError = r.mic;
         stream = new MediaStream(r.stream.getVideoTracks());
       }
     }
@@ -201,6 +208,7 @@ export class CardTracker extends TrackerBase implements Tracker {
         stream = new MediaStream(stream.getVideoTracks());
       } catch (e) {
         this.debug('камера+микрофон одним запросом не вышло (' + (e as Error)?.name + ') — камера отдельно');
+        this.micError = (e as Error)?.name ?? 'Error';
         stream = null;
       }
     }

@@ -118,6 +118,8 @@ export const VOICE_WARM_WAIT_MS = 300;
 const DANCE_MAX_MS = 8000;
 /** реплика зовёт ребёнка говорить — без микрофона не звучит (speakEvent); события тишины и подсказок */
 const SAY_INVITE = /(^|[\s«"(])(скажи|скажешь|говори|повторяй за мной|спроси)(?=[\s,.!?»"]|$)/i;
+/** зовёт в повторялку (в пилоте её нет, feature games.echo) */
+const ECHO_INVITE = /повторя(й|лк|ть)|повторю/i;
 const INVITE_EVENTS = new Set(['silence', 'bored', 'filler', 'help']);
 
 /** панель действий и каталог «Что умеет кот»: кнопка → событие режиссёра (таблица — scenario/actions.ts) */
@@ -1080,7 +1082,7 @@ export class Director extends Emitter<DirectorEvents> {
       if (def) this.playVisual({ clip: def.clip, sound: def.sound, tap, ev: event });
       return;
     }
-    const o = { name: this.state.name, prefer: this.prefer, strict: this.strictVoice };
+    const o = { name: this.state.name, prefer: this.prefer, strict: this.strictVoice, avoid: this.avoidInvite() };
     let pk = this.personas.line(event, { ...o, force: event === 'sleep' || event === 'wake_up' });
     // не понял: «переспроси» и «я пока умею…» подменяют друг друга, если одно ещё остывает, — ребёнок всегда слышит ответ
     // «что ты умеешь» — отвечаем всегда (без cooldown; варианты всё равно не повторяются подряд)
@@ -1105,7 +1107,7 @@ export class Director extends Emitter<DirectorEvents> {
   speakEvent(event: string, o: { force?: boolean; visuals?: boolean; node?: string; scenario?: boolean; background?: boolean } = {}): boolean {
     this.emotion(event);
     const r = this.currentRiddle();
-    const pk = this.personas.line(event, { name: this.state.name, vars: r ? { answer: r.answer } : {}, force: o.force, prefer: this.prefer, strict: this.strictVoice });
+    const pk = this.personas.line(event, { name: this.state.name, vars: r ? { answer: r.answer } : {}, force: o.force, prefer: this.prefer, strict: this.strictVoice, avoid: this.avoidInvite() });
     if (!pk) {
       this.log(`реплика «${event}» не выбрана (${this.picker.coolingDown(event) ? 'cooldown' : 'нет озвученных'})`);
       return false;
@@ -1146,6 +1148,19 @@ export class Director extends Emitter<DirectorEvents> {
     const ls = this.picker.candidates(p, event, this.state.name);
     if (!this.strictVoice) return ls.length > 0;
     return ls.some((l) => this.prefer(l, l.text.replace('{name}', this.picker.nameAllowed(this.state.name) ?? '')));
+  }
+
+  /**
+   * Варианты реплики, которых избегаем (E2E 22.11): голоса нет (микрофон запрещён или распознавание недоступно) — те, что
+   * зовут говорить («Скажи „да“»); повторялки нет в редакции (games.echo) — те, что зовут в неё («Скажи „повторяй за мной“»).
+   * Мягко: picker убирает их, только если у события есть другие варианты.
+   */
+  private avoidInvite(): ((l: ContentLine, text: string) => boolean) | undefined {
+    const v = this.d.voiceIn?.();
+    const noVoice = !!v && !(v.mic && v.asr);
+    const noEcho = !feature('games.echo');
+    if (!noVoice && !noEcho) return undefined;
+    return (_l, text) => (noVoice && SAY_INVITE.test(text)) || (noEcho && ECHO_INVITE.test(text));
   }
 
   /** вариант реплики прозвучит записью (а не синтезом) — такие picker выбирает в первую очередь */

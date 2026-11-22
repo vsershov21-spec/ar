@@ -124,6 +124,21 @@ export class MicInput {
   onDenied: ((why: string) => void) | null = null;
   private deniedFired = false;
 
+  /**
+   * Запрет уже известен: камера и микрофон спрашивались одним запросом (заставка быстрого входа, cardTracker), и
+   * микрофон не дали — не спрашиваем снова и сообщаем один раз (тост «Нет доступа к микрофону», voiceIn().mic = false).
+   * Другие ошибки (камера+микрофон не вышли вместе по иной причине) — не запрет: микрофон попробует открыться сам.
+   */
+  markDenied(name: string) {
+    if (this.node || this.denied) return;
+    if (name !== 'NotAllowedError' && name !== 'SecurityError' && name !== 'NotFoundError') return;
+    this.error = name === 'NotFoundError' ? 'no-device' : 'not-allowed';
+    if (!this.deniedFired) {
+      this.deniedFired = true;
+      this.onDenied?.(this.error);
+    }
+  }
+
   private open(): Promise<boolean> {
     if (this.node) return Promise.resolve(true);
     if (this.denied) return Promise.resolve(false);

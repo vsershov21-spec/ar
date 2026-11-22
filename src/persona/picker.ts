@@ -39,6 +39,11 @@ export interface PickOptions {
   prefer?: (line: ContentLine, text: string) => boolean;
   /** только озвученные: если ни один вариант не озвучен — реплики нет (кот промолчит), а не текст/робот-голос */
   strict?: boolean;
+  /**
+   * Варианты, которых лучше избегать (без микрофона — «Скажи „да“»): убираются, только если остаётся хоть один другой
+   * (реплика события не пропадает, director.enqueue сам решает про реплики, которые все зовут говорить).
+   */
+  avoid?: (line: ContentLine, text: string) => boolean;
 }
 
 const DEFAULT_EVENT: Omit<EventDef, 'id'> = { group: 'dialog', priority: 1, cooldownMs: 0, interruptible: true, trigger: '' };
@@ -83,6 +88,10 @@ export class LinePicker {
       const voiced = cands.filter((l) => o.prefer!(l, fill(l.text, { ...(okName0 ? { name: okName0 } : {}), ...(o.vars ?? {}) }).replace(/\s+/g, ' ').trim()));
       if (voiced.length) cands = voiced;
       else if (o.strict) return null;
+    }
+    if (o.avoid) {
+      const ok = cands.filter((l) => !o.avoid!(l, l.text));
+      if (ok.length) cands = ok;
     }
     const key = `${p.id}:${event}`;
     const hist = this.history.get(key) ?? [];
