@@ -212,6 +212,8 @@ export async function makeDirector(o: HarnessOpts = {}) {
       d.dispatch({ type: 'card_found' });
       await until(() => d.state.phase !== 'appear', 5000);
     },
+    /** заглушка трекера (cardInView и т. п. можно подменить в тесте) */
+    tracker: tracker as unknown as Record<string, unknown>,
     lost: () => tracker.lost.forEach((f) => f()),
     found: () => tracker.found.forEach((f) => f()),
     events: (from = 0) => spoken.filter((s) => s.t >= from).map((s) => s.event),

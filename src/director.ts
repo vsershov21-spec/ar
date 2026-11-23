@@ -96,6 +96,8 @@ const COVER_FX = new Set(['snow_globe', 'steam', 'steam_draw', 'steam_heart', 'k
 const COVER_GAP_MS = 10_000;
 const USER_ACT_MS = 2500;
 const CARD_LOST_SAY_MS = 1500;
+/** карта в кадре и проверяется — «где карта?» не раньше этого (мс после пропажи) */
+const CARD_LOST_WAIT_MS = 8000;
 /**
  * Хаотичные тапы (docs/qa/CHAOS.md, docs/qa/BUGS.md № 19–20): тап пальцем по коту / мимо, пока кот ещё произносит
  * реплику на прошлый тап (< TAP_LINE_HOLD_MS), — без новой реплики (эмоция и звук — да): иначе 10–15 тапов в секунду
@@ -842,11 +844,19 @@ export class Director extends Emitter<DirectorEvents> {
         if (a.event === 'card_lost') {
           // карта мигнула (рука, блик) — кот молчит; пропала надолго — спрашивает, где она
           clearTimeout(this.cardLostTimer);
-          this.cardLostTimer = window.setTimeout(() => {
+          const since = performance.now();
+          const say = () => {
             if (this.state.cardVisible) return;
+            // карта в кадре и проверяется (после «Мой дом» → «На карту», «Пересадить»): «Ой, карта пропала!» при карте
+            // в руке — не по сценарию (запись 23.11, 13:59:15). Ждём, пока проверка не кончится, но не дольше CARD_LOST_WAIT_MS
+            if (d.tracker.cardInView?.() && performance.now() - since < CARD_LOST_WAIT_MS) {
+              this.cardLostTimer = window.setTimeout(say, 500);
+              return;
+            }
             this.cardLostSaid = true;
             this.react('card_lost');
-          }, CARD_LOST_SAY_MS);
+          };
+          this.cardLostTimer = window.setTimeout(say, CARD_LOST_SAY_MS);
           break;
         }
         if (a.event === 'card_found') {

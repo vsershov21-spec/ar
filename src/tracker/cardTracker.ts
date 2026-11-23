@@ -649,6 +649,12 @@ export class CardTracker extends TrackerBase implements Tracker {
     void now;
   }
 
+  /** карта в кадре и проверяется (кандидат) или её видели только что — см. Tracker.cardInView */
+  cardInView(): boolean {
+    const f = this.session.fsm;
+    return f.state === 'candidate' || performance.now() - f.seenAt < CARD_SEEN_MS;
+  }
+
   get isLocked() {
     return this.session.fsm.anchored;
   }
@@ -722,8 +728,7 @@ export class CardTracker extends TrackerBase implements Tracker {
       // пересадили, а карты Сбера так и нет — кот спросит, где карта. Но не когда карта в кадре и её проверяют
       // (кандидат, видели меньше 2,5 с назад): «Ой, карточка пропала» звучало через 6 с после «На карту», пока
       // проверка знака ещё шла, а карта лежала в кадре (запись 20.11, 12:37:25)
-      const f = this.session.fsm;
-      if (f.state === 'candidate' || now - f.seenAt < 2500) this.reanchorAt = now - REANCHOR_LOST_MS + 2500;
+      if (this.cardInView()) this.reanchorAt = now - REANCHOR_LOST_MS + CARD_SEEN_MS;
       else {
         this.reanchorAt = -1;
         this.emitLost();
@@ -839,6 +844,8 @@ const LAT_KEY = 'ar.camlat.v1';
 const FULL_CROP_PX = 600;
 /** после «Пересадить»/«На карту» без карты столько — кот спрашивает, где карта, мс (было 6 с) */
 const REANCHOR_LOST_MS = 8000;
+/** карту видели так недавно (мс) — она «в кадре», хоть кандидат и мигнул */
+const CARD_SEEN_MS = 2500;
 /** рост кота в ширинах карты (config.ts stage.height) и наибольшая доля высоты экрана, которую он занимает на карте */
 const CAT_HEIGHT_W = 1.1;
 const NEAR_FRAC = 0.62;

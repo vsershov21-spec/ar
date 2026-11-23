@@ -43,6 +43,11 @@ export interface Tracker {
   update(dt: number, t: number): void;
   resize(w: number, h: number): void;
   setSmoothing(minCutoff: number, beta: number): void;
+  /**
+   * Карта в кадре, но кот ещё не посажен (кандидат проверяется «это Сбер?» или его видели < 2,5 с назад) — «где карта?»
+   * в это время не говорим (CardTracker).
+   */
+  cardInView?(): boolean;
   /** для трекеров, которым нужен рендерер (WebXR) */
   attachRenderer?(renderer: THREE.WebGLRenderer): void;
 }

@@ -273,6 +273,26 @@ describe('карта и смена кота', () => {
     expect(ev(h, t)).toEqual(['card_lost', 'card_found']);
   });
 
+  it('после «Мой дом» → «На карту» карта в кадре и проверяется — «Ой, карта пропала!» не говорит (запись 23.11, 13:59:15)', async () => {
+    h = await makeDirector({ memory: { met: true, name: 'Маша', persona: 'glitter', visits: 3 } });
+    await h.boot();
+    await h.until(() => !h!.d.queue.busy);
+    let inView = true;
+    h.tracker.cardInView = () => inView;
+    const t = h.T();
+    h.lost();
+    await h.tick(5000);
+    expect(ev(h, t)).toEqual([]);
+    h.found();
+    await h.tick(3000);
+    expect(ev(h, t)).toEqual([]);
+    // карты правда нет (ушла из кадра) — спрашивает, как раньше
+    inView = false;
+    h.lost();
+    await h.tick(2500);
+    expect(ev(h, t)).toEqual(['card_lost']);
+  });
+
   it('другой кот: «переоденусь» → встряска → новый кот здоровается одной репликой', async () => {
     h = await makeDirector({ memory: { met: true, name: 'Маша', persona: 'hooligan', visits: 3 } });
     await h.boot();
