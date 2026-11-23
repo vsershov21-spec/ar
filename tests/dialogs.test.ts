@@ -1,9 +1,10 @@
 import { describe, it, expect } from 'vitest';
+import fs from 'node:fs';
 import { dialogsFile, loadTestContent } from './helpers/content';
 import { initialState, makeScenarioConfig, step as rawStep, type Action, type ScenarioEvent, type ScenarioState } from '../src/scenario/machine';
 import { validateDialogs } from '../src/scenario/dialogs';
 import { answerMatches } from '../src/scenario/intentMatch';
-import { matchIntent } from '../src/voice/intents';
+import { matchIntent, grammarPhrases } from '../src/voice/intents';
 import { contextEvent } from '../src/scenario/session';
 import { PERSONA_IDS } from '../src/persona/types';
 
@@ -289,6 +290,23 @@ describe('имя (словарь names.ru.txt)', () => {
     expect(matchIntent('Зюзя', { expectName: true })).toMatchObject({ intent: 'unknown', confirmName: 'Зюзя' });
     expect(matchIntent('меня зовут Зюзя', { expectName: true })).toMatchObject({ intent: 'name', known: false });
     expect(matchIntent('не скажу', { expectName: true }).intent).toBe('skip');
+  });
+
+  // пакет 23.11: +36 частых имён 6–13 лет (Александра и др.) — известны распознаванию, есть в грамматике Vosk и в пакете озвучки
+  const NEW_23_11 = ('Елисей Демид Тихон Адам Мирослав Филипп Назар Ростислав Ян Артур Савва Гордей Родион Яков Станислав Стас Вячеслав Слава ' +
+    'Даниэль Юрий Юра Александра Милена Мия Николь Эмма Марьям Аврора Василина Виолетта Анфиса Лия Зоя Амина Ариана Владислава').split(' ');
+  it('новые имена 23.11 — known голосом («меня зовут …» и одним словом), в грамматике и в пакете ElevenLabs у каждого кота', () => {
+    expect(NEW_23_11).toHaveLength(36);
+    const grammar = new Set(grammarPhrases());
+    const batch = new Set(fs.readFileSync('voice-src/el_batch_all.jsonl', 'utf8').split('\n').filter(Boolean).map((s) => JSON.parse(s).id as string));
+    for (const n of NEW_23_11) {
+      expect(matchIntent(`Меня зовут ${n}`, { expectName: true }), n).toMatchObject({ intent: 'name', name: n, known: true });
+      expect(matchIntent(n.toLowerCase(), { expectName: true }), n).toMatchObject({ intent: 'name', name: n, known: true });
+      expect(grammar.has(n.toLowerCase().replace(/ё/g, 'е')), n).toBe(true);
+      for (const p of PERSONA_IDS) expect(batch.has(`${p}.slot.name.${n}`), `${p}.slot.name.${n}`).toBe(true);
+    }
+    // Саша — общее уменьшительное для Александра и Александры (одна запись словаря, один файл)
+    expect(matchIntent('Меня зовут Саша', { expectName: true })).toMatchObject({ intent: 'name', name: 'Саша', known: true });
   });
 });
 
