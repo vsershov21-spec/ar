@@ -5,6 +5,10 @@
  * Высота считается по позиции вершины в позе привязки (координаты меша, ориентиры — extras.marks узла Brows от
  * scripts/models/face_detail.py), нормаль возмущается через производные экрана (как bumpMap), сила не зависит от
  * разрешения. При нулевых весах ветка пропускается целиком.
+ *
+ * Риг лица p2 (морфы, меш FaceSkin с ключом brow_angry): брови, лоб и нос двигает геометрия — полоски на лбу (brow_up),
+ * рябь на переносице (nose_wrinkle) и складки между бровей (brow_down) шейдером не рисуются: на крупной сетке морды
+ * рельеф через производные экрана выходил полосами-«ступеньками» (продакт 23.11: surprise, brow_angry у Хулигана).
  */
 import * as THREE from 'three';
 import { modelsV2 } from './modelVariant';
@@ -29,6 +33,8 @@ export interface FaceMarks {
 const V = (a: number[]) => new THREE.Vector3(a[0], a[1], a[2]);
 
 export class FaceWrinkles {
+  /** модель с ригом лица p2 — без полосок лба, ряби носа и складок между бровей */
+  morphRig = false;
   readonly uniforms = {
     uWrA: { value: new THREE.Vector4() }, // смех/прищур, нос, между бровей, улыбка
     uWrB: { value: new THREE.Vector4() }, // брови вверх, щёки вверх, румянец, общий масштаб
@@ -58,6 +64,9 @@ export class FaceWrinkles {
     });
     if (!body) return null;
     const w = new FaceWrinkles();
+    model.traverse((o) => {
+      if (o.name === 'FaceSkin' && (o as THREE.Mesh).morphTargetDictionary && 'brow_angry' in (o as THREE.Mesh).morphTargetDictionary!) w.morphRig = true;
+    });
     const U = w.uniforms;
     U.uWrEyeL.value.copy(V(marks.eyeOuterL));
     U.uWrEyeR.value.copy(V(marks.eyeOuterR));
@@ -78,8 +87,9 @@ export class FaceWrinkles {
   update(W: Record<string, number>) {
     const g = (k: string) => W[k] ?? 0;
     const laugh = Math.max(g('eyes_laugh'), 0.7 * g('eyes_squint'), 0.6 * g('eyes_smug'), 0.45 * g('smile'), 0.8 * Math.max(g('wink_L'), g('wink_R')));
-    this.uniforms.uWrA.value.set(laugh, Math.max(g('nose_wrinkle'), 0.5 * g('brow_down')), g('brow_down'), Math.max(g('smile'), 0.7 * g('smirk')));
-    this.uniforms.uWrB.value.x = g('brow_up');
+    const flat = this.morphRig ? 0 : 1;
+    this.uniforms.uWrA.value.set(laugh, flat * Math.max(g('nose_wrinkle'), 0.5 * g('brow_down')), flat * g('brow_down'), Math.max(g('smile'), 0.7 * g('smirk')));
+    this.uniforms.uWrB.value.x = flat * g('brow_up');
     this.uniforms.uWrB.value.y = Math.max(g('cheek_up'), 0.8 * g('eyes_laugh'));
     this.uniforms.uWrB.value.z = g('blush');
   }

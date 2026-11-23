@@ -88,26 +88,58 @@ export interface EyeInput {
  * Материал век (LidUp/LidLo, вершинный цвет — мех вокруг глаза и подводка у кромки): освещение как у кожи морды
  * (нормаль оболочки — сфера вокруг яблока: верх века смотрел в небо и светился полосой над глазом, низ темнел в серое),
  * пряди меха шумом в координатах века, без блика; подводка и ресницы (тёмный вершинный цвет) — как были.
+ *
+ * soft (мягкие веки, Хулиган и Добряк, 23.11): у геометрии есть атрибут aLid (см. softLidGeometry) — расстояние от кромки
+ * (рад по оболочке) и сила ресниц. Вершинный цвет у кромки уже мех (без тёмных рядов), подводка рисуется в шейдере:
+ * тонкая линия у самого края + ресницы разной длины, мягкий переход в мех (без «козырька» и резкой полосы); нормаль
+ * всей оболочки, включая скруглённую кромку, сведена к оси глаза (закрытое веко не темнеет книзу); тон чуть теплее и
+ * светлее — под мех вокруг (оболочки меха светлеют наружу, голая оболочка века выходила голубее и темнее).
  */
-export function patchLid(m: THREE.MeshStandardMaterial) {
+export function patchLid(m: THREE.MeshStandardMaterial, soft = false, lidN?: { value: THREE.Vector3 }) {
   m.roughness = 0.95;
   m.metalness = 0;
   m.envMapIntensity = 0;
   const prev = m.onBeforeCompile;
   m.onBeforeCompile = (sh, r) => {
     prev?.call(m, sh, r);
-    sh.vertexShader = 'varying vec3 vLidP;\n' + sh.vertexShader
+    if (lidN) sh.uniforms.uLidN = lidN;
+    sh.vertexShader = 'varying vec3 vLidP;\n' + (soft ? 'attribute vec2 aLid;\nvarying vec2 vLid;\n' : '') + (lidN ? 'uniform vec3 uLidN;\n' : '') + sh.vertexShader
       .replace(
         '#include <beginnormal_vertex>',
         // нормаль к «лицу» (ось глаза +Z) — веко освещено, как кожа вокруг глаза; у кромки — своя (скруглённый край)
-        `#include <beginnormal_vertex>
+        soft
+          ? `#include <beginnormal_vertex>
+  objectNormal = normalize(mix(objectNormal, ${lidN ? 'uLidN' : 'vec3(0.0, 0.25, 1.0)'}, 0.94));`
+          : `#include <beginnormal_vertex>
   objectNormal = normalize(mix(objectNormal, vec3(0.0, 0.25, 1.0), 0.8));`,
       )
-      .replace('#include <begin_vertex>', '#include <begin_vertex>\n  vLidP = position;');
-    sh.fragmentShader = 'varying vec3 vLidP;\nfloat lidFur = 0.0;\n' + sh.fragmentShader.replace(
-      '#include <color_fragment>',
-      `#include <color_fragment>
-  {
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\n  vLidP = position;' + (soft ? '\n  vLid = aLid;' : ''));
+    const furCode = soft
+      ? `{
+    // мех по всей оболочке (вершинный цвет у кромки — тоже мех), тон — под мех вокруг: чуть светлее и теплее
+    float lidL0 = dot(diffuseColor.rgb, vec3(0.299, 0.587, 0.114));
+    diffuseColor.rgb = mix(vec3(lidL0), diffuseColor.rgb, 0.9) * vec3(1.1, 1.0, 0.96);
+    vec3 q1 = vLidP * vec3(140.0, 22.0, 140.0);
+    vec3 q2 = vLidP * vec3(60.0, 10.0, 60.0) + 7.0;
+    float n1 = fract(sin(dot(floor(q1), vec3(12.9898, 78.233, 37.719))) * 43758.5453);
+    float n2 = fract(sin(dot(floor(q2), vec3(39.346, 11.135, 83.155))) * 43758.5453);
+    diffuseColor.rgb *= 1.34 + 0.08 * (n1 - 0.5) + 0.1 * (n2 - 0.5);
+    // подводка: тонкая линия у края (≈ 0.02 рад) + ресницы (по столбцам вдоль кромки — разной длины), мягко в мех
+    float e = vLid.x, ls = vLid.y;
+    float col = vLidP.x * 38.0;
+    float hc = fract(sin(floor(col) * 91.345) * 47453.53);
+    float strand = smoothstep(0.5, 0.15, abs(fract(col) - 0.5)); // поперёк ресницы: центр столбца
+    float len = mix(0.09, 0.16, hc) * ls;
+    float lash = max(1.0 - smoothstep(0.032 * ls + 0.004, 0.08 * ls + 0.014, e), strand * (1.0 - smoothstep(0.3 * len, len, e)) * 0.85);
+    float shade = 1.0 - smoothstep(0.0, 0.16 * ls + 0.04, e); // мягкая тень к кромке
+    vec3 lashC = diffuseColor.rgb * 0.12 + vec3(0.006, 0.006, 0.012);
+    diffuseColor.rgb *= 1.0 - 0.16 * shade * ls;
+    diffuseColor.rgb = mix(diffuseColor.rgb, lashC, clamp(lash * (0.35 + 0.65 * ls), 0.0, 1.0));
+    // изнанка оболочки (снизу при широко открытом глазе) — в тени, как ресницы, а не светлой полосой по радужке
+    if (!gl_FrontFacing) { diffuseColor.rgb = lashC * 1.6; lash = 1.0; }
+    lidFur = 1.0 - lash;
+  }`
+      : `{
     // мех: только там, где цвет светлый (не подводка), тонкие пряди вдоль века
     float lidL = dot(diffuseColor.rgb, vec3(0.299, 0.587, 0.114));
     float fur = smoothstep(0.08, 0.2, lidL);
@@ -118,15 +150,56 @@ export function patchLid(m: THREE.MeshStandardMaterial) {
     float n2 = fract(sin(dot(floor(q2), vec3(39.346, 11.135, 83.155))) * 43758.5453);
     diffuseColor.rgb *= mix(1.0, 1.3 + 0.16 * (n1 - 0.5) + 0.1 * (n2 - 0.5), fur);
     lidFur = fur;
-  }`,
+  }`;
+    sh.fragmentShader = 'varying vec3 vLidP;\nfloat lidFur = 0.0;\n' + (soft ? 'varying vec2 vLid;\n' : '') + sh.fragmentShader.replace(
+      '#include <color_fragment>',
+      `#include <color_fragment>
+  ${furCode}`,
     ).replace(
       '#include <emissivemap_fragment>',
       `#include <emissivemap_fragment>
-  totalEmissiveRadiance += diffuseColor.rgb * 0.16 * lidFur;`,
+  totalEmissiveRadiance += diffuseColor.rgb * ${soft ? '0.2' : '0.16'} * lidFur;`,
     );
   };
-  m.customProgramCacheKey = () => 'cat-lid-v2';
+  m.customProgramCacheKey = () => (soft ? (lidN ? 'cat-lid-soft-n-v1' : 'cat-lid-soft-v1') : 'cat-lid-v2');
   m.needsUpdate = true;
+}
+
+/** ряды оболочки века от кромки (рад по оболочке) — как lid_mesh в scripts/models/face_detail.py */
+export const LID_ROWS = [0, 0.05, 0.12, 0.26, 0.44, 0.825, 1.21, 1.595, 1.98, 2.365, 2.75];
+/** тон меха мягкого века к вершинному цвету (сверка по листам docs/qa/face: закрытое веко = мех вокруг глаза) */
+const LID_TONE: Record<string, number> = { hooligan: 0.74, kind: 0.76, glitter: 1.12 };
+/** сила ресниц верхнего века (ширина подводки и длина ресниц; Блёстка — подводка толще, как на рефе) */
+const LID_LASH: Record<string, number> = { glitter: 1.6 };
+
+/**
+ * Мягкие веки: атрибут aLid (x — расстояние от кромки по рядам LID_ROWS, y — сила ресниц: верхнее 1, нижнее 0.35) и
+ * вершинный цвет кромочных рядов = мех того же столбца (подводку рисует шейдер). Сетка века — nu столбцов × 11 рядов
+ * (nu — по нижнему веку); лишние вершины верхнего (лепестки Блёстки) — ресницы (кромка, тёмные). Не та сетка — false (веко как было).
+ */
+export function softLidGeometry(g: THREE.BufferGeometry, nu: number, lash: number, tone = 1): boolean {
+  const n = g.attributes.position?.count ?? 0;
+  const R = LID_ROWS.length;
+  if (!nu || n < nu * R || g.userData.softLid) return !!g.userData.softLid;
+  const a = new Float32Array(n * 2);
+  for (let i = 0; i < n; i++) {
+    const row = i < nu * R ? Math.floor(i / nu) : 0;
+    a[i * 2] = LID_ROWS[row];
+    a[i * 2 + 1] = lash;
+  }
+  g.setAttribute('aLid', new THREE.BufferAttribute(a, 2));
+  const c = g.attributes.color as THREE.BufferAttribute | undefined;
+  if (c) {
+    for (let j = 0; j < 4; j++)
+      for (let k = 0; k < nu; k++) {
+        const src = 4 * nu + k, dst = j * nu + k;
+        c.setXYZ(dst, c.getX(src), c.getY(src), c.getZ(src));
+      }
+    if (tone !== 1) for (let i = 0; i < n; i++) c.setXYZ(i, c.getX(i) * tone, c.getY(i) * tone, c.getZ(i) * tone);
+    c.needsUpdate = true;
+  }
+  g.userData.softLid = true;
+  return true;
 }
 
 export class EyeRig {
@@ -154,7 +227,10 @@ export class EyeRig {
   private qa = new THREE.Quaternion();
   private qb = new THREE.Quaternion();
   private e = new THREE.Euler(0, 0, 0, 'YXZ');
+  /** мягкие веки: ось глаза в пространстве века (обновляется в update) */
+  readonly lidN = new Map<THREE.Object3D, THREE.Vector3>();
   private static AX = new THREE.Vector3(1, 0, 0);
+  private static FACE_N = new THREE.Vector3(0, 0.25, 1).normalize();
   private static AZ = new THREE.Vector3(0, 0, 1);
 
   constructor(private rnd: () => number = Math.random) {}
@@ -177,14 +253,44 @@ export class EyeRig {
     rig.uniforms.uIris.value.set(ex.irisUV?.[0] ?? 0.2, ex.irisUV?.[1] ?? 0.2);
     rig.uniforms.uPr0.value = ex.pupil ?? 0.5;
     const done = new Set<THREE.Material>();
-    // веки: мех, а не серые «заслонки» (продакт 23.11: плоские серые оболочки с резким светлым краем над глазом)
+    // веки: мех, а не серые «заслонки» (продакт 23.11: плоские серые оболочки с резким светлым краем над глазом);
+    // мягкая кромка (подводка и ресницы шейдером) — если сетки век узнаются (softLidGeometry)
+    const meshOf = (o: THREE.Object3D) => {
+      let r: THREE.Mesh | null = null;
+      o.traverse((x) => { if (!r && (x as THREE.Mesh).isMesh) r = x as THREE.Mesh; });
+      return r as THREE.Mesh | null;
+    };
+    const persona = (rig.eyes[0].pivot.userData as { persona?: string }).persona ?? '';
+    const tone = LID_TONE[persona] ?? 1;
+    const lids = rig.eyes.map((e) => {
+      const lo = meshOf(e.lo), up = meshOf(e.up);
+      const nu = lo ? lo.geometry.attributes.position.count / LID_ROWS.length : 0;
+      return { lo, up, nu };
+    });
+    const soft = lids.every((l) => l.lo && l.up && Number.isInteger(l.nu) && l.nu > 2 && l.up.geometry.attributes.position.count >= l.nu * LID_ROWS.length);
+    if (soft)
+      for (const l of lids) {
+        softLidGeometry(l.lo!.geometry, l.nu, 0.35, tone);
+        softLidGeometry(l.up!.geometry, l.nu, LID_LASH[persona] ?? 1, tone);
+      }
     for (const e of rig.eyes)
       for (const lid of [e.up, e.lo])
         lid.traverse((o) => {
-          const m = (o as THREE.Mesh).material as THREE.MeshStandardMaterial | undefined;
-          if (m?.isMeshStandardMaterial && !done.has(m)) {
+          const mesh = o as THREE.Mesh;
+          const m = mesh.material as THREE.MeshStandardMaterial | undefined;
+          if (!m?.isMeshStandardMaterial || done.has(m)) return;
+          if (soft) {
+            // своя копия материала на каждое веко: нормаль «к лицу» (ось глаза) — в пространстве века, оно вращается
+            // (закрытое веко не темнеет к кромке, как кожа вокруг)
+            const own = m.clone();
+            const n = { value: new THREE.Vector3(0, 0.25, 1).normalize() };
+            patchLid(own, true, n);
+            mesh.material = own;
+            done.add(own);
+            rig.lidN.set(lid, n.value);
+          } else {
             done.add(m);
-            patchLid(m);
+            patchLid(m, false);
           }
         });
     for (const e of rig.eyes) {
@@ -332,6 +438,10 @@ export class EyeRig {
       const sgn = e.side === 'L' ? 1 : -1;
       e.up.quaternion.setFromAxisAngle(EyeRig.AZ, lp.tilt * sgn).multiply(this.qa.setFromAxisAngle(EyeRig.AX, upA));
       e.lo.quaternion.setFromAxisAngle(EyeRig.AZ, lp.tilt * sgn * 0.35).multiply(this.qb.setFromAxisAngle(EyeRig.AX, -loA));
+      for (const lid of [e.up, e.lo]) {
+        const n = this.lidN.get(lid);
+        if (n) n.copy(EyeRig.FACE_N).applyQuaternion(this.qa.copy(lid.quaternion).invert());
+      }
     }
   }
 }

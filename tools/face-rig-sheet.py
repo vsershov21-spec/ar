@@ -4,6 +4,7 @@
 
     npx vite --port 4177 &   # dev-сервер
     python3 tools/face-rig-sheet.py [hooligan kind glitter] [--out docs/qa/face]
+    python3 tools/face-rig-sheet.py --lids   # только лист век всех трёх котов: lids.jpg
 """
 import json, os, subprocess, sys, urllib.parse
 from PIL import Image, ImageDraw, ImageFont
@@ -103,12 +104,30 @@ def stack(rows):
     return out
 
 
+LID_SHEET = [('neutral', 'покой'), ('blink:0.03', 'моргание 30 мс'), ('blink:0.075', '75 мс (закрыт)'),
+             ('blink:0.12', '120 мс'), ('wink_r', 'wink_R'), ('laugh', 'смех «^»'), ('sleepy', 'сонный'),
+             ('surprised', 'широко'), ('annoyed', 'злость')]
+
+
+def lids_sheet(outdir):
+    """веки крупно (мягкая кромка, ресницы, тон = мех вокруг): три кота, одни и те же кадры"""
+    rows = []
+    for persona in ['hooligan', 'kind', 'glitter']:
+        t, _ = shot(persona, [s for s, _ in LID_SHEET], 9, '&dy=0.45')
+        rows.append(row(f'{persona}: веки (eyeRig.ts, мягкие веки)', [label(x, n) for x, (_, n) in zip(t, LID_SHEET)]))
+    stack(rows).save(os.path.join(outdir, 'lids.jpg'), quality=86)
+    print('lids ok')
+
+
 def main():
     args = [a for a in sys.argv[1:] if not a.startswith('--')]
     outdir = sys.argv[sys.argv.index('--out') + 1] if '--out' in sys.argv else os.path.join(ROOT, 'docs/qa/face')
     if '--out' in sys.argv:
         args = [a for a in args if a != outdir]
     os.makedirs(outdir, exist_ok=True)
+    if '--lids' in sys.argv:
+        lids_sheet(outdir)
+        return
     for persona in args or ['hooligan', 'kind', 'glitter']:
         rows = []
         v, _ = shot(persona, [s for s, _ in VIS], 9)

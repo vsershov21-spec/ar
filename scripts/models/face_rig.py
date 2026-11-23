@@ -39,10 +39,13 @@ VERSION = 1
 
 # ───────────── параметры рта по коту (в долях W) ─────────────
 # gap — щель между губами в покое (тёмная линия рта), depth — глубина полости, fang — клычки (длина, u),
-# tongue — язык (полуширина, длина), jaw — угол челюсти визем D (рад)
+# tongue — язык (полуширина, длина), jaw — угол челюсти визем D (рад), rim_drop — доля спуска первого кольца
+# полости под нижней губой (у Добряка губа у кромки завёрнута внутрь круче: кольцо, уходя вниз на 45°, выходило перед
+# кожей губы на ~0.03 W — зубцы по нижней губе и в уголках открытого рта), rim_back — то же кольцо в каждом ключе
+# не ближе этого к коже над ним (W), corner_smooth — итераций сглаживания ключей рта в уголках (smooth_corners)
 PERSONA = {
     'hooligan': {'gap': 0.012, 'depth': 0.42, 'fang': (0.085, 0.2), 'tongue': (0.2, 0.2), 'jaw': 0.36},
-    'kind': {'gap': 0.013, 'depth': 0.44, 'fang': (0.08, 0.2), 'tongue': (0.21, 0.21), 'jaw': 0.36},
+    'kind': {'gap': 0.013, 'depth': 0.44, 'fang': (0.08, 0.2), 'tongue': (0.21, 0.21), 'jaw': 0.36, 'rim_drop': 0.0, 'rim_back': 0.03, 'corner_smooth': 24},
     'glitter': {'gap': 0.014, 'depth': 0.42, 'fang': (0.075, 0.19), 'tongue': (0.18, 0.18), 'jaw': 0.24},
 }
 
@@ -54,6 +57,8 @@ EPS = 0.006  # смещения ключа меньше EPS·W не пишутс
 # зоны подразбиения у рта (rx, ry по u/v, центр v, глубина): два уровня — с одним у грубой сетки Tripo разрез по линии
 # не отделяет губы целиком (верх «протекает» в низ, челюсть тянет кожу занавеской)
 SUBDIV = [(0.85, 0.45, -0.08, 0.5), (0.7, 0.24, -0.02, 0.35)]
+# маска ключей прошлых стадий у глаза (eye_guard): в эллипсе глаза r < 1.1 — 0, к r = 1.7 — полностью
+EYE_GUARD = (1.1, 1.7)
 KEEP_KEYS = ['brow_up', 'brow_down', 'brow_sad', 'cheek_up', 'cheeks_gum', 'nose_wrinkle']
 # набор ключей p2 (порядок = порядок морфов; рантайм — src/character/faceMorphs.ts FACE_MORPHS)
 VISEMES = ['vis_A', 'vis_B', 'vis_C', 'vis_D', 'vis_E', 'vis_F', 'vis_G', 'vis_H']
@@ -612,6 +617,19 @@ class Rig:
         return D
 
 
+def eye_guard(fr, P):
+    """маска «не трогать глазницу»: 0 в отверстии глаза и на его кромке (эллипс r ≤ EYE_GUARD[0]), 1 — дальше
+    EYE_GUARD[1]; вглубь головы за глазом — 1 (там нечего прятать)"""
+    m = np.ones(len(P))
+    for s in 'LR':
+        e = fr.eyes[s]
+        c, A, B = e['c'], e['A'], e['B']
+        r = np.sqrt(((P[:, 0] - c[0]) / A) ** 2 + ((P[:, 1] - c[1]) / B) ** 2)
+        front = sm(c[2] - 2.6 * B, c[2] - 1.4 * B, P[:, 2])
+        m = np.minimum(m, 1 - (1 - sm(EYE_GUARD[0], EYE_GUARD[1], r)) * front)
+    return m
+
+
 def profile_fix(fr, T, P, side, pairs):
     """Форма проёма по рефу: нижняя губа опускается дугой только в пределах open (полуширина, u), за ней губы сомкнуты
     (и щель покоя закрыта); верхняя губа в середине чуть поднимается (arch). Поправка — по вертикали, к краю губ
@@ -655,6 +673,34 @@ def profile_fix(fr, T, P, side, pairs):
         zlo = np.interp(u, pu_, d[lo_i, 2])
         zup = np.interp(u, pu_, d[up_i, 2])
         d[:, 2] += (zup - zlo) * (1 - prof) * fall_lo
+
+
+def smooth_corners(fr, T, P, F, keys, iters, lam=0.5, r=0.14):
+    """Сглаживание смещений ключей рта в уголках (лапласиан по сетке; копии вершин по UV сварены по положению): в
+    уголке разрез кончается, верх и низ связаны — у Добряка там «ступенька»-язычок кожи в открытых формах. Зона —
+    круг ~r·W у каждого уголка, к краю сила гаснет; кромка губ между уголками не трогается."""
+    import scipy.sparse as sps
+    W = fr.W
+    key = np.round(P / (1e-5 * W)).astype(np.int64)
+    _, first, inv = np.unique(key, axis=0, return_index=True, return_inverse=True)
+    inv = inv.ravel()
+    n = len(first)
+    E = np.concatenate([F[:, [0, 1]], F[:, [1, 2]], F[:, [2, 0]]])
+    E = inv[E]
+    E = E[E[:, 0] != E[:, 1]]
+    A = sps.coo_matrix((np.ones(len(E) * 2), (np.r_[E[:, 0], E[:, 1]], np.r_[E[:, 1], E[:, 0]])), shape=(n, n)).tocsr()
+    A.data[:] = 1
+    An = sps.diags(1 / np.maximum(np.asarray(A.sum(1)).ravel(), 1)) @ A
+    u, v, w = fr.uvw(P[first])
+    cu = fr.cu
+    vc = float(fr.line(cu))
+    m = np.exp(-(((np.abs(u) - cu) / r) ** 2 + ((v - vc) / r) ** 2)) * sm(-0.6, -0.3, w)
+    m = (lam * m)[:, None]
+    for k in keys:
+        D = T[k][first].copy()
+        for _ in range(iters):
+            D += m * (An @ D - D)
+        T[k] = D[inv]
 
 
 def build_targets(fr, rig, P, side, ang_d):
@@ -717,6 +763,8 @@ def cavity(fr, rig, S, T_skin, ang_d, head_j, body=None):
                 vt = lv
             tgt = fr.O + np.array([uu * 0.5, vt, -depth * fr.zd]) * W
             fy = t ** (0.4 if s < 0 else 0.9)
+            if s < 0 and t < 0.2:
+                fy *= cfg.get('rim_drop', 1.0)
             fxz = t ** 0.9
             p = np.array([p0[0] + (tgt[0] - p0[0]) * fxz, p0[1] + (tgt[1] - p0[1]) * fy, p0[2] + (tgt[2] - p0[2]) * fxz])
             if t > 0:
@@ -810,7 +858,51 @@ def cavity(fr, rig, S, T_skin, ang_d, head_j, body=None):
             targets[key] = d
         elif np.abs(rim).max() > 0:
             targets[key] = d * (1 - a_up)  # щёки, нос: край губ, глубже — нет
+    # первое кольцо низа и уголков в каждом ключе — за кожей губы, что над ним (луч вдоль z), с запасом rim_back·W:
+    # иначе лента «кромка → кольцо» выходит перед завёрнутой внутрь нижней губой зубцами (Добряк)
+    rb = cfg.get('rim_back')
+    if rb:
+        ring1 = np.where((tt > 0) & (tt < 0.2) & (sd <= 0))[0]
+        cen = V[tt == 0].mean(0)
+        Fm = S['F'][(np.linalg.norm(P - cen, axis=1) < 1.2 * W)[S['F']].all(1)]
+        nfix = 0
+        for key in list(targets) + [None]:
+            Q = P + (T_skin[key] if key else 0)
+            d = targets[key] if key else np.zeros_like(V)
+            pts = V[ring1] + d[ring1]
+            zs = skin_z_under(Q, Fm, pts, W)
+            over = np.where(np.isfinite(zs), pts[:, 2] - (zs - rb * W), -1)
+            m = over > 0
+            nfix += int(m.sum())
+            if key:
+                targets[key][ring1[m], 2] -= over[m]
+            else:
+                V[ring1[m], 2] -= over[m]
+        if nfix:
+            print(f'  полость: первое кольцо за губой — {nfix} поправок')
     return {'V': V, 'N': N, 'F': F, 'col': col, 'src': np.array(colsrc), 'targets': targets, 't': tt, 'side': sd}
+
+
+def skin_z_under(Q, F, pts, W):
+    """z ближайшей к камере (+z) кожи над каждой точкой (луч вдоль z, только поверхности не дальше 0.5 W за точкой);
+    nan — кожи нет (проём рта)"""
+    A, B, C = Q[F[:, 0]], Q[F[:, 1]], Q[F[:, 2]]
+    v0, v1 = B[:, :2] - A[:, :2], C[:, :2] - A[:, :2]
+    den = v0[:, 0] * v1[:, 1] - v1[:, 0] * v0[:, 1]
+    ok = np.abs(den) > 1e-14
+    den = np.where(ok, den, 1)
+    out = np.full(len(pts), np.nan)
+    for i, p in enumerate(pts):
+        v2 = p[:2] - A[:, :2]
+        a = (v2[:, 0] * v1[:, 1] - v1[:, 0] * v2[:, 1]) / den
+        b = (v0[:, 0] * v2[:, 1] - v2[:, 0] * v0[:, 1]) / den
+        m = ok & (a >= 0) & (b >= 0) & (a + b <= 1)
+        if m.any():
+            z = A[m, 2] + a[m] * (B[m, 2] - A[m, 2]) + b[m] * (C[m, 2] - A[m, 2])
+            z = z[z > p[2] - 0.5 * W]
+            if len(z):
+                out[i] = z.max()
+    return out
 
 
 def front_surface(fr, P):
@@ -1222,9 +1314,17 @@ def main():
     # ── ключи FaceSkin
     T = build_targets(fr, rig, Ps, side, ang_d)
     profile_fix(fr, T, Ps, side, S['pairs'])
+    if fr.cfg.get('corner_smooth'):
+        smooth_corners(fr, T, Ps, S['F'], VISEMES + EMOS, fr.cfg['corner_smooth'])
     for k in KEEP_KEYS:
         if k in S['v']:
             T[k] = S['v'][k]
+    # ключи прошлых стадий (щёки, брови, нос) не трогают глазницу: у Хулигана cheeks_gum выдвигал край глазницы вперёд
+    # поверх яблока на 0.4 B (глаз «срезан»), brow_up поднимал верхний край — щель между веком и кожей
+    eyem = eye_guard(fr, Ps)
+    for k in KEEP_KEYS:
+        if k in T:
+            T[k] = T[k] * eyem[:, None]
     for k in T:
         T[k] = T[k] * border[:, None]
     # губы не перехлёстываются: в паре разреза нижняя не выше верхней
@@ -1241,6 +1341,10 @@ def main():
             for (pp, o) in zip(S['pairs'], over):
                 fix[pp[2]] = o
             T[k][:, 1] -= fix
+    if os.environ.get('FACE_DUMP'):
+        np.savez(os.environ['FACE_DUMP'], P=Ps, F=S['F'], side=side, W=W, cu=cu,
+                 pu=np.array([p[0] for p in S['pairs']]), up=pu, lo=pl,
+                 **{'T_' + k: T[k] for k in VISEMES + EMOS})
     if os.environ.get('FACE_DEBUG'):
         Eb = np.sort(np.concatenate([S['src'][S['F'][:, [0, 1]]], S['src'][S['F'][:, [1, 2]]], S['src'][S['F'][:, [2, 0]]]]), 1)
         uqb, cb_ = np.unique(Eb, axis=0, return_counts=True)
@@ -1272,6 +1376,9 @@ def main():
     # ── полость, клычки, язык
     keep_b = ~reg_t
     C = cavity(fr, rig, S, T, ang_d, hj, body=(P, Ib[keep_b]))
+    if os.environ.get('FACE_DUMP'):
+        np.savez(os.environ['FACE_DUMP'] + '.cav.npz', V=C['V'], F=C['F'], t=C['t'], side=C['side'], src=C['src'],
+                 **{'T_' + k: v for k, v in C['targets'].items()})
     Tf = fangs(fr, rig, S, C, T, ang_d, body=(P, Ib[keep_b]))
     Tg = tongue(fr, rig, S, C, ang_d, body=(P, Ib[keep_b]))
 

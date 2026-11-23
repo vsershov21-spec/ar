@@ -38,6 +38,8 @@ sc.add(ch.object);
 ch.play('idle');
 if (q.get('mdt') === '0' && ch.mouthRig) ch.mouthRig.mesh.material.depthTest = false;
 if (q.get('hide')) ch.object.traverse((o) => { if (new RegExp(q.get('hide')).test(o.name)) o.visible = false; });
+// сетка поверх меша (отладка кромки губ): ?wire=FaceSkin
+if (q.get('wire')) ch.object.traverse((o) => { if (o.isMesh && new RegExp(q.get('wire')).test(o.name)) { o.material = o.material.clone(); o.material.wireframe = true; } });
 ch.faceMix.nextBlink = 1e9;
 ch.life.nextMicro = 1e9;
 const bone = (n) => { let b = null; ch.object.traverse((o) => { if (!b && o.name.replace(/^mixamorig:?/, '') === n) b = o; }); return b; };
