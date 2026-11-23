@@ -83,7 +83,7 @@ function probe() {
   const roll = sh ? Math.acos(Math.min(1, Math.abs(sh.y))) * r2d : null;
   // вершины кожи (каждая k-я): голова — по доминирующей кости
   const tv = new THREE.Vector3();
-  const body = [], headV = [], skirt = [];
+  const body = [], headV = [], skirt = [], trunk = [];
   ch.object.traverse((o) => {
     if (!o.isSkinnedMesh || !o.visible || /shell|fur/i.test(o.name) || /shell|fur/i.test(o.material?.name ?? '')) return;
     const pos = o.geometry.getAttribute('position'), si = o.geometry.getAttribute('skinIndex'), sw = o.geometry.getAttribute('skinWeight');
@@ -95,10 +95,14 @@ function probe() {
       const w = tv.clone().applyMatrix4(o.matrixWorld).applyMatrix4(inv);
       let best = 0, bi = 0;
       for (let k = 0; k < 4; k++) if (sw.getComponent(i, k) > best) (best = sw.getComponent(i, k)), (bi = si.getComponent(i, k));
-      let hd = false;
-      for (let x = bones[bi]; x; x = x.parent) if (/Head$/.test(x.name)) hd = true;
+      let hd = false, arm = false;
+      for (let x = bones[bi]; x; x = x.parent) {
+        if (/Head$/.test(x.name)) hd = true;
+        if (/(Left|Right)Shoulder$/.test(x.name)) arm = true;
+      }
       if (hd) headV.push(w);
       else body.push(w);
+      if (!hd && !arm) trunk.push(w);
       if (isSkirt) skirt.push(w);
     }
   });
@@ -111,15 +115,16 @@ function probe() {
   const headC = headV.length ? headV.reduce((a, v) => a.add(v), new THREE.Vector3()).multiplyScalar(1 / headV.length) : head;
   const headMinY = Math.min(...headV.map((v) => v.y));
   const onPillow = Math.abs(headC.x - P.x) < P.length / 2 + 0.04 && Math.abs(headC.z - P.z) < P.width / 2 + 0.04;
-  // одеяло: вершины ткани над вершинами тела (ближайшая по xz в 4 см) — накрыто / тело сквозь ткань
+  // одеяло: вершины ткани над вершинами туловища и ног (лапы — поверх одеяла по замыслу; ближайшая вершина ткани по xz
+  // в 4 см, допуск 1 см) — накрыто / тело сквозь ткань
   const bl = bed.group.getObjectByName('bed-blanket');
   let covered = 0, poke = 0, cand = 0;
   if (bl && bl.visible && bed.cover > 0.5) {
     bl.updateMatrixWorld(true);
     const bp = bl.geometry.getAttribute('position'), B = [];
     for (let i = 0; i < bp.count; i++) B.push(new THREE.Vector3().fromBufferAttribute(bp, i).applyMatrix4(bl.matrixWorld).applyMatrix4(inv));
-    for (let i = 0; i < body.length; i += 2) {
-      const v = body[i];
+    for (let i = 0; i < trunk.length; i += 2) {
+      const v = trunk[i];
       if (!(inX(v) && inZ(v))) continue;
       let best = null, bd = 0.04 * 0.04;
       for (const b of B) {
@@ -128,7 +133,7 @@ function probe() {
       }
       cand++;
       if (!best) continue;
-      if (best.y >= v.y - 0.004) covered++;
+      if (best.y >= v.y - 0.01) covered++;
       else poke++;
     }
   }
@@ -175,7 +180,7 @@ const WAKE = [[150, 'одеяло'], [700, 'тянется'], [1500, 'садит
 
 async function runCat(browser, cat, morning) {
   const page = await browser.newPage();
-  await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 1, isMobile: true, hasTouch: true });
+  await page.setViewport({ width: 390, height: 844, deviceScaleFactor: Number(arg('--dpr', 1)), isMobile: true, hasTouch: true });
   page.on('pageerror', (e) => log(`  [${cat}] pageerror`, e.message.slice(0, 200)));
   await page.evaluateOnNewDocument(reactionClock, { persona: cat });
   const q = `from=test&nocard=off&debug&flow=home&zone=bedroom&hour=14${morning ? '&bed=morning' : ''}${PARAMS ? '&' + PARAMS : ''}`;
@@ -211,6 +216,11 @@ async function runCat(browser, cat, morning) {
     const top = await page.screenshot({ type: 'png' });
     await page.evaluate(() => document.documentElement.classList.remove('bedshot'));
     shots.push({ label, m, cam, top });
+    // --raw DIR: кадр камеры пилота целиком (крупно посмотреть ткань)
+    if (arg('--raw', '')) {
+      fs.mkdirSync(arg('--raw'), { recursive: true });
+      fs.writeFileSync(path.join(arg('--raw'), `${TAG}_${cat}_${shots.length}_${label.replace(/\s+/g, '_')}.png`), cam);
+    }
   };
   let t = 0;
   const until = async (ms) => {

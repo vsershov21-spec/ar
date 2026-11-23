@@ -221,7 +221,7 @@ export function buildBed(batch: BatchLike, cx: number, win: { x: number; y: numb
   // u — вдоль одеяла от изножья (−X) к изголовью, v — поперёк. Откинуто: 0,22 длины лежит у изножья в два слоя;
   // накрыто: до плеч кота (голова и уши на подушке открыты). Высота над матрасом — карта высот тела кота
   // (капсулы по костям, setBody): максимум → расширение → размытие, чтобы ткань легла мягко, без «зелёного кирпича».
-  const NU = 44, NV = 20;
+  const NU = 56, NV = 32;
   const WB = W + 0.28;
   const geo = new THREE.PlaneGeometry(1, 1, NU, NV);
   const uvAttr = geo.getAttribute('uv') as THREE.BufferAttribute;
@@ -239,9 +239,16 @@ export function buildBed(batch: BatchLike, cx: number, win: { x: number; y: numb
   let coverLen = L * 0.7;
   const FOLD = 0.22;
   // карта высот тела над матрасом (мир): сетка HX × HZ над кроватью
-  const HX = 56, HZ = 24;
+  const HX = 60, HZ = 40;
   const hx0 = x0 - L / 2 - 0.05, hx1 = x0 + L / 2 + 0.05, hz0 = z0 - WB / 2, hz1 = z0 + WB / 2;
   const HF = new Float32Array(HX * HZ);
+  /** ткань над телом, м; наклон провиса (м вниз на м вбок): ткань спадает к матрасу раньше края, без стенки */
+  const CLOTH = 0.012, SAG = 0.8;
+  const sagFwd: { di: number; dj: number; drop: number }[] = [];
+  {
+    const cx = (L + 0.1) / (HX - 1), cz = (W + 0.28) / (HZ - 1);
+    for (const [di, dj] of [[-1, 0], [-1, -1], [0, -1], [1, -1]]) sagFwd.push({ di, dj, drop: Math.hypot(di * cx, dj * cz) * SAG });
+  }
   let bodyOn = false;
   const hfAt = (x: number, z: number) => {
     const fx = THREE.MathUtils.clamp(((x - hx0) / (hx1 - hx0)) * (HX - 1), 0, HX - 1.001);
@@ -273,10 +280,16 @@ export function buildBed(batch: BatchLike, cx: number, win: { x: number; y: numb
         const q = 1 - ex * ex - ez * ez;
         let rise = q > 0 ? 0.32 * Math.pow(q, 0.6) : 0;
         if (bodyOn) {
-          rise = Math.max(rise, hfAt(x, z) - floor);
-          // край у плеч не обрывается стенкой: последние ~12 см ткань мягко спускается к матрасу
-          const toEdge = (c - along) * len;
-          if (!folded && toEdge < 0.12) rise *= 0.55 + 0.45 * (toEdge / 0.12);
+          // по телу (карта высот: вершины кожи + провис ткани конусом) — без купола: купол поднимал ткань «шатром»
+          // на 10–20 см над котом на боку
+          rise = Math.max(0, hfAt(x, z) - floor);
+          // край не обрывается стенкой: последние ~22 см до края (и до сгиба, пока одеяло наезжает или откидывается —
+          // у сгиба нижний слой и отвёрнутый верхний) ткань плавно спускается к матрасу (smoothstep)
+          const toEdge = Math.abs(c - u) * len;
+          if (toEdge < 0.22) {
+            const e = toEdge / 0.22;
+            rise *= 0.1 + 0.9 * e * e * (3 - 2 * e);
+          }
         }
         else if (q > 0) rise = 0.3 * Math.pow(q, 0.6);
         y += hump * rise;
@@ -316,37 +329,56 @@ export function buildBed(batch: BatchLike, cx: number, win: { x: number; y: numb
       return;
     }
     const raw = new Float32Array(HX * HZ).fill(BED.top);
-    for (let j = 0; j < HZ; j++)
-      for (let i = 0; i < HX; i++) {
-        const x = hx0 + ((hx1 - hx0) * i) / (HX - 1), z = hz0 + ((hz1 - hz0) * j) / (HZ - 1);
-        let top = BED.top;
-        for (const cp of caps) {
-          const dx = cp.b.x - cp.a.x, dz = cp.b.z - cp.a.z, l2 = dx * dx + dz * dz;
+    // по капсулам — только клетки в их рамке; расстояние — до клетки целиком (минус полклетки): редкие вершины не
+    // проваливаются между узлами сетки (подошва кеда, край худи торчали сквозь ткань)
+    const sx = (hx1 - hx0) / (HX - 1), sz = (hz1 - hz0) / (HZ - 1), half = 0.5 * Math.hypot(sx, sz);
+    for (const cp of caps) {
+      const dx = cp.b.x - cp.a.x, dz = cp.b.z - cp.a.z, l2 = dx * dx + dz * dz, rr = cp.r + half;
+      const i0 = Math.max(0, Math.floor((Math.min(cp.a.x, cp.b.x) - rr - hx0) / sx)), i1 = Math.min(HX - 1, Math.ceil((Math.max(cp.a.x, cp.b.x) + rr - hx0) / sx));
+      const j0 = Math.max(0, Math.floor((Math.min(cp.a.z, cp.b.z) - rr - hz0) / sz)), j1 = Math.min(HZ - 1, Math.ceil((Math.max(cp.a.z, cp.b.z) + rr - hz0) / sz));
+      for (let j = j0; j <= j1; j++)
+        for (let i = i0; i <= i1; i++) {
+          const x = hx0 + sx * i, z = hz0 + sz * j;
           const t = l2 < 1e-6 ? 0.5 : THREE.MathUtils.clamp(((x - cp.a.x) * dx + (z - cp.a.z) * dz) / l2, 0, 1);
           const cx = cp.a.x + dx * t, cz = cp.a.z + dz * t, cy = cp.a.y + (cp.b.y - cp.a.y) * t;
-          const d2 = (x - cx) * (x - cx) + (z - cz) * (z - cz);
-          if (d2 < cp.r * cp.r) top = Math.max(top, cy + Math.sqrt(cp.r * cp.r - d2));
+          const d = Math.max(0, Math.hypot(x - cx, z - cz) - half);
+          if (d < cp.r) {
+            const top = cy + Math.sqrt(cp.r * cp.r - d * d);
+            if (top > raw[j * HX + i]) raw[j * HX + i] = top;
+          }
         }
-        raw[j * HX + i] = top;
-      }
-    // расширение (ткань не прилипает к телу вплотную) и размытие (мягкие складки)
-    const tmp = new Float32Array(HX * HZ);
-    for (let j = 0; j < HZ; j++)
-      for (let i = 0; i < HX; i++) {
-        let m = BED.top;
-        for (let b = -1; b <= 1; b++) for (let a = -1; a <= 1; a++) {
-          const ii = Math.min(HX - 1, Math.max(0, i + a)), jj = Math.min(HZ - 1, Math.max(0, j + b));
-          m = Math.max(m, raw[jj * HX + ii]);
+    }
+    // провис ткани: от каждой точки тела ткань спадает к матрасу конусом (наклон SAG), а не стенкой; потом лёгкое
+    // размытие (мягкие складки), не ниже тела; над телом — толщина ткани CLOTH
+    // конус провиса — двумя проходами (как дистанционное преобразование, 8 соседей): h ≥ сосед − наклон × шаг
+    const tmp = Float32Array.from(raw);
+    for (let rep = 0; rep < 2; rep++) {
+      for (let j = 0; j < HZ; j++)
+        for (let i = 0; i < HX; i++) {
+          let m = tmp[j * HX + i];
+          for (const o of sagFwd) {
+            const ii = i + o.di, jj = j + o.dj;
+            if (ii >= 0 && jj >= 0 && ii < HX && jj < HZ) m = Math.max(m, tmp[jj * HX + ii] - o.drop);
+          }
+          tmp[j * HX + i] = m;
         }
-        tmp[j * HX + i] = m;
-      }
+      for (let j = HZ - 1; j >= 0; j--)
+        for (let i = HX - 1; i >= 0; i--) {
+          let m = tmp[j * HX + i];
+          for (const o of sagFwd) {
+            const ii = i - o.di, jj = j - o.dj;
+            if (ii >= 0 && jj >= 0 && ii < HX && jj < HZ) m = Math.max(m, tmp[jj * HX + ii] - o.drop);
+          }
+          tmp[j * HX + i] = m;
+        }
+    }
     for (let pass = 0; pass < 4; pass++) {
       const src = pass % 2 ? HF : tmp, dst = pass % 2 ? tmp : HF;
       for (let j = 0; j < HZ; j++)
         for (let i = 0; i < HX; i++) {
           let sum = 0, n = 0;
-          for (let b = -1; b <= 1; b++) for (let a = -1; a <= 1; a++) {
-            const ii = Math.min(HX - 1, Math.max(0, i + a)), jj = Math.min(HZ - 1, Math.max(0, j + b));
+          for (let b2 = -1; b2 <= 1; b2++) for (let a2 = -1; a2 <= 1; a2++) {
+            const ii = Math.min(HX - 1, Math.max(0, i + a2)), jj = Math.min(HZ - 1, Math.max(0, j + b2));
             sum += src[jj * HX + ii];
             n++;
           }
@@ -354,9 +386,9 @@ export function buildBed(batch: BatchLike, cx: number, win: { x: number; y: numb
         }
     }
     // после чётного числа проходов результат — в tmp
-    for (let k = 0; k < HF.length; k++) HF[k] = tmp[k] + 0.025;
+    for (let k = 0; k < HF.length; k++) HF[k] = tmp[k] > BED.top + 0.002 ? tmp[k] + CLOTH : BED.top;
     bodyOn = true;
-    if (shoulderX !== undefined) coverLen = THREE.MathUtils.clamp(shoulderX - footX, L * 0.45, L * 0.85);
+    if (shoulderX !== undefined) coverLen = THREE.MathUtils.clamp(shoulderX - footX, L * 0.45, L * 0.9);
     dirty = true;
   };
   shape();

@@ -695,6 +695,7 @@ export class BedFlow {
   private bodyAt = 0;
   private alAt = 0;
   private alClip = '';
+  private turnY: number | null = null;
   private alSwitch = 0;
   /** вершины тела (без головы), мир — силуэт для одеяла (fitPose, раз в 0,25 с) */
   private bodyPts: THREE.Vector3[] = [];
@@ -702,30 +703,41 @@ export class BedFlow {
   /** замер для стенда и debug: ось тела, наклон, низ тела над простынёй, голова над подушкой (мм комнаты) */
   readonly alDbg = { axis: 0, pitch: 0, lowMM: 0, headMM: 0, clip: '' };
 
-  /** вершины кожи для замера (каждая k-я; голова — по доминирующей кости в поддереве Head) — раз на модель */
-  private samples(obj: THREE.Object3D) {
-    if (this.samp?.of === obj) return this.samp.list;
+  /**
+   * Вершины кожи (каждая k-я; голова — по доминирующей кости в поддереве Head) — раз на модель. Для замера позы — ~300
+   * на сетку без меха; для одеяла (cloth) — гуще и с прядями меха (BD_FurCards: хвост и пряди торчали сквозь ткань).
+   */
+  private sampCloth: typeof this.samp = null;
+  private samples(obj: THREE.Object3D, cloth = false) {
+    const cache = cloth ? this.sampCloth : this.samp;
+    if (cache?.of === obj) return cache.list;
     const list: { mesh: THREE.SkinnedMesh; idx: Int32Array; head: Uint8Array }[] = [];
     obj.traverse((o) => {
       const m = o as THREE.SkinnedMesh;
-      if (!m.isSkinnedMesh || /shell|fur/i.test(m.name)) return;
+      if (!m.isSkinnedMesh || (/shell|fur/i.test(m.name) && !(cloth && /furcard/i.test(m.name)))) return;
       const pos = m.geometry.getAttribute('position'), si = m.geometry.getAttribute('skinIndex'), sw = m.geometry.getAttribute('skinWeight');
       if (!pos || !si || !sw) return;
       const underHead = (b: THREE.Object3D | undefined) => {
         for (let x: THREE.Object3D | null | undefined = b; x; x = x.parent) if (/Head$/.test(x.name)) return true;
         return false;
       };
-      const step = Math.max(1, Math.floor(pos.count / 300));
+      const underArm = (b: THREE.Object3D | undefined) => {
+        for (let x: THREE.Object3D | null | undefined = b; x; x = x.parent) if (/(Left|Right)Shoulder$/.test(x.name)) return true;
+        return false;
+      };
+      const step = Math.max(1, Math.floor(pos.count / (cloth ? 1500 : 300)));
       const idx: number[] = [], head: number[] = [];
       for (let i = 0; i < pos.count; i += step) {
         let best = 0, bi = 0;
         for (let k = 0; k < 4; k++) if (sw.getComponent(i, k) > best) (best = sw.getComponent(i, k)), (bi = si.getComponent(i, k));
         idx.push(i);
-        head.push(underHead(m.skeleton.bones[bi]) ? 1 : 0);
+        // для одеяла лапы — как голова (не под тканью): поднятая к мордочке лапа ставила ткань «шатром» с гребнем
+        head.push(underHead(m.skeleton.bones[bi]) || (cloth && underArm(m.skeleton.bones[bi])) ? 1 : 0);
       }
       list.push({ mesh: m, idx: Int32Array.from(idx), head: Uint8Array.from(head) });
     });
-    this.samp = { of: obj, list };
+    if (cloth) this.sampCloth = { of: obj, list };
+    else this.samp = { of: obj, list };
     return list;
   }
 
@@ -766,6 +778,18 @@ export class BedFlow {
         snap = fresh && this.al.ok;
       }
     }
+    // ворочается (turn_over_sleep приподнимает тело на 5–7 см): поворот и место — прежние, по высоте тело держим на
+    // матрасе (иначе одеяло тянулось вверх за котом)
+    if (this.turn && LYING_CLIPS.has(clip) && this.al.ok) {
+      if (now - this.alAt > 100) {
+        this.alAt = now;
+        const g = this.measure(ch as Required<typeof ch>, room.anchor, bed.mattress);
+        if (g) this.turnY = g.y;
+      }
+      if (this.turnY !== null) this.al.y += (this.turnY - this.al.y) * (1 - Math.exp(-dt / 0.1));
+      return;
+    }
+    this.turnY = null;
     // цель: замер этого клипа, иначе прежняя цель
     const want = memo.get(clip) ?? this.goal;
     if (!want) return;
@@ -858,7 +882,8 @@ export class BedFlow {
       if (this.lieW < 0.05) bed?.setBody(null);
       return;
     }
-    if (now - this.bodyAt < 250 || !bed) return;
+    // ворочается: силуэт одеяла не трогаем (иначе ткань тянулась вверх за лапами клипа), высоту тела держит alignTick
+    if (now - this.bodyAt < 250 || !bed || this.turn) return;
     const P: Record<string, THREE.Vector3> = {};
     for (const n of BONES) {
       const v = new THREE.Vector3();
@@ -875,15 +900,19 @@ export class BedFlow {
     this.bodyPts = [];
     if (obj) {
       obj.parent?.updateMatrixWorld(true);
-      for (const s of this.samples(obj)) {
+      for (const s of this.samples(obj, true)) {
         if (!s.mesh.visible) continue;
-        for (let j = 0; j < s.idx.length; j += 2) if (!s.head[j]) this.bodyPts.push(s.mesh.getVertexPosition(s.idx[j], new THREE.Vector3()).applyMatrix4(s.mesh.matrixWorld));
+        for (let j = 0; j < s.idx.length; j++) if (!s.head[j]) this.bodyPts.push(s.mesh.getVertexPosition(s.idx[j], new THREE.Vector3()).applyMatrix4(s.mesh.matrixWorld));
       }
     }
-    for (const p of this.bodyPts) caps.push({ a: p, b: p, r: 0.035 });
-    const kR = this.bodyPts.length ? 0.7 : 1;
-    for (const [a, b] of CAPS) if (P[a] && P[b]) caps.push({ a: P[a], b: P[b], r: Math.max(R(a), R(b)) * kR });
-    bed.setBody(caps, Math.min(P.Neck.x, P.Spine2?.x ?? P.Neck.x + 1) + 0.02);
+    // ткань ложится по коже: вершина + 1,8 см (мех-оболочка) + толщина ткани в bedProp (1,2 см); кости — только связать
+    for (const p of this.bodyPts) caps.push({ a: p, b: p, r: 0.018 });
+    const kR = this.bodyPts.length ? 0.5 : 1;
+    // по вершинам — капсулы туловища и ног (лапы — поверх одеяла)
+    for (const [a, b] of CAPS) if (P[a] && P[b] && !(this.bodyPts.length && /Arm|Hand/.test(a + b))) caps.push({ a: P[a], b: P[b], r: Math.max(R(a), R(b)) * (/Foot|Toe/.test(a + b) ? 1 : kR) });
+    // стопы — полной капсулой: подошва кеда между редкими вершинами торчала сквозь ткань
+    // край одеяла — у шеи: последние 22 см ткань спускается к матрасу, грудь укрыта, лапы поверх
+    bed.setBody(caps, Math.max(P.Neck.x, P.Spine2?.x ?? P.Neck.x) + 0.04);
   }
 
   /** клип играет опорой (настоящего в GLB нет); спрайт/риг-заглушка — тоже как опора */
