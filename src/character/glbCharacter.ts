@@ -153,6 +153,14 @@ const PERSONA_TONGUE_V2: Record<string, { size?: number; deeper?: number; tone?:
   glitter: { size: 0.6, deeper: 0.1, tone: 0.82 },
 };
 
+/** эмоция поверх лица держится не дольше (кроме сна) */
+const EMO_MAX_MS = 8000;
+/** «головокружение» (спирали): не дольше и не чаще */
+const DIZZY_MAX_MS = 2500;
+const DIZZY_GAP_S = 6;
+/** лицо, поставленное не раньше чем столько секунд назад, сброс (resetFace) не трогает */
+const FACE_FRESH_S = 0.25;
+
 /** множители век по характеру (v2, по умолчанию): 1 — как в пресете */
 const PERSONA_EYES_V2: Record<string, Record<string, number>> = {
   glitter: { eyes_smug: 0.3, eyes_sleepy: 0.5, eyes_squint: 0.6 },
@@ -570,7 +578,7 @@ export class GlbCharacter implements Character {
     const a = this.act;
     this.act = null;
     this.restoreArms();
-    this.actFace = null;
+    this.resetFace();
     this.propFx.hide();
     if (this.clips.requested === 'idle_breathe' || ACT_CLIPS.has(this.clips.requested)) this.play('idle');
     this.actLook = null;
@@ -1083,12 +1091,34 @@ export class GlbCharacter implements Character {
   setEmotion(name: string, weight = 1, durationMs = 1500, inS = 0.18) {
     const p = facePreset(name);
     if (!p) return;
+    // без срока — только сон (его снимает пробуждение); остальное — не дольше EMO_MAX_MS: эмоция не залипает
+    if (!(durationMs > 0) && name !== 'sleep') durationMs = EMO_MAX_MS;
+    durationMs = name === 'sleep' ? durationMs : Math.min(durationMs, EMO_MAX_MS);
+    // спирали (встряска телефона, запись 23.11: у Блёстки держались после сальто — встряски шли подряд): коротко и
+    // не чаще раза в DIZZY_GAP_S — иначе каждая следующая встряска продлевала «головокружение» без конца
+    if (name === 'dizzy') {
+      if (this.time - this.dizzyAt < DIZZY_GAP_S) return;
+      this.dizzyAt = this.time;
+      durationMs = Math.min(durationMs, DIZZY_MAX_MS);
+    }
     // сила стартует с текущей (смена эмоции на ходу — без провала), веса перетекают в слое emoL
     this.emo = { p, w: clamp(weight, 0, 1), t: 0, dur: durationMs / 1000, from: this.emoL.s, inS };
   }
 
   clearEmotion() {
     if (this.emo) this.emo.dur = Math.min(this.emo.dur || Infinity, this.emo.t + 0.5); // гаснет за 0.5 с
+  }
+  private dizzyAt = -Infinity;
+
+  /**
+   * Лицо к нейтральному (cancelAct, вытеснение действия режиссёром, смена обстановки дом ↔ карта): пресет — neutral
+   * (моргание по расписанию), мимика действия снята, эмоция гаснет за 0,5 с. Только что поставленное (≤ 0,25 с — лицо
+   * нового действия, пришедшего вместе с отменой) и сон не трогаем.
+   */
+  resetFace() {
+    this.actFace = null;
+    if (this.faceMix.preset !== 'sleep' && this.faceMix.preset !== 'neutral' && this.faceMix.age > FACE_FRESH_S) this.faceMix.reset();
+    if (this.emo && this.emo.p.id !== 'sleep' && this.emo.t > FACE_FRESH_S) this.clearEmotion();
   }
 
   /** текущая эмоция (id) или null */

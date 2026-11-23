@@ -283,6 +283,8 @@ export class Director extends Emitter<DirectorEvents> {
     this.orch.onCancel = (a) => {
       if (this.queue.drop((it) => it.owner === a.token && it.priority < 3)) this.log(`сняты реплики вытесненного «${a.id}»`);
       if (this.actBusy()) this.stopAct();
+      // вытесненное действие уносит своё лицо (сонное, хмурое, спирали) — новое ставит своё следом
+      else this.resetFace();
     };
     d.tracker.onFound(() => this.dispatch({ type: 'card_found' }));
     d.tracker.onLost(() => this.dispatch({ type: 'card_lost' }));
@@ -310,6 +312,8 @@ export class Director extends Emitter<DirectorEvents> {
   dispatch(e: ScenarioEvent) {
     // «ты тут?» говорит только лестница тишины (byCat); таймер тишины Input — без слов, у лестницы свой отсчёт
     if (e.type === 'silence' && !e.byCat) return;
+    // смена обстановки (дом ↔ карта): лицо прошлой сцены не едет в новую — нейтральное, моргает
+    if (e.type === 'context_change') this.resetFace();
     const now = performance.now();
     // конец сессии (4–6 мин) — тоже инициатива кота: не поверх реплики, действия ребёнка, мини-игры или дрёмы
     if (e.type === 'timer' && e.id === 'outro' && (this.queue.busy || now - this.lastUserAct < 8000 || this.state.dialog || this.dozing || !this.state.cardVisible)) {
@@ -656,6 +660,7 @@ export class Director extends Emitter<DirectorEvents> {
     this.actTimers.forEach((t) => clearTimeout(t));
     this.actTimers = [];
     (this.character as Character & { cancelAct?: () => void })?.cancelAct?.();
+    this.resetFace();
     if (this.d.stage.walking) this.d.stage.cancelWalk();
   }
 
@@ -1414,6 +1419,16 @@ export class Director extends Emitter<DirectorEvents> {
     const cue = emotionFor(event, this.persona.id) ?? EXTRA_EMOTION[event] ?? null;
     const ch = this.character as Character & { setEmotion?: (n: string, w?: number, ms?: number) => void };
     if (cue && ch?.setEmotion) ch.setEmotion(cue[0], cue[1], cue[2]);
+  }
+
+  /**
+   * Лицо к нейтральному (отмена/вытеснение действия, смена обстановки): пресет реплики и задержавшаяся эмоция снимаются,
+   * глаза моргают (GlbCharacter.resetFace). Дрёма держит сон — её снимает пробуждение.
+   */
+  private resetFace() {
+    if (this.dozing) return;
+    this.lineFace = null;
+    (this.character as Character & { resetFace?: () => void })?.resetFace?.();
   }
 
   /** последний пресет лица реплики: по концу реплики лицо возвращается к нейтральному (а не держит «annoyed» до следующей) */

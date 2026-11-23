@@ -20,6 +20,17 @@ export interface FaceState { weights: Record<string, number>; ears: number; pupi
 
 const warned = new Set<string>();
 
+/**
+ * «Глаза залипают» (iPhone 23.11: Хулиган с полуприкрытыми веками и хмурым ртом дольше реплики): пресет без срока
+ * (set(id) / setFace) держится не дольше FACE_HOLD_MAX_S, потом лицо само возвращается к базе (нейтральное с морганием).
+ * База — только neutral и sleep (сон держит своё до пробуждения); сонное лицо в кровати и мурчание при глажке — дольше.
+ * Кто держит пресет намеренно (реплика, глажка) — просто зовёт set снова: срок продлевается.
+ */
+export const FACE_HOLD_MAX_S = 8;
+const FACE_HOLD_S: Record<string, number> = { sleepy: 15, purr: 12 };
+/** пресеты, которые могут быть базой лица (без срока) */
+const FACE_BASE = new Set(['neutral', 'sleep']);
+
 export class FaceMixer {
   /** текущее состояние (после update) */
   readonly cur: FaceState = { weights: {}, ears: 0, pupils: 1, blink: 0 };
@@ -32,6 +43,11 @@ export class FaceMixer {
   private time = 0;
   private blinkT = 0;
   private nextBlink = 3;
+  private setAt = -Infinity;
+  /** сколько секунд назад поставлен текущий пресет */
+  get age() {
+    return this.time - this.setAt;
+  }
   /** id текущего пресета */
   get preset() {
     return this.to.id;
@@ -54,12 +70,29 @@ export class FaceMixer {
       }
       p = PRESETS.get('neutral')!;
     }
+    if (ms <= 0 && !FACE_BASE.has(p.id)) ms = (FACE_HOLD_S[p.id] ?? FACE_HOLD_MAX_S) * 1000;
     if (ms <= 0) this.base = p.id;
     this.untilS = ms > 0 ? this.time + ms / 1000 : 0;
     this.from = { weights: { ...this.cur.weights }, ears: this.cur.ears, pupils: this.cur.pupils, blink: 0 };
     this.to = p;
+    this.setAt = this.time;
     this.t = 0;
     this.dur = Math.min(0.2, Math.max(0.12, transitionMs / 1000));
+  }
+
+  /** база лица (neutral или sleep) */
+  get basePreset() {
+    return this.base;
+  }
+
+  /**
+   * Сброс к нейтральному (отмена действия, смена режима дом/карта): база — neutral, временный пресет снят, моргание
+   * идёт по расписанию (следующее — не позже чем через 1,5 с, если пауза затянулась под noBlink-пресетом).
+   */
+  reset(transitionMs = 200) {
+    this.base = 'neutral';
+    this.set('neutral', 0, transitionMs);
+    this.nextBlink = Math.min(this.nextBlink, this.time + 1.5);
   }
 
   /** моргнуть сейчас */
