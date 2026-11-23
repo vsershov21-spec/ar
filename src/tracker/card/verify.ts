@@ -21,7 +21,7 @@
  * сохраняется и никуда не отправляется: всё считается в памяти воркера (буферы переиспользуются и
  * перезаписываются следующим кадром). См. docs/PRIVACY.md.
  */
-import { matchDesign } from './fingerprint';
+import { matchDesign, foreignDb } from './fingerprint';
 import { type Pt, type Intrinsics, CARD_ASPECT, CARD_RADIUS, homography, applyH, metricShape, orderClockwise, rotateQuad, type Quad } from './geometry';
 
 export const CW = 200;
@@ -46,6 +46,8 @@ export interface CardFeatures {
   designHit: boolean;
   /** номер дизайна в каталоге (−1 — нет) */
   designId: number;
+  /** отпечаток совпал с известной картой ДРУГОГО банка (foreignDb.ts), номер записи; −1 — нет */
+  foreign?: number;
   ps: number;
   corners: number;
   tex: number;
@@ -106,6 +108,8 @@ export function cardCorners(q: Pt[], K?: Intrinsics): Quad {
 export function warpCard(img: Img, q: Quad): boolean {
   const H = homography([{ x: 0, y: 0 }, { x: CW, y: 0 }, { x: CW, y: CH }, { x: 0, y: CH }], q);
   if (!H) return false;
+  srcImg = img;
+  srcH = H;
   const { rgba, w, h } = img;
   // прямой проход по строке: числители и знаменатель гомографии линейны по x
   let i = 0;
@@ -392,7 +396,27 @@ for (let a = 0; a < 360; a += 30) LOGO_OUT.push([1.42 * Math.cos((a * Math.PI) /
 
 let LS: Float32Array = L; // откуда берём яркость для знака: L (резкая) или LB (размытая, грубый поиск)
 const LB = new Float32Array(N);
+/** источник последнего warpCard и гомография канонический → источник (точная проверка знака в полном разрешении) */
+let srcImg: Img | null = null;
+let srcH: number[] | null = null;
+/** брать яркость знака прямо из источника (карта в источнике крупнее канонических 200 px — мелкий знак резче) */
+let fromSrc = false;
+function sampleSrc(x: number, y: number) {
+  const H = srcH!, img = srcImg!;
+  const dw = H[6] * x + H[7] * y + H[8];
+  let sx = (H[0] * x + H[1] * y + H[2]) / dw - 0.5, sy = (H[3] * x + H[4] * y + H[5]) / dw - 0.5;
+  if (!(sx >= 0)) sx = 0;
+  if (!(sy >= 0)) sy = 0;
+  if (sx > img.w - 1.001) sx = img.w - 1.001;
+  if (sy > img.h - 1.001) sy = img.h - 1.001;
+  const x0 = sx | 0, y0 = sy | 0, fx = sx - x0, fy = sy - y0, d = img.rgba;
+  const a = (y0 * img.w + x0) * 4, b = a + 4, c = a + img.w * 4, e = c + 4;
+  const la = 0.299 * d[a] + 0.587 * d[a + 1] + 0.114 * d[a + 2], lb = 0.299 * d[b] + 0.587 * d[b + 1] + 0.114 * d[b + 2];
+  const lc = 0.299 * d[c] + 0.587 * d[c + 1] + 0.114 * d[c + 2], le = 0.299 * d[e] + 0.587 * d[e + 1] + 0.114 * d[e + 2];
+  return ((la * (1 - fx) + lb * fx) * (1 - fy) + (lc * (1 - fx) + le * fx) * fy) / 255;
+}
 function sampleL(x: number, y: number) {
+  if (fromSrc) return sampleSrc(x + 0.5, y + 0.5);
   if (x < 0) x = 0;
   if (y < 0) y = 0;
   if (x > CW - 1.001) x = CW - 1.001;
@@ -466,8 +490,12 @@ export function logoAt(cx: number, cy: number, r: number, rot: number, strict = 
 export const logoBest = { x: 0, y: 0, r: 0, rot: 0, s: 0 };
 
 const seeds: { x: number; y: number; r: number; rot: number; s: number }[] = [];
+/** нижний радиус знака в грубом поиске (доля ширины карты) */
+const LOGO_RR_MIN = 0.026;
+/** карта в источнике крупнее канонической во столько раз — знак уточняем ещё и по источнику */
+const LOGO_ZOOM = 1.3;
 /** знак Сбера у угла «верх-лево» дизайна: любая из 4 ориентаций дизайна на карте. Грубо (размытая яркость) → точно */
-function logoScore() {
+function logoScore(zoom = false) {
   // размытие 3×3 для грубого поиска: шире «воронка» вокруг правильного положения
   for (let y = 1; y < CH - 1; y++)
     for (let x = 1; x < CW - 1; x++) {
@@ -487,7 +515,8 @@ function logoScore() {
     const vert = rot === 1 || rot === 3;
     // три лучших несоседних места для этой ориентации
     const top: { x: number; y: number; r: number; s: number }[] = [];
-    for (let rr = 0.031; rr <= 0.064; rr += 0.0085) {
+    // от 0,026 ширины: маленький знак старого дизайна «СБЕРБАНК» (≈ 0,036) не на краю диапазона
+    for (let rr = LOGO_RR_MIN; rr <= 0.069; rr += 0.0085) {
       const r = rr * CW;
       // a — вдоль «горизонтали» дизайна, b — вдоль его «вертикали» (px канонического)
       for (let a = 0.045 * CW; a <= 0.19 * CW; a += 2.5)
@@ -511,11 +540,16 @@ function logoScore() {
   }
   LS = L;
   let best = 0;
+  // точная проверка: по каноническому изображению, а если карта в источнике заметно крупнее 200 px — ещё и прямо по
+  // источнику (полное разрешение фрагмента кадра: знак радиусом 7 px канонических — там 10–14 px)
+  for (const src of zoom ? [false, true] : [false])
   for (const sd of seeds) {
     if (sd.s < 0.05) continue;
-    for (let dr = -2; dr <= 2; dr += 1)
-      for (let dx = -1.5; dx <= 1.5; dx += 0.75)
-        for (let dy = -1.5; dy <= 1.5; dy += 0.75) {
+    fromSrc = src;
+    const st = src ? 0.5 : 1;
+    for (let dr = -2; dr <= 2; dr += st)
+      for (let dx = -1.5; dx <= 1.5; dx += 0.75 * st)
+        for (let dy = -1.5; dy <= 1.5; dy += 0.75 * st) {
           const sc = logoAt(sd.x + dx, sd.y + dy, sd.r + dr, sd.rot);
           if (sc > best) {
             best = sc;
@@ -526,6 +560,7 @@ function logoScore() {
           }
         }
   }
+  fromSrc = false;
   logoBest.s = best;
   return best;
 }
@@ -691,10 +726,15 @@ export function classifyCard(img: Img, quad: Pt[], K?: Intrinsics): CardVerdict 
   const chip = Math.max(chipScore(false, card), chipScore(true, card));
   const t3 = now();
   const back = Math.max(backScore(false), backScore(true));
-  const logo = logoScore();
+  const pxw0 = Math.hypot(q[1].x - q[0].x, q[1].y - q[0].y);
+  const logo = logoScore(pxw0 >= LOGO_ZOOM * CW);
   const t4 = now();
   const green = greenScore();
   const dm = matchDesign(R, G, B, CW, CH);
+  const fdb = foreignDb();
+  const fm = fdb.length ? matchDesign(R, G, B, CW, CH, fdb) : null;
+  // чужая карта по отпечатку: совпала увереннее, чем лучший дизайн Сбера
+  const foreign = fm && fm.hit && !(dm.hit && dm.margin >= fm.margin) ? fm.id : -1;
   const t5 = now();
   prof.warp += t1 - t0;
   prof.stats += t2 - t1;
@@ -708,21 +748,28 @@ export function classifyCard(img: Img, quad: Pt[], K?: Intrinsics): CardVerdict 
   const flat = clamp01(1 - busyFrac / 0.04) * clamp01(1 - card.sd / 0.08);
   const sharp = clamp01(g90 / 0.1);
   const pxw = Math.hypot(q[1].x - q[0].x, q[1].y - q[0].y);
-  const f: CardFeatures = { chip, back, logo, green, design: dm.score, designHit: dm.hit, designId: dm.id, ps, corners, tex, flat, sharp, px: pxw };
+  const f: CardFeatures = { chip, back, logo, green, design: dm.score, designHit: dm.hit && foreign < 0, designId: dm.id, foreign, ps, corners, tex, flat, sharp, px: pxw };
   const W = CARD_W;
   const z = W.b + W.chip * chip + W.back * back + W.logo * logo + W.ps * ps + W.corners * (corners - 0.5) * 2 + W.tex * tex + W.flat * flat;
   const pCard = sig(z);
   // Сбер: знак по форме; фирменный зелёный — только вместе с чипом (зелёная книга — не карта Сбера)
   // зелёный цвет сам по себе — не Сбер (зелёные карты есть и у других банков): только усиливает найденный знак
   // известный дизайн каталога (отпечаток) — тоже Сбер, даже без знака на лицевой стороне
-  const sber = Math.max(clamp01(logo * 1.1 + (logo > 0.3 ? 0.25 * green : 0)), dm.hit ? 0.9 : 0);
-  return { card: pCard, sber, side: back > chip && back > 0.4 ? 'back' : 'front', f, ms: now() - t0 };
+  // чужая карта по отпечатку — не Сбер, что бы ни показалось знаком
+  const sber = foreign >= 0 ? 0 : Math.max(clamp01(logo * 1.1 + (logo > 0.3 ? 0.25 * green : 0)), dm.hit ? 0.9 : 0);
+  last = { card: pCard, sber, side: back > chip && back > 0.4 ? 'back' : 'front', f, ms: now() - t0 };
+  return last;
+}
+let last: CardVerdict | null = null;
+/** последний вердикт classifyCard (тесты, стенд) */
+export function lastVerdict() {
+  return last;
 }
 
 export function fmtFeatures(v: CardVerdict | null): string {
   if (!v) return 'ver —';
   const f = v.f, p = (x: number) => x.toFixed(2);
-  return `chip ${p(f.chip)} sber ${p(f.logo)}/${p(f.green)} design ${f.designHit ? '#' + f.designId + ' ' : ''}${p(f.design)} ps ${p(f.ps)} corners ${p(f.corners)} back ${p(f.back)} tex ${p(f.tex)} flat ${p(f.flat)} → card ${p(v.card)} sber ${p(v.sber)} ${v.side}`;
+  return `chip ${p(f.chip)} sber ${p(f.logo)}/${p(f.green)} design ${f.designHit ? '#' + f.designId + ' ' : ''}${p(f.design)}${(f.foreign ?? -1) >= 0 ? ' чужая#' + f.foreign : ''} ps ${p(f.ps)} corners ${p(f.corners)} back ${p(f.back)} tex ${p(f.tex)} flat ${p(f.flat)} → card ${p(v.card)} sber ${p(v.sber)} ${v.side}`;
 }
 
 /** буферы последнего выпрямленного изображения (R, G, B 0..1, CW × CH) — для отпечатка дизайна */
@@ -747,7 +794,9 @@ export function canonicalRGBA(): Uint8ClampedArray {
 export type CardKind = 'unknown' | 'notcard' | 'card' | 'back' | 'sber';
 
 /** пороги «попадания» в одном кадре (подбор — tests/card/verify.test.ts) */
-export const HIT = { logo: 0.6, chip: 0.75, back: 0.6, miss: 0.3 };
+/** карта уже этой ширины (px источника) — промах знака не голосует */
+export const SMALL_PX = 110;
+export const HIT = { logo: 0.6, chip: 0.75, back: 0.6, miss: 0.3, strong: 0.9 };
 
 /**
  * Решение по нескольким кадрам одного и того же кандидата (одной «дорожки» трекинга). Один кадр ничего не
@@ -760,7 +809,7 @@ export const HIT = { logo: 0.6, chip: 0.75, back: 0.6, miss: 0.3 };
  * Неуверенные кадры (размытые, карта мельче 60 px) пропускаем — они не голосуют ни «за», ни «против».
  */
 export class CardEvidence {
-  readonly win: { logo: number; chip: number; back: number; design: number; id: number; t: number }[] = [];
+  readonly win: { logo: number; chip: number; back: number; design: number; id: number; t: number; foreign?: number }[] = [];
   state: CardKind = 'unknown';
   last: CardVerdict | null = null;
   /**
@@ -784,21 +833,29 @@ export class CardEvidence {
     // дизайна (сетка 16 × 10) — ещё да: в окно идёт только совпадение отпечатка, «нет признаков» не голосует
     const small = !CardEvidence.usable(v) && v.f.sharp >= 0.3 && v.f.px >= 40 && v.side === 'front' && v.f.designHit;
     if (small) {
-      this.win.push({ logo: 0, chip: 0, back: 0, design: 1, id: v.f.designId, t });
+      this.win.push({ logo: 0, chip: 0, back: 0, design: 1, id: v.f.designId, t, foreign: 0 });
       if (this.win.length > this.size) this.win.shift();
       this.state = this.decide();
       return this.state;
     }
     if (!CardEvidence.usable(v)) return this.state;
+    // карта 60–110 px (кадр детектора без фрагмента в большем разрешении): знак там 2–4 px — «не нашли» ничего не
+    // значит. Голосуют только находки; иначе такие кадры разбавляли окно и отодвигали посадку (запись 23.11: старый
+    // «СБЕРБАНК» с маленьким знаком — на 80 px знак 0, во фрагменте 165 px — 1,0)
+    if (v.f.px < SMALL_PX && !(v.f.logo >= HIT.logo || v.f.chip >= HIT.chip || v.f.back >= HIT.back || v.f.designHit || (v.f.foreign ?? -1) >= 0)) return this.state;
     const front = v.side === 'front';
-    this.win.push({ logo: front ? v.f.logo : 0, chip: v.f.chip, back: v.f.back, design: front && v.f.designHit ? 1 : 0, id: v.f.designHit ? v.f.designId : -1, t });
+    // чужая карта по отпечатку: «знак» в этом кадре — кольцо чужого банка
+    const foreign = (v.f.foreign ?? -1) >= 0 ? 1 : 0;
+    this.win.push({ logo: front && !foreign ? v.f.logo : 0, chip: v.f.chip, back: v.f.back, design: front && v.f.designHit ? 1 : 0, id: v.f.designHit ? v.f.designId : -1, t, foreign });
     if (this.win.length > this.size) this.win.shift();
     this.state = this.decide();
     return this.state;
   }
   counts() {
-    let sber = 0, chip = 0, back = 0, none = 0, maxLogo = 0, design = 0, maxChip = 0, nLogo = 0, nChip = 0;
+    let sber = 0, chip = 0, back = 0, none = 0, maxLogo = 0, design = 0, maxChip = 0, nLogo = 0, nChip = 0, strong = 0, foreign = 0;
     for (const w of this.win) {
+      if (w.logo >= HIT.strong) strong++;
+      if (w.foreign) foreign++;
       // знак Сбера ИЛИ известный дизайн каталога
       if (w.logo >= HIT.logo || w.design >= 1) sber++;
       if (w.design >= 1) design++;
@@ -810,11 +867,15 @@ export class CardEvidence {
       if (w.logo >= 0.3) nLogo++;
       if (w.chip >= 0.35) nChip++;
     }
-    return { n: this.win.length, sber, chip, back, none, maxLogo, design, maxChip, nLogo, nChip };
+    return { n: this.win.length, sber, chip, back, none, maxLogo, design, maxChip, nLogo, nChip, strong, foreign };
   }
   private decide(): CardKind {
     const c = this.counts();
-    if (c.sber >= 2 && c.sber * 4 >= c.n) {
+    // известная чужая карта (отпечаток) в 2+ кадрах — «карта другого банка» сразу, без ожидания 10 кадров
+    if (c.foreign >= 2 && c.foreign >= c.sber) return 'card';
+    // Сбер по знаку — хотя бы один кадр с уверенным знаком (≥ HIT.strong): кольцо чужого банка на 7 px даёт ровно 0,81
+    // в каждом кадре (запись 23.11, золотая карта с картой мира), знак Сбера в резком кадре — 1,0
+    if (c.sber >= 2 && c.sber * 4 >= c.n && (c.design >= 1 || c.strong >= 1)) {
       for (let i = this.win.length - 1; i >= 0; i--) if (this.win[i].id >= 0) {
         this.known = this.win[i].id;
         break;

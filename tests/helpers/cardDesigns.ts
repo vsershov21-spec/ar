@@ -140,6 +140,12 @@ function blobs(c: Canvas, R: () => number, n: number, palette: RGB[], rmin = 6, 
 export type SberDesign = 'sber-green' | 'sber-photo' | 'sber-black' | 'sber-white' | 'sber-kids' | 'sber-red' | 'sber-vertical';
 export type OtherDesign = 'other-blue' | 'other-yellow' | 'other-red' | 'other-green' | 'other-black';
 export type BackDesign = 'back' | 'back-sber';
+/**
+ * Дизайны с записей 23.11 (только для своих тестов, в общие наборы не входят):
+ * 'sber-old' — старый «СБЕРБАНК» (синий верх, фото здания, МИР; маленький белый знак ≈ 0,034 ширины);
+ * 'other-target' — золотая карта другого банка с картой мира и знаком-«мишенью» (двойное кольцо с точкой) в углу.
+ */
+export type FieldDesign = 'sber-old' | 'other-target';
 export type NotCard = 'paper' | 'book' | 'phone' | 'laptop' | 'box' | 'screen' | 'notebook';
 
 export const SBER_DESIGNS: SberDesign[] = ['sber-green', 'sber-photo', 'sber-black', 'sber-white', 'sber-kids', 'sber-red', 'sber-vertical'];
@@ -157,7 +163,7 @@ export const NOT_CARD_SHAPE: Record<NotCard, { aspect: number; radius: number }>
   notebook: { aspect: 1.45, radius: 0.01 },
 };
 
-export function design(kind: SberDesign | OtherDesign | BackDesign | NotCard, seed = 1): Tex {
+export function design(kind: SberDesign | OtherDesign | BackDesign | NotCard | FieldDesign, seed = 1): Tex {
   const R = rng(seed * 977 + 13);
   const c = new Canvas();
   const ps = (['mir', 'mir', 'visa', 'mc', 'up'] as const)[Math.floor(R() * 5)];
@@ -238,6 +244,31 @@ export function design(kind: SberDesign | OtherDesign | BackDesign | NotCard, se
           for (let k = 0; k < 3; k++) c.rgba[j + k] = c.rgba[j + k] * (1 - a) + 255 * a;
         }
       chip(c);
+      break;
+    }
+    case 'sber-old': {
+      c.fill((x, y) => (y < 0.3 * TH ? [28, 50, 120] : [190 + 40 * Math.sin(x * 0.21), 80 + 30 * Math.sin(x * 0.13 + y * 0.2), 40]));
+      for (let i = 0; i < 14; i++) c.rect(R() * TW, 0.32 * TH + R() * 0.4 * TH, 4 + R() * 18, 4 + R() * 26, [210 + R() * 40, 120 + R() * 60, 50 + R() * 30]);
+      sberMark(c, 0.07 * TW, 0.12 * TH, 0.034 * TW, [240, 242, 248]);
+      wordmark(c, 0.12 * TW, 0.085 * TH, 0.07 * TH, 8, [240, 242, 248]);
+      chip(c);
+      number(c, [240, 225, 210]);
+      psLogo(c, 'mir');
+      break;
+    }
+    case 'other-target': {
+      c.fill((x, y) => [205 + 15 * (x / TW), 170 + 12 * (y / TH), 95]);
+      blobs(c, R, 9, [[160, 128, 60], [150, 120, 55]], 8, 22); // «материки»
+      const cx = 0.09 * TW, cy = 0.15 * TH, r = 0.045 * TW;
+      c.circle(cx, cy, r, [45, 40, 30]);
+      c.circle(cx, cy, r * 0.76, [205, 170, 95]);
+      c.circle(cx, cy, r * 0.5, [45, 40, 30]);
+      c.circle(cx, cy, r * 0.3, [205, 170, 95]);
+      c.circle(cx, cy, r * 0.14, [45, 40, 30]);
+      wordmark(c, 0.16 * TW, 0.1 * TH, 0.09 * TH, 8, [45, 40, 30]);
+      chip(c);
+      number(c, [90, 75, 45]);
+      psLogo(c, 'visa');
       break;
     }
     case 'other-blue':

@@ -65,7 +65,8 @@ export class CardVerifier {
    */
   private maybe(): boolean {
     const c = this.ev.counts();
-    return c.maxLogo >= MAYBE_LOGO && c.maxChip >= MAYBE_CHIP && c.nLogo >= 3 && c.nChip >= 3;
+    // известная чужая карта по отпечатку — никакой посадки «по форме»
+    return c.foreign === 0 && c.maxLogo >= MAYBE_LOGO && c.maxChip >= MAYBE_CHIP && c.nLogo >= 3 && c.nChip >= 3;
   }
 
   reset() {

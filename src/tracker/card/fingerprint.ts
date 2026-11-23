@@ -19,6 +19,7 @@
  * ПРИВАТНОСТЬ: дескриптор 16 × 10 — не картинка карты; номер/имя по нему не прочитать (клетка ≈ 5 × 5 мм).
  */
 import { DESIGN_DB } from './designDb';
+import { FOREIGN_DB } from './foreignDb';
 
 export const GX = 16, GY = 10;
 export const CGX = 8, CGY = 5;
@@ -230,6 +231,18 @@ let db: DbEntry[] | null = null;
 export function designDb(): DbEntry[] {
   return (db ??= decodeDb(DESIGN_DB));
 }
+let fdb: DbEntry[] | null = null;
+/**
+ * Отпечатки карт ДРУГИХ банков, которые на записях с iPhone проходили проверку знака (foreignDb.ts): совпал такой
+ * отпечаток — знак Сбера в этом кадре не засчитываем (кольцо-«мишень» чужого банка на 7 px не отличить от знака).
+ */
+export function foreignDb(): DbEntry[] {
+  return (fdb ??= decodeDb(FOREIGN_DB));
+}
+export function setForeignDb(entries: DbEntry[] | null) {
+  fdb = entries;
+}
+
 /** тесты и генератор базы: подменить базу */
 export function setDesignDb(entries: DbEntry[] | null) {
   db = entries;
