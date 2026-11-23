@@ -28,7 +28,7 @@ function quickSplashPlugin() {
         const transcoder = Object.values(ctx?.bundle ?? {}).map((f) => f.fileName).filter((f) => /basis_transcoder[^/]*\.(wasm|js)$/.test(f)).map((f) => base + f);
         const early = earlyModelScript({
           assetBase: process.env.VITE_ASSET_BASE || base, storagePrefix: process.env.VITE_STORAGE_PREFIX ?? '',
-          glbByPersona: ASSETS.glbByPersona, v2: (p: string) => variantGlb(p, 'v2'), anims: ASSETS.glbAnims, transcoder,
+          glbByPersona: ASSETS.glbByPersona, v2: (p: string) => variantGlb(p, 'v2', featureIn(parseEdition(process.env.VITE_EDITION), 'face.morph') ? 'morph' : 'shader'), anims: ASSETS.glbAnims, transcoder,
         });
         // сразу за <meta charset> (кодировка — в первых 1024 байтах), до стилей и бандла
         if (early) html = /<meta charset[^>]*>/i.test(html) ? html.replace(/(<meta charset[^>]*>)/i, `$1\n    ${early}`) : html.replace('<head>', `<head>\n    ${early}`);

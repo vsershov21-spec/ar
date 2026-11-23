@@ -151,10 +151,10 @@ export class FurTone {
     });
   }
 
-  /** чьи материалы тонировать: тело и всё «меховое»; не глаза, рот, нос-накладки, румянец, усы, подушечки */
+  /** чьи материалы тонировать: тело и всё «меховое»; не глаза, рот (накладка, полость рига p2, клычки, язык), нос-накладки, румянец, усы, подушечки */
   static isFur(name: string, v2 = modelsV2()) {
     // у моделей v2 наушники и фатин — свои меши со своим цветом (не мех)
-    return !(v2 ? /^(EyeBall|Mouth|Blush|Whiskers|BD_Pads|BD_Metal|BD_Cloth|Emblem|Tear|Headphones|Skirt)/ : /^(EyeBall|Mouth|Blush|Whiskers|BD_Pads|BD_Metal|BD_Cloth|Emblem|Tear)/).test(name);
+    return !(v2 ? /^(EyeBall|Mouth|Blush|Whiskers|BD_Pads|BD_Metal|BD_Cloth|Emblem|Tear|Headphones|Skirt|Teeth|Tongue)/ : /^(EyeBall|Mouth|Blush|Whiskers|BD_Pads|BD_Metal|BD_Cloth|Emblem|Tear|Teeth|Tongue)/).test(name);
   }
 
   /** маска лица — только у сеток в координатах покоя тела: само тело (скин, морфы), оболочки, карточки */

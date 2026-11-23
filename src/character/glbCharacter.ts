@@ -42,6 +42,7 @@ import { FaceWrinkles } from './faceWrinkles';
 import { FurTone } from './furTone';
 import { collidersUrl, modelsV2 } from './modelVariant';
 import { MouthRig } from './mouthRig';
+import { FaceMorphs } from './faceMorphs';
 import { personaMeta } from './personaMeta';
 import type { AnchorName } from '../fx/core';
 
@@ -149,6 +150,14 @@ const PERSONA_FACE: Record<string, Record<string, number>> = {
  */
 const PERSONA_FACE_V2: Record<string, Record<string, number>> = {
   glitter: { smile: 0.6, mouth_A: 0.46 },
+};
+
+/**
+ * то же для рига лица p2 (морфы, faceMorphs.ts): у Блёстки по design/cut/glitter/face/neutral — сомкнутая улыбка «ω»,
+ * губы чуть разомкнуты (прежние mouth_A 0.46 с ригом — это уже smile_open: рот «настежь»)
+ */
+const PERSONA_FACE_MORPH: Record<string, Record<string, number>> = {
+  glitter: { smile: 0.55 },
 };
 
 /**
@@ -289,6 +298,15 @@ export class GlbCharacter implements Character {
   readonly furTone = new FurTone();
   /** рот-накладка с шейдером (модели после face_detail v3); null — старая полость Mouth */
   mouthRig: MouthRig | null = null;
+  /**
+   * мимика морфами (модели p2, scripts/models/face_rig.py: рот геометрией, полость, клычки, язык): драйвер виземы →
+   * vis_*, лицо → ключи рига (faceMorphs.ts); null — модель без рига (рот шейдером, mouthRig)
+   */
+  faceMorphs: FaceMorphs | null = null;
+  /** меши с прежними ключами (не риг p2: румянец и т.п.) — их ведёт прежний цикл по MORPH_TARGETS */
+  private legacyMorph: THREE.Mesh[] = [];
+  /** визема кадра без сглаживания (LipSync.target) — для кроссфейда драйвера морфов */
+  private lipRaw: Viseme | null = null;
   /** эмоция поверх пресета реплики (setEmotion) */
   private emo: { p: FacePreset; w: number; t: number; dur: number; from: number; inS?: number } | null = null;
   /** слой эмоции: сглаженные веса пресета (смена эмоции — перетекание весов, а не провал в нейтраль) и его сила */
@@ -426,6 +444,14 @@ export class GlbCharacter implements Character {
     // …и хвост с искрой к кончику (только эта модель — tailSparkle.ts)
     if (attachTulle(model)) attachTailSparkle(model);
     this.mouthRig = MouthRig.find(model);
+    // риг лица p2: морфы рта/лица ведёт драйвер; шейдерная линия рта (если вдруг есть) — выключена
+    this.faceMorphs = FaceMorphs.find(this.morphMeshes);
+    this.legacyMorph = this.faceMorphs ? this.morphMeshes.filter((m) => !FaceMorphs.isRigMesh(m)) : this.morphMeshes;
+    if (this.faceMorphs) {
+      if (this.mouthRig) this.mouthRig.mesh.visible = false;
+      this.mouthRig = null;
+      console.info('[glb] мимика морфами', this.faceMorphs.meshCount, 'мешей');
+    }
     this.eyes = EyeRig.find(model);
     this.wrinkles = FaceWrinkles.attach(model);
     if (this.eyes) console.info('[glb] 3D-глаза');
@@ -532,7 +558,16 @@ export class GlbCharacter implements Character {
       const jaw = this.bones.get('Jaw');
       // накладка рта — с запасом вниз под открытый рот: линия сомкнутых губ — на 0,62 её высоты (стенд)
       const mb = mm ? new THREE.Box3().setFromObject(mm) : null;
-      const c = mb ? mb.getCenter(new THREE.Vector3()).setY(mb.min.y + (mb.max.y - mb.min.y) * 0.62) : jaw ? jaw.getWorldPosition(new THREE.Vector3()) : null;
+      // риг p2: середина линии рта из extras FaceSkin (координаты меша)
+      const rigO = model.getObjectByName('FaceSkin')?.userData?.faceRig?.O as number[] | undefined;
+      const fs = rigO ? model.getObjectByName('FaceSkin') : null;
+      const c = mb
+        ? mb.getCenter(new THREE.Vector3()).setY(mb.min.y + (mb.max.y - mb.min.y) * 0.62)
+        : fs && rigO
+          ? fs.localToWorld(new THREE.Vector3(rigO[0], rigO[1], rigO[2]))
+          : jaw
+            ? jaw.getWorldPosition(new THREE.Vector3())
+            : null;
       if (c) {
         const fwd = new THREE.Vector3(0, 0, 1).transformDirection(this.object.matrixWorld);
         const ray = new THREE.Raycaster(c.clone().addScaledVector(fwd, 2), fwd.clone().negate());
@@ -1174,9 +1209,11 @@ export class GlbCharacter implements Character {
    * Липсинк → блендшейпы. Берём не только доминирующую визему, а сглаженные параметры рта (open/wide/round —
    * уже смешаны с коартикуляцией): рот открывается плавно и заметно, «О»/«У» — из округлости.
    */
-  setMouth(v: Viseme, w: number, shape: MouthShape) {
+  setMouth(v: Viseme, w: number, shape: MouthShape, raw?: Viseme) {
     this.mouth = clamp(shape.open, 0, 1);
     this.visemeW = FaceLife.mouthWeights(v, w, shape);
+    // драйвер морфов: визема без сглаживания (кроссфейд — свой, 75 мс); нет виземы — амплитудный фолбэк по open
+    this.lipRaw = raw ?? (w > 0 && v ? v : null);
   }
 
   private applyPose(pose: ProcPose, w: number, root: THREE.Vector3, rootRot: THREE.Vector3, s: { v: number }) {
@@ -1271,7 +1308,7 @@ export class GlbCharacter implements Character {
       W.blink_R = Math.max(W.blink_R ?? 0, f.blink);
     }
     // характер в покое (референс): у Блёстки всегда чуть розовые щёчки и мягкая полуулыбка
-    const base = (modelsV2() ? PERSONA_FACE_V2 : PERSONA_FACE)[this.personaId];
+    const base = (this.faceMorphs ? PERSONA_FACE_MORPH : modelsV2() ? PERSONA_FACE_V2 : PERSONA_FACE)[this.personaId];
     if (base) for (const k in base) W[k] = Math.max(W[k] ?? 0, base[k] * (1 - (W.frown ?? 0)));
     // характер глаз (v2 — по умолчанию; ?models=v1 — без них): у Блёстки по рефу глаза широко открыты — пресеты «самодовольно/сонно/прищур»
     // в idle-клипах (зеркальце, кружение) прикрывают веки слабее
@@ -1280,7 +1317,8 @@ export class GlbCharacter implements Character {
     // складки и мягкость: щёки поднимаются при улыбке, морщинка у носа при хмурых бровях
     W.cheek_up = Math.max(W.cheek_up ?? 0, 0.5 * (W.smile ?? 0), 0.3 * (W.smirk ?? 0));
     W.nose_wrinkle = Math.max(W.nose_wrinkle ?? 0, 0.35 * (W.brow_down ?? 0));
-    for (const k in this.visemeW) W[k] = Math.max((W[k] ?? 0) * 0.5, this.visemeW[k]);
+    // риг p2: виземы — у драйвера морфов (свои ключи vis_*); прежние модели — mouth_* из липсинка поверх пресета
+    if (!this.faceMorphs) for (const k in this.visemeW) W[k] = Math.max((W[k] ?? 0) * 0.5, this.visemeW[k]);
     // мимика действия с предметом (глоток «^^», подмигнуть, «чмок», жуёт): поверх, без хмурых бровей
     const af = this.actFace;
     if (af) {
@@ -1291,7 +1329,11 @@ export class GlbCharacter implements Character {
     this.wrinkles?.update(W);
     this.mouthRig?.setTongue(modelsV2() ? PERSONA_TONGUE_V2[this.personaId] : undefined);
     this.mouthRig?.update(W);
-    for (const m of this.morphMeshes) {
+    if (this.faceMorphs) {
+      this.faceMorphs.setLip(this.lipRaw, this.mouth);
+      this.faceMorphs.update(dt, W);
+    }
+    for (const m of this.legacyMorph) {
       const d = m.morphTargetDictionary!;
       const inf = m.morphTargetInfluences!;
       for (const key of MORPH_TARGETS) {

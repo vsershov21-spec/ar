@@ -58,9 +58,10 @@ export interface Character {
   emote(e: Emote, ms?: number): void;
   /**
    * Липсинк: доминирующая визема (Rhubarb A–H, X), её вес 0..1 и сглаженные параметры рта.
-   * 3D — блендшейпы mouth_A/E/O/U/M (или челюсть), спрайт — PNG-оверлей рта.
+   * 3D — блендшейпы mouth_A/E/O/U/M (или челюсть), спрайт — PNG-оверлей рта; raw — визема кадра без сглаживания
+   * (LipSync.target, нет — амплитуда по shape.open): у моделей с ригом лица p2 кроссфейд визем делает faceMorphs.ts.
    */
-  setMouth(viseme: Viseme, weight: number, shape: MouthShape): void;
+  setMouth(viseme: Viseme, weight: number, shape: MouthShape, raw?: Viseme): void;
   update(dt: number, camera: THREE.Camera): void;
   /** попадание луча в кота */
   hitTest(ray: THREE.Raycaster): boolean;

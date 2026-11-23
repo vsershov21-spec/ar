@@ -1649,7 +1649,7 @@ export class Director extends Emitter<DirectorEvents> {
     const v = this.d.voice;
     v.update(dt);
     const lip = v.lip;
-    this.character?.setMouth(lip.dominant, lip.weights[lip.dominant], lip.shape);
+    this.character?.setMouth(lip.dominant, lip.weights[lip.dominant], lip.shape, lip.active ? lip.target : undefined);
     // моргание чаще во время речи
     if (v.speaking && (this.blinkT += dt) > 2.2 + Math.random() * 2) {
       this.blinkT = 0;

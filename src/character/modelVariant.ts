@@ -12,7 +12,22 @@
  * ?models=v2h — геометрия v2 у всех трёх (для сравнения). Мех, тон и лицо при v2/v2h берут значения v2
  * (furShell, furTone, faceWrinkles, glbCharacter PERSONA_FACE).
  */
+import { feature } from '../config/edition';
+
 export type ModelsVariant = 'v1' | 'v2' | 'v2h';
+
+/**
+ * Лицо котов v2 (основа p1): 'morph' — риг лица p2 (scripts/models/face_rig.py: рот геометрией, полость, клычки,
+ * язык, морфы визем и эмоций, драйвер faceMorphs.ts) → models/v2/<кот>_p2.glb; 'shader' — как было (p1, рот шейдером
+ * mouthRig.ts). По умолчанию — функция face.morph (lab — вкл., MVP и пилот — выкл., пока продакт не посмотрит);
+ * сравнение — ?face=morph | ?face=shader (lab; MVP и пилот — только со страницы /test, ?from=test).
+ */
+export type FaceMode = 'morph' | 'shader';
+export function faceMode(search = typeof location !== 'undefined' ? location.search : '', on = feature('face.morph')): FaceMode {
+  const f = new URLSearchParams(search).get('face');
+  if (f === 'morph' || f === 'shader') return f;
+  return on ? 'morph' : 'shader';
+}
 
 /** основа кота в v2 (по умолчанию): v2 — геометрия v2, p1 — v1 с правками по рефам персонажа */
 export const V2_BASE: Record<string, 'v2' | 'p1'> = { glitter: 'p1', hooligan: 'p1', kind: 'p1' };
@@ -31,12 +46,16 @@ export function modelsVariant(search = typeof location !== 'undefined' ? locatio
 
 export const modelsV2 = (search?: string) => modelsVariant(search) !== 'v1';
 
-/** путь модели характера: models/kind_v1.glb → models/v2/kind_p1.glb (v2) | models/v2/kind_v2.glb (v2h) */
-export function variantGlb(p: string, variant: ModelsVariant = modelsVariant()): string {
+/**
+ * путь модели характера: models/kind_v1.glb → models/v2/kind_p1.glb (v2, лицо шейдером) | models/v2/kind_p2.glb
+ * (v2, риг лица p2 — faceMode 'morph') | models/v2/kind_v2.glb (v2h)
+ */
+export function variantGlb(p: string, variant: ModelsVariant = modelsVariant(), face: FaceMode = faceMode()): string {
   if (variant === 'v1') return p;
   const m = p.match(/^(.*?)models\/(hooligan|kind|glitter)_v1\.glb$/);
   if (!m) return p;
-  const base = variant === 'v2h' ? 'v2' : V2_BASE[m[2]] ?? 'v2';
+  let base: string = variant === 'v2h' ? 'v2' : V2_BASE[m[2]] ?? 'v2';
+  if (base === 'p1' && face === 'morph') base = 'p2';
   return `${m[1]}models/v2/${m[2]}_${base}.glb`;
 }
 
@@ -50,7 +69,8 @@ export function collidersUrl(glb: string): string | null {
   if (m && /(^|\/)v2\/$/.test(m[1] ?? '')) return `${m[1]}${m[2]}_colliders.json`;
   const m1 = glb.match(/^(.*\/)?(hooligan|kind|glitter)_v1\.glb$/);
   if (m1) return `${m1[1] ?? ''}${m1[2]}_v1_colliders.json`;
-  const p1 = glb.match(/^(.*\/)?v2\/(hooligan|kind|glitter)_p1\.glb$/);
+  // p2 (риг лица) — та же геометрия тела, что у p1: прокси те же
+  const p1 = glb.match(/^(.*\/)?v2\/(hooligan|kind|glitter)_p[12]\.glb$/);
   if (!p1) return null;
   return P1_OWN_COLLIDERS.has(p1[2]) ? `${p1[1] ?? ''}v2/${p1[2]}_p1_colliders.json` : `${p1[1] ?? ''}${p1[2]}_v1_colliders.json`;
 }

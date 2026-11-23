@@ -77,6 +77,8 @@ export function setFurEnergy(mode: string) {
 
 interface FurLod {
   shells: THREE.SkinnedMesh[];
+  /** те же слои других мешей меха (морда рига p2 — BD_FurShellFace): видимость и h — как у слоя shells[i] */
+  twins: THREE.SkinnedMesh[][];
   h: { value: number }[];
   quality: number;
   visible: number;
@@ -110,6 +112,7 @@ function applyLod(lod: FurLod) {
   lod.shells.forEach((s, i) => {
     const h = keep.get(i);
     s.visible = h !== undefined;
+    for (const t of lod.twins[i] ?? []) t.visible = s.visible;
     if (h !== undefined) lod.h[i].value = h;
   });
 }
@@ -212,24 +215,34 @@ float furStrand(vec3 q, vec3 nn, out vec3 r) {
 export function buildFurShells(model: THREE.Object3D, body?: THREE.MeshStandardMaterial): THREE.SkinnedMesh[] {
   const shells: THREE.SkinnedMesh[] = [];
   let src: THREE.SkinnedMesh | null = null;
+  /** другие меши меха с _FURLEN (риг лица p2: морда — свой меш BD_FurShellFace со своими морфами) */
+  const more: THREE.SkinnedMesh[] = [];
   let cardsSrc: THREE.SkinnedMesh | null = null;
   let bodyMat = body ?? null;
   model.traverse((o) => {
     const m = o as THREE.SkinnedMesh;
     if (!m.isSkinnedMesh) return;
-    if (/^BD_FurShell/.test(m.name)) src = m;
+    if (/^BD_FurShell/.test(m.name)) {
+      if (!src || (m.name === 'BD_FurShell' && (src as THREE.SkinnedMesh).name !== 'BD_FurShell')) {
+        if (src) more.push(src);
+        src = m;
+      } else more.push(m);
+    }
     else if (/^BD_FurCards/.test(m.name)) cardsSrc = m;
     else if (!bodyMat && !/^BD_/.test(m.name) && (m.geometry.attributes.position?.count ?? 0) > 5000) bodyMat = m.material as THREE.MeshStandardMaterial;
   });
   const n = furLayersFor();
   const cards = cardsSrc as THREE.SkinnedMesh | null;
-  const lod: FurLod = { shells, h: [], quality: 1, visible: -1, cards, px: 0, on: n > 0 };
+  const lod: FurLod = { shells, twins: [], h: [], quality: 1, visible: -1, cards, px: 0, on: n > 0 };
   model.userData.furLod = lod;
   if (cards) setupCards(cards, bodyMat, n > 0);
   const sm = src as THREE.SkinnedMesh | null;
   if (!sm || !sm.geometry.attributes._furlen) return shells;
-  sm.visible = false;
-  sm.raycast = () => {};
+  const extra = more.filter((m) => m.geometry.attributes._furlen);
+  for (const m of [sm, ...more]) {
+    m.visible = false;
+    m.raycast = () => {};
+  }
   const p: FurParams = { ...DEF, ...((sm.userData?.fur as Partial<FurParams>) ?? {}) };
   const tip = new THREE.Vector3(...p.tip);
   const look = furLook();
@@ -295,20 +308,24 @@ export function buildFurShells(model: THREE.Object3D, body?: THREE.MeshStandardM
     };
     // слой задаётся униформой uShell — шейдер у всех оболочек один: компилируется один раз, а не по разу на слой
     mat.customProgramCacheKey = () => 'bdfur' + look.key;
-    const m = new THREE.SkinnedMesh(sm.geometry, mat);
-    m.name = `BD_FurShell_${k}`;
-    m.position.copy(sm.position);
-    m.quaternion.copy(sm.quaternion);
-    m.scale.copy(sm.scale);
-    m.bind(sm.skeleton, sm.bindMatrix);
-    if (sm.morphTargetDictionary) {
-      m.morphTargetDictionary = { ...sm.morphTargetDictionary };
-      m.morphTargetInfluences = new Array(Object.keys(sm.morphTargetDictionary).length).fill(0);
-    }
-    m.frustumCulled = false;
-    m.raycast = () => {};
-    sm.parent?.add(m);
-    shells.push(m);
+    const layer = (src0: THREE.SkinnedMesh, name: string) => {
+      const m = new THREE.SkinnedMesh(src0.geometry, mat);
+      m.name = name;
+      m.position.copy(src0.position);
+      m.quaternion.copy(src0.quaternion);
+      m.scale.copy(src0.scale);
+      m.bind(src0.skeleton, src0.bindMatrix);
+      if (src0.morphTargetDictionary) {
+        m.morphTargetDictionary = { ...src0.morphTargetDictionary };
+        m.morphTargetInfluences = new Array(Object.keys(src0.morphTargetDictionary).length).fill(0);
+      }
+      m.frustumCulled = false;
+      m.raycast = () => {};
+      src0.parent?.add(m);
+      return m;
+    };
+    shells.push(layer(sm, `BD_FurShell_${k}`));
+    lod.twins.push(extra.map((e, i) => layer(e, `BD_FurShellX${i}_${k}`)));
   }
   // внешняя оболочка видна всегда — по ней раз в кадр: время, размер кота на экране → LOD на следующий кадр
   const outer = shells[shells.length - 1];
