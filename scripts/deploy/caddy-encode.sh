@@ -55,7 +55,7 @@ cat > "$SNIP" <<'EOF'
 			header Content-Type application/octet-stream*
 		}
 	}
-	@voiceMp3 path /voice/el/*.mp3
+	@voiceMp3 path /voice/el/*.mp3 /voice/el/*/*.mp3
 	header @voiceMp3 Cache-Control "public, max-age=31536000, immutable"
 	@voiceManifest path /voice/el/manifest.json
 	header @voiceManifest Cache-Control "no-cache"
