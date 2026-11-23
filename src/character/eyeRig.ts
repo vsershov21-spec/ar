@@ -84,6 +84,51 @@ export interface EyeInput {
   bias?: [number, number] | null;
 }
 
+/**
+ * Материал век (LidUp/LidLo, вершинный цвет — мех вокруг глаза и подводка у кромки): освещение как у кожи морды
+ * (нормаль оболочки — сфера вокруг яблока: верх века смотрел в небо и светился полосой над глазом, низ темнел в серое),
+ * пряди меха шумом в координатах века, без блика; подводка и ресницы (тёмный вершинный цвет) — как были.
+ */
+export function patchLid(m: THREE.MeshStandardMaterial) {
+  m.roughness = 0.95;
+  m.metalness = 0;
+  m.envMapIntensity = 0;
+  const prev = m.onBeforeCompile;
+  m.onBeforeCompile = (sh, r) => {
+    prev?.call(m, sh, r);
+    sh.vertexShader = 'varying vec3 vLidP;\n' + sh.vertexShader
+      .replace(
+        '#include <beginnormal_vertex>',
+        // нормаль к «лицу» (ось глаза +Z) — веко освещено, как кожа вокруг глаза; у кромки — своя (скруглённый край)
+        `#include <beginnormal_vertex>
+  objectNormal = normalize(mix(objectNormal, vec3(0.0, 0.25, 1.0), 0.8));`,
+      )
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\n  vLidP = position;');
+    sh.fragmentShader = 'varying vec3 vLidP;\nfloat lidFur = 0.0;\n' + sh.fragmentShader.replace(
+      '#include <color_fragment>',
+      `#include <color_fragment>
+  {
+    // мех: только там, где цвет светлый (не подводка), тонкие пряди вдоль века
+    float lidL = dot(diffuseColor.rgb, vec3(0.299, 0.587, 0.114));
+    float fur = smoothstep(0.08, 0.2, lidL);
+    // пряди: вытянуты вдоль века (по y), два масштаба — как мех оболочек вокруг
+    vec3 q1 = vLidP * vec3(140.0, 22.0, 140.0);
+    vec3 q2 = vLidP * vec3(60.0, 10.0, 60.0) + 7.0;
+    float n1 = fract(sin(dot(floor(q1), vec3(12.9898, 78.233, 37.719))) * 43758.5453);
+    float n2 = fract(sin(dot(floor(q2), vec3(39.346, 11.135, 83.155))) * 43758.5453);
+    diffuseColor.rgb *= mix(1.0, 1.3 + 0.16 * (n1 - 0.5) + 0.1 * (n2 - 0.5), fur);
+    lidFur = fur;
+  }`,
+    ).replace(
+      '#include <emissivemap_fragment>',
+      `#include <emissivemap_fragment>
+  totalEmissiveRadiance += diffuseColor.rgb * 0.16 * lidFur;`,
+    );
+  };
+  m.customProgramCacheKey = () => 'cat-lid-v2';
+  m.needsUpdate = true;
+}
+
 export class EyeRig {
   readonly eyes: Eye[] = [];
   readonly uniforms = {
@@ -132,6 +177,16 @@ export class EyeRig {
     rig.uniforms.uIris.value.set(ex.irisUV?.[0] ?? 0.2, ex.irisUV?.[1] ?? 0.2);
     rig.uniforms.uPr0.value = ex.pupil ?? 0.5;
     const done = new Set<THREE.Material>();
+    // веки: мех, а не серые «заслонки» (продакт 23.11: плоские серые оболочки с резким светлым краем над глазом)
+    for (const e of rig.eyes)
+      for (const lid of [e.up, e.lo])
+        lid.traverse((o) => {
+          const m = (o as THREE.Mesh).material as THREE.MeshStandardMaterial | undefined;
+          if (m?.isMeshStandardMaterial && !done.has(m)) {
+            done.add(m);
+            patchLid(m);
+          }
+        });
     for (const e of rig.eyes) {
       e.ball.traverse((o) => {
         const m = (o as THREE.Mesh).material as THREE.MeshStandardMaterial | undefined;
