@@ -78,6 +78,20 @@
       "ref": "b99f37a431f85708ebd6c9c396887b1af30afa19",
       "path": "scripts/deploy/voice-headers.sh",
       "timeoutMin": 10
+    },
+    {
+      "id": "caddy-encode-2311b",
+      "kind": "script",
+      "ref": "859d8a420771ed1330c73bf6136282703cc67a54",
+      "path": "scripts/deploy/caddy-encode.sh",
+      "timeoutMin": 15
+    },
+    {
+      "id": "voice-headers-2311b",
+      "kind": "script",
+      "ref": "859d8a420771ed1330c73bf6136282703cc67a54",
+      "path": "scripts/deploy/voice-headers.sh",
+      "timeoutMin": 10
     }
   ]
 }
