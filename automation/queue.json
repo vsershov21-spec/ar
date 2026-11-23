@@ -57,6 +57,27 @@
         "nrDDckraMcifi2Jru1IO:1795359600:kqgDZ5acL1m2411PpKJjgZRogds="
       ],
       "timeoutMin": 10
+    },
+    {
+      "id": "pilot-setup-2311",
+      "kind": "script",
+      "ref": "b99f37a431f85708ebd6c9c396887b1af30afa19",
+      "path": "scripts/deploy/pilot-setup.sh",
+      "timeoutMin": 15
+    },
+    {
+      "id": "caddy-encode-2311",
+      "kind": "script",
+      "ref": "b99f37a431f85708ebd6c9c396887b1af30afa19",
+      "path": "scripts/deploy/caddy-encode.sh",
+      "timeoutMin": 15
+    },
+    {
+      "id": "voice-headers-2311",
+      "kind": "script",
+      "ref": "b99f37a431f85708ebd6c9c396887b1af30afa19",
+      "path": "scripts/deploy/voice-headers.sh",
+      "timeoutMin": 10
     }
   ]
 }
