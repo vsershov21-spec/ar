@@ -41,14 +41,14 @@ VERSION = 1
 # gap — щель между губами в покое (тёмная линия рта), depth — глубина полости, fang — клычки (длина, u),
 # tongue — язык (полуширина, длина), jaw — угол челюсти визем D (рад)
 PERSONA = {
-    'hooligan': {'gap': 0.024, 'depth': 0.42, 'fang': (0.085, 0.2), 'tongue': (0.2, 0.2), 'jaw': 0.36},
-    'kind': {'gap': 0.026, 'depth': 0.44, 'fang': (0.08, 0.2), 'tongue': (0.21, 0.21), 'jaw': 0.36},
-    'glitter': {'gap': 0.028, 'depth': 0.42, 'fang': (0.075, 0.19), 'tongue': (0.18, 0.18), 'jaw': 0.24},
+    'hooligan': {'gap': 0.012, 'depth': 0.42, 'fang': (0.085, 0.2), 'tongue': (0.2, 0.2), 'jaw': 0.36},
+    'kind': {'gap': 0.013, 'depth': 0.44, 'fang': (0.08, 0.2), 'tongue': (0.21, 0.21), 'jaw': 0.36},
+    'glitter': {'gap': 0.014, 'depth': 0.42, 'fang': (0.075, 0.19), 'tongue': (0.18, 0.18), 'jaw': 0.24},
 }
 
 # ключи прошлых стадий, которые переезжают на FaceSkin как есть (интерполируются при подразбиении)
 W_REF = 0.1458  # ширина рта Хулигана (масштаб глубины рамки)
-REST_FANG = 0.012  # длина клычка в покое (W): не виден в щели губ
+REST_FANG = 0.003  # длина клычка в покое (W): не виден в щели губ
 TONGUE_DROP = 0.05  # язык ниже: в покое не виден в щели губ (W)
 EPS = 0.006  # смещения ключа меньше EPS·W не пишутся (≈ 0.9 мм у Хулигана)
 # зоны подразбиения у рта (rx, ry по u/v, центр v, глубина): два уровня — с одним у грубой сетки Tripo разрез по линии
@@ -64,22 +64,25 @@ EXTRA = ['cheek_up', 'cheeks_gum', 'nose_wrinkle']
 KEYS = VISEMES + EMOS + LIDS + BROWS + EXTRA
 
 # состав ключей рта: jaw — доля угла челюсти; остальное — веса элементарных полей
+# open — полуширина проёма (u, доли W) по рефу design/sheets/mouths.jpg: губы расходятся только в её пределах, дальше
+# сомкнуты (и щель покоя закрыта) — «о» круглое маленькое, «у» трубочка, «а» уже и выше; arch — подъём середины
+# верхней губы (доля опускания нижней)
 MOUTH = {
     'vis_A': {'press': 1.0},
-    'vis_B': {'jaw': 0.14, 'wide': 0.35, 'lift': 0.25},
-    'vis_C': {'jaw': 0.42, 'wide': 0.6, 'lift': 0.2},
-    'vis_D': {'jaw': 1.0, 'wide': 0.2, 'lift': 0.25},
-    'vis_E': {'jaw': 0.55, 'round': 0.9},
-    'vis_F': {'jaw': 0.2, 'pucker': 1.0},
-    'vis_G': {'jaw': 0.08, 'tuck': 1.0},
-    'vis_H': {'jaw': 0.42, 'wide': 0.25, 'lift': 0.2, 'tongue_up': 1.0},
-    'smile': {'smile': 1.0},
-    'smile_open': {'smile': 0.9, 'jaw': 0.42, 'lift': 0.6},
-    'smirk': {'smirk': 1.0},
-    'frown': {'frown': 1.0},
-    'surprise': {'jaw': 0.5, 'round': 0.8, 'pucker': 0.45},
-    'pout': {'pout': 1.0},
-    'tongue_out': {'jaw': 0.34, 'wide': 0.15, 'tongue_out': 1.0},
+    'vis_B': {'jaw': 0.16, 'wide': 0.2, 'lift': 0.2, 'open': 0.34, 'arch': 0.1},
+    'vis_C': {'jaw': 0.45, 'wide': 0.3, 'lift': 0.2, 'open': 0.36, 'arch': 0.12},
+    'vis_D': {'jaw': 0.95, 'lift': 0.25, 'open': 0.34, 'arch': 0.15},
+    'vis_E': {'jaw': 0.3, 'round': 0.8, 'open': 0.25, 'arch': 0.25, 'flat': 1.0},
+    'vis_F': {'jaw': 0.16, 'pucker': 1.0, 'open': 0.14, 'arch': 0.25, 'flat': 1.0},
+    'vis_G': {'jaw': 0.08, 'tuck': 1.0, 'open': 0.3},
+    'vis_H': {'jaw': 0.42, 'lift': 0.2, 'tongue_up': 1.0, 'open': 0.32, 'arch': 0.12},
+    'smile': {'smile': 1.0, 'press': 0.5},
+    'smile_open': {'smile': 0.9, 'jaw': 0.42, 'lift': 0.6, 'open': 0.4, 'arch': 0.1},
+    'smirk': {'smirk': 1.3, 'press': 0.5},
+    'frown': {'frown': 1.0, 'press': 0.8},
+    'surprise': {'jaw': 0.34, 'round': 0.9, 'pucker': 0.2, 'open': 0.24, 'arch': 0.3, 'flat': 1.0},
+    'pout': {'pout': 1.0, 'press': 0.6},
+    'tongue_out': {'jaw': 0.34, 'open': 0.3, 'tongue_out': 1.0, 'arch': 0.1},
 }
 
 
@@ -609,6 +612,51 @@ class Rig:
         return D
 
 
+def profile_fix(fr, T, P, side, pairs):
+    """Форма проёма по рефу: нижняя губа опускается дугой только в пределах open (полуширина, u), за ней губы сомкнуты
+    (и щель покоя закрыта); верхняя губа в середине чуть поднимается (arch). Поправка — по вертикали, к краю губ
+    полная, вниз по подбородку и вверх к носу гаснет: подбородок идёт за челюстью как был, уголки мягкие."""
+    W = fr.W
+    u, v, w = fr.uvw(P)
+    cu = fr.cu
+    dv = v - fr.line(np.clip(u, -cu, cu))
+    up_i = np.array([p[1][0] for p in pairs])
+    lo_i = np.array([p[2][0] for p in pairs])
+    pu_ = np.array([p[0] for p in pairs])
+    order = np.argsort(pu_)
+    pu_, up_i, lo_i = pu_[order], up_i[order], lo_i[order]
+    gap = fr.cfg['gap']
+    qrest = np.cos(np.clip(u / cu, -1, 1) * math.pi / 2)
+    near = sm(cu + 0.12, cu - 0.02, np.abs(u)) * sm(-0.6, -0.25, w)
+    lo = (side < 0) | ((side == 0) & (dv < 0))
+    fall_lo = np.exp(-(np.minimum(dv, 0) / 0.28) ** 2) * lo * near
+    fall_up = np.exp(-(np.maximum(dv, 0) / 0.16) ** 2) * (~lo) * near * sm(fr.nose + 0.02, fr.nose - 0.05, v)
+    for k, comp in MOUTH.items():
+        h = comp.get('open')
+        if not h:
+            continue
+        d = T[k]
+        ylo = np.interp(u, pu_, d[lo_i, 1])  # текущее смещение края нижней губы над этой u
+        yup = np.interp(u, pu_, d[up_i, 1])
+        c = int(np.argmin(np.abs(pu_)))
+        drop = min(0.0, float(d[lo_i[c], 1] - d[up_i[c], 1]))  # раскрытие в середине (< 0)
+        prof = sm(h * 1.15, 0.0, np.abs(u)) ** 0.7  # купол без излома на краю — мягкие уголки
+        # цель: край нижней губы = верхняя губа + раскрытие·профиль; за проёмом — сомкнуто (щель покоя тоже)
+        close = 0.5 * gap * qrest * W * (1 - prof)
+        tgt_lo = yup + drop * prof + close
+        corr_lo = tgt_lo - ylo
+        arch = comp.get('arch', 0) * (-drop) * prof
+        # круглые формы: «ω» верхней губы в проёме разглажена в дугу (без острого пика под носом)
+        flat = comp.get('flat', 0) * (float(fr.line(0.0)) - fr.line(np.clip(u, -cu, cu))) * W * prof
+        flat = np.where(flat > 0, flat * 0.0, flat) + np.where(flat > 0, flat, 0)
+        corr_up = arch + flat - close
+        d[:, 1] += corr_lo * fall_lo + corr_up * fall_up
+        # по глубине — край нижней губы за проёмом тоже к верхней (нет «ступеньки» в уголках)
+        zlo = np.interp(u, pu_, d[lo_i, 2])
+        zup = np.interp(u, pu_, d[up_i, 2])
+        d[:, 2] += (zup - zlo) * (1 - prof) * fall_lo
+
+
 def build_targets(fr, rig, P, side, ang_d):
     """словарь ключ → смещения для точек P (side — губа)"""
     T = {}
@@ -728,7 +776,7 @@ def cavity(fr, rig, S, T_skin, ang_d, head_j, body=None):
         F.append([ring_at[-1][lastc[k_]], ring_at[-1][lastc[(k_ + 1) % len(lastc)]], bi])
     F = np.array(F)
     # цвет: кромка губ — тёмно-розовая, глубже — почти чёрная, низ (у языка) — теплее
-    lip = np.array([0.32, 0.1, 0.13])
+    lip = np.array([0.46, 0.27, 0.32])  # кромка: тонкая линия «ω» в покое — не чёрная щель
     deep = np.array([0.06, 0.012, 0.02])
     floor = np.array([0.3, 0.07, 0.09])
     k = sm(0.0, 0.2, tt)[:, None]
@@ -879,7 +927,7 @@ def fangs(fr, rig, S, cav, T_skin, ang_d, body=None):
         # ближайшая верхняя пара разреза
         pi = min(range(len(S['pairs'])), key=lambda i: abs(S['pairs'][i][0] - u0))
         top_i = S['pairs'][pi][1][0]
-        base = P[top_i] + np.array([0, -0.004, -0.05]) * W
+        base = P[top_i] + np.array([0, 0.012, -0.05]) * W  # над кромкой губы: в покое не виден в щели
         tip = base + np.array([sgn * -0.008, -REST_FANG, -0.008]) * W
         b0 = len(V)
         for k in range(seg):
@@ -1165,7 +1213,7 @@ def main():
     Ps[:, 1] += np.sign(side) * 0.5 * gap * q * near_s * W
     Ps[:, 2] += -0.018 * W * np.exp(-(dv / 0.06) ** 2) * sm(cu + 0.05, cu - 0.1, np.abs(u)) * sm(-0.5, -0.2, w)
     phil = np.exp(-(u / 0.025) ** 2) * sm(0.0, 0.03, dv) * sm(fr.nose, fr.nose - 0.04, v) * sm(-0.5, -0.2, w)
-    Ps[:, 2] += -0.012 * W * phil
+    Ps[:, 2] += -0.02 * W * phil
     S['P'] = Ps
     # мех у губ — 0 (пряди не лезут в рот), плавно к прежней длине
     furlen = S['f']['furlen'] * sm(0.05, 0.16, np.abs(dv) + np.maximum(0, np.abs(u) - cu)) ** 1.0
@@ -1173,6 +1221,7 @@ def main():
 
     # ── ключи FaceSkin
     T = build_targets(fr, rig, Ps, side, ang_d)
+    profile_fix(fr, T, Ps, side, S['pairs'])
     for k in KEEP_KEYS:
         if k in S['v']:
             T[k] = S['v'][k]
