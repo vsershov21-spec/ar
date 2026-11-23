@@ -130,6 +130,16 @@
       ],
       "maxCredits": 120,
       "note": "Блёстка p3: multiview по развороту 23.11 (H3.1, detailed)"
+    },
+    {
+      "id": "el-names36-2311",
+      "kind": "eleven",
+      "args": [
+        "--only",
+        "slot"
+      ],
+      "maxCredits": 800,
+      "note": "36 новых имён × 3 кота = 108 слотов, 726 симв.; --only slot, уже озвученное пропускается по хэшу"
     }
   ]
 }
