@@ -21,9 +21,11 @@ export interface TulleLook {
  * 20.11 (кадр КотоТом 17-11, design/sheets/glitter_turnaround.jpg): у подола тонкая мягкая золотистая кромка, блёстки
  * гуще к подолу, общий тон мятно-золотой. Было band 0.1 / смешение 0.85 — толстое жёлтое кольцо.
  */
-export const TULLE_GLITTER: TulleLook = { band: 0.1, sparkle: 0.28, gold: [0.82, 0.6, 0.24], bandK: 0.72 };
+export const TULLE_GLITTER: TulleLook = { band: 0.085, sparkle: 0.3, gold: [0.86, 0.62, 0.22], bandK: 0.88 };
 // 23.11 (разворот design/refs/glitter_turnaround_1123.png): у каждого слоя — широкая золотая блестящая кайма с фестонами
-// (край волной по окружности), блёстки по всей пачке гуще; было band 0.04 / sparkle 0.16 / bandK 0.6 — тонкая кромка
+// (край волной по окружности), блёстки по всей пачке гуще; было band 0.04 / sparkle 0.16 / bandK 0.6 — тонкая кромка.
+// 24.11 (пачка в три яруса, glitter_ref2.py): t каймы у ярусов — в долях длины нижнего яруса, кайма ≈ 13 мм модели
+// у каждого яруса; было band 0.1 / sparkle 0.28 / bandK 0.72 (по одному слою — бледная тонкая полоса)
 
 /**
  * Вторичная анимация фатина (живой покой Блёстки, 20.11): сдвиг к подолу (∝ t^1.5) — пружина от скорости таза
@@ -57,6 +59,9 @@ export function attachTulle(model: THREE.Object3D, look: TulleLook = TULLE_GLITT
     const uv = m.geometry.getAttribute('uv');
     if (!uv) return;
     m.geometry.setAttribute('tulleT', uv);
+    // ярусы (glitter_ref2.py): UV1.y — t от пояса до нижнего подола, качание одно на всю пачку (у яруса UV0.y — свой t
+    // для каймы); без UV1 — как раньше
+    m.geometry.setAttribute('tulleS', m.geometry.getAttribute('uv1') ?? uv);
     const mat = m.material as THREE.MeshStandardMaterial;
     patch(mat, look);
     tulleMeshes.add(m);
@@ -76,14 +81,14 @@ function patch(m: THREE.MeshStandardMaterial, look: TulleLook) {
     sh.uniforms.uTuSway = motion.sway;
     sh.uniforms.uTuFlut = motion.flut;
     sh.vertexShader =
-      'attribute vec2 tulleT;\nvarying vec2 vTu;\nuniform vec3 uTuSway;\nuniform vec2 uTuFlut;\n' +
+      'attribute vec2 tulleT;\nattribute vec2 tulleS;\nvarying vec2 vTu;\nuniform vec3 uTuSway;\nuniform vec2 uTuFlut;\n' +
       sh.vertexShader.replace(
         '#include <begin_vertex>',
         `#include <begin_vertex>
   vTu = tulleT;
   {
     // пачка качается от пояса к подолу (пружина от таза) и чуть дышит рябью по нормали
-    float tt = clamp(tulleT.y, 0.0, 1.0);
+    float tt = clamp(tulleS.y, 0.0, 1.0);
     transformed += uTuSway * pow(tt, 1.5);
     transformed += objectNormal * uTuFlut.y * tt * sin(uTuFlut.x * 5.0 + tulleT.x * 6.2832 * 6.0);
   }`,
@@ -123,6 +128,6 @@ function patch(m: THREE.MeshStandardMaterial, look: TulleLook) {
         );
   };
   const prevKey = m.customProgramCacheKey?.bind(m);
-  m.customProgramCacheKey = () => (prevKey ? prevKey() : '') + '|tulle-fx-v4';
+  m.customProgramCacheKey = () => (prevKey ? prevKey() : '') + '|tulle-fx-v5';
   m.needsUpdate = true;
 }

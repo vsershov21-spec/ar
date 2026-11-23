@@ -1,5 +1,11 @@
 """Лист «реф vs было vs стало» для Блёстки по развороту продакта 23.11 (design/refs/glitter_turnaround_1123.png).
 
+Второй проход (24.11, scripts/models/glitter_ref2.py: пачка в три яруса, длинный хвост) — --pass2: строки видов,
+спина и профиль крупно (реф | было | стало), кадры клипов «сидит» и «танец» (было | стало):
+    Q="v=backc,sider&w=450&h=600&face=shader&m=/_tmp/p1o.glb" … ob   (стало — nb, без m= или m=/models/v2/glitter_p1.glb)
+    Q="v=front,side,back34&w=300&h=440&m=…&clip=sit&ct=1.6" … os / ns;  clip=dance_glitter&ct=1.3 … od / nd
+    python3 tools/glitter-ref-sheet.py <dir> out.jpg --pass2
+
     npx vite --port 4191 &
     # было: копии прежних GLB в public/_tmp/p1o.glb, p2o.glb (не коммитить)
     PORT=4191 Q="v=front,tq,side,back,face&w=300&h=440&face=shader&m=/_tmp/p1o.glb" node tools/persona-shot.mjs <dir> o1 glitter
@@ -52,8 +58,47 @@ def row(title, ts):
     return out
 
 
+def ref_big():
+    im = Image.open(os.path.join(ROOT, 'design/refs/glitter_turnaround_1123.png')).convert('RGB')
+    out = []
+    for x0, x1 in ((985, 1360), (720, 1030)):
+        c = im.crop((x0, 90, x1, 660)); c.thumbnail((450, 600))
+        t = Image.new('RGB', (450, 600), BG); t.paste(c, ((450 - c.width) // 2, (600 - c.height) // 2)); out.append(t)
+    return out
+
+
+def pass2(d, out):
+    V = ['анфас', '3/4', 'профиль', 'спина', 'лицо']
+    rows = [row('реф: design/refs/glitter_turnaround_1123.png', [lab(t, v) for t, v in zip(ref_views(), V)]),
+            row('было: glitter_p1 ece63b2 (пилот, рот шейдером)', [lab(t, v) for t, v in zip(tiles(f'{d}/o1_glitter.png', 5), V)]),
+            row('стало: glitter_p1 (пачка в 3 яруса, длинный хвост)', [lab(t, v) for t, v in zip(tiles(f'{d}/n1_glitter.png', 5), V)]),
+            row('стало: glitter_p2 (lab, риг лица морфами)', [lab(t, v) for t, v in zip(tiles(f'{d}/n2_glitter.png', 5), V)])]
+    rb = ref_big(); ob = tiles(f'{d}/ob_glitter.png', 2, 450, 600); nb = tiles(f'{d}/nb_glitter.png', 2, 450, 600)
+    big = [lab(rb[0], 'реф: спина'), lab(ob[0], 'было: спина'), lab(nb[0], 'стало: спина')]
+    big2 = [lab(rb[1], 'реф: профиль'), lab(ob[1], 'было: профиль справа'), lab(nb[1], 'стало: профиль справа')]
+    for title, ts in (('спина крупно: капюшон, хвост, пачка сзади', big), ('профиль крупно: хвост', big2)):
+        r = Image.new('RGB', (1500, 600 + 32), BG); ImageDraw.Draw(r).text((8, 4), title, fill=(20, 20, 30), font=FB)
+        for i, t in enumerate(ts):
+            r.paste(t, (i * 500, 32))
+        rows.append(r)
+    A = ['анфас', 'профиль', 'сзади 3/4']
+    for nm, k in (('сидит (sit, 1.6 с)', 's'), ('танец Блёстки (dance_glitter, 1.3 с)', 'd')):
+        ts = [lab(t, 'было: ' + a) for t, a in zip(tiles(f'{d}/o{k}_glitter.png', 3), A)] + \
+             [lab(t, 'стало: ' + a) for t, a in zip(tiles(f'{d}/n{k}_glitter.png', 3), A)]
+        rows.append(row(nm + ': было | стало', ts))
+    W = max(r.width for r in rows)
+    sheet = Image.new('RGB', (W, sum(r.height for r in rows)), BG)
+    y = 0
+    for r in rows:
+        sheet.paste(r, (0, y)); y += r.height
+    sheet.save(out, quality=85)
+    print(out, sheet.size)
+
+
 def main():
     d, out = sys.argv[1:3]
+    if '--pass2' in sys.argv:
+        return pass2(d, out)
     V = ['анфас', '3/4', 'профиль', 'спина', 'лицо']
     rows = [row('реф: design/refs/glitter_turnaround_1123.png (разворот продакта 23.11)', [lab(t, v) for t, v in zip(ref_views(), V)]),
             row('было: glitter_p1 до правок (пилот, рот шейдером)', [lab(t, v) for t, v in zip(tiles(f'{d}/o1_glitter.png', 5), V)]),
