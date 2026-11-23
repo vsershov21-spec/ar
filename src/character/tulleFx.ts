@@ -21,7 +21,9 @@ export interface TulleLook {
  * 20.11 (кадр КотоТом 17-11, design/sheets/glitter_turnaround.jpg): у подола тонкая мягкая золотистая кромка, блёстки
  * гуще к подолу, общий тон мятно-золотой. Было band 0.1 / смешение 0.85 — толстое жёлтое кольцо.
  */
-export const TULLE_GLITTER: TulleLook = { band: 0.04, sparkle: 0.16, gold: [0.8, 0.58, 0.24], bandK: 0.6 };
+export const TULLE_GLITTER: TulleLook = { band: 0.1, sparkle: 0.28, gold: [0.82, 0.6, 0.24], bandK: 0.72 };
+// 23.11 (разворот design/refs/glitter_turnaround_1123.png): у каждого слоя — широкая золотая блестящая кайма с фестонами
+// (край волной по окружности), блёстки по всей пачке гуще; было band 0.04 / sparkle 0.16 / bandK 0.6 — тонкая кромка
 
 /**
  * Вторичная анимация фатина (живой покой Блёстки, 20.11): сдвиг к подолу (∝ t^1.5) — пружина от скорости таза
@@ -99,7 +101,9 @@ function patch(m: THREE.MeshStandardMaterial, look: TulleLook) {
     float mesh = 0.5 + 0.5 * max(sin(g.x * 3.1416) * sin(g.y * 3.1416), 0.0);
     diffuseColor.a *= 0.82 + 0.25 * mesh;
     // золотая полоса по подолу (мягкий край) и блёстки, гуще к подолу
-    float band = smoothstep(1.0 - uTuK.x - 0.025, 1.0 - uTuK.x + 0.01, t) * uTuK.z;
+    float scal = 0.65 + 0.7 * abs(sin(vTu.x * 6.2832 * 13.0));
+    float band = smoothstep(1.0 - uTuK.x * scal - 0.02, 1.0 - uTuK.x * scal + 0.012, t) * uTuK.z;
+    band *= 0.75 + 0.25 * tuHash(floor(vec2(vTu.x * 700.0, t * 120.0)));
     vec2 cell = floor(vec2(vTu.x * 420.0, t * 64.0));
     float h = tuHash(cell);
     vec2 f = fract(vec2(vTu.x * 420.0, t * 64.0)) - 0.5;
@@ -119,6 +123,6 @@ function patch(m: THREE.MeshStandardMaterial, look: TulleLook) {
         );
   };
   const prevKey = m.customProgramCacheKey?.bind(m);
-  m.customProgramCacheKey = () => (prevKey ? prevKey() : '') + '|tulle-fx-v3';
+  m.customProgramCacheKey = () => (prevKey ? prevKey() : '') + '|tulle-fx-v4';
   m.needsUpdate = true;
 }

@@ -12,7 +12,7 @@ export interface HeadLife { yaw: number; pitch: number; roll: number; breath: nu
 
 interface Micro { weights: Record<string, number>; dur: number }
 
-/** микромимика по характеру: Хулиган ухмыляется, Добряк улыбается, Блёстка улыбается и краснеет */
+/** микромимика по характеру: Хулиган ухмыляется, Добряк улыбается, Блёстка улыбается (без румянца) */
 const MICRO: Record<string, Micro[]> = {
   hooligan: [
     { weights: { smirk: 0.55 }, dur: 1.6 },
@@ -26,7 +26,7 @@ const MICRO: Record<string, Micro[]> = {
   ],
   glitter: [
     { weights: { smile: 0.5, eyes_squint: 0.2 }, dur: 1.5 },
-    { weights: { blush: 0.6, smile: 0.35 }, dur: 1.8 },
+    { weights: { smile: 0.45, cheek_up: 0.3 }, dur: 1.8 }, // 23.11: без румянца (разворот 1123)
     { weights: { wink_R: 1, smile: 0.4 }, dur: 0.55 },
   ],
 };

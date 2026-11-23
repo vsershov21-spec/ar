@@ -82,9 +82,11 @@ function patch(m: THREE.MeshStandardMaterial) {
     vec3 cell = floor(q);
     float h = tsHash(cell);
     float d = length(fract(q) - 0.5);
-    float sp = step(1.0 - 0.32 * t, h) * (1.0 - smoothstep(0.16, 0.36, d));
-    tsCol = mix(vec3(0.86, 0.64, 0.3), vec3(0.74, 0.6, 0.92), step(0.5, fract(h * 7.31)));
-    diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.04, 0.97, 1.08), t * 0.5);
+    // 23.11 (разворот 1123): сине-лиловый у корня → фиолетовый к кончику, золотые блёстки гуще к кончику
+    float sp = step(1.0 - 0.45 * t, h) * (1.0 - smoothstep(0.16, 0.36, d));
+    tsCol = mix(vec3(0.9, 0.66, 0.26), vec3(0.74, 0.6, 0.92), step(0.78, fract(h * 7.31)));
+    float tv = smoothstep(0.05, 0.9, vTsT);
+    diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.3, 0.17, 0.62) * (0.6 + 0.6 * dot(diffuseColor.rgb, vec3(0.33))), tv * 0.72);
     diffuseColor.rgb = mix(diffuseColor.rgb, tsCol, sp);
     tsSpark = sp;
   }`,
@@ -96,6 +98,6 @@ function patch(m: THREE.MeshStandardMaterial) {
         );
   };
   const prevKey = m.customProgramCacheKey?.bind(m);
-  m.customProgramCacheKey = () => (prevKey ? prevKey() : '') + '|tail-spark-v1';
+  m.customProgramCacheKey = () => (prevKey ? prevKey() : '') + '|tail-spark-v2';
   m.needsUpdate = true;
 }

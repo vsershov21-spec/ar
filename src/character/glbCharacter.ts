@@ -157,7 +157,9 @@ const PERSONA_FACE_V2: Record<string, Record<string, number>> = {
  * губы чуть разомкнуты (прежние mouth_A 0.46 с ригом — это уже smile_open: рот «настежь»)
  */
 const PERSONA_FACE_MORPH: Record<string, Record<string, number>> = {
-  glitter: { smile: 0.55 },
+  // 23.11, разворот design/refs/glitter_turnaround_1123.png: в покое открытая улыбка — видны верхние зубки и язычок
+  // (mapFace: smile 0.6 + mouth_A 0.2 → smile_open 0.4 + smile 0.36)
+  glitter: { smile: 0.6, mouth_A: 0.2 },
 };
 
 /**
@@ -178,7 +180,8 @@ const FACE_FRESH_S = 0.25;
 
 /** множители век по характеру (v2, по умолчанию): 1 — как в пресете */
 const PERSONA_EYES_V2: Record<string, Record<string, number>> = {
-  glitter: { eyes_smug: 0.3, eyes_sleepy: 0.5, eyes_squint: 0.6 },
+  // 23.11 (разворот 1123): глаза в покое открыты (без «сонных» век), румянца нет вовсе — blush ×0
+  glitter: { eyes_smug: 0.15, eyes_sleepy: 0.2, eyes_squint: 0.45, blush: 0 },
 };
 
 let ENV: THREE.Texture | null = null;
