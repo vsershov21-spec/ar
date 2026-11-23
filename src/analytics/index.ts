@@ -18,6 +18,8 @@ export const EVENTS = [
   // быстрый вход (feature 'intro.quick', src/quick): воронка по шагам, ms — от начала навигации
   'page_open', 'splash_shown', 'cta_tap', 'camera_denied', 'camera_retry', 'mic_granted', 'mic_denied', 'terms_open',
   'card_search_start', 'card_found', 'cat_awake', 'first_action',
+  // озвучка (src/voice/voicePlayer.ts): реплика без звука или поздно — причина и мс (без текста, имени, id реплики)
+  'voice_issue',
 ] as const;
 export type EventName = (typeof EVENTS)[number];
 
@@ -47,6 +49,7 @@ export const PROPS: Partial<Record<EventName, Record<string, Kind>>> = {
   sberkids_click: { kind: 'id' },
   session_end: { sec: 'num' },
   paint_start: { color: 'id' },
+  voice_issue: { reason: 'id', ms: 'num', net: 'num', dec: 'num', warm: 'num', ev: 'id', ctx: 'id' },
 };
 const ID_RE = /^[a-z0-9_:.-]{1,32}$/i;
 

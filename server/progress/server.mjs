@@ -42,7 +42,9 @@ export const LIMITS = {
 /** события воронки и их свойства (тот же список — src/analytics/index.ts EVENTS/PROPS); всё прочее — 400 */
 export const FUNNEL = ['open', 'onboarding_done', 'camera_granted', 'card_landed', 'awake_done', 'named', 'action', 'game_start', 'game_end', 'cat_switch', 'home_enter', 'sleep', 'wake', 'card_lost', 'sberkids_click', 'session_end', 'paint_offer', 'paint_start', 'paint_done', 'paint_erase',
   // быстрый вход (intro.quick): шаги воронки входа, ms — от начала навигации
-  'page_open', 'splash_shown', 'cta_tap', 'camera_denied', 'camera_retry', 'mic_granted', 'mic_denied', 'terms_open', 'card_search_start', 'card_found', 'cat_awake', 'first_action'];
+  'page_open', 'splash_shown', 'cta_tap', 'camera_denied', 'camera_retry', 'mic_granted', 'mic_denied', 'terms_open', 'card_search_start', 'card_found', 'cat_awake', 'first_action',
+  // озвучка: реплика без звука или поздно (src/voice/voicePlayer.ts) — причина и мс
+  'voice_issue'];
 const EVENT_PROPS = {
   card_landed: { ms: 'num' }, action: { id: 'id' }, game_start: { id: 'id' }, game_end: { id: 'id' }, cat_switch: { to: 'id' },
   home_enter: { reason: 'id' }, card_lost: { count: 'num' }, sberkids_click: { kind: 'id' }, session_end: { sec: 'num' },
@@ -50,6 +52,7 @@ const EVENT_PROPS = {
   camera_granted: { ms: 'num' }, page_open: { ms: 'num' }, splash_shown: { ms: 'num' }, cta_tap: { ms: 'num', early: 'num' }, camera_denied: { ms: 'num' },
   camera_retry: { ms: 'num' }, mic_granted: { ms: 'num' }, mic_denied: { ms: 'num' }, terms_open: { ms: 'num' }, card_search_start: { ms: 'num' },
   card_found: { ms: 'num' }, cat_awake: { ms: 'num' }, first_action: { ms: 'num', id: 'id' },
+  voice_issue: { reason: 'id', ms: 'num', net: 'num', dec: 'num', warm: 'num', ev: 'id', ctx: 'id' },
 };
 /** метка источника из QR (?src=, src/analytics readSrc): латиница и цифры до 32 символов; хранится в props.src (формат строк не меняется) */
 export const SRC_RE = /^[A-Za-z0-9]{1,32}$/;
@@ -216,7 +219,7 @@ export async function createProgressServer(opts = {}) {
    */
   function stats(days, onlySrc = null) {
     const since = now() - days * DAY;
-    const by = new Map(), bySrc = new Map(), srcs = new Map();
+    const by = new Map(), bySrc = new Map(), srcs = new Map(), voice = {};
     const add = (map, key, base, e) => {
       let r = map.get(key);
       if (!r) map.set(key, (r = { ...base, events: {} }));
@@ -239,6 +242,11 @@ export async function createProgressServer(opts = {}) {
       add(by, `${day}|${e.edition}`, { day, edition: e.edition }, e);
       add(bySrc, `${day}|${e.edition}|${src ?? ''}`, { day, edition: e.edition, src }, e);
       if (src) srcs.set(src, (srcs.get(src) ?? new Set()).add(e.device));
+      // озвучка: немые и поздние реплики по причинам (src/voice/voicePlayer.ts voice_issue)
+      if (e.name === 'voice_issue') {
+        const r = props && typeof props.reason === 'string' && PROP_ID_RE.test(props.reason) ? props.reason : 'unknown';
+        voice[r] = (voice[r] ?? 0) + 1;
+      }
     }
     const order = (a, b) => (a.day === b.day ? a.edition.localeCompare(b.edition) || String(a.src ?? '').localeCompare(String(b.src ?? '')) : b.day.localeCompare(a.day));
     const out = (r) => ({ ...r, events: Object.fromEntries(Object.entries(r.events).map(([k, v]) => [k, { n: v.n, devices: v.devices.size }])) });
@@ -247,6 +255,7 @@ export async function createProgressServer(opts = {}) {
       since, days, funnel: FUNNEL, rows,
       bySrc: [...bySrc.values()].sort(order).map(out),
       srcs: [...srcs].map(([src, d]) => ({ src, devices: d.size })).sort((a, b) => b.devices - a.devices),
+      voice,
       ...(onlySrc ? { src: onlySrc } : {}),
     };
   }

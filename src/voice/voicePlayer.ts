@@ -12,12 +12,22 @@
  * В проде на сайте полная озвучка ElevenLabs (voice/el/manifest.json) — тогда Piper-индекс и манифесты характеров
  * НЕ грузятся, а speechSynthesis не трогается вовсе (ни unlock в жесте, ни getVoices, ни cancel: на iOS синтез
  * поднимает свою аудиосессию). Для отладки: ?piper — Piper-записи как запасной голос, ?synth — синтез браузера.
- * Кэш декодированных реплик — LRU по объёму (VOICE_CACHE_BYTES, ~12 МБ ≈ минута звука 48 кГц), предзагрузка —
- * не больше 2 декодирований одновременно, реплика «сейчас» — без очереди. Плюс кэш сжатых mp3 (RAW_CACHE_BYTES, 6 МБ ≈
+ * Кэш декодированных реплик — LRU по объёму (VOICE_CACHE_BYTES, 8 МБ ≈ 45 с звука 48 кГц), предзагрузка —
+ * по одному декодированию, реплика «сейчас» — без очереди. Плюс кэш сжатых mp3 (RAW_CACHE_BYTES, 6 МБ ≈
  * 250 реплик): warmEvents() качает все варианты реплик ближайших действий заранее, а декодирует только самые вероятные —
  * реплика «сейчас» тогда стоит одно декодирование (десятки мс), а не сеть (iPhone 20.11: «озвучка запаздывает»).
  * Синхронность: speak(req, { onStart }) зовёт onStart в момент, когда звук реально пошёл (с задержкой вывода) —
  * режиссёр показывает пузырь и «говорящий» клип по нему, а не до сети и декодирования. timings — разбор задержек.
+ *
+ *
+ * Устойчивость (iPhone 22.11, показ в офисе: «со звуком опять проблемы — зависал и не грузился»): любой звук ограничен по
+ * времени — не начал играть за VOICE_START_TIMEOUT_MS (сеть, декодирование, спящий контекст iOS) → пузырь без звука на
+ * длину реплики, сценарий идёт дальше; запрос mp3 и decodeAudioData — с таймаутами; контекст встал во время реплики
+ * (currentTime не идёт) — остаток молча, а не вечное ожидание onended. Фоновая докачка — после посадки кота
+ * (holdBackground), только текущего кота, по одному варианту каждого события сначала, на медленной сети — 1 запрос и
+ * только первые варианты, пока идёт реплика «сейчас» — пауза; декодирование заранее — по одному и только при живом
+ * контексте. 404 записи (манифест старше файлов после пересборки) — манифест перечитывается. Причины задержек и
+ * немых реплик — в аналитику (voice_issue: причина и миллисекунды, без текста и имени).
  *
  * Перебивание (barge-in): fadeOut(120) — реплика затухает, очередь DialogQueue сохраняется.
  * Самопрослушивание: onSpeaking(true/false) — VoiceEngine глушит распознавание на время реплики + 250 мс.
@@ -28,6 +38,7 @@ import { LipSync } from '../lipsync/lipsync';
 import { cuesFromText, estimateSpeechSec, type MouthCue } from '../lipsync/visemes';
 import { cuesFromAmplitude } from '../lipsync/ru';
 import { frames } from '../audio/dsp';
+import { track } from '../analytics';
 
 /** Один файл озвучки в манифесте характера */
 export interface ClipEntry {
@@ -110,13 +121,29 @@ type ElEntry = ClipEntry & { kind?: 'line' | 'part' | 'slot'; line?: string; par
 type ElHit = { kind: 'line'; e: ElEntry } | { kind: 'parts'; a?: ElEntry; b?: ElEntry; v: ElEntry };
 const SLOT_RE = /\{(name|answer)\}/;
 
-/** кэш декодированных реплик: объём (декодируется в частоту контекста: 3 с ≈ 0,58 МБ) и число записей */
-export const VOICE_CACHE_BYTES = 12 * 1024 * 1024;
+/** кэш декодированных реплик: объём (декодируется в частоту контекста: 3 с ≈ 0,58 МБ) и число записей; на iPhone память
+ *  нужна и коту (текстуры, движения) — 8 МБ, а не 12 */
+export const VOICE_CACHE_BYTES = 8 * 1024 * 1024;
 const LRU_MAX = 64;
 /** кэш сжатых mp3 (байты как пришли из сети): ~25 КБ на реплику — все варианты ближайших действий */
 export const RAW_CACHE_BYTES = 6 * 1024 * 1024;
-/** фоновых запросов сжатых записей одновременно */
-const RAW_PARALLEL = 3;
+/** фоновых запросов сжатых записей одновременно (медленная сеть — 1) */
+const RAW_PARALLEL = 2;
+/** звук не начался за столько мс от speak (после hold) — пузырь без звука, сценарий не ждёт */
+export const VOICE_START_TIMEOUT_MS = 1200;
+/** запрос mp3: реплика «сейчас» (докачивается и после немого пузыря — в кэш на следующий раз) и фоновый */
+export const FETCH_NOW_TIMEOUT_MS = 6000;
+const FETCH_BG_TIMEOUT_MS = 10_000;
+/** decodeAudioData (iOS при «interrupted» контексте может не ответить вовсе) */
+export const DECODE_TIMEOUT_MS = 3000;
+/** через столько после старта буфера проверяем, что часы контекста идут (иначе onended не придёт никогда) */
+export const STALL_CHECK_MS = 700;
+/** запрос дольше — сеть медленная: фон по одному запросу и только первые варианты реплик */
+const SLOW_FETCH_MS = 1500;
+/** реплика началась позже — в аналитику (voice_issue reason=late) */
+const VOICE_LATE_MS = 800;
+/** не больше стольких voice_issue за сессию */
+const ISSUE_MAX = 30;
 /** контекст звука не «running» (iOS: interrupted после камеры/микрофона) — ждём resume не дольше */
 const RESUME_WAIT_MS = 250;
 /** конец реплики → приглушение sfx/фона снимается не сразу: следующая реплика подряд не «качает» громкость */
@@ -136,19 +163,35 @@ export interface VoiceTiming {
   decodeMs: number;
   /** ожидание resume() контекста */
   resumeMs: number;
-  /** от вызова speak до слышимого звука (с учётом задержки вывода) */
+  /** от вызова speak до слышимого звука (с учётом задержки вывода); немая реплика — до пузыря */
   startMs: number;
+  /** ok — звук пошёл; silent — пузырь без звука (reason) */
+  outcome?: 'ok' | 'silent';
+  /** почему без звука / поздно: net_slow, net_timeout, net_error, http_404, decode_slow, decode_timeout, decode_error, ctx_interrupted, ctx_suspended, ctx_stalled, no_audio */
+  reason?: string;
   /** буфер был готов (декодирован) к моменту speak */
   warm: boolean;
   source: string;
 }
 /** одновременно декодируемых предзагрузок */
-const PRELOAD_PARALLEL = 2;
+const PRELOAD_PARALLEL = 1;
 const qflag = (k: string) => typeof location !== 'undefined' && new URLSearchParams(location.search).has(k);
 
 interface BufEntry { p: Promise<AudioBuffer | null>; bytes: number; dead?: boolean; buf?: AudioBuffer | null; fetchMs?: number; decodeMs?: number }
 interface RawEntry { p: Promise<ArrayBuffer | null>; bytes: number; ok?: boolean }
 const wait = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+/** промис или null через ms (onTimeout — причина в телеметрию) */
+function within<T>(p: Promise<T>, ms: number, onTimeout?: () => void): Promise<T | null> {
+  let t = 0 as unknown as ReturnType<typeof setTimeout>;
+  return Promise.race([
+    p.finally(() => clearTimeout(t)),
+    new Promise<null>((r) => {
+      t = setTimeout(() => (onTimeout?.(), r(null)), ms);
+    }),
+  ]);
+}
+/** фоновая докачка: путь и номер варианта события (сначала первые варианты всех событий) */
+interface BgItem { path: string; k: number }
 
 export class VoicePlayer {
   readonly lip = new LipSync();
@@ -227,25 +270,46 @@ export class VoicePlayer {
   }
 
   /** Индекс озвучки (маленький). legacyUrl — старый манифест voice:build, если нового нет. */
-  async load(legacyUrl?: string) {
+  /** манифест ElevenLabs (no-cache: после пересборки — новые хэши файлов); true — прочитан */
+  private async loadEl(): Promise<boolean> {
     try {
       const r = await fetch(asset('voice/el/manifest.json'), { cache: 'no-cache' });
-      if (r.ok && (r.headers.get('content-type') ?? '').includes('json')) {
-        const man = await r.json();
-        this.el = man.lines ?? {};
-        this.elTemplates = man.templates ?? {};
-        for (const [id, e] of Object.entries(this.el)) {
-          const persona = id.split('.')[0];
-          if (e.kind === 'slot' && e.slot && e.v) {
-            const k = `${persona}:${e.slot}`;
-            if (!this.elSlots.has(k)) this.elSlots.set(k, new Map());
-            this.elSlots.get(k)!.set(normName(e.v), e);
-          } else if ((e.kind ?? 'line') === 'line' && e.t) this.elByText.set(`${persona}:${normText(e.t)}`, id);
-        }
+      if (!r.ok || !(r.headers.get('content-type') ?? '').includes('json')) return false;
+      const man = await r.json();
+      const el: Record<string, ElEntry> = man.lines ?? {};
+      const byText = new Map<string, string>(), slots = new Map<string, Map<string, ElEntry>>();
+      for (const [id, e] of Object.entries(el)) {
+        const persona = id.split('.')[0];
+        if (e.kind === 'slot' && e.slot && e.v) {
+          const k = `${persona}:${e.slot}`;
+          if (!slots.has(k)) slots.set(k, new Map());
+          slots.get(k)!.set(normName(e.v), e);
+        } else if ((e.kind ?? 'line') === 'line' && e.t) byText.set(`${persona}:${normText(e.t)}`, id);
       }
+      this.el = el;
+      this.elTemplates = man.templates ?? {};
+      this.elByText = byText;
+      this.elSlots = slots;
+      return true;
     } catch {
-      /* нет — только Piper */
+      return false;
     }
+  }
+
+  /**
+   * Запись ElevenLabs ответила 404: вкладка открыта до пересборки (файлы с новыми хэшами, старых уже нет) — перечитать
+   * манифест (не чаще раза в 30 с). Промис — пока перечитывается.
+   */
+  private elRefresh: Promise<boolean> | null = null;
+  private elRefreshAt = -1e9;
+  private manifestStale(path: string) {
+    if (!path.startsWith('voice/el/') || performance.now() - this.elRefreshAt < 30_000) return;
+    this.elRefreshAt = performance.now();
+    this.elRefresh = this.loadEl();
+  }
+
+  async load(legacyUrl?: string) {
+    await this.loadEl(); // нет — только Piper
     // озвучка ElevenLabs есть — Piper не нужен (не качаем ни индекс, ни манифесты, ни mp3); ?piper — для отладки
     if (this.hasRecordings && !this.piperFlag) return;
     try {
@@ -376,6 +440,12 @@ export class VoicePlayer {
 
   cancel() {
     this.gen++;
+    // реплика, ждавшая hold (ребёнок говорил), — снята: её speak выходит сразу, а не через 8 с (очередь не висит)
+    if (this.holdWaiters.length) {
+      const w = this.holdWaiters;
+      this.holdWaiters = [];
+      w.forEach((f) => f());
+    }
     // ничего не звучит — ни остановок, ни end() (раньше очередь и speak гасили дважды: приглушение фона «качалось»)
     if (!this.speaking && !this.src) return;
     if (this.synthUsed)
@@ -459,11 +529,21 @@ export class VoicePlayer {
       try {
         const t0 = performance.now();
         const had = !!this.raw.get(path)?.ok;
-        const data = await this.fetchRaw(path);
+        const data = await this.fetchRaw(path, low);
         if (!data) return null;
+        // заранее декодируем только при живом контексте (iOS: «interrupted» — decodeAudioData может не ответить);
+        // сжатый остаётся в кэше — декодируется по требованию
+        if (low && ctx.state !== 'running') return null;
         const t1 = performance.now();
         // decodeAudioData отдаёт (detach) свой ArrayBuffer — сжатый остаётся в кэше копией
-        const buf = await ctx.decodeAudioData(data.slice(0));
+        let decErr = false;
+        const buf = await within(
+          ctx.decodeAudioData(data.slice(0)).catch(() => ((decErr = true), null)),
+          DECODE_TIMEOUT_MS,
+          () => this.fail(path, 'decode_timeout'),
+        );
+        if (decErr) this.fail(path, 'decode_error');
+        if (!buf) return null;
         entry.fetchMs = had ? 0 : t1 - t0;
         entry.decodeMs = performance.now() - t1;
         entry.buf = buf;
@@ -489,27 +569,71 @@ export class VoicePlayer {
   }
 
   /** фоновая докачка сжатых: не больше RAW_PARALLEL запросов сразу (реплика «сейчас» идёт мимо очереди) */
-  private rawQueue: string[] = [];
+  private rawQueue: BgItem[] = [];
   private rawInflight = 0;
-  private prefetchRaw(path: string) {
-    if (this.raw.has(path) || this.buffers.has(path) || this.rawQueue.includes(path)) return;
-    this.rawQueue.push(path);
+  /** фон закрыт до посадки кота (holdBackground): сеть и процессор — коту, трекеру и модели распознавания */
+  private bgHeld = false;
+  /** реплик «сейчас» в подготовке — фон ждёт */
+  private nowBusy = 0;
+  /** сеть медленная (последний запрос дольше SLOW_FETCH_MS) */
+  private slowNet = false;
+  /** фон: чей кот и сколько байт уже скачано для него (не больше RAW_CACHE_BYTES — больше кэш не удержит) */
+  private bgPersona = '';
+  private bgBytes = 0;
+  /**
+   * Придержать фоновую докачку (true) или отпустить (false). Приложение держит её до посадки кота: на старте сеть
+   * нужна модели кота, движениям и распознаванию; реплики первых шагов (decode) идут и без фона.
+   */
+  holdBackground(on: boolean) {
+    this.bgHeld = on;
+    if (!on) this.pumpRaw();
+  }
+  private prefetchRaw(path: string, k = 0) {
+    if (this.raw.has(path) || this.buffers.has(path) || this.rawQueue.some((q) => q.path === path)) return;
+    // сначала первые варианты всех событий, потом вторые… (на медленной сети до дальних может и не дойти)
+    let i = this.rawQueue.length;
+    while (i > 0 && this.rawQueue[i - 1].k > k) i--;
+    this.rawQueue.splice(i, 0, { path, k });
     this.pumpRaw();
   }
   private pumpRaw() {
-    while (this.rawInflight < RAW_PARALLEL && this.rawQueue.length) {
-      const path = this.rawQueue.shift()!;
-      if (this.raw.has(path)) continue;
+    if (this.bgHeld || this.nowBusy > 0) return;
+    const par = this.slowNet ? 1 : RAW_PARALLEL;
+    while (this.rawInflight < par && this.rawQueue.length) {
+      if (this.bgBytes >= RAW_CACHE_BYTES) return void (this.rawQueue = []);
+      const it = this.rawQueue.shift()!;
+      if (this.raw.has(it.path) || this.buffers.has(it.path)) continue;
+      if (this.slowNet && it.k >= 2) continue; // медленная сеть: только первые два варианта
       this.rawInflight++;
-      void this.fetchRaw(path).finally(() => {
+      void this.fetchRaw(it.path, true).then((b) => {
+        if (b) this.bgBytes += b.byteLength;
+      }).finally(() => {
         this.rawInflight--;
-        this.pumpRaw();
+        // медленная сеть — между фоновыми запросами пауза (полоса — реплике «сейчас» и коту)
+        if (this.slowNet) setTimeout(() => this.pumpRaw(), 400);
+        else this.pumpRaw();
       });
     }
   }
+  /** смена кота: фон — только для нового (очередь прежнего и его ждущие декодирования — прочь) */
+  private bgFor(persona: string) {
+    if (persona === this.bgPersona) return;
+    this.bgPersona = persona;
+    this.bgBytes = 0;
+    this.rawQueue = [];
+    for (const path of [...this.waiting.keys()]) this.drop(path);
+  }
 
-  /** сжатый mp3 из кэша / сети (LRU по объёму RAW_CACHE_BYTES) */
-  private fetchRaw(path: string): Promise<ArrayBuffer | null> {
+  /** последняя неудача записи: путь → причина (для телеметрии немой реплики) */
+  private fails = new Map<string, string>();
+  private fail(path: string, reason: string) {
+    this.fails.delete(path);
+    this.fails.set(path, reason);
+    if (this.fails.size > 64) this.fails.delete(this.fails.keys().next().value!);
+  }
+
+  /** сжатый mp3 из кэша / сети (LRU по объёму RAW_CACHE_BYTES); запрос — с таймаутом (обрывается) */
+  private fetchRaw(path: string, low = false): Promise<ArrayBuffer | null> {
     const hit = this.raw.get(path);
     if (hit) {
       this.raw.delete(path);
@@ -517,10 +641,31 @@ export class VoicePlayer {
       return hit.p;
     }
     const e: RawEntry = { p: Promise.resolve(null), bytes: 0 };
-    e.p = fetch(asset(path))
-      .then((r) => (r.ok ? r.arrayBuffer() : null))
+    const ac = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const t0 = performance.now();
+    let settled = false;
+    const why = (r: string) => {
+      if (!settled) this.fail(path, r);
+      settled = true;
+    };
+    const req = fetch(asset(path), ac ? { signal: ac.signal } : undefined)
+      .then((r) => {
+        if (r.ok) return r.arrayBuffer();
+        why(`http_${r.status}`);
+        if (r.status === 404) this.manifestStale(path);
+        return null;
+      })
+      .catch(() => (why('net_error'), null));
+    e.p = within(req, low ? FETCH_BG_TIMEOUT_MS : FETCH_NOW_TIMEOUT_MS, () => {
+      why('net_timeout');
+      ac?.abort();
+    })
       .catch(() => null)
       .then((b) => {
+        settled = true;
+        const ms = performance.now() - t0;
+        if (b) this.slowNet = ms > SLOW_FETCH_MS;
+        else if (ms > SLOW_FETCH_MS) this.slowNet = true;
         if (!b) {
           if (this.raw.get(path) === e) this.raw.delete(path);
           return null;
@@ -661,10 +806,18 @@ export class VoicePlayer {
   }
 
   private async prepare(req: SpeakRequest): Promise<Prepared | null> {
-    const el = this.elFor(req);
+    let el = this.elFor(req);
     if (el?.kind === 'line') {
-      const buf = await this.clip(el.e);
-      if (buf) {
+      let buf = await this.clip(el.e);
+      // 404: манифест старше файлов (пересборка при открытой вкладке) — перечитали; у реплики новый файл — он
+      if (!buf && this.elRefresh && (await within(this.elRefresh, 2000))) {
+        const again = this.elFor(req);
+        if (again?.kind === 'line' && again.e.f !== el.e.f) {
+          el = again;
+          buf = await this.clip(again.e);
+        }
+      }
+      if (buf && el?.kind === 'line') {
         this.lastSource = 'elevenlabs';
         return { buf, cues: this.cuesFor(buf, el.e), offset: this.lipStrategy === 'amp' ? 0 : this.onsetShift(buf, el.e) };
       }
@@ -745,13 +898,15 @@ export class VoicePlayer {
    */
   warmEvents(persona: string, events: string[], o: { fetch?: number; decode?: number } = {}) {
     const nf = o.fetch ?? 6, nd = o.decode ?? 1;
+    this.bgFor(persona);
     const go = (m: PersonaVoice | null) => {
+      if (persona !== this.bgPersona) return; // пока грузился манифест характера — кота сменили
       for (const ev of events) {
         const el = this.elEventIds(persona, ev).map((id) => this.el[id]);
         const piper = el.length ? [] : Object.keys(m?.lines ?? {}).filter((id) => id.split('.')[1] === ev).sort().map((id) => m!.lines[id]);
         [...el, ...piper].slice(0, Math.max(nf, nd)).forEach((e, i) => {
           if (i < nd) void this.clip(e, true);
-          else this.prefetchRaw(`voice/${e.f}`);
+          else this.prefetchRaw(`voice/${e.f}`, i);
         });
       }
     };
@@ -791,6 +946,7 @@ export class VoicePlayer {
     this.timings.push(t);
     if (this.timings.length > 64) this.timings.shift();
     this.onTiming?.(t);
+    if (t.outcome === 'silent' || t.startMs > VOICE_LATE_MS) this.issue(t);
   }
 
   // ───────────── перебивание: пауза перед следующей репликой ─────────────
@@ -861,38 +1017,117 @@ export class VoicePlayer {
       return await this.silentLine(req, gen);
     }
     const warm = this.isWarm(req);
+    // живая запись есть — реплика не пропадает молча и не висит: не вышло со звуком — пузырь без звука
+    const recorded = this.hasRecordings && !!this.elFor(req);
     const tp = performance.now();
-    const prep = await this.prepare(req).catch(() => null);
+    this.nowBusy++;
+    const prepP = this.prepare(req)
+      .catch(() => null)
+      .finally(() => {
+        this.nowBusy--;
+        this.pumpRaw();
+      });
+    // звук не готов за VOICE_START_TIMEOUT_MS — не ждём (запись докачается в кэш на следующий раз)
+    const res = await within(prepP.then((p) => ({ p })), VOICE_START_TIMEOUT_MS);
     if (gen !== this.gen) return;
     const prepMs = performance.now() - tp;
+    const timing: VoiceTiming = { id: req.lineId, t0, holdMs, prepMs, fetchMs: 0, decodeMs: 0, resumeMs: 0, startMs: 0, warm, source: this.lastSource, outcome: 'ok' };
+    if (!res) return await this.silentFallback(req, gen, start, timing, this.pendingReason(req));
+    const prep = res.p;
     const ctx = this.audio.ctx;
     // iOS: контекст «interrupted»/«suspended» (камера, микрофон, звонок) — буфер стартует, а звука нет до resume
-    let resumeMs = 0;
     if (prep && ctx && ctx.state !== 'running') {
       const tr = performance.now();
       await Promise.race([ctx.resume().catch(() => undefined), wait(RESUME_WAIT_MS)]);
-      resumeMs = performance.now() - tr;
+      timing.resumeMs = performance.now() - tr;
       if (gen !== this.gen) return;
+      // не проснулся (вне жеста iOS может не пустить) — пузырь без звука; будим дальше (касание, возврат на вкладку, таймер)
+      if ((ctx.state as AudioContextState) !== 'running') {
+        this.wakeLater();
+        return await this.silentFallback(req, gen, start, timing, `ctx_${ctx.state}`);
+      }
     }
     const out = this.audio.voiceOut();
     if (prep && ctx && out) {
       this.last = { id: req.lineId, source: `${this.lastSource}${this.lipStrategy === 'amp' ? '+amp' : ''}`, text: req.text };
       const { fetchMs, decodeMs } = warm ? { fetchMs: 0, decodeMs: 0 } : this.costOf(req);
-      const timing: VoiceTiming = { id: req.lineId, t0, holdMs, prepMs, fetchMs, decodeMs, resumeMs, startMs: 0, warm, source: this.lastSource };
-      return await this.playPrepared(ctx, out, prep, gen, 'file', (leadMs) => {
-        timing.startMs = performance.now() - t0 + leadMs;
-        this.record(timing);
-        if (leadMs > 12) setTimeout(start, leadMs);
-        else start();
-      });
+      Object.assign(timing, { fetchMs, decodeMs, source: this.lastSource });
+      return await this.playPrepared(
+        ctx,
+        out,
+        prep,
+        gen,
+        'file',
+        (leadMs) => {
+          timing.startMs = performance.now() - t0 + leadMs;
+          this.record(timing);
+          if (leadMs > 12) setTimeout(start, leadMs);
+          else start();
+        },
+        () => {
+          // контекст встал посреди реплики: остаток — молча (пузырь уже на экране)
+          this.wakeLater();
+          this.issue({ ...timing, outcome: 'silent', reason: 'ctx_stalled' });
+        },
+      );
     }
+    if (recorded) return await this.silentFallback(req, gen, start, timing, this.pendingReason(req, true));
     if (!this.synthAllowed) {
-      // записи нет (или не скачалась), синтез на сайте с живой озвучкой не используем — молчим
+      // записи нет, синтез на сайте с живой озвучкой не используем — молчим
       this.last = { id: req.lineId, source: 'none', text: req.text };
       return;
     }
     this.last = { id: req.lineId, source: 'synth', text: req.text };
     return await this.synth(req, gen, start);
+  }
+
+  /** пузырь без звука на длину реплики (запись не успела / не скачалась / контекст спит) — сценарий идёт дальше */
+  private async silentFallback(req: SpeakRequest, gen: number, start: () => void, timing: VoiceTiming, reason: string) {
+    timing.outcome = 'silent';
+    timing.reason = reason;
+    timing.startMs = performance.now() - timing.t0;
+    this.record(timing);
+    start();
+    await this.silentLine(req, gen, `silent:${reason}`);
+  }
+
+  /** почему реплика «сейчас» не готова: сеть ещё идёт / упала, декодирование — по записям реплики */
+  private pendingReason(req: SpeakRequest, failed = false): string {
+    const el = this.elFor(req);
+    const list = (el?.kind === 'line' ? [el.e] : el?.kind === 'parts' ? [el.a, el.v, el.b] : []).filter(Boolean) as ClipEntry[];
+    for (const e of list) {
+      const path = `voice/${e.f}`;
+      const f = this.fails.get(path);
+      if (f) return f;
+      if (this.buffers.get(path)?.buf) continue;
+      const r = this.raw.get(path);
+      if (r && !r.ok) return 'net_slow';
+      if (r?.ok) return failed ? 'decode_error' : 'decode_slow';
+    }
+    return failed ? 'no_audio' : 'net_slow';
+  }
+
+  /** контекст не «running»: будим ещё (вне жеста — может и не выйти; касание будит в Audio) */
+  private wakeTimer = 0;
+  private wakeLater() {
+    if (this.wakeTimer) return;
+    let n = 0;
+    const tick = () => {
+      const ctx = this.audio.ctx;
+      if (!ctx || ctx.state === 'running' || ++n > 5) return void (this.wakeTimer = 0);
+      void ctx.resume?.().catch(() => undefined);
+      this.wakeTimer = setTimeout(tick, 1500) as unknown as number;
+    };
+    this.wakeTimer = setTimeout(tick, 500) as unknown as number;
+  }
+
+  /** немые и поздние реплики — в аналитику: причина и мс (без текста, имени и id реплики — только событие) */
+  private issues = 0;
+  private issue(t: VoiceTiming) {
+    if (this.issues >= ISSUE_MAX) return;
+    this.issues++;
+    const ev = t.id?.split('.')[1]?.replace(/@.*$/, '');
+    track('voice_issue', { reason: t.reason ?? 'late', ms: t.startMs, net: t.fetchMs, dec: t.decodeMs, warm: t.warm ? 1 : 0, ev, ctx: this.audio.ctx?.state });
   }
 
   /** длина реплики, с: по записи (манифест), иначе — как живая речь (0,45 с + 1 с на 14 символов), не меньше 1,2 с */
@@ -905,8 +1140,8 @@ export class VoicePlayer {
   }
 
   /** реплика без звука (кнопка «Без звука»): ждём её длину; cancel/новая реплика обрывают ожидание */
-  private silentLine(req: SpeakRequest, gen: number): Promise<void> {
-    this.last = { id: req.lineId, source: 'muted', text: req.text };
+  private silentLine(req: SpeakRequest, gen: number, source = 'muted'): Promise<void> {
+    this.last = { id: req.lineId, source, text: req.text };
     const end = Date.now() + this.lineSeconds(req) * 1000;
     return new Promise<void>((resolve) => {
       const tick = () => (gen !== this.gen || Date.now() >= end ? resolve() : setTimeout(tick, 100));
@@ -924,7 +1159,7 @@ export class VoicePlayer {
     return this.playPrepared(ctx, out, { buf, cues: c, offset: 0 }, gen, 'echo');
   }
 
-  private playPrepared(ctx: AudioContext, out: AudioNode, p: Prepared, gen: number, mode: 'file' | 'echo', onStart?: (leadMs: number) => void) {
+  private playPrepared(ctx: AudioContext, out: AudioNode, p: Prepared, gen: number, mode: 'file' | 'echo', onStart?: (leadMs: number) => void, onStall?: () => void) {
     return new Promise<void>((resolve) => {
       const s = ctx.createBufferSource();
       s.buffer = p.buf;
@@ -941,7 +1176,14 @@ export class VoicePlayer {
       // часы cues идут от вызова playCues; звук начнётся через delay (+ задержка декодера MP3)
       const delay = startAt - ctx.currentTime + p.offset;
       this.lip.playCues(delay ? p.cues.map((c) => ({ start: c.start + delay, end: c.end + delay, value: c.value })) : p.cues, () => ctx.currentTime);
-      s.onended = () => {
+      const lenMs = (p.buf.duration + p.offset) * 1000;
+      let done = false;
+      let stallT = 0, guardT = 0;
+      const finish = () => {
+        if (done) return;
+        done = true;
+        clearTimeout(stallT);
+        clearTimeout(guardT);
         // узлы реплики — из графа (иначе на iOS копятся подключёнными к выходу голоса)
         try {
           s.disconnect();
@@ -949,13 +1191,37 @@ export class VoicePlayer {
         } catch {
           /* ignore */
         }
-        if (gen === this.gen) {
+        if (gen === this.gen && this.src === s) {
           this.src = null;
           this.gain = null;
           this.end();
         }
         resolve();
       };
+      s.onended = finish;
+      // часы контекста стоят (iOS: interrupted/suspended посреди реплики, «running» без вывода) — onended не придёт
+      // никогда: источник — прочь, остаток реплики — молча (пузырь читается), cancel обрывает ожидание
+      const stallAt = performance.now();
+      const ct0 = ctx.currentTime;
+      stallT = setTimeout(() => {
+        if (done || ctx.currentTime - ct0 > 0.05) return;
+        try {
+          s.stop();
+        } catch {
+          /* ignore */
+        }
+        if (gen === this.gen && this.src === s) {
+          this.src = null;
+          this.gain = null;
+          this.end();
+        }
+        onStall?.();
+        const end = stallAt + lenMs;
+        const tick = () => (done ? undefined : gen !== this.gen || performance.now() >= end ? finish() : void setTimeout(tick, 100));
+        tick();
+      }, STALL_CHECK_MS) as unknown as number;
+      // страховка: onended не пришёл и через 2 с после конца реплики — заканчиваем сами
+      guardT = setTimeout(finish, lenMs + 2000) as unknown as number;
       s.start(startAt);
       // слышно через: до startAt + задержка декодера MP3 (offset) + задержка вывода (iOS — десятки мс)
       const outLat = Math.min(0.2, Math.max(0, (ctx as AudioContext & { outputLatency?: number }).outputLatency || ctx.baseLatency || 0));

@@ -326,6 +326,11 @@ export class App {
     this.wireFx();
     // озвучка: манифест текущего характера и первые реплики сценария — заранее
     this.voice.preloadEvents(this.director.persona.id, ['point_camera', 'meet_card', 'meet_congrats', 'ask_name', 'nice_name', 'no_name', 'meet_self', 'meet_skills', 'welcome_back']);
+    // фоновая докачка всех вариантов реплик — после посадки кота (+1,5 с), не во время поиска карты и «ПУФ» (iPhone 22.11)
+    this.voice.holdBackground(true);
+    const bgOpen = () => setTimeout(() => this.voice.holdBackground(false), 1500);
+    const offBg = this.director.on('phase', (ph) => ph !== 'start' && ph !== 'scanning' && ph !== 'appear' && (offBg(), bgOpen()));
+    setTimeout(() => this.voice.holdBackground(false), 45_000);
 
     this.input = new Input(this.fx.canvas, {
       zoneAt: (x, y, coarse) => this.zoneAt(x, y, coarse),

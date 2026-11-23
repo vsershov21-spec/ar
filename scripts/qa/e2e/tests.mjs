@@ -709,6 +709,112 @@ export const TESTS = [
       await cdp.detach().catch(() => undefined);
     },
   },
+
+  // ───────────── 11. ненадёжная озвучка (iPhone 22.11: «со звуком проблемы — зависал и не грузился») ─────────────
+  {
+    name: '11_voice_flaky',
+    title: 'медленная сеть + потерянные/зависшие mp3 + AudioContext «interrupted»: реплики — пузырём без звука, кот не зависает, причины в voice_issue',
+    timeout: 600,
+    // потерянные mp3 — нарочно (Fetch.failRequest); зависшие обрывает сам плеер (AbortController — ERR_ABORTED, не ошибка)
+    allow: [{ re: /voice\/el\/.*\.(mp3|wav).*(ERR_FAILED|ERR_INTERNET_DISCONNECTED|ERR_CONNECTION)|Failed to load resource: net::ERR_FAILED/i, why: 'mp3 роняет сценарий 11 нарочно' }],
+    async fn(t) {
+      const n0 = t.server.requests.length;
+      const P = t.track(await openPhone(t.browser, t.server, { url: null, memory: MET('kind') }));
+      const cdp = await P.page.createCDPSession();
+      await cdp.send('Network.enable');
+      // медленная сеть: 3G-подобная задержка и полоса
+      await cdp.send('Network.emulateNetworkConditions', { offline: false, latency: 300, downloadThroughput: (3 * 1024 * 1024) / 8, uploadThroughput: (750 * 1024) / 8 });
+      // записи озвучки (на стенде — тишина .wav от fake-voice, на сайте — mp3): каждый 3-й — ошибка сети, каждый 3-й — висит без ответа, остальные — с задержкой 1,5 с
+      let n = 0;
+      const lost = { fail: 0, hang: 0, slow: 0 };
+      let flaky = true;
+      await P.page.setRequestInterception(true);
+      P.page.on('request', (r) => {
+        if (!flaky || !/\/voice\/el\/.*\.(mp3|wav)(\?|$)/.test(r.url())) return void r.continue().catch(() => undefined);
+        const k = n++ % 3;
+        if (k === 0) {
+          lost.fail++;
+          void r.abort('failed').catch(() => undefined);
+        } else if (k === 1) lost.hang++; // не отвечаем никогда (плеер обрывает сам по таймауту)
+        else {
+          lost.slow++;
+          setTimeout(() => void r.continue().catch(() => undefined), 1500);
+        }
+      });
+      await P.go('cat=kind');
+      await toPlay(P);
+      await watchTexts(P);
+      await P.must(SETTLED, 60000, 'кот свободен после приветствия');
+
+      /** действия подряд: каждая реплика (speak) заканчивается (speak_end) ≤ 12 с, кот освобождается */
+      const round = async (tag, acts) => {
+        const from = await rt(P);
+        for (const a of acts) {
+          if (a === 'tap') {
+            const b = await catBox(P);
+            if (b) await P.tapXY(b.cx, b.head);
+          } else await pick(P, a);
+          await settle(P, `${tag}: ${a}`, 25000);
+          await sleep(800);
+        }
+        await sleep(3000);
+        const rec = await P.ev((from) => (window.__qaRec ?? []).filter((x) => x.rt >= from && /^(speak|speak_end|bubble)$/.test(x.kind)), from);
+        const speaks = rec.filter((x) => x.kind === 'speak');
+        const ends = rec.filter((x) => x.kind === 'speak_end');
+        const bubbles = rec.filter((x) => x.kind === 'bubble' && x.on && !x.hint);
+        const long = ends.filter((x) => x.dur > 12000);
+        t.note(`${tag}: реплик ${speaks.length}, закончились ${ends.length}, пузырей ${bubbles.length}, дольше 12 с: ${long.length}`);
+        assert(speaks.length > 0, `${tag}: кот не сказал ни одной реплики`);
+        // последняя реплика могла ещё звучать — остальные обязаны закончиться
+        assert(ends.length >= speaks.length - 1, `${tag}: реплики не закончились (${ends.length} из ${speaks.length}) — кот «висит»`);
+        assert(!long.length, `${tag}: реплика шла ${Math.max(...long.map((x) => x.dur))} мс`);
+        assert(bubbles.length > 0, `${tag}: ни одного пузыря (реплики пропали молча)`);
+        return rec;
+      };
+
+      await round('сеть', ['dance', 'tap', 'flip', 'tap']);
+      t.note(`mp3: ошибка ${lost.fail}, висит ${lost.hang}, медленно ${lost.slow}`);
+      assert(lost.fail + lost.hang > 0, 'ни один mp3 не потерялся — сценарий ничего не проверил');
+
+      // AudioContext «interrupted» (iOS: камера, микрофон, звонок) и resume не отвечает: часы контекста стоят.
+      // Записи — снова доходят (сеть по-прежнему медленная): немая реплика теперь — из-за контекста
+      flaky = false;
+      await P.ev(async () => {
+        const ctx = window.__app.audio.ctx;
+        await ctx.suspend();
+        window.__qaCtxResume = ctx.resume;
+        Object.defineProperty(ctx, 'state', { configurable: true, get: () => 'interrupted' });
+        ctx.resume = () => new Promise(() => {});
+      });
+      await round('interrupted', ['dance', 'tap']);
+      const st = await P.ev(() => window.__app.voice.timings.slice(-6).map((x) => `${x.outcome}:${x.reason ?? ''}`));
+      t.note(`interrupted: ${st.join(', ')}`);
+      assert(st.some((x) => /ctx_/.test(x)), 'немая реплика без причины ctx_*');
+
+      // восстановление: контекст проснулся, сеть нормальная — снова звук
+      await cdp.send('Network.emulateNetworkConditions', { offline: false, latency: 0, downloadThroughput: -1, uploadThroughput: -1 });
+      await P.ev(async () => {
+        const ctx = window.__app.audio.ctx;
+        delete ctx.state;
+        ctx.resume = window.__qaCtxResume;
+        await ctx.resume();
+      });
+      await round('восстановление', ['flip', 'tap']);
+      const okNow = await P.ev(() => window.__app.voice.timings.slice(-3).some((x) => x.outcome === 'ok'));
+      assert(okNow, 'после восстановления контекста и сети звук не вернулся');
+
+      // причины — в аналитику (без текста реплик и имени)
+      await sleep(1000);
+      const vi = events(t.server, n0).filter((e) => e.name === 'voice_issue');
+      const reasons = [...new Set(vi.map((e) => e.props?.reason))];
+      t.note(`voice_issue: ${vi.length} (${reasons.join(', ')})`);
+      assert(vi.length > 0, 'нет событий voice_issue');
+      assert(reasons.some((r) => /^ctx_/.test(r)), `в voice_issue нет причины ctx_*: ${reasons.join(', ')}`);
+      assert(reasons.some((r) => /^(net_|http_|no_audio|decode_)/.test(r)), `в voice_issue нет сетевой причины: ${reasons.join(', ')}`);
+      for (const e of vi) assert(Object.keys(e.props ?? {}).every((k) => ['reason', 'ms', 'net', 'dec', 'warm', 'ev', 'ctx', 'src'].includes(k)), `лишнее в voice_issue: ${JSON.stringify(e.props)}`);
+      await cdp.detach().catch(() => undefined);
+    },
+  },
 ];
 
 // ───────────── 10. ошибки за весь прогон ─────────────

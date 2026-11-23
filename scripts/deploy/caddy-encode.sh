@@ -13,6 +13,9 @@
 #      /mvp/ — 200 и no-cache, /lab/ — 200, /api/progress/health — ok, Range-запрос модели — 206. Что-то сломалось
 #      (страница, API) — откат и reload.
 # Блоки /mvp, /lab, /api/progress (handle, rewrite, header) не трогаются.
+# Озвучка (тот же свой блок): /voice/el/*.mp3 — имена с хэшем содержимого → immutable на год; /voice/el/manifest.json —
+# no-cache (после пересборки — новые хэши; старый манифест в кэше ссылался бы на удалённые файлы). mp3 (audio/mpeg) в
+# список сжатия НЕ входит: повторно не жмётся, Content-Length и Range (206) — как у file_server. Проверка — voice-headers.sh.
 #
 # Запуск в фоне (reload Caddy не рвёт сессию), REF — коммит или ветка:
 #   REF=<коммит>; curl -fsSL https://raw.githubusercontent.com/vsershov21-spec/ar/$REF/scripts/deploy/caddy-encode.sh -o /tmp/caddy-encode.sh \
@@ -52,6 +55,10 @@ cat > "$SNIP" <<'EOF'
 			header Content-Type application/octet-stream*
 		}
 	}
+	@voiceMp3 path /voice/el/*.mp3
+	header @voiceMp3 Cache-Control "public, max-age=31536000, immutable"
+	@voiceManifest path /voice/el/manifest.json
+	header @voiceManifest Cache-Control "no-cache"
 	# <<< caddy-encode
 EOF
 
@@ -136,6 +143,8 @@ code=$(curl -s -o /dev/null -w '%{http_code}' "$H/lab/"); echo "lab/:        $co
 api=$(curl -s "$H/api/progress/health"); echo "api health:  $api"; printf '%s' "$api" | grep -q '"ok"\|ok' || fail=2
 rng=$(curl -s -o /dev/null -w '%{http_code}' -H 'Range: bytes=0-99' "$H/models/anims_v1.glb"); echo "range:       $rng (ждём 206)"
 echo "root /:      $(curl -s -o /dev/null -w '%{http_code}' "$H/")"
+echo "--- озвучка (scripts/deploy/voice-headers.sh) ---"
+[ -f "$(dirname "$0")/voice-headers.sh" ] && H="$H" bash "$(dirname "$0")/voice-headers.sh" || echo "(voice-headers.sh рядом нет — curl -fsSL …/scripts/deploy/voice-headers.sh | bash)"
 if [ "$fail" = 2 ]; then rollback "сайт или API не отвечают как раньше"; exit 1; fi
 [ "$fail" = 1 ] && echo "ВНИМАНИЕ: не всё сжимается (см. выше: типы Content-Type) — блок оставлен, сайт работает"
 echo "=== done ==="

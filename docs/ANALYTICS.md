@@ -57,6 +57,7 @@
 | `paint_start` | `color` — id цвета палитры (`lime`, `pink`, `purple`, `mint`, `peach`, `sky`, `lilac`, `gold`, `turquoise`) | выбран цвет, кот начал рисовать (`CardPaint.start`) |
 | `paint_done` | — | рисунок готов (или дорисован сразу, если карта ушла посреди) |
 | `paint_erase` | — | «Стереть рисунок» в каталоге |
+| `voice_issue` | `reason` — почему (`net_slow`, `net_timeout`, `net_error`, `http_404`, `decode_slow`, `decode_timeout`, `decode_error`, `ctx_interrupted`, `ctx_suspended`, `ctx_stalled`, `no_audio`, `late`), `ms` — от speak до звука/пузыря, `net`/`dec` — сеть и декодирование, мс, `warm` — 1, если запись была готова, `ev` — событие реплики (`tap_cat`, `dance`…), `ctx` — состояние AudioContext | реплика кота без звука (пузырь молча — сценарий не ждёт) или звук позже 0,8 с (`VoicePlayer`, ≤ 30 за сессию); сводка `/stats` — поле `voice` (причина → число) |
 | **Воронка входа** (быстрый вход `intro.quick`, `src/quick`; `ms` — мс от начала навигации; раз за сессию) | | |
 | `page_open` | `ms` — когда стартовал JS | вместе с `open` (`bootAnalytics`) |
 | `splash_shown` | `ms` | заставка нарисована — **до бандла** (встроенный скрипт `src/quick/splash.ts`; события копятся в `window.__quick.ev` и уходят при старте аналитики) |
