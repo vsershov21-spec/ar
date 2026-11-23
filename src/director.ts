@@ -315,6 +315,9 @@ export class Director extends Emitter<DirectorEvents> {
     // смена обстановки (дом ↔ карта): лицо прошлой сцены не едет в новую — нейтральное, моргает
     if (e.type === 'context_change') this.resetFace();
     const now = performance.now();
+    // имя, которое ребёнок только что назвал (голосом или полем): для пузыря «приятно» без записи имени (bubbleText)
+    const heard = e.type === 'name' ? e.name : e.type === 'intent' && e.intent.type === 'name' ? e.intent.name : null;
+    if (heard) this.heardName = { name: heard, at: now };
     // конец сессии (4–6 мин) — тоже инициатива кота: не поверх реплики, действия ребёнка, мини-игры или дрёмы
     if (e.type === 'timer' && e.id === 'outro' && (this.queue.busy || now - this.lastUserAct < 8000 || this.state.dialog || this.dozing || !this.state.cardVisible)) {
       this.exec({ type: 'timer', id: 'outro', ms: 10_000 });
@@ -1360,9 +1363,27 @@ export class Director extends Emitter<DirectorEvents> {
    */
   private bubbleText(pk: PickedLine): string {
     const t = pk.text;
+    const nm = this.bubbleName(pk);
+    if (nm) return `${nm}! ${t}`;
     if (pk.event !== 'riddle_hint' || !/[:—–-]\s*$/.test(t)) return t;
     const hint = this.currentRiddle()?.hint?.trim();
     return hint ? `${t} ${hint}` : t.replace(/\s*[:—–-]\s*$/, '.');
+  }
+
+  /**
+   * Имя без записи (нет в словаре names.ru.txt или у этого кота нет слота с этим именем): кот говорит записанный
+   * вариант без {name} (picker), а имя показываем только в пузыре — «Ксюша! Красивое имя…». Голосом имя не звучит
+   * (ни синтеза, ни Piper), имя никуда не уходит и не запоминается, если его нет в словаре (как и раньше).
+   */
+  private heardName: { name: string; at: number } | null = null;
+  bubbleName(pk: Pick<PickedLine, 'event' | 'text' | 'line'>): string | null {
+    if (pk.line.text.includes('{name}')) return null; // имя уже в реплике (и в записи)
+    let name: string | null = null;
+    if (pk.event === 'nice_name' && this.heardName && performance.now() - this.heardName.at < 60_000) name = this.heardName.name;
+    else if (pk.event === 'welcome_back') name = this.state.name ?? null;
+    name = name?.trim().replace(/[<>{}]/g, '').slice(0, 24) ?? null;
+    if (!name || pk.text.toLowerCase().includes(name.toLowerCase())) return null;
+    return name.charAt(0).toUpperCase() + name.slice(1);
   }
 
   /** повторялка, ветка «*» без записи: echo_done следом не говорим */

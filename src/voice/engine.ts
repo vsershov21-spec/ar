@@ -39,7 +39,19 @@ export type VoiceEventId = 'echo_start' | 'echo_done' | 'echo_stop' | 'loud' | '
   /** офлайн-модели нет (health-проверка, загрузка не удалась): один раз за сессию — «Голос пока не работает» */
   | 'asr_down'
   /** доступ к микрофону запрещён: один раз за сессию */
-  | 'mic_denied';
+  | 'mic_denied'
+  /** вход сломался / починился (MicInput.health): data.health, причина — для аналитики mic_issue и подсказки «не слышу» */
+  | 'mic_health'
+  /** ребёнок заговорил, а модель ещё не готова (качается/распаковывается): data.progress 0..1 — подсказка, не чаще раза в 20 с */
+  | 'asr_wait';
+
+/**
+ * Что показать на кнопке микрофона: off — голоса нет (микрофон запрещён/нет, модель не загрузилась); deaf — микрофон
+ * открыт, но звук не идёт (iOS: контекст interrupted, дорожка заглушена); loading — модель ещё не готова; speaking — кот
+ * говорит (себя не слушает); hearing — в микрофоне голос (VAD); listening — окно ответа/кнопка, ждём фразу; thinking —
+ * фраза кончилась, распознаём; idle — готов («слушаю всегда» — ждёт голоса).
+ */
+export type VoiceStatus = 'off' | 'deaf' | 'loading' | 'speaking' | 'hearing' | 'listening' | 'thinking' | 'idle';
 
 /** голосовой вход доступен: распознавание (модель) и микрофон — для режиссёра (не предлагать голосовые занятия) */
 export interface VoiceAvailability { asr: boolean; mic: boolean }
@@ -72,6 +84,10 @@ export interface EngineState {
   /** здоровье офлайн-модели (asr.ts ModelHealth) */
   asrHealth: string;
   micDenied: boolean;
+  /** состояние входа микрофона (MicInput.health) */
+  micHealth: string;
+  /** для кнопки микрофона: слушаю / думаю / не слышу (см. VoiceStatus) */
+  status: VoiceStatus;
 }
 
 export interface ListenOpts {
@@ -94,6 +110,8 @@ export const QUESTION_WINDOW_MS = 8000;
 const USER_HOLD_MS = 5000;
 /** заглушка текста для сценария: «ребёнок что-то сказал» в режиме повтора (распознавания нет) */
 export const ECHO_HEARD = '…';
+/** подсказка «кот ещё учится слушать» — не чаще */
+export const ASR_WAIT_HINT_MS = 20_000;
 
 export class VoiceEngine extends Emitter<EngineEvents> {
   readonly mic: MicInput;
@@ -125,6 +143,9 @@ export class VoiceEngine extends Emitter<EngineEvents> {
   /** «Тебя зовут X?» — ждём «да»/«нет» или другое имя */
   private nameCandidate: string | null = null;
   private asrDownFired = false;
+  private asrWaitAt = -1e9;
+  /** фраза кончилась, ждём итог распознавания (индикатор «думаю») */
+  private thinking = false;
   private st = { asrState: 'idle' as AsrState, modelProgress: 0, lastText: '', lastIntent: '', lastConfidence: 0, lastEvent: '' };
   /** пресет повтора текущего характера (app.ts: из persona.voice) */
   echoPreset: () => EchoPreset = () => ({ echoPitchSemitones: 5, echoRate: 1.05 });
@@ -187,6 +208,9 @@ export class VoiceEngine extends Emitter<EngineEvents> {
       if (this.echo.active) this.echo.stop('api');
       this.fire('mic_denied', { why });
     };
+    this.mic.onHealth = (h, info) => {
+      this.fire('mic_health', { health: h, ...info });
+    };
     this.asr.onResult = (t) => this.onAsrResult(t);
     this.asr.onInterim = (t) => this.emit('interim', t);
     this.asr.onState = (s, m) => {
@@ -194,6 +218,7 @@ export class VoiceEngine extends Emitter<EngineEvents> {
       if (s === 'idle' || s === 'error') {
         this.listening = false;
         this.listenReason = null;
+        this.thinking = false;
         // повторялка слушает сама (EchoMode) — её приглушение снимет echo_stop, а не конец фразы распознавания
         if (!this.echo.active) this.audio.duck(false, 'mic');
         turn.userEnd();
@@ -255,7 +280,14 @@ export class VoiceEngine extends Emitter<EngineEvents> {
     this.startListening('ptt');
   }
   pttUp() {
-    if (this.listenReason === 'ptt') this.asr.stop();
+    if (this.listenReason === 'ptt') this.finishPhrase();
+  }
+
+  /** фраза кончилась: распознаватель дожёвывает хвост (≈ 0,5 с) — на кнопке «думаю» */
+  private finishPhrase() {
+    if (this.listening) this.thinking = true;
+    this.asr.stop();
+    this.pushState();
   }
 
   private startListening(reason: 'ptt' | 'window' | 'barge' | 'vad') {
@@ -416,6 +448,9 @@ export class VoiceEngine extends Emitter<EngineEvents> {
         continue;
       }
       if (this.selfMuted) continue;
+      // свой звук (касание → «бум», «вжух»): эхоподавление iPhone гасит его не до конца — начало фразы в это время
+      // не ищем (иначе кот держит реплику и распознаёт свой же звук); начатую фразу ребёнка не обрываем
+      if (!this.vad.speaking && this.audio.sfxBusy?.()) continue;
       // лёгкий порог для распознавания в окне ответа: ниже порога VAD (+6 дБ над шумом), чтобы тихое «да» не терялось
       const fd = db(f.rms);
       if (fd > this.mic.floor.floorDb + 6 && fd > -58) this.voiceUntil = performance.now() + 700;
@@ -424,22 +459,35 @@ export class VoiceEngine extends Emitter<EngineEvents> {
       if (ev?.type === 'start' && !this.echo.active) {
         clearTimeout(this.nameEndTimer); // окно имени: ребёнок продолжил («меня зовут… Маша»)
         turn.userStart();
+        // модель ещё не в памяти (качается / распаковывается после посадки кота): фразу всё равно не разберём —
+        // кота не держим и загрузку 45 МБ голосом из комнаты не запускаем (раньше любой звук во время поиска карты
+        // начинал её раньше времени, а каждая фраза держала кота 5 с молча). Ребёнку — подсказка «кот учится слушать»
+        const canHear = this.asr.ready !== false && !this.asr.unavailable;
+        if (!canHear && (this.mode === 'auto' || this.listening) && this.asr.health !== 'dead') this.asrWait();
         // ребёнок заговорил — кот не начинает новую реплику, пока фраза не разобрана
-        // (голоса нет — модели нет или микрофон запрещён — кота не держим: фразу всё равно не разберём)
-        if ((this.mode === 'auto' && !this.asr.unavailable) || this.listening) this.voice.hold(USER_HOLD_MS);
+        if ((this.mode === 'auto' && canHear) || (this.listening && canHear)) this.voice.hold(USER_HOLD_MS);
         // «слушаю всегда»: заговорили — сразу распознаём (начало фразы — из кольца)
-        if (this.mode === 'auto' && !this.listening) this.startListening('vad');
+        if (this.mode === 'auto' && !this.listening && canHear) this.startListening('vad');
+        this.pushState();
       }
       if (ev?.type === 'end') {
         turn.userEnd();
+        if (!this.listening) this.pushState();
+        // «фраза» 6 с без пауз — это фон (телевизор, шум улицы), не ребёнок: порог шума — к его уровню. Иначе пол
+        // шума не учится (во время «речи» он стоит), VAD перезапускается каждые 6 с и держит кота молча
+        if (ev.reason === 'max' && this.vad.stats.n > 0) {
+          const mean = this.vad.stats.sumDb / this.vad.stats.n;
+          const fl = this.mic.floor;
+          fl.floorDb = Math.min(-25, Math.max(fl.floorDb, mean - this.vad.opts.marginDb + 3));
+        }
         if (this.listening) this.utter.speechMs = Math.max(this.utter.speechMs, ev.durMs);
         const w = this.sound.phraseEnded(ev.durMs, this.vad.stats);
         if (w && !this.echo.active) this.fire('whisper', { meanDb: +(this.vad.stats.sumDb / Math.max(1, this.vad.stats.n)).toFixed(1) });
         if (this.listenReason === 'window' && intentContext().expectName) {
           // окно имени: пауза конца фразы длиннее (дети делают паузу перед именем)
           clearTimeout(this.nameEndTimer);
-          this.nameEndTimer = window.setTimeout(() => this.listenReason === 'window' && !this.vad.speaking && this.asr.stop(), NAME_END_PAUSE_MS - this.vad.opts.endSilenceMs);
-        } else if (this.listenReason === 'window' || this.listenReason === 'barge' || this.listenReason === 'vad') this.asr.stop(); // фраза кончилась — не ждём таймаута
+          this.nameEndTimer = window.setTimeout(() => this.listenReason === 'window' && !this.vad.speaking && this.finishPhrase(), NAME_END_PAUSE_MS - this.vad.opts.endSilenceMs);
+        } else if (this.listenReason === 'window' || this.listenReason === 'barge' || this.listenReason === 'vad') this.finishPhrase(); // фраза кончилась — не ждём таймаута
       }
       const s = this.sound.push(f);
       // в повторе громкость — часть игры (кот повторит и крик), хлопки/шёпот не отвлекают; в окне ответа — без хлопков
@@ -534,6 +582,28 @@ export class VoiceEngine extends Emitter<EngineEvents> {
     this.pushState();
   }
 
+  /** ребёнок заговорил, модель не готова: событие для подсказки — не чаще ASR_WAIT_HINT_MS */
+  private asrWait() {
+    const now = performance.now();
+    if (now - this.asrWaitAt < ASR_WAIT_HINT_MS) return;
+    this.asrWaitAt = now;
+    this.fire('asr_wait', { progress: +this.st.modelProgress.toFixed(2), health: this.asr.health });
+  }
+
+  /** что показать на кнопке микрофона */
+  status(): VoiceStatus {
+    const a = this.asr;
+    if (!this.mic.supported || this.mic.denied || a.health === 'dead' || (a.unavailable && !a.ready)) return 'off';
+    if (this.catSpeaking) return 'speaking';
+    const mh = this.mic.health;
+    if (this.mic.isOpen && mh !== 'ok') return 'deaf';
+    if (this.thinking) return 'thinking';
+    if (a.ready === false) return 'loading';
+    if (this.vad.speaking && !this.selfMuted) return 'hearing';
+    if (this.listening) return 'listening';
+    return 'idle';
+  }
+
   private fire(id: VoiceEventId, data?: Record<string, unknown>) {
     this.st.lastEvent = data ? `${id} ${JSON.stringify(data)}` : id;
     this.emit('event', { id, data });
@@ -546,7 +616,7 @@ export class VoiceEngine extends Emitter<EngineEvents> {
       level: this.mic.level, floorDb: +this.mic.floor.floorDb.toFixed(1), modelProgress: this.st.modelProgress, echo: this.echo.phase,
       catSpeaking: this.catSpeaking, lastText: this.st.lastText, lastIntent: this.st.lastIntent, lastConfidence: this.st.lastConfidence,
       lastEvent: this.st.lastEvent, question: !!intentContext().question, micError: this.mic.error,
-      asrHealth: this.asr.health ?? 'ok', micDenied: this.mic.denied,
+      asrHealth: this.asr.health ?? 'ok', micDenied: this.mic.denied, micHealth: this.mic.health, status: this.status(),
     };
   }
 

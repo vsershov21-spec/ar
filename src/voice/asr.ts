@@ -26,6 +26,11 @@ export type ModelHealth = 'unknown' | 'loading' | 'ok' | 'down' | 'dead';
 export const MODEL_MAX_ATTEMPTS = 2;
 /** пауза перед второй попыткой */
 export const MODEL_RETRY_MS = 30_000;
+/**
+ * Распаковка модели в воркере Vosk не ответила за столько — попытка не удалась (iPhone: воркер мог упасть по памяти
+ * молча; раньше health оставался «loading» навсегда — голос не работал, а кот звал говорить и тоста не было)
+ */
+export const MODEL_UNPACK_TIMEOUT_MS = 150_000;
 
 export interface Asr {
   readonly name: string;
@@ -334,7 +339,12 @@ export class VoskAsr implements Asr {
         if (!h.ok) throw new Error(h.why);
         // модель (сеть или HTTP-кэш) и сам движок (≈2.4 МБ gzip) — параллельно
         const [, vosk] = await Promise.all([fetchModelWithProgress(this.modelUrl, (p) => this.onProgress(p)), import('vosk-browser')]);
-        this.model = await vosk.createModel(new URL(asset(this.modelUrl), location.href).href);
+        let tm = 0 as unknown as ReturnType<typeof setTimeout>;
+        const model = await Promise.race([
+          vosk.createModel(new URL(asset(this.modelUrl), location.href).href),
+          new Promise<never>((_, rej) => (tm = setTimeout(() => rej(new Error('load timeout')), MODEL_UNPACK_TIMEOUT_MS))),
+        ]).finally(() => clearTimeout(tm));
+        this.model = model;
         markModelReady(this.modelUrl);
         this.health = 'ok';
         this.onState('idle');

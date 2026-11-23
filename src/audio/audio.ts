@@ -20,6 +20,8 @@ import { earlyAudioContext, shareAudioContext } from '../quick/early';
 export type Category = 'sfx' | 'voice' | 'ambience';
 const DUCK = Math.pow(10, -8 / 20); // −8 дБ ≈ 0.4
 const DUCK_MIC = Math.pow(10, -14 / 20); // −14 дБ ≈ 0.2
+/** хвост своего звука (реверберация комнаты, задержка вывода iOS) — микрофон ещё слышит его */
+const SFX_TAIL_MS = 200;
 
 export class Audio {
   private howl: Howl | null = null;
@@ -169,6 +171,9 @@ export class Audio {
     if (vars.length > 1 && key === this.lastVariant.get(base)) key = vars[(vars.indexOf(key) + 1) % vars.length];
     this.lastVariant.set(base, key);
     const id = this.howl.play(key);
+    // микрофон не ищет начало фразы, пока звучит свой звук (VoiceEngine: эхоподавление гасит его не до конца)
+    const dur = this.sprite[key]?.[1] ?? 0;
+    if (dur > 0 && volume * this.volume.sfx > 0.05 && !this.muted) this.sfxUntil = Math.max(this.sfxUntil, performance.now() + dur + SFX_TAIL_MS);
     this.howl.volume(volume * this.volume.sfx * this.duckK, id);
     const j = opts.pitchJitter ?? 0.05;
     this.howl.rate(1 + (Math.random() * 2 - 1) * j, id);
@@ -223,6 +228,7 @@ export class Audio {
     for (const f of [523.25, 659.25, 783.99, 1046.5]) note(f, 0.38, 0.75, 0.13);
     for (let i = 0; i < 6; i++) note(2093 * (1 + i * 0.12), 0.42 + i * 0.07, 0.12, 0.05, 'triangle');
     setTimeout(() => out.disconnect(), 1600);
+    this.sfxUntil = Math.max(this.sfxUntil, performance.now() + 1300 + SFX_TAIL_MS);
   }
 
   playAmbience(url: string) {
@@ -235,6 +241,12 @@ export class Audio {
     this.volume[cat] = v;
     if (cat === 'voice' && this.voiceGain) this.voiceGain.gain.value = v;
     this.applyDuck();
+  }
+
+  /** до какого момента (performance.now) звучит свой звук спрайта / фанфары */
+  private sfxUntil = 0;
+  sfxBusy(): boolean {
+    return performance.now() < this.sfxUntil;
   }
 
   private duckReasons = new Set<string>();

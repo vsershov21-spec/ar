@@ -453,6 +453,8 @@ export class App {
     let lastState = '';
     e.on('interim', (t) => this.ui.micHintText(t));
     e.on('state', (s) => {
+      // индикатор на кнопке: слушаю / думаю / не слышу (без текста в пузыре — только сама кнопка)
+      this.ui.micStatus(s.status);
       const k = `${s.asrState}|${s.listening}|${Math.round(s.modelProgress * 20)}|${s.echo}`;
       if (k === lastState) return;
       lastState = k;
@@ -495,6 +497,13 @@ export class App {
       // голос недоступен — сказать один раз за сессию (движок шлёт каждое событие однажды)
       if (id === 'asr_down') this.ui.toast('Голос пока не работает — жми кнопки', 5000);
       if (id === 'mic_denied') this.ui.toast('Нет доступа к микрофону — жми кнопки', 5000);
+      if (id === 'asr_down') track('mic_issue', { reason: 'asr_down', ctx: this.audio.ctx?.state });
+      // ребёнок заговорил, а кот ещё не умеет слушать (модель качается / распаковывается) — одна подсказка над кнопкой
+      if (id === 'asr_wait' && this.director.state.appeared) {
+        const p = Number(data?.progress ?? 0);
+        this.ui.micHintText(p > 0.02 && p < 0.99 ? `Кот ещё учится слушать… ${Math.round(p * 100)}% Пока жми кнопки` : 'Кот ещё учится слушать — пока жми кнопки');
+      }
+      if (id === 'mic_health') this.onMicHealth(String(data?.health ?? ''), data ?? {});
       // громкость без распознавания → реакции кота (events.json: loud, whisper, clap)
       if ((id === 'loud' || id === 'whisper' || id === 'clap') && this.director.state.appeared) this.director.interaction(id);
     });
@@ -505,6 +514,33 @@ export class App {
       const v = this.director.persona.voice;
       return { echoPitchSemitones: v.echoPitchSemitones ?? 5, echoRate: v.echoRate ?? 1 };
     };
+  }
+
+  /**
+   * Микрофон открыт, а звук не идёт (MicInput.health): в аналитику — причина (раз за сессию на причину); ребёнку —
+   * подсказка «кот тебя не слышит», если так держится 3 с и кот уже на карте: не чаще раза в минуту, не больше 2 за сессию.
+   * Касание будит звук на iPhone (Audio: pointerdown → resume) — потому и «нажми на кота».
+   */
+  private micIssues = new Set<string>();
+  private micDeafTimer = 0;
+  private micDeafHints = 0;
+  private micDeafAt = -1e9;
+  private onMicHealth(h: string, data: Record<string, unknown>) {
+    clearTimeout(this.micDeafTimer);
+    if (h === 'ok' || h === 'closed') return;
+    const reason = h === 'silent' ? `silent_${data.why ?? 'x'}` : h === 'ctx' ? `ctx_${data.state ?? 'x'}` : h;
+    if (!this.micIssues.has(reason)) {
+      this.micIssues.add(reason);
+      track('mic_issue', { reason, ctx: data.ctx, node: data.node, ms: data.upMs, sr: data.sr });
+    }
+    this.micDeafTimer = window.setTimeout(() => {
+      const now = performance.now();
+      if (this.engine.mic.health === 'ok' || !this.director.state.appeared) return;
+      if (this.micDeafHints >= 2 || now - this.micDeafAt < 60_000) return;
+      this.micDeafHints++;
+      this.micDeafAt = now;
+      this.ui.micHintText('Кот тебя не слышит — нажми на кота или на микрофон', 'warn');
+    }, 3000);
   }
 
   // ───────────── чипы кота, каталог, микрофон «я говорю» ─────────────

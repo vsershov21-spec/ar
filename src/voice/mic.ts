@@ -21,6 +21,27 @@ export interface MicEvent extends MicChunk {
   list: Frame[];
 }
 export type MicListener = (c: MicEvent) => void;
+/**
+ * Что со входом (для индикатора на кнопке и телеметрии mic_issue):
+ *  closed — не открыт; ok — кадры идут; ctx — AudioContext не «running» (iOS: interrupted после камеры/звонка — звук
+ *  в ворклет не идёт); silent — кадров нет / одни нули при «running»; muted — iOS заглушила дорожку; ended — дорожка
+ *  завершилась (звонок, Siri), переоткрываем.
+ */
+export type MicHealth = 'closed' | 'ok' | 'ctx' | 'silent' | 'muted' | 'ended';
+
+/** iOS: ctx.resume() у «interrupted» контекста вне жеста может не ответить никогда — ждём не дольше */
+export const MIC_RESUME_WAIT_MS = 700;
+/** модуль AudioWorklet не загрузился за столько — ScriptProcessor (открытие микрофона не виснет) */
+export const MIC_WORKLET_WAIT_MS = 3000;
+/** кадров нет дольше — «не слышу» (и будим контекст / пересобираем узлы) */
+export const MIC_STALL_MS = 1500;
+/** одни цифровые нули дольше — «не слышу» (настоящий микрофон даже в тишине даёт шум ≥ −100 dBFS) */
+export const MIC_ZERO_MS = 4000;
+const ZERO_DB = -115;
+
+function within<T>(p: Promise<T>, ms: number): Promise<T | 'timeout'> {
+  return Promise.race([p, new Promise<'timeout'>((r) => setTimeout(() => r('timeout'), ms))]);
+}
 
 /** модуль ворклета загружается в контекст один раз */
 const workletLoaded = new WeakMap<BaseAudioContext, Promise<boolean>>();
@@ -62,6 +83,18 @@ export class MicInput {
   lastDb = -120;
   /** ошибка последнего открытия: 'not-allowed' | 'no-device' | 'unsupported' | … */
   error: string | null = null;
+  /** когда пришёл последний кадр из ворклета (performance.now) */
+  private lastChunkAt = 0;
+  /** с какого момента идут одни нули (0 — не нули) */
+  private zeroSince = 0;
+  private watchTimer = 0;
+  private openedAt = 0;
+  private rebuilt = false;
+  private reopens = 0;
+  /** состояние входа (индикатор «не слышу», телеметрия) */
+  health: MicHealth = 'closed';
+  /** вход сломался/починился: причина (MicHealth) — engine шлёт в аналитику mic_issue (без звука и текста) */
+  onHealth: ((h: MicHealth, info: Record<string, unknown>) => void) | null = null;
   /** Не закрываем: на iOS повторный getUserMedia и смена аудиосессии (playback ↔ play-and-record) рвут камеру —
    *  фон становится чёрным. Микрофон, раз открытый, живёт до ухода со страницы. */
   idleCloseMs = Infinity;
@@ -166,9 +199,12 @@ export class MicInput {
       return false;
     }
     try {
-      if (ctx.state !== 'running') await ctx.resume().catch(() => undefined);
+      // iOS: после камеры контекст бывает «interrupted», и resume() вне жеста не отвечает никогда — раньше открытие
+      // микрофона висело на этом await навсегда (opening не сбрасывался: «слушаю всегда» не открывался до перезагрузки).
+      // Не ждём дольше MIC_RESUME_WAIT_MS: узлы подключим и так, звук пойдёт, когда контекст проснётся (касание, реплика)
+      if (ctx.state !== 'running') await within(ctx.resume().catch(() => undefined), MIC_RESUME_WAIT_MS);
       // модуль ворклета — параллельно с запросом доступа (getUserMedia ждёт ответа ребёнка/родителя)
-      const wl = loadWorklet(ctx);
+      const wl = within(loadWorklet(ctx), MIC_WORKLET_WAIT_MS).then((ok) => ok === true);
       // эхоподавление нужно: кот не слышит себя, голосом можно перебить. На iOS оно включает «голосовую обработку»,
       // и звук приложения играет тише; ?aec=0 — без него (проверить громкость на устройстве)
       const aec = typeof location === 'undefined' || new URLSearchParams(location.search).get('aec') !== '0';
@@ -208,10 +244,17 @@ export class MicInput {
         if (this.node === node) {
           this.error = 'ended';
           this.cleanup();
+          this.setHealth('ended');
+          this.reopenSoon();
         }
       };
       this.floor.reset(true); // калибровка шума 2 с после включения
       this.error = null;
+      this.openedAt = this.lastChunkAt = performance.now();
+      this.zeroSince = 0;
+      this.rebuilt = false;
+      this.setHealth('ok');
+      this.watch();
       return true;
     } catch (e: any) {
       this.error = e?.name === 'NotAllowedError' || e?.name === 'SecurityError' ? 'not-allowed' : e?.name === 'NotFoundError' ? 'no-device' : String(e?.message ?? e);
@@ -224,8 +267,74 @@ export class MicInput {
     }
   }
 
+  /**
+   * Сторож входа (раз в секунду, пока открыт): кадров нет или одни нули — «не слышу». Контекст не «running» —
+   * будим (без ожидания); при «running» без кадров 4 с — один раз пересобираем узлы (iOS после смены маршрута звука);
+   * дорожка завершилась — открываем заново (не больше 2 раз за сессию).
+   */
+  private watch() {
+    clearInterval(this.watchTimer);
+    if (typeof window === 'undefined') return;
+    this.watchTimer = window.setInterval(() => this.check(), 1000);
+  }
+
+  /** одна проверка сторожа (публично — для тестов) */
+  check(now = performance.now()) {
+    const node = this.node, ctx = this.audio.ctx;
+    if (!node || !ctx) return this.setHealth('closed');
+    if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
+    const track = this.stream?.getAudioTracks()[0];
+    if (track && track.readyState === 'ended') {
+      this.error = 'ended';
+      this.cleanup();
+      this.setHealth('ended');
+      return void this.reopenSoon();
+    }
+    const stalled = now - this.lastChunkAt > MIC_STALL_MS;
+    if (stalled && ctx.state !== 'running') {
+      void ctx.resume().catch(() => undefined);
+      return this.setHealth('ctx', { state: ctx.state });
+    }
+    if (stalled && now - this.lastChunkAt > 4000 && !this.rebuilt) {
+      this.rebuilt = true;
+      this.rewire();
+    }
+    if (track?.muted) return this.setHealth('muted');
+    if (stalled) return this.setHealth('silent', { why: 'no_chunks', ms: Math.round(now - this.lastChunkAt) });
+    if (this.zeroSince && now - this.zeroSince > MIC_ZERO_MS) return this.setHealth('silent', { why: 'zeros' });
+    this.setHealth('ok');
+  }
+
+  private setHealth(h: MicHealth, info: Record<string, unknown> = {}) {
+    if (h === this.health) return;
+    const prev = this.health;
+    this.health = h;
+    this.onHealth?.(h, { ...info, prev, node: this.nodeKind, ctx: this.audio.ctx?.state, sr: this.audio.ctx?.sampleRate, upMs: Math.round(performance.now() - this.openedAt) });
+  }
+
+  /** источник → узел → выход заново (тот же поток) */
+  private rewire() {
+    const ctx = this.audio.ctx;
+    if (!ctx || !this.stream || !this.node || !this.sink) return;
+    try {
+      this.src?.disconnect();
+      this.src = ctx.createMediaStreamSource(this.stream);
+      this.src.connect(this.node);
+    } catch (e) {
+      console.warn('[mic] пересборка узлов', e);
+    }
+  }
+
+  private reopenSoon() {
+    if (this.users <= 0 || this.reopens >= 2 || this.denied) return;
+    this.reopens++;
+    setTimeout(() => void this.open(), 500);
+  }
+
   private process(c: MicChunk) {
     perf.count('mic');
+    const t = performance.now();
+    this.lastChunkAt = t;
     const f = c.frames;
     const list: Frame[] = [];
     for (let i = 0; i + 2 < f.length; i += 3) {
@@ -236,6 +345,9 @@ export class MicInput {
       const v = Math.min(1, Math.max(0, (this.lastDb + 60) / 50));
       this.level += (v - this.level) * (v > this.level ? 0.5 : 0.15);
     }
+    if (this.lastDb > ZERO_DB) this.zeroSince = 0;
+    else if (!this.zeroSince) this.zeroSince = t;
+    if (this.health !== 'ok' && this.health !== 'muted' && this.lastDb > ZERO_DB) this.setHealth('ok');
     const ev = c as MicEvent;
     ev.list = list;
     for (const fn of this.listeners) fn(ev);
@@ -245,9 +357,11 @@ export class MicInput {
     clearTimeout(this.idleTimer);
     this.cleanup();
     this.level = 0;
+    this.setHealth('closed');
   }
 
   private cleanup() {
+    clearInterval(this.watchTimer);
     try {
       this.node?.disconnect();
       this.src?.disconnect();

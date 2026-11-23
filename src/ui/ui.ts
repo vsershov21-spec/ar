@@ -286,7 +286,7 @@ ${TOUR ? OB_TOUR : ''}
       </div>
       <div class="dock no-play">
         <button class="iconbtn side-l" data-a="mute" aria-label="Выключить звук">${ICON.sound}</button>
-        <div class="mic-slot">${EARS}<button class="mic" aria-label="Скажи коту">${ICON.mic}</button></div>
+        <div class="mic-slot">${EARS}<button class="mic" aria-label="Скажи коту">${ICON.mic}</button><i class="mic-st" aria-hidden="true"></i></div>
         <button class="pawbtn side-r" data-a="paw" type="button" aria-label="Что умеет кот" aria-haspopup="dialog" aria-expanded="false"><span class="paw-ico">${ICON.paw}</span><span class="paw-l">Что умею</span></button>
       </div>`;
     parent.appendChild(root);
@@ -1291,6 +1291,22 @@ ${TOUR ? OB_TOUR : ''}
   micLoading(k: number | null) {
     this.micSlot.classList.toggle('loading', k !== null);
     if (k !== null) this.micSlot.style.setProperty('--load', `${Math.round(k * 360)}deg`);
+  }
+  /**
+   * Индикатор на кнопке микрофона (VoiceEngine.status): «Слушаю» — голос в микрофоне или окно ответа; «Думаю…» —
+   * фраза кончилась, распознаём; «Не слышу» — микрофон открыт, а звука нет; off — голоса нет (кнопка серая).
+   * Без пузырей и тостов: подпись под кнопкой, меняется только при смене состояния.
+   */
+  private micSt = '';
+  micStatus(st: string) {
+    if (st === this.micSt) return;
+    this.micSt = st;
+    const label: Record<string, string> = { hearing: 'Слышу', listening: 'Слушаю', thinking: 'Думаю…', deaf: 'Не слышу', loading: '' };
+    const el = this.micSlot.querySelector('.mic-st');
+    if (el) el.textContent = label[st] ?? '';
+    this.micSlot.dataset.vs = st;
+    this.mic.classList.toggle('thinking', st === 'thinking');
+    this.mic.classList.toggle('deaf', st === 'deaf' || st === 'off');
   }
   micLevel(v: number) {
     this.mic.style.setProperty('--lvl', String(v));

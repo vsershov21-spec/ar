@@ -20,6 +20,8 @@ export const EVENTS = [
   'card_search_start', 'card_found', 'cat_awake', 'first_action',
   // озвучка (src/voice/voicePlayer.ts): реплика без звука или поздно — причина и мс (без текста, имени, id реплики)
   'voice_issue',
+  // микрофон (src/voice/mic.ts, engine.ts): вход сломался — причина (ctx / silent / muted / ended / asr_down), без звука и текста
+  'mic_issue',
 ] as const;
 export type EventName = (typeof EVENTS)[number];
 
@@ -50,6 +52,7 @@ export const PROPS: Partial<Record<EventName, Record<string, Kind>>> = {
   session_end: { sec: 'num' },
   paint_start: { color: 'id' },
   voice_issue: { reason: 'id', ms: 'num', net: 'num', dec: 'num', warm: 'num', ev: 'id', ctx: 'id' },
+  mic_issue: { reason: 'id', ctx: 'id', node: 'id', ms: 'num', sr: 'num' },
 };
 const ID_RE = /^[a-z0-9_:.-]{1,32}$/i;
 

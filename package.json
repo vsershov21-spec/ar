@@ -23,7 +23,8 @@
     "video-manifest": "node scripts/video-manifest.mjs",
     "voice:eleven": "node scripts/voice/eleven.mjs",
     "qa": "node scripts/qa/run.mjs",
-    "e2e:pilot": "node scripts/qa/e2e/run.mjs"
+    "e2e:pilot": "node scripts/qa/e2e/run.mjs",
+    "e2e:mic": "node scripts/qa/e2e/mic.mjs"
   },
   "keywords": [],
   "author": "",
