@@ -12,10 +12,14 @@
  * Анимации: клипы get_into_bed, lie_down_side, sleep_loop_bed, turn_over_sleep, wake_stretch_in_bed, hop_out_of_bed
  * (content/animations.json). Пока их нет в anims_v1.glb, играет клип-опора (fallback), путь корня (дуга на матрас,
  * крен на бок, спрыгнуть) — здесь, мелкие поправки костей — GlbCharacter.poseTweak. Настоящий клип — без поправок.
+ * Поза лёжа (любой клип лёжа, Meshy или опора) выравнивается по матрасу и подушке (alignTick): клипы Meshy кладут тело
+ * в своей системе (sleep_loop_bed — поперёк, lie_down_side — ещё иначе), поэтому поворот, наклон и место якоря считаются
+ * из позы клипа, а не задаются константой. Стенд — scripts/qa/bed-stand.mjs, листы до/после — docs/qa/bed/.
  */
 import * as THREE from 'three';
 import type { HomeHost, HomePhase } from './homeMode';
 import type { Room } from './room';
+import type { Mattress } from './bedProp';
 import type { ZoneId } from './zones';
 import { ZONES, zoneSpot } from './zones';
 import type { Chip } from '../scenario/suggest';
@@ -49,7 +53,7 @@ export const LIE = {
   /** точка опоры ближе к зрителю: тело после крена лежит от неё к стене */
   dz: 0.2,
 };
-/** настоящий клип «лёжа на боку» (TZ): корень в точке сна, кот уже лицом к зрителю, голова вправо */
+/** настоящий клип «лёжа на боку»: без крена (поворот, наклон и место — alignTick по позе клипа) */
 export const REAL_LIE = { yaw: 0, roll: 0, lift: 0, dz: 0 };
 /** кот спит не в спальне (камера в другой комнате): свет в доме — приглушённый */
 const AWAY_LIGHT = 0.55;
@@ -69,6 +73,9 @@ const CAPS: [string, string][] = [
   ['Spine2', 'LeftArm'], ['Spine2', 'RightArm'], ['LeftArm', 'LeftForeArm'], ['RightArm', 'RightForeArm'], ['LeftForeArm', 'LeftHand'], ['RightForeArm', 'RightHand'],
 ];
 const clampR = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
+/** клипы, по позе которых выравниваемся (опора sleep_loop — когда клипа сна нет) */
+const LYING_CLIPS = new Set(['lie_down_side', SLEEP_CLIP, TURN_CLIP, 'wake_stretch_in_bed', 'sleep_loop']);
+const AX_X = new THREE.Vector3(1, 0, 0), AX_Y = new THREE.Vector3(0, 1, 0), AX_Z = new THREE.Vector3(0, 0, 1);
 const bedroomX = () => ZONES.find((z) => z.id === 'bedroom')!.x;
 const ease = (t: number) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
 const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
@@ -464,9 +471,10 @@ export class BedFlow {
       if (e.done === 'awake') this.onAwake();
     }
     if (this.m.inBed && v.room) {
+      this.alignTick(now);
       this.pose(now);
       this.fitPose(now);
-    }
+    } else this.lastT = now;
     if (this.turn && now - this.turn.t0 > this.turn.ms) {
       if (this.turn.amp >= 1 && this.m.state === 'asleep') h.character()?.play(SLEEP_CLIP, { loop: true });
       this.turn = null;
@@ -602,8 +610,10 @@ export class BedFlow {
     const edge = new THREE.Vector3(spot.x - 0.05, BED.top, front - 0.14);
     const p = this.m.progress(now);
     const L = this.isProc(SLEEP_CLIP) ? LIE : REAL_LIE;
-    const f = this.fit;
-    const lie = { x: spot.x + f.dx, y: spot.y + L.lift + f.lift, z: spot.z + L.dz + f.dz, yaw: L.yaw, roll: L.roll, tilt: f.tilt };
+    // поза лёжа — по матрасу (alignTick: ось тела вдоль кровати, голова на подушке, тело на простыне); пока не мерили —
+    // запас из точки сна
+    const A = this.al;
+    const lie = A.ok ? { x: A.x, y: A.y, z: A.z, yaw: A.yaw, roll: L.roll, tilt: A.tilt } : { x: spot.x, y: spot.y + L.lift, z: spot.z + L.dz, yaw: L.yaw, roll: L.roll, tilt: 0 };
     let x = stand.x, y = 0, z = stand.z, yaw = 0, roll = 0, tilt = 0;
     const id = p.step?.id;
     const k = p.k;
@@ -673,53 +683,207 @@ export class BedFlow {
   }
   /** насколько кот лежит (последний кадр) */
   private lieW = 0;
-  /** подгонка позы лёжа по костям: подъём, наклон вдоль тела, сдвиги — копится, пока кот лежит */
-  readonly fit = { lift: 0, tilt: 0, dx: 0, dz: 0 };
+  /**
+   * Выравнивание позы лёжа по матрасу (не интегратор: цель считается заново из позы клипа в системе якоря).
+   * al — сглаженная поза якоря (её берёт pose), goal — цель последнего замера, memo — цель по клипу (кот → клип → поза),
+   * чтобы смена клипа (лёг → петля сна → потягивание) начиналась с уже известной позы, а не с точки сна.
+   */
+  readonly al = { x: 0, y: 0, z: 0, yaw: 0, tilt: 0, ok: false };
+  private goal: { x: number; y: number; z: number; yaw: number; tilt: number } | null = null;
+  private memo = new WeakMap<object, Map<string, { x: number; y: number; z: number; yaw: number; tilt: number }>>();
+  private samp: { of: object; list: { mesh: THREE.SkinnedMesh; idx: Int32Array; head: Uint8Array }[] } | null = null;
   private bodyAt = 0;
+  private alAt = 0;
+  private alClip = '';
+  private alSwitch = 0;
+  /** вершины тела (без головы), мир — силуэт для одеяла (fitPose, раз в 0,25 с) */
+  private bodyPts: THREE.Vector3[] = [];
+  private lastT = 0;
+  /** замер для стенда и debug: ось тела, наклон, низ тела над простынёй, голова над подушкой (мм комнаты) */
+  readonly alDbg = { axis: 0, pitch: 0, lowMM: 0, headMM: 0, clip: '' };
+
+  /** вершины кожи для замера (каждая k-я; голова — по доминирующей кости в поддереве Head) — раз на модель */
+  private samples(obj: THREE.Object3D) {
+    if (this.samp?.of === obj) return this.samp.list;
+    const list: { mesh: THREE.SkinnedMesh; idx: Int32Array; head: Uint8Array }[] = [];
+    obj.traverse((o) => {
+      const m = o as THREE.SkinnedMesh;
+      if (!m.isSkinnedMesh || /shell|fur/i.test(m.name)) return;
+      const pos = m.geometry.getAttribute('position'), si = m.geometry.getAttribute('skinIndex'), sw = m.geometry.getAttribute('skinWeight');
+      if (!pos || !si || !sw) return;
+      const underHead = (b: THREE.Object3D | undefined) => {
+        for (let x: THREE.Object3D | null | undefined = b; x; x = x.parent) if (/Head$/.test(x.name)) return true;
+        return false;
+      };
+      const step = Math.max(1, Math.floor(pos.count / 300));
+      const idx: number[] = [], head: number[] = [];
+      for (let i = 0; i < pos.count; i += step) {
+        let best = 0, bi = 0;
+        for (let k = 0; k < 4; k++) if (sw.getComponent(i, k) > best) (best = sw.getComponent(i, k)), (bi = si.getComponent(i, k));
+        idx.push(i);
+        head.push(underHead(m.skeleton.bones[bi]) ? 1 : 0);
+      }
+      list.push({ mesh: m, idx: Int32Array.from(idx), head: Uint8Array.from(head) });
+    });
+    this.samp = { of: obj, list };
+    return list;
+  }
 
   /**
-   * Кот лежит: кости → (1) поправка позы — нижняя точка тела на матрасе (не тонет и не висит), спина горизонтально,
-   * шея у подушки, тело по центру кровати; (2) капсулы тела для одеяла (раз в 0,25 с).
+   * Кот лежит: поза клипа в системе якоря → поза якоря, при которой (1) ось таз→шея лежит вдоль кровати головой к
+   * изголовью (+X), спина горизонтально (наклон ≤ 0,35 рад); (2) голова — на подушке, тело — по центру матраса;
+   * (3) нижняя вершина тела — на простыне, нижняя вершина головы — не ниже верха подушки (−5 см: подушка мягкая;
+   * не хватает — голова приподнимается наклоном спины, не больше 0,25 рад).
+   * Геометрия — BedProp.mattress (как построена кровать), замер — по вершинам кожи раз в 0,2 с, между — сглаживание.
    */
+  private alignTick(now: number) {
+    const ch = this.h.character() as unknown as { object?: THREE.Object3D; boneWorld?: (n: string, o: THREE.Vector3) => boolean; currentClip?: string } | null;
+    const room = this.v.room, bed = room?.bed;
+    const dt = Math.min(0.1, Math.max(0, (now - (this.lastT || now)) / 1000));
+    this.lastT = now;
+    if (!ch?.object || !ch.boneWorld || !room || !bed) return;
+    const clip = ch.currentClip ?? '';
+    let memo = this.memo.get(ch.object);
+    if (!memo) this.memo.set(ch.object, (memo = new Map()));
+    const st = this.m.progress(now);
+    // мерить: кот лежит (поза сна, ложится, потягивается лёжа), не ворочается
+    const lyingStep = st.state === 'asleep' || ['lie_down_side', 'cover', 'uncover'].includes(st.step?.id ?? '') || (st.step?.id === 'wake_stretch_in_bed' && st.k < 0.3);
+    // смена клипа (лёг → петля сна): клипы Meshy кладут тело в своей системе по-разному (ось расходится до 150°) —
+    // первые 0,7 с после смены мерим каждый кадр и ставим якорь без сглаживания: тело остаётся вдоль кровати, пока
+    // микшер смешивает позы; дальше — раз в 0,2 с со сглаживанием
+    if (clip !== this.alClip) {
+      this.alClip = clip;
+      this.alSwitch = now;
+    }
+    const fresh = now - this.alSwitch < 700;
+    let snap = false;
+    // мерим только позы лёжа (во время шага может заиграть чужой клип — реплика режиссёра, talk_*): иначе прежняя цель
+    if (lyingStep && LYING_CLIPS.has(clip) && !this.turn && (fresh || now - this.alAt > 200)) {
+      this.alAt = now;
+      const g = this.measure(ch as Required<typeof ch>, room.anchor, bed.mattress);
+      if (g) {
+        memo.set(clip, g);
+        snap = fresh && this.al.ok;
+      }
+    }
+    // цель: замер этого клипа, иначе прежняя цель
+    const want = memo.get(clip) ?? this.goal;
+    if (!want) return;
+    this.goal = want;
+    const A = this.al;
+    if (!A.ok) {
+      Object.assign(A, want, { ok: true });
+      return;
+    }
+    const k = snap ? 1 : 1 - Math.exp(-dt / 0.18);
+    A.x += (want.x - A.x) * k;
+    A.y += (want.y - A.y) * k;
+    A.z += (want.z - A.z) * k;
+    A.tilt += (want.tilt - A.tilt) * k;
+    A.yaw += Math.atan2(Math.sin(want.yaw - A.yaw), Math.cos(want.yaw - A.yaw)) * k;
+  }
+
+  private measure(ch: { object: THREE.Object3D; boneWorld: (n: string, o: THREE.Vector3) => boolean }, anchor: THREE.Object3D, M: Mattress) {
+    ch.object.parent?.updateMatrixWorld(true);
+    anchor.updateMatrixWorld(true);
+    const inv = new THREE.Matrix4().copy(anchor.matrixWorld).invert();
+    const loc = (n: string) => {
+      const v = new THREE.Vector3();
+      return ch.boneWorld(n, v) ? v.applyMatrix4(inv) : null;
+    };
+    const hips = loc('Hips'), neck = loc('Neck'), head = loc('Head');
+    if (!hips || !neck || !head) return null;
+    const L = this.isProc(SLEEP_CLIP) ? LIE : REAL_LIE;
+    const q0 = new THREE.Quaternion().setFromAxisAngle(AX_Z, L.roll).multiply(new THREE.Quaternion().setFromAxisAngle(AX_X, -Math.PI / 2));
+    const b = neck.clone().sub(hips).applyQuaternion(q0);
+    const len = b.length();
+    // не лёжа (сидит, встаёт): ось почти вертикальна — не мерим
+    if (len < 1e-4 || Math.abs(b.y) / len > 0.64) return null;
+    const yaw = Math.atan2(b.z, b.x);
+    const qy = new THREE.Quaternion().setFromAxisAngle(AX_Y, yaw);
+    const c = b.clone().applyQuaternion(qy);
+    let tilt = clampR(-Math.atan2(c.y, c.x), -0.25, 0.25);
+    const P = M.pillow;
+    const W = new THREE.Quaternion();
+    const v = new THREE.Vector3();
+    let lowB = Infinity, lowH = Infinity, hw = head, mid = head, hipW = hips;
+    const hc = new THREE.Vector3();
+    let hn = 0;
+    /** подушка мягкая: голова может уйти в неё на столько */
+    const SINK = 0.05;
+    // два прохода: спина горизонтально → не хватает до подушки — приподнять голову наклоном (не всё тело)
+    for (let pass = 0; pass < 2; pass++) {
+      W.setFromAxisAngle(AX_Z, tilt).multiply(qy).multiply(q0);
+      lowB = lowH = Infinity;
+      hc.set(0, 0, 0);
+      hn = 0;
+      for (const s of this.samples(ch.object)) {
+        if (!s.mesh.visible) continue;
+        for (let j = 0; j < s.idx.length; j++) {
+          s.mesh.getVertexPosition(s.idx[j], v);
+          v.applyMatrix4(s.mesh.matrixWorld).applyMatrix4(inv).applyQuaternion(W);
+          if (s.head[j]) {
+            lowH = Math.min(lowH, v.y);
+            hc.add(v);
+            hn++;
+          } else lowB = Math.min(lowB, v.y);
+        }
+      }
+      hw = head.clone().applyQuaternion(W);
+      mid = hips.clone().add(neck).multiplyScalar(0.5).applyQuaternion(W);
+      hipW = hips.clone().applyQuaternion(W);
+      if (!Number.isFinite(lowB)) lowB = hipW.y - 0.1;
+      const short = P.top - SINK - lowH - (M.top + 0.004 - lowB);
+      if (pass || !Number.isFinite(short) || short <= 0.005) break;
+      tilt = clampR(tilt + Math.atan2(short, Math.max(0.15, hw.x - hipW.x)), -0.25, 0.25);
+    }
+    // голова (центр вершин головы) — на середину подушки; нет вершин головы — кость Head чуть ближе к телу
+    const x = hn ? P.x - hc.x / hn : P.x - P.length * 0.2 - hw.x;
+    // placeAnchor ставит якорь на 0,1 дальше от зрителя (точка опоры Stage), тело — по центру матраса
+    const z = M.z0 + 0.1 - mid.z;
+    // голова не дотягивается и наклоном: тело не висит над простынёй больше 3 см — голова глубже в подушку (Добряк)
+    const y = Math.max(M.top + 0.004 - lowB, Number.isFinite(lowH) ? P.top - SINK - lowH - 0.03 : -Infinity);
+    const r2d = 180 / Math.PI;
+    Object.assign(this.alDbg, { axis: Math.round(yaw * r2d), pitch: Math.round(-tilt * r2d), lowMM: Math.round((y + lowB - M.top) * 1000), headMM: Math.round((y + lowH - P.top) * 1000), clip: (ch as { currentClip?: string }).currentClip ?? '' });
+    return { x, y, z, yaw, tilt };
+  }
+
+  /** капсулы тела для одеяла (раз в 0,25 с), пока кот лежит */
   private fitPose(now: number) {
     const ch = this.h.character() as unknown as { boneWorld?: (n: string, o: THREE.Vector3) => boolean } | null;
     const bed = this.v.room?.bed;
-    // подгоняем только позу сна (клип sleep_loop_bed / опора): в потягивании и прыжке клип другой — поправки замирают
     const st = this.m.progress(now);
     const sleepPose = st.state === 'asleep' || st.step?.id === 'cover' || st.step?.id === 'uncover' || (st.step?.id === 'lie_down_side' && st.k > 0.6);
-    if (!ch?.boneWorld || this.lieW < 0.6 || this.turn || !sleepPose) {
+    if (!ch?.boneWorld || this.lieW < 0.6 || !sleepPose) {
       if (this.lieW < 0.05) bed?.setBody(null);
       return;
     }
+    if (now - this.bodyAt < 250 || !bed) return;
     const P: Record<string, THREE.Vector3> = {};
     for (const n of BONES) {
       const v = new THREE.Vector3();
       if (ch.boneWorld(n, v)) P[n] = v;
     }
-    if (!P.Hips || !P.Neck || !P.Head) return;
+    if (!P.Hips || !P.Neck) return;
+    this.bodyAt = now;
     const hgt = this.h.stage.cfg.height;
     const R = (n: string) => (n === 'Head' ? 0.13 : /Hips|Spine/.test(n) ? 0.12 : /Foot|Toe/.test(n) ? 0.12 : /Leg/.test(n) ? 0.1 : 0.07) * hgt;
-    // опора на матрас: кости минус «толщина» части тела (торс на боку тоньше, чем капсула под одеялом)
-    const Rg = (n: string) => (n === 'Head' ? 0.11 : /Hips|Spine/.test(n) ? 0.09 : 0.05) * hgt;
-    let minY = Infinity;
-    // лапы опоры свисают ниже корпуса («на коленях») — опора по корпусу и ногам, лапы уходят под одеяло
-    // голова — тоже (лицом в матрас — нельзя, аудит 21.11); на подушке она и так выше
-    for (const n in P) if (!/Arm|Hand/.test(n)) minY = Math.min(minY, P[n].y - Rg(n));
-    const f = this.fit, g = 0.25 * this.lieW;
-    const spot = bed?.spot ?? new THREE.Vector3(bedroomX() + BED.dx + 0.1, BED.top, BED.z);
-    f.lift = clampR(f.lift + (BED.top + 0.01 - minY) * g, -0.25, 0.5);
-    const sx = P.Neck.x - P.Hips.x, sy = P.Neck.y - P.Hips.y;
-    if (sx > 0.05) f.tilt = clampR(f.tilt - Math.atan2(sy, sx) * g, -0.7, 0.7);
-    const pillowX = spot.x + BED.length / 2 - 0.45;
-    f.dx = clampR(f.dx + (pillowX - P.Neck.x) * g, -0.5, 0.5);
-    const cz = ((P.Spine2?.z ?? P.Hips.z) + P.Hips.z) / 2;
-    f.dz = clampR(f.dz + (BED.z + 0.02 - cz) * g, -0.4, 0.4);
-    if (now - this.bodyAt > 250 && bed) {
-      this.bodyAt = now;
-      const caps: { a: THREE.Vector3; b: THREE.Vector3; r: number }[] = [];
-      for (const [a, b] of CAPS) if (P[a] && P[b]) caps.push({ a: P[a], b: P[b], r: Math.max(R(a), R(b)) });
-      bed.setBody(caps, Math.min(P.Neck.x, P.Spine2?.x ?? P.Neck.x + 1) + 0.02);
+    const caps: { a: THREE.Vector3; b: THREE.Vector3; r: number }[] = [];
+    // силуэт: вершины кожи без головы (на боку туловище в худи толще капсул по костям — торчало сквозь одеяло; во время
+    // «ворочается» — тоже по текущей позе) + капсулы костей потоньше (связать точки)
+    const obj = (this.h.character() as unknown as { object?: THREE.Object3D } | null)?.object;
+    this.bodyPts = [];
+    if (obj) {
+      obj.parent?.updateMatrixWorld(true);
+      for (const s of this.samples(obj)) {
+        if (!s.mesh.visible) continue;
+        for (let j = 0; j < s.idx.length; j += 2) if (!s.head[j]) this.bodyPts.push(s.mesh.getVertexPosition(s.idx[j], new THREE.Vector3()).applyMatrix4(s.mesh.matrixWorld));
+      }
     }
+    for (const p of this.bodyPts) caps.push({ a: p, b: p, r: 0.035 });
+    const kR = this.bodyPts.length ? 0.7 : 1;
+    for (const [a, b] of CAPS) if (P[a] && P[b]) caps.push({ a: P[a], b: P[b], r: Math.max(R(a), R(b)) * kR });
+    bed.setBody(caps, Math.min(P.Neck.x, P.Spine2?.x ?? P.Neck.x + 1) + 0.02);
   }
 
   /** клип играет опорой (настоящего в GLB нет); спрайт/риг-заглушка — тоже как опора */

@@ -33,6 +33,15 @@ export interface BatchLike {
   add(geo: THREE.BufferGeometry, color: THREE.ColorRepresentation, at?: { p?: [number, number, number]; r?: [number, number, number]; s?: [number, number, number] }, o?: BakeOpts): void;
 }
 
+export interface Mattress {
+  x0: number;
+  z0: number;
+  top: number;
+  length: number;
+  width: number;
+  pillow: { x: number; z: number; top: number; length: number; width: number };
+}
+
 export interface BedProp {
   /** подключить GLB-кровать (loadBedGlb): процедурная статика прячется */
   attachGlb(root: THREE.Object3D, hideStatic: () => void): void;
@@ -40,6 +49,11 @@ export interface BedProp {
   readonly group: THREE.Group;
   /** где лежит кот (мир): на матрасе у подушки */
   readonly spot: THREE.Vector3;
+  /**
+   * Геометрия матраса и подушки (мир, как построены): центр матраса x0/z0, верх простыни top, длина по X (изголовье — +X),
+   * ширина по Z; подушка — центр, верх, размеры. По ним bedFlow кладёт кота, стенд кровати меряет позу.
+   */
+  readonly mattress: Mattress;
   /** где кот стоит перед прыжком в кровать (пол у края матраса) */
   readonly foot: THREE.Vector3;
   /** 0 — одеяло откинуто к изножью, 1 — накрывает кота до плеч */
@@ -193,10 +207,14 @@ export function buildBed(batch: BatchLike, cx: number, win: { x: number; y: numb
   S(rbox(L, 0.16, W, 0.06, 3), PAL.cream, { p: [x0, BED.top - 0.08, z0] });
   S(rbox(L - 0.04, 0.012, W - 0.04, 0.006), PAL.sheet, { p: [x0, BED.top + 0.002, z0] }, { ao: 0 });
   // подушка у изголовья
-  S(rbox(0.36, 0.13, W * 0.68, 0.06, 3), PAL.white, { p: [x0 + L / 2 - 0.25, BED.top + 0.07, z0], r: [0, 0, 0.12] });
-  S(rbox(0.3, 0.02, W * 0.6, 0.01), PAL.mint, { p: [x0 + L / 2 - 0.25, BED.top + 0.14, z0], r: [0, 0, 0.12] });
+  // подушка ниже прежней (0,13 → 0,09): кот на боку с большой головой ложился головой на подушку, а тело висело над
+  // простынёй на 5–7 см (стенд docs/qa/bed)
+  S(rbox(0.36, 0.09, W * 0.68, 0.045, 3), PAL.white, { p: [x0 + L / 2 - 0.25, BED.top + 0.05, z0], r: [0, 0, 0.08] });
+  S(rbox(0.3, 0.02, W * 0.6, 0.01), PAL.mint, { p: [x0 + L / 2 - 0.25, BED.top + 0.1, z0], r: [0, 0, 0.08] });
 
   const spot = new THREE.Vector3(x0 + 0.1, BED.top, z0 + 0.04);
+  // верх подушки: коробка 0,09 с центром +0,05 и наволочка 0,02 с центром +0,1 (наклон 0,08 рад — ±1,5 см по длине)
+  const mattress: Mattress = { x0, z0, top: BED.top + 0.008, length: L, width: W, pillow: { x: x0 + L / 2 - 0.25, z: z0, top: BED.top + 0.11, length: 0.36, width: W * 0.68 } };
   const foot = new THREE.Vector3(stand.x, 0, stand.z);
 
   // ───────── одеяло: ткань-сетка с настоящим сгибом, ложится по силуэту кота ─────────
@@ -396,6 +414,7 @@ export function buildBed(batch: BatchLike, cx: number, win: { x: number; y: numb
   const api: BedProp = {
     group,
     spot,
+    mattress,
     foot,
     get cover() {
       return cover;
