@@ -107,6 +107,19 @@
       "path": "scripts/deploy/mirror-props.sh",
       "timeoutMin": 10,
       "note": "Без трат: зеркало /srv/ar-extra/models/props в out/latest/props (bed.glb для стенда)"
+    },
+    {
+      "id": "el-plan-names36-2311",
+      "kind": "script",
+      "ref": "0452d3d1aad947c7bbe0e66d0f36f36615aa22d2",
+      "path": "scripts/voice/el-run.sh",
+      "args": [
+        "--plan",
+        "--only",
+        "slot"
+      ],
+      "timeoutMin": 20,
+      "note": "план: сколько слотов осталось озвучить после +36 имён"
     }
   ]
 }
