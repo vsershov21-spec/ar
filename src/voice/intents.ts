@@ -22,7 +22,9 @@ export type IntentId =
   | 'age_ask' | 'choose_hooligan' | 'choose_kind' | 'choose_glitter' | 'switch' | 'flip' | 'jump' | 'dance' | 'sit'
   | 'wave' | 'sing' | 'gum' | 'stickers' | 'riddle' | 'joke' | 'help' | 'bored' | 'compliment' | 'rude' | 'thanks' | 'yes' | 'no' | 'skip'
   // мини-игры и частые детские вопросы (ночь 18.11, docs/scenario/CONTENT_NIGHT.md)
-  | 'emo_game' | 'rps' | 'simon' | 'where_live' | 'likes' | 'friends' | 'tale' | 'friend' | 'how_are_you';
+  | 'emo_game' | 'rps' | 'simon' | 'where_live' | 'likes' | 'friends' | 'tale' | 'friend' | 'how_are_you'
+  // «просыпайся», «вставай», «подъём» — будит кота из дрёмы на карте (director.text; в доме — кровать, home/bed.ts bedIntent)
+  | 'wake';
 
 /** Совместимый с автоматом сценария тип: change_persona из словаря → 'switch' */
 export type Intent =

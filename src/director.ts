@@ -387,6 +387,23 @@ export class Director extends Emitter<DirectorEvents> {
 
   /** ввод голосом/чипом/текстом. Разбор — src/voice/intents.ts по content/intents.ru.json */
   text(t: string) {
+    // «просыпайся», «проснись», «вставай», «подъём», «доброе утро» — будят дремлющего кота так же, как касание:
+    // «А? Я не спал!» (wake_up), а не молча + «не понял». Кот не спит — «доброе утро»/«вставай» как приветствие.
+    // Дома кровать понимает эти фразы раньше режиссёра (app.ts → home.onText, src/home/bed.ts bedIntent)
+    const wm = this.wakeWord(t);
+    if (wm && this.dozing && this.state.appeared) {
+      this.coachDone();
+      this.lastUserAct = performance.now();
+      this.ladder.reset(this.lastUserAct);
+      this.log(`«${t}» → wake (дрёма) ${wm.toFixed(2)}`);
+      return this.dispatch({ type: 'interaction', kind: 'wake_up' });
+    }
+    if (wm && !this.state.dialog) {
+      this.childAct();
+      this.coachDone();
+      this.log(`«${t}» → wake, кот не спит → hello`);
+      return this.dispatch({ type: 'intent', intent: { type: 'hello', text: t } });
+    }
     this.childAct();
     this.coachDone();
     const st = this.state;
@@ -426,6 +443,14 @@ export class Director extends Emitter<DirectorEvents> {
       return this.dispatch({ type: 'game_answer', value: null, text: t });
     }
     this.dispatch({ type: 'intent', intent: h });
+  }
+
+  /** фраза-побудка (интент wake или «доброе утро», которое словарь отдаёт приветствию): уверенность или 0 */
+  wakeWord(t: string): number {
+    const m = matchIntent(t, {});
+    if (m.intent === 'wake') return m.confidence;
+    if (m.intent === 'hello' && /(^| )утр/.test(normalize(t))) return m.confidence;
+    return 0;
   }
 
   private gameItems(id: string | undefined): GameItem[] {

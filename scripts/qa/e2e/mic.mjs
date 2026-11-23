@@ -275,13 +275,18 @@ try {
     const rs = await say(P, 'привет');
     FLOWS.push({ step: 'после смены кота: привет', ...rs });
     res('after_switch: voice', rs.ok && !!rs.speakId, { persona: await P.ev(() => window.__app.director.persona.id), ...rs });
-    // сон (дрёма) → «просыпайся» голосом
-    await P.ev(() => window.__app.director.action('sleep'));
-    await sleep(3000);
-    const dz = await P.ev(() => window.__app.director.dozing);
-    const rw = await say(P, 'просыпайся');
-    FLOWS.push({ step: 'сон: просыпайся', ...rw });
-    res('sleep: wake by voice', rw.ok, { dozingBefore: dz, dozingAfter: await P.ev(() => window.__app.director.dozing), ...rw });
+    // сон (дрёма) → «просыпайся» / «вставай» / «доброе утро» голосом: кот просыпается с репликой пробуждения (wake_up),
+    // «Zzz» гаснет, не «не понял»
+    for (const ph of ['просыпайся', 'вставай', 'доброе утро']) {
+      await P.until(SETTLED, 20000);
+      await P.ev(() => window.__app.director.action('sleep'));
+      await sleep(3000);
+      const dz = await P.ev(() => window.__app.director.dozing);
+      const rw = await say(P, ph);
+      FLOWS.push({ step: `сон: ${ph}`, ...rw });
+      const after = await P.ev(() => window.__app.director.dozing);
+      res(`sleep: wake by voice «${ph}»`, rw.ok && dz && !after && /wake_up/.test(rw.speakId ?? ''), { dozingBefore: dz, dozingAfter: after, ...rw });
+    }
     const gum = await P.ev(() => window.__gum);
     res('one_mic_request', gum.filter((g) => g.audio).length === 1, { gum: gum.map((g) => `${g.video ? 'v' : ''}${g.audio ? 'a' : ''}`).join(' ') });
     fs.writeFileSync(path.join(OUT, 'flow1.log.txt'), (await P.log()).join('\n'));
