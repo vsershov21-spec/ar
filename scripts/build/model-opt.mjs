@@ -23,7 +23,7 @@ import { fileURLToPath } from 'node:url';
  */
 const MAX_TEX = Number(process.env.AR_TEX_MAX) || 1024;
 /** меняется при любой правке алгоритма — сбрасывает кэш */
-export const PIPELINE = `v1-etc1s-q255-min1024-meshopt-filter${MAX_TEX !== 2048 ? `-max${MAX_TEX}` : ''}`;
+export const PIPELINE = `v1-etc1s-q255-min1024-meshopt-filter-densei16${MAX_TEX !== 2048 ? `-max${MAX_TEX}` : ''}`;
 /** меньше 1024 px KTX2 выходит тяжелее JPEG, а памяти такие текстуры почти не занимают — оставляем как есть */
 const MIN_KTX = 1024;
 
@@ -77,6 +77,9 @@ async function optimizeBuffer(input) {
     ktx++;
   }
   if (ktx) doc.createExtension(KHRTextureBasisu).setRequired(true);
+  // sparse-ключи не float (int16 normalized, риг лица p2 — scripts/models/face_rig.py): gltf-transform пишет их значения
+  // нулями — раскрываем в плотные (нули между ключами meshopt сжимает почти даром)
+  for (const a of docRoot.listAccessors()) if (a.getSparse() && a.getComponentType() !== 5126) a.setSparse(false);
   doc.createExtension(EXTMeshoptCompression).setRequired(true).setEncoderOptions({ method: EXTMeshoptCompression.EncoderMethod.FILTER });
   const out = await io.writeBinary(doc);
   return { out: Buffer.from(out.buffer, out.byteOffset, out.byteLength), log };

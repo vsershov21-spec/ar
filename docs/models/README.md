@@ -19,6 +19,30 @@
 > румянец в faceWrinkles.ts, `PERSONA_FACE_V2`). Сравнение в приложении: `node tools/model-ab-shot.mjs <out>` →
 > `v2b_app_<кот>.png` (слева v1, справа v2).
 
+## Риг лица p2: рот геометрией и морфы (23.11, функция `face.morph` — lab): `scripts/models/face_rig.py`
+
+Последняя стадия, поверх p1, без ручных шагов (Blender headless: `pip install bpy==5.3.0 numpy pillow scipy`; повтор по p2
+отказывается — пометка `asset.extras.faceRig`; результат побайтно воспроизводим):
+
+    python face_rig.py hooligan public/models/v2/hooligan_p1.glb public/models/v2/hooligan_p2.glb --report docs/qa/face
+    python face_rig.py kind     public/models/v2/kind_p1.glb     public/models/v2/kind_p2.glb     --report docs/qa/face
+    python face_rig.py glitter  public/models/v2/glitter_p1.glb  public/models/v2/glitter_p2.glb  --report docs/qa/face
+
+- Морда (вес Head ≥ 0.5, спереди) — свой меш `FaceSkin` (тот же материал/скин/UV) и мех `BD_FurShellFace` (те же буферы +
+  `_FURLEN`, у губ 0); у тела и `BD_FurShell` ключей больше нет, буферы ужаты. Рантайм меха строит оболочки для обоих
+  (`furShell.ts`, `lod.twins`).
+- bmesh: сварка швов (допуск 3e-4 W; у Блёстки сшита щель фильтрума Tripo), два подразбиения у рта, разрез точно по линии
+  «ω» рамки MouthD (`bisect_plane` по звеньям) и `split_edges`; верх/низ губ — по связности. В покое — щель губ (тёмная
+  линия рта геометрией), кромка скруглена внутрь, складка фильтрума.
+- `MouthCavity` (кольца от края губ к «задней стенке», внутри головы — проверка чётностью лучей, отступ от кожи),
+  `Teeth` (2 клычка, в покое короткие), `Tongue` (лежит на дне, за челюстью). Края полости = края губ во всех ключах.
+- Ключи — поля в рамке рта (u, v в долях W; глубина — в мере «W Хулигана», `zd`), челюсть — поворот вокруг шарнира за ртом
+  с весом по стороне губы, дуга «D» нижней губы; веки — кольцо кожи вокруг глаза (яблоки и веки — eyeRig), брови —
+  `brow_angry` новый, `brow_up/down/sad`, `cheek_up`, `cheeks_gum`, `nose_wrinkle` перенесены с p1. Карточки меха, усы,
+  пучки — привязка корня к ближайшим точкам морды. MouthD (рот шейдером) убрана.
+- Отчёт проникновений и листы — docs/qa/face (README). Размер GLB −0.1…+5.6 %, сжатый −8.7…+0.4 % (ключи int16;
+  `model-opt.mjs` раскрывает sparse int16 в плотные — gltf-transform писал их нулями).
+
 ## Нос, заколки, логотип (20.11, без генераций): `scripts/models/face_geom.py`
 
 Последняя стадия основ p1 (после `persona_tune.py --clean`; у Блёстки — после пачки, раздел ниже):
