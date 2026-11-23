@@ -43,6 +43,23 @@ void main() {
   gl_FragColor = vec4(col, clamp(a, 0.0, 1.0));
 }`;
 
+/**
+ * трещины на карте (метафора заставки «вылупление», src/quick/splash.ts): текстура — R: яркость линии (ядро / ореол),
+ * G: расстояние вдоль трещины от центра 0..1; uGrow открывает трещины от центра к краям толчками, свет — изнутри,
+ * тёплый зелёно-золотой
+ */
+const FS_CRACKS = /* glsl */ `
+uniform sampler2D map; uniform float uK; uniform float uGrow; uniform vec3 uA;
+varying vec2 vUv;
+void main() {
+  vec4 c = texture2D(map, vUv);
+  float open = 1.0 - smoothstep(uGrow - 0.06, uGrow, c.g);
+  float core = smoothstep(0.55, 1.0, c.r);
+  vec3 col = mix(uA, vec3(1.0, 0.97, 0.78), core);
+  float a = uK * c.r * open;
+  gl_FragColor = vec4(col, clamp(a, 0.0, 1.0));
+}`;
+
 /** портал: закрученные лучи, яркий центр, кольцо по краю */
 const FS_PORTAL = /* glsl */ `
 uniform float uK; uniform float uT; uniform vec3 uA; uniform vec3 uB;
@@ -273,6 +290,7 @@ export class AwakeScene {
   private pillar: THREE.Mesh<THREE.CylinderGeometry, THREE.ShaderMaterial>;
   private core: THREE.Mesh<THREE.CylinderGeometry, THREE.ShaderMaterial>;
   private silhouette: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>;
+  private cracks: THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMaterial>;
   private splats: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>[] = [];
   readonly glowParts = new PartPool(260, THREE.AdditiveBlending);
   readonly softParts = new PartPool(140, THREE.NormalBlending);
@@ -324,6 +342,14 @@ export class AwakeScene {
     };
     this.pillar = add(pil(0.3, 0.19, 0), 4);
     this.core = add(pil(0.07, 0.05, 1), 4);
+    // трещины по карте (под порталом: портал вспыхивает поверх)
+    const crackMat = new THREE.ShaderMaterial({
+      vertexShader: VS_UV, fragmentShader: FS_CRACKS, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+      uniforms: { map: { value: crackTexture(aspect) }, uK: { value: 0 }, uGrow: { value: 0 }, uA: { value: new THREE.Color('#C9F25A') } },
+    });
+    this.cracks = add(new THREE.Mesh(new THREE.PlaneGeometry(1, H), crackMat), 3);
+    this.cracks.position.z = 0.0022;
+    this.cracks.visible = false;
     // тень-силуэт кота
     this.silhouette = add(new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.5), new THREE.MeshBasicMaterial({ map: silhouetteTexture(), transparent: true, depthWrite: false, opacity: 0 })), 2);
     this.silhouette.position.z = 0.0015;
@@ -350,7 +376,7 @@ export class AwakeScene {
   }
 
   textures(): THREE.Texture[] {
-    return [this.silhouette.material.map!, ...this.splats.map((s) => s.material.map!)];
+    return [this.silhouette.material.map!, this.cracks.material.uniforms.map.value as THREE.Texture, ...this.splats.map((s) => s.material.map!)];
   }
 
   setColors(p: PersonaId) {
@@ -374,10 +400,14 @@ export class AwakeScene {
   }
 
   /** кадр: значения кривых → uniforms, видимость */
-  apply(s: { t: number; glow: number; portal: number; pillarH: number; pillarK: number; silhouette: number; splat: number[]; occlude: boolean; catXY: THREE.Vector2; flair: PersonaId | null }) {
+  apply(s: { t: number; cracks?: { grow: number; k: number }; glow: number; portal: number; pillarH: number; pillarK: number; silhouette: number; splat: number[]; occlude: boolean; catXY: THREE.Vector2; flair: PersonaId | null }) {
     this.uT.value = s.t;
     this.edge.material.uniforms.uK.value = s.glow;
     this.edge.visible = s.glow > 0.003;
+    const ck = s.cracks ?? { grow: 0, k: 0 };
+    this.cracks.material.uniforms.uK.value = ck.k;
+    this.cracks.material.uniforms.uGrow.value = ck.grow;
+    this.cracks.visible = ck.k > 0.003 && ck.grow > 0.003;
     this.portal.material.uniforms.uK.value = Math.min(1.6, s.portal);
     const ps = 0.45 + 0.55 * Math.min(1, s.portal);
     this.portal.scale.setScalar(ps);
@@ -427,6 +457,60 @@ function canvas(n: number) {
   const c = document.createElement('canvas');
   c.width = c.height = n;
   return c;
+}
+
+/**
+ * трещины карты: из центра ломаные ветки к краям + отростки (сид постоянный — рисунок один и тот же).
+ * R — яркость (ореол тенью, ядро линией), G — путь от центра 0..1 (для «толчков» uGrow).
+ */
+function crackTexture(aspect: number): THREE.Texture {
+  const W = 512, H = Math.round(W / aspect), c = document.createElement('canvas');
+  c.width = W;
+  c.height = H;
+  const g = c.getContext('2d');
+  const t = new THREE.CanvasTexture(c);
+  if (!g) return t;
+  let seed = 7;
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  type Seg = [number, number, number, number, number, number];
+  const segs: Seg[] = [];
+  const maxLen = Math.hypot(W, H) * 0.5;
+  const branch = (x: number, y: number, ang: number, len: number, d0: number, depth: number) => {
+    let d = d0;
+    const n = 5 + Math.floor(rnd() * 3);
+    for (let i = 0; i < n && len > 4; i++) {
+      const step = len / (n - i);
+      ang += (rnd() - 0.5) * 0.9;
+      const nx = x + Math.cos(ang) * step, ny = y + Math.sin(ang) * step;
+      segs.push([x, y, nx, ny, d / maxLen, (d + step) / maxLen]);
+      if (depth < 2 && rnd() < 0.32) branch(nx, ny, ang + (rnd() < 0.5 ? -1 : 1) * (0.6 + rnd() * 0.5), len * 0.38, d + step, depth + 1);
+      d += step;
+      len -= step;
+      x = nx;
+      y = ny;
+    }
+  };
+  const cx = W / 2, cy = H / 2, arms = 7;
+  for (let i = 0; i < arms; i++) branch(cx, cy, (i / arms) * Math.PI * 2 + rnd() * 0.5, maxLen * (0.55 + rnd() * 0.35), 0, 0);
+  g.fillStyle = '#000';
+  g.fillRect(0, 0, W, H);
+  g.lineCap = g.lineJoin = 'round';
+  const pass = (r: number, w: number, blur: number) => {
+    for (const [x0, y0, x1, y1, d0, d1] of segs) {
+      const col = `rgb(${r},${Math.min(255, Math.round(((d0 + d1) / 2) * 255))},0)`;
+      g.strokeStyle = col;
+      g.shadowColor = col;
+      g.shadowBlur = blur;
+      g.lineWidth = w * (1 - 0.55 * d0);
+      g.beginPath();
+      g.moveTo(x0, y0);
+      g.lineTo(x1, y1);
+      g.stroke();
+    }
+  };
+  pass(90, 12, 16);
+  pass(255, 3.4, 0);
+  return t;
 }
 
 /** силуэт сидящего кота сверху-спереди, размытый (размытие — через тень: работает и в Safari без ctx.filter) */

@@ -35,11 +35,12 @@
 .home-arrow.off { opacity: 0; pointer-events: none; }
 .home-arrow:active { transform: scale(.94); }
 
-/* портал: вспышка из кота — кольцо бирюза → зелёный → лайм, заливает экран и гаснет */
+/* портал: из кота расходится светлое кольцо (лайм → бирюза), за ним — тёмно-зелёная заливка экрана (не белая: запись 23.11
+   — белый экран при «На карту»); заливка держится, пока камера не даст кадр (homeMode.exit), и гаснет */
 .ui > .home-portal { position: absolute; inset: 0; z-index: 6; pointer-events: none; overflow: hidden; display: none; }
 .home-portal.on { display: block; }
 .home-portal i { position: absolute; left: var(--px, 50%); top: var(--py, 55%); width: 40px; height: 40px; margin: -20px 0 0 -20px; border-radius: 50%;
-  background: radial-gradient(circle, #ffffff 0 30%, #e4f5b5 42%, #9be3cf 58%, #14b8a6 72%, #21a038 86%, rgba(33,160,56,0) 100%);
+  background: radial-gradient(circle, #0f6e3c 0 24%, #178f4a 33%, #21a038 44%, #14b8a6 58%, #9be3cf 70%, #e4f5b5 80%, rgba(228,245,181,0) 100%);
   transform: scale(0); }
 .home-portal.in i { animation: portalIn .45s cubic-bezier(.5,0,.75,0) forwards; }
 .home-portal.out i { transform: scale(60); animation: portalOut .6s ease-out forwards; }

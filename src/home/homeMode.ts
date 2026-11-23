@@ -40,6 +40,8 @@ export interface HomeHost {
     stop(): void;
     withAudio?: boolean;
     reanchor?(): void;
+    /** <video> камеры: переход «На карту» держит заливку портала, пока в нём нет кадра (без белой/серой вспышки) */
+    video?: HTMLVideoElement | null;
   };
   stage: {
     root: THREE.Object3D;
@@ -80,6 +82,8 @@ export interface HomeHost {
 
 const PORTAL_IN_MS = 430;
 const PORTAL_OUT_MS = 600;
+/** «На карту»: сколько заливка портала ждёт первого кадра камеры */
+const CAM_WAIT_MS = 1500;
 /** бег между зонами */
 const SWITCH_MS = 900;
 /** миска с рыбкой стоит столько */
@@ -306,13 +310,25 @@ export class HomeMode {
     if (!inBed) h.character()?.play('jump');
     h.audio.play('whoosh_big', 0.8);
     this.portalIn();
+    let camOk = false;
+    void started.then(() => (camOk = true));
     this.later(PORTAL_IN_MS, () => {
       this.swapToCard();
-      this.portalOut();
-      this.later(PORTAL_OUT_MS, () => {
-        if (this.phase === 'to_ar') this.phase = 'ar';
-        this.h.suggest();
-      });
+      // заливка портала — «занавес»: снимаем, когда камера дала кадр (запись 23.11: белый, затем серый экран с
+      // маленьким видео, пока дорожка перезапускается); не дольше CAM_WAIT_MS — дальше трекер покажет, что есть
+      const t0 = performance.now();
+      const reveal = () => {
+        const v = this.h.tracker.video;
+        const ready = camOk && (!v || (v.readyState >= 2 && v.videoWidth > 0));
+        if (this.phase !== 'to_ar') return;
+        if (!ready && performance.now() - t0 < CAM_WAIT_MS) return void this.later(50, reveal);
+        this.portalOut();
+        this.later(PORTAL_OUT_MS, () => {
+          if (this.phase === 'to_ar') this.phase = 'ar';
+          this.h.suggest();
+        });
+      };
+      reveal();
     });
     h.suggest();
     return true;

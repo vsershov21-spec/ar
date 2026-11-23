@@ -211,7 +211,7 @@ export class AwakeController {
       return t < t0 ? 0 : easeOutBack((t - t0) / 0.22, 2.6) * fade;
     });
     this.scene.apply({
-      t, glow: p.glow(t), portal: p.portal(t), pillarH: pil.h, pillarK: pil.k, silhouette: p.silhouette(t), splat,
+      t, cracks: p.cracks(t), glow: p.glow(t), portal: p.portal(t), pillarH: pil.h, pillarK: pil.k, silhouette: p.silhouette(t), splat,
       occlude: t >= p.tPop - 0.02 && t < p.tLand, catXY: this.catXY, flair: this.persona,
     });
     // скейт под лапами (Хулиган), после приземления укатывается

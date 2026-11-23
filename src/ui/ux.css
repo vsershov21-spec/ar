@@ -76,7 +76,7 @@
 .ui.fog-on .tom-col, .ui.fog-on .tom-tab, .ui.fog-on .chips.suggest, .ui.fog-on .kids-card { opacity: 0; pointer-events: none !important; transition: opacity .3s; }
 
 /* ───────────── неактивные кнопки: под замочком — почему (tomMenu.ts whyShort: «нужна карта») ───────────── */
-.tom-btn.dis .tb-l { color: #8a4b00; }
+.tom-btn.dis .tb-l { color: #ffd98a; font-size: 10px; letter-spacing: -.03em; max-width: calc(100% + 18px); }
 
 /* ───────────── пузырь под мордой кота (ui.ts bubbleLow): сверху и сбоку некуда ───────────── */
 .bubble.tail-up::after { display: block; left: calc(var(--tail-x, 50%) - 9px); top: -7px; transform: rotate(45deg); }
@@ -113,6 +113,11 @@
   box-shadow: 0 0 0 2px #fff;
 }
 .act-wait.new .cs-ico::after { display: none; }
+/* круглые кнопки (колонки, комната): таймер — на нижнем крае своего круга, а не над ним — сверху подпись соседней
+   кнопки («нужна карта» под замочком «Раскраски», скрин 23.11); над своей подписью тоже не заходит */
+.tom-btn.act-wait::after { top: calc(var(--tom-btn, 56px) - 18px); right: calc(50% - var(--tom-btn, 56px) / 2 - 4px); }
+.tom-btn.act-wait.dis::after { right: auto; left: calc(50% - var(--tom-btn, 56px) / 2 - 4px); }
+.tom-btn.act-wait.new .tb-ico::after { display: none; }
 
 /* быстрый вход (feature 'intro.quick', src/quick): подпись к подсказке «нажми сюда» — смысл прежних экранов тура */
 .hintp-cap { position: absolute; left: 0; top: 0; z-index: 9; pointer-events: none; max-width: 230px; padding: 8px 12px; border-radius: 14px;

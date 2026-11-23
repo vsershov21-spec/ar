@@ -56,6 +56,8 @@ export interface AwakePlan {
   tLand: number;
   events: AwakeEvent[];
   pose(t: number): IntroPose;
+  /** трещины на карте до ПУФ (как на заставке — «вылупление»): grow — раскрыто 0..1 толчками, k — яркость */
+  cracks(t: number): { grow: number; k: number };
   /** свечение контура карты 0..1 */
   glow(t: number): number;
   /** портал в центре карты 0..~1,4 (вспышка на ПУФ) */
@@ -112,6 +114,10 @@ const STYLE: Record<PersonaId, Style> = {
   kind: { flight: 1.2, peak: 0.42, depth: 0.7, flips: 0, spins: 0, sway: 0.16, flightClip: 'idle_yawn' },
   glitter: { flight: 0.95, peak: 0.55, depth: 0.75, flips: 0, spins: 2, sway: 0, flightClip: 'jump' },
 };
+
+/** толчки трещин до ПУФ: [за сколько секунд до ПУФ, раскрытие] (первая встреча) и [доля tPop до ПУФ, раскрытие] (короткая) */
+const CRACK_BEATS_FIRST: [number, number][] = [[1.3, 0.3], [0.8, 0.5], [0.6, 0.7], [0.18, 1]];
+const CRACK_BEATS_SHORT: [number, number][] = [[0.85, 0.55], [0.3, 1]];
 
 /** план сцены пробуждения для образа и вида визита */
 export function awakePlan(persona: PersonaId, kind: AwakeKind): AwakePlan {
@@ -199,6 +205,19 @@ export function awakePlan(persona: PersonaId, kind: AwakeKind): AwakePlan {
     tLand,
     events: ev,
     pose,
+    cracks: (t) => {
+      // толчки как на заставке: тук… тук-тук… ТУК → ПУФ; после ПУФ трещины гаснут
+      const beats = first ? CRACK_BEATS_FIRST : CRACK_BEATS_SHORT;
+      let grow = 0, hit = 0;
+      for (const [bt, lv] of beats) {
+        const b = first ? tPop - bt : tPop * (1 - bt);
+        grow = Math.max(grow, lv * easeOut((t - b) / 0.12));
+        hit += Math.exp(-(((t - b) / 0.07) ** 2));
+      }
+      const fade = 1 - clamp01((t - tPop - 0.04) / 0.5);
+      const flash = 0.9 * Math.exp(-(((t - tPop) / 0.08) ** 2));
+      return { grow, k: grow > 0 ? (0.7 + 0.7 * Math.min(1, hit) + flash) * fade : 0 };
+    },
     glow: (t) => (first ? win(t, 0, 0.45, tLand + 0.1, tLand + 0.8) : win(t, 0, 0.18, tLand, tLand + 0.4)),
     portal: (t) => {
       const base = first ? win(t, 0.3, 0.8, tPop + 0.05, tLand + 0.2) : win(t, 0.05, 0.2, tPop, tLand);
