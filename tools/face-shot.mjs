@@ -8,7 +8,7 @@ const errs = []; page.on('pageerror', (e) => errs.push(e.message)); page.on('con
 await page.setViewport({ width: 2000, height: 2000 });
 await page.goto(`http://localhost:${port}/tools/${process.env.PAGE || "face-preview"}.html?${query}`, { waitUntil: 'load' });
 await page.waitForFunction(() => window.__ready, { timeout: 120000 }).catch(() => {});
-const info = await page.evaluate(() => ({ labels: window.__labels, morphs: window.__morphs }));
+const info = await page.evaluate(() => ({ labels: window.__labels, morphs: window.__morphs, seq: window.__seq, cues: window.__cues }));
 if (process.env.ALPHA) {
   // PNG с прозрачностью прямо из WebGL-холста (для наложения на фото)
   const url = await page.evaluate(() => document.querySelector('canvas').toDataURL('image/png'));

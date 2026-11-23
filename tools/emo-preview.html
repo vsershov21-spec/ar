@@ -4,7 +4,8 @@
 // Эмоции и рот через НАСТОЯЩИЙ рантайм (GlbCharacter: setEmotion, липсинк setMouth, 3D-глаза, складки, тон меха,
 // мех-оболочки) и свет приложения (src/app.ts: полусфера 2.2 + направленный 1.6, без тонмаппинга).
 // ?p=glitter&m=/models/glitter_v1.glb&s=neutral,happy,laugh,talk:A&cols=4&tile=360&yaw=0&pitch=0&zoom=1&t=1.2
-// Состояние: id пресета (setEmotion), «talk:A|O|E|U|M|F» — рот липсинка, «emo>emo2@0.2» — кадр перехода через 0.2 с.
+// Состояние: id пресета (setEmotion), «talk:A|O|E|U|M|F» — рот липсинка, «vis:A…H|X» — визема Rhubarb (риг p2),
+// «emo>emo2@0.2» — кадр перехода через 0.2 с. ?face=morph|shader — лицо рига p2 или шейдером (modelVariant.ts faceMode).
 import * as THREE from 'three';
 // детерминированный Math.random (моргание, саккады, микромимика)
 let seed = 12345; Math.random = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
@@ -57,10 +58,46 @@ const SH = {
   U: { open: 0.12, wide: 0, round: 0.9 }, M: { open: 0, wide: 0, round: 0 }, F: { open: 0.15, wide: 0.3, round: 0 },
 };
 const hold = +(q.get('t') || 1.2);
+// реплика с липсинком (?text=…): состояния «seq:<с>» — кадр на этой секунде реплики. Cues — из текста (русские буквы →
+// виземы Rhubarb, lipsync/visemes.ts cuesFromText); LipSync сглаживает как в приложении, setMouth получает и сырую визему
+const { LipSync } = await import('../src/lipsync/lipsync.ts');
+const { cuesFromText, estimateSpeechSec } = await import('../src/lipsync/visemes.ts');
+const lip = new LipSync();
+let seqT = -1;
+const text = q.get('text');
+const seqCues = text ? cuesFromText(text, estimateSpeechSec(text)) : [];
+window.__cues = seqCues;
 const run = (sec) => { for (let k = 0; k < Math.round(sec * 30); k++) ch.update(1 / 30, cam); };
+window.__seq = [];
 states.forEach((st, i) => {
+  if (st.startsWith('seq:')) {
+    if (seqT < 0) {
+      ch.clearEmotion(); ch.setMouth('X', 0, { open: 0, wide: 0, round: 0 }); run(0.8);
+      seqT = 0;
+      lip.playCues(seqCues, () => seqT);
+    }
+    const T = +st.slice(4);
+    while (seqT < T - 1e-6) {
+      const dt = 1 / 60;
+      seqT += dt;
+      lip.update(dt);
+      ch.setMouth(lip.dominant, lip.weights[lip.dominant], lip.shape, lip.target);
+      ch.update(dt, cam);
+    }
+    window.__seq.push({ t: T, cue: lip.target, vis: ch.faceMorphs ? { ...ch.faceMorphs.vis } : null });
+  } else if (st.startsWith('blink:')) {
+    // моргание: кадр через t с после начала (моргание 150 мс)
+    ch.clearEmotion(); ch.setMouth('X', 0, { open: 0, wide: 0, round: 0 }); run(0.8);
+    ch.faceMix.blink();
+    run(+st.slice(6));
+  } else {
   ch.clearEmotion(); ch.setMouth('X', 0, { open: 0, wide: 0, round: 0 }); run(0.8);
-  if (st.startsWith('talk:')) {
+  if (st.startsWith('vis:')) {
+    // визема Rhubarb напрямую (риг p2: драйвер морфов faceMorphs.ts, кроссфейд 75 мс)
+    const v = st.slice(4);
+    ch.setMouth(v, 1, { open: 0.5, wide: 0, round: 0 }, v);
+    run(0.3);
+  } else if (st.startsWith('talk:')) {
     const v = st.slice(5);
     ch.setMouth(v === 'M' ? 'A' : 'D', 1, SH[v] ?? SH.A);
     run(0.4);
@@ -76,6 +113,7 @@ states.forEach((st, i) => {
     if (mouth) ch.setMouth('D', 1, SH[mouth]);
     run(hold);
   } else run(0.5);
+  }
   camAt();
   const x = (i % cols) * T, y = (rows - 1 - Math.floor(i / cols)) * T;
   r.setViewport(x, y, T, T); r.setScissor(x, y, T, T); r.render(sc, cam);
