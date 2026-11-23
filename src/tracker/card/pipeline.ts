@@ -55,6 +55,9 @@ export interface PipelineOut {
   stages?: { pre: number; key: number; flow: number; detect: number; verify: number; other: number };
 }
 
+/** кот сидит, карты нет столько мс — ищем её полным поиском среди всех кандидатов кадра (relocalize) */
+const RELOC_MS = 300;
+
 export class CardPipeline {
   readonly det = new CardDetector();
   readonly ver = new CardVerifier();
@@ -78,7 +81,11 @@ export class CardPipeline {
     if (m.detectEvery) this.detectEvery = m.detectEvery;
     // пока кот не посажен и идёт проверка «это карта Сбера?» — полный поиск через кадр: проверяем только кадры
     // полного поиска (точные углы). По времени полный поиск ≈ ведению потоком (края считаются в каждом кадре)
-    det.params.detectEvery = !det.locked && m.verify !== false ? Math.min(2, this.detectEvery) : this.detectEvery;
+    // кот сидит, а карты нет дольше RELOC_MS (резкий сдвиг телефона, смаз): полный поиск тоже через кадр — иначе карта,
+    // уже снова резкая в кадре, находилась через 1–1,5 с, и всё это время кот стоял у края экрана без карты (запись
+    // 23.11, 14:00:48 — «второй кот у края»)
+    const lostLong = det.locked && (m.lostMs ?? 0) > RELOC_MS;
+    det.params.detectEvery = (!det.locked && m.verify !== false) || lostLong ? Math.min(2, this.detectEvery) : this.detectEvery;
     const r = det.process(m.rgba, m.w, m.h, { focal: m.focal });
     const out: PipelineOut = { id: m.id, quad: r.quad, score: r.score, mode: r.mode, ms: r.ms, key: det.keyInfo, why: det.why };
     let tv = 0;
@@ -92,7 +99,7 @@ export class CardPipeline {
     // полного поиска — не только у прогноза. Раньше карта, ушедшая дальше 0,6 диагонали от прогноза при другом
     // масштабе, не находилась вовсе: кот 6 с висел, потом «Где карта?» при карте в кадре (запись 18.11).
     // (воркер может и «вести» что-то по ключевому кадру/поверхности, а поза не принимается главным потоком — тоже ищем)
-    if (m.verify !== false && det.locked && (!r.quad || (m.lostMs ?? 0) > 400) && det.ranDetect) {
+    if (m.verify !== false && det.locked && (!r.quad || (m.lostMs ?? 0) > RELOC_MS) && det.ranDetect) {
       const t0 = now();
       const q = this.relocalize({ rgba: m.rgba, w: m.w, h: m.h }, { f: m.focal, cx: m.w / 2, cy: m.h / 2 }, m.crop ?? null);
       if (q) {
