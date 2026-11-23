@@ -81,6 +81,14 @@ describe('ar-auto ops: белый список скриптов', () => {
       'scripts/automation/install.sh', 'scripts/voice/eleven.mjs', 'scripts/meshy/motion.mjs', 'scripts/deploy/x.sh\n', 'scripts/deploy/a b.sh', 'scripts/Deploy/x.sh', '', null, 5])
       expect(scriptAllowed(p), String(p)).toBe(false);
   });
+  it('mirror-props.sh: в белом списке, без трат, имена-аргументы проходят проверку очереди', () => {
+    expect(scriptAllowed('scripts/deploy/mirror-props.sh')).toBe(true);
+    expect(scriptArgsPolicy('scripts/deploy/mirror-props.sh', ['bed'])).toBeFalsy();
+    expect(validateJob(sc({ path: 'scripts/deploy/mirror-props.sh', args: ['bed', 'sofa'] })).job).toBeTruthy();
+    const src = fs.readFileSync('scripts/deploy/mirror-props.sh', 'utf8');
+    expect(src).toMatch(/out\/latest\/props/);
+    expect(src).not.toMatch(/curl|MESHY_API|TRIPO|xi-api-key/i);
+  });
   it('glob → regex', () => {
     expect(globToRe('scripts/qa/**/server-run.sh').test('scripts/qa/x/y/server-run.sh')).toBe(true);
     expect(globToRe('scripts/deploy/*.sh').test('scripts/deploy/a/b.sh')).toBe(false);
