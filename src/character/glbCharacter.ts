@@ -83,9 +83,15 @@ export const MESHY_PEN_MAX_MM = 5;
  * (прокси одежды и головы, кисти, стопы, колени) не ниже плоскости опоры. Кроме намеренных поз: уход в карту,
  * появление из карты, сон и кровать (их высоту ведёт сцена).
  */
-/** поправка стопы к точке опоры: не дальше (доли роста), скорость поворота бедра (рад/с) */
-const FOOT_FIX_MAX = 0.12;
-const FOOT_FIX_RATE = 6;
+/**
+ * поправка стопы к точке опоры: не дальше (доли роста), скорость поворота бедра (рад/с). 23.11 («ноги как желе»):
+ * было 0,12 роста и 6 рад/с — бедро поворачивалось на всю ногу, стопа держалась, а ноги «разъезжались» и в танце
+ * стопы прыгали (стенд legs.mjs: дрожь стопы в танце Хулигана 0,4 → 5 мм после f6bf935). Теперь — доводка в несколько мм
+ */
+const FOOT_FIX_MAX = 0.05;
+const FOOT_FIX_RATE = 3.5;
+/** клипы с переступанием (танец, празднование): опора корня есть, поворот бедра к точке опоры — нет (стопы прыгали) */
+const STEP_CLIPS = /dance|celebrate|cheer|warm_up|jump|hop/;
 /** позы лёжа: пол держит тело (не ниже опоры), а не снимается, как для нырка */
 const LYING = /sleep|lie_|fall_asleep/;
 /** намеренно ниже опоры (нырок в карту, появление, уход) */
@@ -2117,12 +2123,14 @@ export class GlbCharacter implements Character {
 
   /** опорные лапы не едут (footPin.ts): сдвиг тела по горизонтали; выкл. — ходьба, акробатика, лёжа, кровать */
   readonly footPin = new FootPin();
+  /** стенд «до/после»: выключить опору лап (сдвиг корня и поворот бедра к точке опоры) */
+  footPinOff = false;
   private footBuf: [number, number, number][] = [[0, 0, 0], [0, 0, 0]];
   private pinFeet(dt: number, id: string) {
     const L = this.bones.get('LeftFoot'), R = this.bones.get('RightFoot');
     if (!L || !R) return;
     const moving = ((this.object.userData.moveSpeed as number) ?? 0) > 0;
-    const enabled = !moving && !this.poseTweak && !ACRO.test(id) && !NO_PIN.test(id) && this.lift < 0.01 && this.act?.kind !== 'skate';
+    const enabled = !this.footPinOff && !moving && !this.poseTweak && !ACRO.test(id) && !NO_PIN.test(id) && this.lift < 0.01 && this.act?.kind !== 'skate';
     // положения стоп без прошлого сдвига
     this.inner.position.x = this.inner.position.z = 0;
     this.inner.updateMatrixWorld(true);
@@ -2145,7 +2153,7 @@ export class GlbCharacter implements Character {
     [L, R].forEach((F, i) => {
       const U = this.bones.get(i ? 'RightUpLeg' : 'LeftUpLeg');
       if (!U) return;
-      const an = enabled ? this.footPin.anchor(i) : null;
+      const an = enabled && !STEP_CLIPS.test(id) ? this.footPin.anchor(i) : null;
       const st = this.footFix[i];
       let want = 0;
       if (an) {

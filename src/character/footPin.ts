@@ -21,6 +21,11 @@ export interface FootPinConfig {
 }
 
 export const FOOT_PIN: FootPinConfig = { plantY: 0.035, plantVy: 0.3, maxOff: 0.14, releaseS: 0.3, creep: 0.01 };
+/**
+ * смена опоры (одна лапа поднялась / встала): цель сдвига тела догоняем за столько секунд. Было 50 мс (k = dt/0,05 —
+ * за кадр 2/3 пути): тело с лапами прыгало до 260 мм/с на стенде («Дай лапу» Добряка, 23.11, «ноги как желе»)
+ */
+export const CATCH_S = 0.08;
 
 interface FootState {
   /** точка, где стопа стоит (в системе кота, уже со сдвигом) */
@@ -83,8 +88,8 @@ export class FootPin {
     if (n) {
       tx /= n;
       tz /= n;
-      // смена опоры (одна лапа поднялась) — цель сдвигается: догоняем за ~50 мс, без рывка тела
-      const k = Math.min(1, dt / 0.05);
+      // смена опоры (одна лапа поднялась) — цель сдвигается: догоняем плавно (CATCH_S), без рывка тела
+      const k = 1 - Math.exp(-dt / CATCH_S);
       this.x += (tx - this.x) * k;
       this.z += (tz - this.z) * k;
     } else {

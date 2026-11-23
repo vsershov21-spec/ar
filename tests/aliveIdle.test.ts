@@ -25,7 +25,10 @@ describe('живой покой', () => {
       for (const k of Object.keys(f.arms) as (keyof typeof f.arms)[]) expect(Math.abs(f.arms[k] - prev.arms[k])).toBeLessThan(0.1);
       prev = { ...f, arms: { ...f.arms } };
     }
-    expect(mx).toBeGreaterThan(0.025);
-    expect(mn).toBeLessThan(-0.025);
+    // заметно, но без «желе» в коленях (23.11): таз вбок ≈ 0,8 % роста и не опускается — колени держит клип
+    expect(mx).toBeGreaterThan(0.006);
+    expect(mn).toBeLessThan(-0.006);
+    expect(mx).toBeLessThan(0.01);
+    for (let t = 0; t < 12; t += 0.1) expect(alivePose(t).hipDown).toBe(0);
   });
 });
