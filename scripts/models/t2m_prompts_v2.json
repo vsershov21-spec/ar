@@ -1737,6 +1737,27 @@
    "bone": "RightHand",
    "size": 0.17,
    "prompt": "A chunky cartoon spray paint can, rounded body (separate tintable material) with a white stripe, silver shoulders, white nozzle cap, no text and no logo, game asset, low detail, clean topology"
+  },
+  "glitter_p3_tripo": {
+   "status": "по запросу (персонаж, не предмет)",
+   "priority": "P1",
+   "for": [
+    "glitter_p3"
+   ],
+   "$comment": "Блёстка p3 по развороту продакта 23.11: Tripo multiview-to-model (H3.1), виды — scripts/models/glitter_p3_views.py. В обычный прогон не попадает — только --only glitter_p3_tripo. Дальше — scripts/models/glitter_p3.py (риг под скелет p1).",
+   "views": {
+    "front": "design/refs/glitter_views/front.png",
+    "left": "design/refs/glitter_views/left.png",
+    "back": "design/refs/glitter_views/back.png",
+    "right": "design/refs/glitter_views/right.png"
+   },
+   "args": [
+    "--model=tripo-v3.1",
+    "face_limit=80000",
+    "texture_quality=detailed",
+    "geometry_quality=detailed",
+    "texture_alignment=original_image"
+   ]
   }
  },
  "meshy": "Meshy Text-to-Motion (scripts/meshy/motion-run.sh, docs/animations/MESHY.md): specs[id].meshy = {prompt ≤400, duration 2–10 шаг 0,5 = durationS ТЗ вверх до 0,5 и не меньше 2, mode}. Промпты — только движение тела одного персонажа, на месте, без хвоста/ушей/лица; старт/финиш — стойка, кроме цепочек сна и сидения."

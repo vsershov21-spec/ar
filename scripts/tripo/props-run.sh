@@ -22,16 +22,27 @@ curl -fsSL "$RAW/scripts/models/t2m_prompts_v2.json" -o "$WORK/prompts.json" || 
 node -e '
 const d=require(process.argv[1]); const only=(process.argv[2]||"").split(",").filter(Boolean);
 const style=" Soft rounded toy-like shapes, bright Sber palette (green #21A038, lime #B5E36A, teal, cream), matte clay look, no text, no logos, single object on its own, centered, game-ready.";
-for (const [k,v] of Object.entries(d.props||{})) { if(!v||!v.prompt) continue; if(only.length&&!only.includes(k)) continue;
+for (const [k,v] of Object.entries(d.props||{})) { if(!v||!(v.prompt||v.views)) continue; if(only.length&&!only.includes(k)) continue;
+  if(v.views&&!only.includes(k)) continue; // персонажи по видам — только явным --only
   if(!only.length && /готов|есть/.test(v.status||"") && !/по желанию/.test(v.status||"")) continue;
+  if(v.views) { console.log(k+"\tVIEWS\t"+Object.entries(v.views).map(([s,f])=>s+"="+f).join(" ")+"\t"+(v.args||[]).join(" ")); continue; }
   console.log(k+"\t"+(v.prompt+style).replace(/\s+/g," ")); }' "$WORK/prompts.json" "$ONLY" > "$WORK/list.tsv"
 N=$(wc -l < "$WORK/list.tsv"); TODO=0; TOTAL=0; SPENT=0
 echo "=== $(date -Is) props-run $([ $GO = 1 ] && echo GO || echo PLAN) ==="
 tripo balance --json 2>/dev/null | sed 's/^/баланс: /'
-while IFS=$'\t' read -r name prompt; do
+while IFS=$'\t' read -r name prompt views vargs; do
   if [ -s "$OUT/$name.glb" ]; then echo "✓ $name — уже есть"; continue; fi
   TODO=$((TODO+1))
-  est=$(tripo make "$prompt" --model tripo-p2 -p face_limit=8000 --dry-run --json 2>/dev/null | node -e 'let s="";process.stdin.on("data",c=>s+=c).on("end",()=>{try{const v=Number(JSON.parse(s).generation_credits_estimate);console.log(v>0?Math.ceil(v):"?")}catch{console.log("?")}})')
+  # multiview (персонаж по развороту): картинки из репо того же коммита, имена файлов = вид (front/left/back/right)
+  if [ "$prompt" = VIEWS ]; then
+    vd="$WORK/$name.views"; rm -rf "$vd"; mkdir -p "$vd"; INPUT=(); ARGS=()
+    for pair in $views; do v=${pair%%=*}; f=${pair#*=}
+      [[ "$v" =~ ^(front|left|back|right)$ && "$f" =~ ^[A-Za-z0-9_./-]+\.png$ && "$f" != *..* ]] || { echo "✗ $name — плохой вид $pair"; continue 2; }
+      curl -fsSL "$RAW/$f" -o "$vd/$v.png" || { echo "✗ $name — не скачал $f"; continue 2; }; INPUT+=("$vd/$v.png"); done
+    for a in $vargs; do [[ "$a" =~ ^(--model=[a-z0-9.-]+|[a-z_]+=[A-Za-z0-9_.-]+)$ ]] || { echo "✗ $name — плохой параметр $a"; continue 2; }
+      case "$a" in --model=*) ARGS+=(--model "${a#--model=}");; *) ARGS+=(-p "$a");; esac; done
+  else INPUT=("$prompt"); ARGS=(--model tripo-p2 -p face_limit=8000); fi
+  est=$(tripo make "${INPUT[@]}" "${ARGS[@]}" --dry-run --json 2>/dev/null | node -e 'let s="";process.stdin.on("data",c=>s+=c).on("end",()=>{try{const v=Number(JSON.parse(s).generation_credits_estimate);console.log(v>0?Math.ceil(v):"?")}catch{console.log("?")}})')
   case "$est" in ''|*[!0-9]*) estn=110;; *) estn=$est;; esac
   TOTAL=$((TOTAL+estn))
   if [ $GO = 0 ]; then
@@ -41,7 +52,7 @@ while IFS=$'\t' read -r name prompt; do
   if [ -n "$MAXCR" ] && [ $((SPENT+estn)) -gt "$MAXCR" ]; then echo "■ лимит --max-credits $MAXCR: $name (~$estn) не запускаю"; break; fi
   SPENT=$((SPENT+estn))
   echo "▶ $name · ~$estn кр."
-  res=$(tripo make "$prompt" --model tripo-p2 -p face_limit=8000 --json --yes --no-open -o "$WORK/$name" --name "prop_$name" 2>>"$WORK/$name.err")
+  res=$(tripo make "${INPUT[@]}" "${ARGS[@]}" --json --yes --no-open -o "$WORK/$name" --name "prop_$name" 2>>"$WORK/$name.err")
   code=$?
   echo "$res" > "$WORK/$name.json"
   if [ $code -eq 4 ]; then echo "✗ кредиты кончились — стоп (tripo topup)"; break; fi

@@ -120,6 +120,16 @@
       ],
       "timeoutMin": 20,
       "note": "план: сколько слотов осталось озвучить после +36 имён"
+    },
+    {
+      "id": "glitter-p3-tripo-1",
+      "kind": "tripo",
+      "args": [
+        "--only",
+        "glitter_p3_tripo"
+      ],
+      "maxCredits": 120,
+      "note": "Блёстка p3: multiview по развороту 23.11 (H3.1, detailed)"
     }
   ]
 }
