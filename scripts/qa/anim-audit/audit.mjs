@@ -65,6 +65,8 @@ const FOCUS = Object.fromEntries(arg('--focus', '').split(',').filter(Boolean).m
 const FOCUS_ON = Object.keys(FOCUS).length > 0;
 /** --trace "JS-выражение от app" — значение в каждый кадр (frame.tr; spikes.cjs его печатает) */
 const TRACE = arg('--trace', '');
+/** --setup "JS от app" — выполнить перед сценариями (переключатели слоёв для сравнения: app.character.footPin.off = true …) */
+const SETUP = arg('--setup', '');
 const MESHY_DIR = arg('--meshy', '') ? path.resolve(arg('--meshy')) : '';
 /** --clips a,b|meshy — сценарии clip_<id>: клип сам по себе (character.play), «meshy» — все загруженные клипы Meshy кота */
 const CLIPS = arg('--clips', '');
@@ -142,6 +144,12 @@ function scenarios(cat, durs = {}) {
     { id: 'home_bed', dur: 8000, steps: [{ op: 'js', at: 300, label: 'home:sleep', code: "app.home?.act('home:sleep')" }], keep: true },
     { id: 'home_bed_wake', dur: 7000, steps: [{ op: 'js', at: 300, label: 'home:wake', code: "app.home?.act('home:wake')" }], keep: true },
     { id: 'home_exit', dur: 6000, steps: [{ op: 'js', at: 300, label: 'home.exit', code: 'app.home?.exit()' }], keep: true },
+    // лицо не залипает (23.11): пресет реплики без срока; встряски подряд (телефон в руке) — спирали; действие вытеснено
+    { id: 'st_face_hold', dur: 14000, steps: [{ op: 'js', at: 300, label: "setFace('annoyed')", code: "app.character.setFace('annoyed')" }] },
+    { id: 'st_shake_spam', dur: 12000, steps: [300, 1300, 2300, 3300, 4300, 5300].map((at) => ({ op: 'js', at, label: 'shake', code: "app.director.interaction('shake')" })) },
+    { id: 'st_face_cancel', dur: 8000, steps: [{ op: 'action', at: 300, id: SIG[cat][0] === 'skate' ? 'skate' : SIG[cat][0] }, { op: 'js', at: 700, label: "setFace('sleepy')", code: "app.character.setFace('sleepy')" }, { op: 'action', at: 1500, id: 'pet' }] },
+    // скейт в гостиной (дом): доска на ковре, не проваливается (23.11)
+    { id: 'st_home_skate', dur: 13000, steps: [{ op: 'js', at: 300, label: 'home.enter', code: "app.home?.enter('button')" }, { op: 'action', at: 4000, id: SIG[cat][0] }], after: 'app.home?.exit?.()' },
     { id: 'st_flip5', dur: 7000, steps: [0, 150, 300, 450, 600].map((d) => ({ op: 'action', at: 300 + d, id: 'flip' })) },
     { id: 'st_skate_dance', dur: 12000, steps: [{ op: 'action', at: 300, id: SIG[cat][0] }, { op: 'action', at: 900, id: 'dance' }] },
     { id: 'st_mix_fast', dur: 9000, steps: ['pet', 'dance', 'treat', SIG[cat][0], 'flip', 'hug', SIG[cat][1], 'tickle'].map((id, i) => ({ op: 'action', at: 300 + i * 220, id })) },
@@ -284,6 +292,7 @@ async function runCat(browser, cat) {
     for (let i = 0; i < 40 && !(['play', 'free'].includes(window.__app.director.state.phase) && !window.__app.director.queue.busy); i++) await window.__rx.run(window.__rx.t() + 500);
   });
   await page.evaluate(() => window.__rx.calibrate());
+  if (SETUP) await page.evaluate((x) => new Function('app', x)(window.__app), SETUP);
   for (const sc of scenarios(cat, durs)) {
     await settle(page, sc);
     await page.evaluate((s) => {

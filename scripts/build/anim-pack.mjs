@@ -272,7 +272,14 @@ export async function checkPacks(srcBuf, packBufs, { fps = 30 } = {}) {
       for (const nd of nodes) rec(nd);
       return world;
     };
-    let maxMm = 0, maxDeg = 0, worst = '';
+    let maxMm = 0, maxDeg = 0, worst = '', footMm = 0, kneeDeg = 0;
+    // ноги отдельно (23.11, «ноги как желе»): стопа (мм на кота 1 м) и угол сгиба колена (°) — пакет против исходника
+    const byName = (re) => nodes.find((nd) => re.test(nd.getName()));
+    const legs = ['Left', 'Right'].map((s) => [byName(new RegExp(s + 'UpLeg$')), byName(new RegExp(s + 'Leg$')), byName(new RegExp(s + 'Foot$'))]).filter((l) => l.every(Boolean));
+    const knee = (w, [U, K, F]) => {
+      const u = new THREE.Vector3().setFromMatrixPosition(w.get(U)), k = new THREE.Vector3().setFromMatrixPosition(w.get(K)), f = new THREE.Vector3().setFromMatrixPosition(w.get(F));
+      return (k.clone().sub(u).angleTo(f.clone().sub(k)) * 180) / Math.PI;
+    };
     const n = Math.max(2, Math.round(a.dur * fps) + 1);
     for (let i = 0; i < n; i++) {
       const t = Math.min(a.dur, i / fps);
@@ -284,9 +291,11 @@ export async function checkPacks(srcBuf, packBufs, { fps = 30 } = {}) {
         const deg = (qa.angleTo(qb) * 180) / Math.PI;
         if (mm > maxMm) [maxMm, worst] = [mm, nd.getName().replace(/^.*:/, '')];
         if (deg > maxDeg) maxDeg = deg;
+        if (/Foot$/.test(nd.getName()) && mm > footMm) footMm = mm;
       }
+      for (const l of legs) kneeDeg = Math.max(kneeDeg, Math.abs(knee(wa, l) - knee(wb, l)));
     }
-    rows.push({ name, dur: +a.dur.toFixed(2), maxMm: +maxMm.toFixed(2), maxDeg: +maxDeg.toFixed(2), worst });
+    rows.push({ name, dur: +a.dur.toFixed(2), maxMm: +maxMm.toFixed(2), maxDeg: +maxDeg.toFixed(2), worst, footMm: +footMm.toFixed(2), kneeDeg: +kneeDeg.toFixed(2) });
   }
   return rows;
 }
@@ -311,7 +320,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === here) {
   if (check) {
     const rows = await checkPacks(buf, [r.start, r.rest].filter(Boolean));
     rows.sort((x, y) => (y.maxMm ?? 0) - (x.maxMm ?? 0));
-    for (const x of rows) console.log(x.missing ? `${x.name}: НЕТ В ПАКЕТЕ` : `${x.name.padEnd(28)} ${String(x.dur).padStart(6)} с  макс ${String(x.maxMm).padStart(6)} мм  ${String(x.maxDeg).padStart(5)}°  (${x.worst})`);
+    for (const x of rows) console.log(x.missing ? `${x.name}: НЕТ В ПАКЕТЕ` : `${x.name.padEnd(28)} ${String(x.dur).padStart(6)} с  макс ${String(x.maxMm).padStart(6)} мм  ${String(x.maxDeg).padStart(5)}°  (${x.worst}); стопа ${x.footMm} мм, колено ${x.kneeDeg}°`);
     if (outDir) fs.writeFileSync(path.join(outDir, 'anim-check.json'), JSON.stringify(rows, null, 1));
   }
 }

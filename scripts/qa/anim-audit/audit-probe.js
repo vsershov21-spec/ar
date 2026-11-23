@@ -24,9 +24,48 @@ export function extraProbe() {
     };
     P['__aa_' + name] = true;
   };
+  // ноги по стадиям кадра: после клипа (вход groundClamp), после опоры лап (вход applyAlive), до коррекции тела
+  // (вход collider.apply) — углы коленей, ° (что именно гнёт колено: клип, pinFeet, живой слой, коллайдер)
+  const legSnap = (c) => {
+    const V = c.object.position.constructor;
+    const loc = (n) => {
+      const b = c.bones?.get(n);
+      if (!b) return null;
+      b.updateWorldMatrix(true, false);
+      return c.object.worldToLocal(b.getWorldPosition(new V()));
+    };
+    c.object.updateMatrixWorld(true);
+    const fe = [];
+    const out = ['Left', 'Right'].map((s) => {
+      const U = loc(s + 'UpLeg'), K = loc(s + 'Leg'), F = loc(s + 'Foot');
+      if (!U || !K || !F) return 0;
+      fe.push(F);
+      return +((K.clone().sub(U).angleTo(F.clone().sub(K)) * 180) / Math.PI).toFixed(1);
+    });
+    // ширина стойки на этой стадии, мм
+    if (fe.length === 2) out.push(+(Math.hypot(fe[0].x - fe[1].x, fe[0].z - fe[1].z) * (rx.__catMM ?? 77)).toFixed(1));
+    return out;
+  };
+  rx.legStage = {};
+  const wrapSnap = (obj, name, key) => {
+    const P = Object.getPrototypeOf(obj);
+    if (!P || P['__ls_' + name] || typeof P[name] !== 'function') return;
+    const f = P[name];
+    P[name] = function (...a) {
+      try {
+        const c = app.character;
+        if (c) rx.legStage[key] = legSnap(c);
+      } catch {}
+      return f.apply(this, a);
+    };
+    P['__ls_' + name] = true;
+  };
   const hook = () => {
     const c = app.character;
     if (!c) return;
+    wrapSnap(c, 'groundClamp', 'clip');
+    wrapSnap(c, 'applyAlive', 'pin');
+    if (c.collider) wrapSnap(c.collider, 'apply', 'precol');
     wrapProto(c, 'update', 'upd');
     if (c.collider) wrapProto(c.collider, 'apply', 'col');
     if (c.mixer) wrapProto(c.mixer, 'update', 'mix');
@@ -96,6 +135,52 @@ export function extraProbe() {
       q2.copy(q1); q1.copy(b.quaternion);
     });
     r.jit = +jit.toFixed(2);
+    // ноги (23.11, «ноги как желе»): в системе кота, мм на карте. st — расстояние между стопами по горизонтали, hw — между
+    // тазобедренными суставами; kA — сгиб колена (°, 0 — прямая); kF — колено вперёд от линии бедро→стопа (мм, < 0 —
+    // колено назад, «обратный» сгиб); kO — колено наружу (мм); fv — скорость стопы по горизонтали (мм/с); fj — дрожь
+    // стопы (отклонение от середины соседних кадров, мм)
+    {
+      const mm = rx.__catMM ?? 77;
+      const loc = (n) => {
+        const b = c.bones?.get(n);
+        return b ? c.object.worldToLocal(b.getWorldPosition(new V())) : null;
+      };
+      const S = ['Left', 'Right'].map((s) => ({ U: loc(s + 'UpLeg'), K: loc(s + 'Leg'), F: loc(s + 'Foot') }));
+      if (S.every((s) => s.U && s.K && s.F)) {
+        const midX = (S[0].U.x + S[1].U.x) / 2;
+        r.st = +(Math.hypot(S[0].F.x - S[1].F.x, S[0].F.z - S[1].F.z) * mm).toFixed(1);
+        r.hw = +(Math.hypot(S[0].U.x - S[1].U.x, S[0].U.z - S[1].U.z) * mm).toFixed(1);
+        r.kA = [];
+        r.kF = [];
+        r.kO = [];
+        r.fv = [];
+        r.fj = [];
+        rx.__legPrev ??= [];
+        S.forEach((s, i) => {
+          const a = s.K.clone().sub(s.U), b = s.F.clone().sub(s.K);
+          r.kA.push(+((a.angleTo(b) * 180) / Math.PI).toFixed(1));
+          const line = s.F.clone().sub(s.U);
+          const u = Math.max(0, Math.min(1, s.K.clone().sub(s.U).dot(line) / Math.max(1e-9, line.lengthSq())));
+          const off = s.K.clone().sub(s.U.clone().addScaledVector(line, u));
+          r.kF.push(+(off.z * mm).toFixed(1));
+          r.kO.push(+(off.x * Math.sign(s.U.x - midX || (i ? -1 : 1)) * mm).toFixed(1));
+          const pv = rx.__legPrev[i];
+          r.fv.push(pv && rx.__legCat === c ? +((Math.hypot(s.F.x - pv[1].x, s.F.z - pv[1].z) * 30) * mm).toFixed(1) : 0);
+          r.fj.push(pv && rx.__legCat === c ? +(pv[1].distanceTo(pv[0].clone().add(s.F).multiplyScalar(0.5)) * mm).toFixed(2) : 0);
+          rx.__legPrev[i] = [pv ? pv[1] : s.F.clone(), s.F.clone()];
+        });
+        rx.__legCat = c;
+      }
+      r.kS = rx.legStage;
+      rx.legStage = {};
+      // лицо (залипание): пресет микшера, эмоция и её сила, веки и спирали
+      const W = c.W ?? {};
+      r.fPre = c.faceMix?.preset ?? '';
+      r.emoS = +(c.emoL?.s ?? 0).toFixed(2);
+      r.lid = +Math.max(W.eyes_sleepy ?? 0, W.eyes_smug ?? 0, W.eyes_squint ?? 0).toFixed(2);
+      r.spiral = +(W.eyes_spiral ?? 0).toFixed(2);
+      r.frown = +Math.max(W.frown ?? 0, W.brow_down ?? 0).toFixed(2);
+    }
     // --trace "выражение" (audit.mjs): своё значение в кадр (отладка правки)
     if (window.__rxTraceFn) {
       try {
