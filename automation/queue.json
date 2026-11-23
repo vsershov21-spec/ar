@@ -99,6 +99,14 @@
       "ref": "0971621f791390cd6818b1ce252b80180826b9c3",
       "path": "scripts/deploy/pilot-setup.sh",
       "timeoutMin": 15
+    },
+    {
+      "id": "mirror-props-2311",
+      "kind": "script",
+      "ref": "f5a4587018e665f4dbe546e0eb5499dbb7c8ff31",
+      "path": "scripts/deploy/mirror-props.sh",
+      "timeoutMin": 10,
+      "note": "Без трат: зеркало /srv/ar-extra/models/props в out/latest/props (bed.glb для стенда)"
     }
   ]
 }
