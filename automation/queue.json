@@ -92,6 +92,13 @@
       "ref": "859d8a420771ed1330c73bf6136282703cc67a54",
       "path": "scripts/deploy/voice-headers.sh",
       "timeoutMin": 10
+    },
+    {
+      "id": "pilot-setup-2311b",
+      "kind": "script",
+      "ref": "0971621f791390cd6818b1ce252b80180826b9c3",
+      "path": "scripts/deploy/pilot-setup.sh",
+      "timeoutMin": 15
     }
   ]
 }
