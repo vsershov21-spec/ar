@@ -1441,6 +1441,17 @@ export class App {
     );
   }
 
+  /**
+   * Микрофон есть (OPT-01): поддержан, не запрещён и уже открыт либо пришёл живой дорожкой в общем запросе с камерой.
+   * Иначе модель распознавания не прогреваем.
+   */
+  private micAvailable(): boolean {
+    const m = this.engine.mic;
+    if (!m.supported || m.denied) return false;
+    const s = (this.tracker as unknown as { audioStream?: MediaStream | null }).audioStream;
+    return m.isOpen || !!s?.getAudioTracks().some((t) => t.readyState === 'live');
+  }
+
   /** «Разбудить кота»: всё, что требует жеста в iOS, — синхронно в начале обработчика */
   private wakeTries = 0;
   async wake() {
@@ -1462,18 +1473,24 @@ export class App {
     // не на «экономии трафика»
     // Не во время поиска карты: распаковка модели (воркер Vosk, WASM) на iPhone забирала процессор у трекера —
     // посадка шла медленнее. Начинаем через 1,5 с после посадки кота (или через 25 с, если карты так и нет).
-    if (!retry && !(navigator as any).connection?.saveData) {
-      // скачивание (health-проверка + архив в HTTP-кэш) — сразу с жеста: пока ищем карту, модель уже едет по сети;
-      // распаковка в воркере (тяжёлая для процессора) — как раньше, после посадки.
+    // Только при доступном микрофоне (OPT-01): запретили или его нет — модель не качаем (ни HEAD, ни GET), голос
+    // выключен, кнопки работают; первая команда голосом (если микрофон дадут позже) загрузит её сама.
+    const warm = !retry && !(navigator as any).connection?.saveData;
+    let warmEarly = false;
+    if (warm) {
+      // скачивание (health-проверка + архив в HTTP-кэш) — как только известно, что микрофон есть (общий запрос с камерой):
+      // пока ищем карту, модель уже едет по сети; распаковка в воркере (тяжёлая для процессора) — после посадки.
       // Быстрый вход: и скачивание — после посадки (45 МБ на медленной сети отнимали полосу у модели кота, озвучки
       // и пробуждения — кот на карте позже); первое «скажи» подождёт, кнопки работают сразу
-      if (!quick) void this.engine.asr.prefetch?.();
+      warmEarly = !quick;
       let started = false;
       const go = () => {
         if (started) return;
         started = true;
         off();
-        if (quick) void this.engine.asr.prefetch?.();
+        if (!this.micAvailable()) return this.director.log('распознавание: микрофона нет — модель не качаем');
+        // prefetch и preload делят одну загрузку архива (VoskAsr.fetchArchive)
+        void this.engine.asr.prefetch?.();
         void this.engine.asr.preload?.();
       };
       const off = this.tracker.onFound(() => setTimeout(go, quick ? 4000 : 1500));
@@ -1504,6 +1521,7 @@ export class App {
       // микрофон запретили в общем запросе с камерой — сказать сразу (тост) и не звать говорить
       const micErr = (this.tracker as unknown as { micError?: string | null }).micError;
       if (tv.withAudio && !tv.audioStream && micErr) this.engine.mic.markDenied(micErr);
+      if (warmEarly && this.micAvailable()) void this.engine.asr.prefetch?.();
       openMic();
       void sensors.then((ok) => {
         this.director.log(`датчики: ${desk ? 'десктоп-просмотр' : ok ? 'да' : 'нет'}`);

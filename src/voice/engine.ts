@@ -206,6 +206,8 @@ export class VoiceEngine extends Emitter<EngineEvents> {
     voice.echoReady = () => this.echo.phase === 'ready';
     this.mic.onDenied = (why) => {
       if (this.echo.active) this.echo.stop('api');
+      // без микрофона модель распознавания (46 МБ) не нужна — идущую загрузку прочь (OPT-01)
+      this.asr.cancel?.();
       this.fire('mic_denied', { why });
     };
     this.mic.onHealth = (h, info) => {
@@ -264,6 +266,8 @@ export class VoiceEngine extends Emitter<EngineEvents> {
     const a = this.asr;
     if (a.ready || a.health === undefined) return Promise.resolve(true); // Web Speech — без модели
     if (a.unavailable || a.health === 'dead' || !a.preload) return Promise.resolve(false);
+    // микрофона нет — модель (46 МБ) не нужна: имя и ответы — полем ввода и кнопками (OPT-01)
+    if (!this.mic.supported || this.mic.denied) return Promise.resolve(false);
     if (ms <= 0) return Promise.resolve(false);
     return Promise.race([a.preload(), new Promise<boolean>((r) => setTimeout(() => r(false), ms))]);
   }

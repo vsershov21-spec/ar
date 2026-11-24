@@ -31,6 +31,46 @@ export const MODEL_RETRY_MS = 30_000;
  * молча; раньше health оставался «loading» навсегда — голос не работал, а кот звал говорить и тоста не было)
  */
 export const MODEL_UNPACK_TIMEOUT_MS = 150_000;
+/**
+ * Сетевые дедлайны загрузки модели (VOX-01): HEAD-проверка, заголовки ответа GET и пауза между кусками тела.
+ * Раньше любое из трёх ожиданий могло висеть бесконечно — статус «loading» навсегда, повтора не было.
+ */
+export const MODEL_HEAD_TIMEOUT_MS = 10_000;
+export const MODEL_GET_TIMEOUT_MS = 20_000;
+/** тело архива: ни одного байта за столько — попытка не удалась (медленная сеть даёт куски чаще) */
+export const MODEL_STALL_TIMEOUT_MS = 20_000;
+
+export interface ModelFetchOpts {
+  /** внешняя отмена (VoskAsr.cancel: микрофон запретили, попытка провалилась) */
+  signal?: AbortSignal;
+  headMs?: number;
+  getMs?: number;
+  stallMs?: number;
+  fetch?: typeof fetch;
+}
+
+const reasonOf = (s: AbortSignal, d = 'no-model aborted') => (s.reason instanceof Error ? s.reason : new Error(typeof s.reason === 'string' ? s.reason : d));
+/** обещание, которое сдаётся по сигналу (даже если тот, кто его дал, сигнал не слушает — чужой fetch, тело ответа) */
+function abortable<T>(p: Promise<T>, s: AbortSignal): Promise<T> {
+  if (s.aborted) return Promise.reject(reasonOf(s));
+  return new Promise<T>((res, rej) => {
+    const on = () => rej(reasonOf(s));
+    s.addEventListener('abort', on, { once: true });
+    p.then(
+      (v) => (s.removeEventListener('abort', on), res(v)),
+      (e) => (s.removeEventListener('abort', on), rej(e)),
+    );
+  });
+}
+/** свой AbortController попытки, связанный с внешним сигналом */
+function linked(outer?: AbortSignal): AbortController {
+  const c = new AbortController();
+  if (outer) {
+    if (outer.aborted) c.abort(reasonOf(outer));
+    else outer.addEventListener('abort', () => c.abort(reasonOf(outer)), { once: true });
+  }
+  return c;
+}
 
 export interface Asr {
   readonly name: string;
@@ -53,6 +93,8 @@ export interface Asr {
   preload?(): Promise<boolean>;
   /** только скачать модель в HTTP-кэш (без распаковки в воркере): с жеста «Разбудить», пока ищем карту */
   prefetch?(): Promise<boolean>;
+  /** отменить загрузку модели (микрофон запретили): без ошибки и без засчитанной попытки */
+  cancel?(): void;
   /** здоровье модели (Vosk); у Web Speech — всегда ok */
   readonly health?: ModelHealth;
   /** модель готова: распознавание стартует сразу */
@@ -162,7 +204,7 @@ const READY_KEY = 'ar.vosk.ready';
  * в главном потоке (45 МБ кусков + 45 МБ Blob) и клался второй копией в Cache Storage, которую никто не читал.
  * Модель уже разворачивалась на этом телефоне (метка в localStorage) — не качаем вовсе.
  */
-export async function fetchModelWithProgress(url: string, onProgress: (p: number) => void): Promise<boolean> {
+export async function fetchModelWithProgress(url: string, onProgress: (p: number) => void, o: ModelFetchOpts = {}): Promise<boolean> {
   const full = new URL(asset(url), location.href).href;
   void globalThis.caches?.delete(OLD_CACHE).catch(() => undefined);
   try {
@@ -173,24 +215,47 @@ export async function fetchModelWithProgress(url: string, onProgress: (p: number
   } catch {
     /* приватный режим */
   }
-  const r = await fetch(full);
-  if (!r.ok) throw new Error(`no-model ${r.status}`);
-  const total = Number(r.headers.get('content-length') || 0) || 46_000_000;
-  if (!r.body) {
-    await r.arrayBuffer();
+  const f = o.fetch ?? ((...a: Parameters<typeof fetch>) => fetch(...a));
+  const ctrl = linked(o.signal);
+  const sig = ctrl.signal;
+  let timer = 0 as unknown as ReturnType<typeof setTimeout>;
+  const arm = (ms: number, what: string) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => ctrl.abort(new Error(`no-model timeout ${what}`)), ms);
+  };
+  let reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
+  try {
+    arm(o.getMs ?? MODEL_GET_TIMEOUT_MS, 'get');
+    const r = await abortable(f(full, { signal: sig }), sig);
+    if (!r.ok) throw new Error(`no-model ${r.status}`);
+    if (/text\/html/i.test(r.headers.get('content-type') ?? '')) throw new Error('no-model html');
+    const total = Number(r.headers.get('content-length') || 0) || 46_000_000;
+    if (!r.body) {
+      arm(o.stallMs ?? MODEL_STALL_TIMEOUT_MS, 'body');
+      await abortable(r.arrayBuffer(), sig);
+      onProgress(1);
+      return true;
+    }
+    reader = r.body.getReader();
+    let got = 0;
+    for (;;) {
+      arm(o.stallMs ?? MODEL_STALL_TIMEOUT_MS, 'body');
+      const { done, value } = await abortable(reader.read(), sig);
+      if (done) break;
+      got += value.length; // байты не держим
+      onProgress(Math.min(0.99, got / total));
+    }
+    reader = null;
     onProgress(1);
     return true;
+  } catch (e) {
+    throw sig.aborted ? reasonOf(sig) : e;
+  } finally {
+    clearTimeout(timer);
+    // сдались посреди тела (дедлайн, отмена) — отпустить поток и сам запрос, чтобы прежняя попытка не качала дальше
+    if (reader) void reader.cancel().catch(() => undefined);
+    if (!sig.aborted) ctrl.abort(new Error('no-model done'));
   }
-  const reader = r.body.getReader();
-  let got = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    got += value.length; // байты не держим
-    onProgress(Math.min(0.99, got / total));
-  }
-  onProgress(1);
-  return true;
 }
 
 /**
@@ -198,7 +263,7 @@ export async function fetchModelWithProgress(url: string, onProgress: (p: number
  * index.html с 200 на любой путь) или подозрительно маленький файл — модели нет. Модель уже разворачивалась на этом
  * телефоне (лежит в IndexedDB воркера) — не проверяем: работает и без сети.
  */
-export async function checkModel(url: string, f: typeof fetch = (...a) => fetch(...a)): Promise<{ ok: boolean; why?: string }> {
+export async function checkModel(url: string, f: typeof fetch = (...a) => fetch(...a), o: ModelFetchOpts = {}): Promise<{ ok: boolean; why?: string }> {
   const full = new URL(asset(url), location.href).href;
   try {
     if (localStorage.getItem(READY_KEY) === full) return { ok: true };
@@ -206,10 +271,15 @@ export async function checkModel(url: string, f: typeof fetch = (...a) => fetch(
     /* приватный режим */
   }
   let r: Response;
+  const ctrl = linked(o.signal);
+  const tm = setTimeout(() => ctrl.abort(new Error('no-model timeout head')), o.headMs ?? MODEL_HEAD_TIMEOUT_MS);
   try {
-    r = await f(full, { method: 'HEAD', cache: 'no-store' });
+    r = await abortable(f(full, { method: 'HEAD', cache: 'no-store', signal: ctrl.signal }), ctrl.signal);
   } catch (e) {
-    return { ok: false, why: 'no-model fetch ' + String((e as Error)?.message ?? e).slice(0, 60) };
+    const m = String((e as Error)?.message ?? e);
+    return { ok: false, why: /^no-model|^cancel/.test(m) ? m : 'no-model fetch ' + m.slice(0, 60) };
+  } finally {
+    clearTimeout(tm);
   }
   // HEAD не поддержан (405/501) — пусть решает GET
   if (r.status === 405 || r.status === 501) return { ok: true };
@@ -271,6 +341,58 @@ export class VoskAsr implements Asr {
   private attempts = 0;
   private nextTryAt = 0;
   private prefetching: Promise<boolean> | null = null;
+  /**
+   * Одна загрузка архива на попытку (OPT-01): HEAD + GET с прогрессом в HTTP-кэш. prefetch, preload и первая команда
+   * (start → preload) ждут ЭТО обещание — второй полной передачи архива из главного потока нет; воркер Vosk потом
+   * берёт архив из HTTP-кэша. Отменяется cancel() (микрофон запретили) и сетевыми дедлайнами.
+   */
+  private download: Promise<void> | null = null;
+  /** архив уже скачан в этой сессии (в HTTP-кэше) — preload сразу распаковывает */
+  private downloaded = false;
+  private ctrl: AbortController | null = null;
+  private cancelled = false;
+  /** дедлайны (тесты ставят короткие) */
+  net: ModelFetchOpts = {};
+
+  private fetchArchive(): Promise<void> {
+    if (this.downloaded) return Promise.resolve();
+    if (this.download) return this.download;
+    const ctrl = (this.ctrl = new AbortController());
+    const o = { ...this.net, signal: ctrl.signal };
+    const d = (async () => {
+      const h = await checkModel(this.modelUrl, this.net.fetch, o);
+      if (!h.ok) throw new Error(h.why);
+      await fetchModelWithProgress(this.modelUrl, (p) => this.onProgress(p), o);
+      this.downloaded = true;
+    })();
+    this.download = d;
+    const done = () => {
+      if (this.download === d) this.download = null;
+      if (this.ctrl === ctrl) this.ctrl = null;
+    };
+    d.then(done, done);
+    return d;
+  }
+
+  /**
+   * Отменить загрузку модели (микрофон запретили — 46 МБ не нужны): попытка не засчитывается, ошибки нет,
+   * статус — idle. Распаковку в воркере не прерывает (её держит MODEL_UNPACK_TIMEOUT_MS).
+   */
+  cancel() {
+    if (!this.ctrl) return;
+    this.cancelled = true;
+    this.ctrl.abort(new Error('cancel'));
+  }
+  private settleCancel(): boolean {
+    if (!this.cancelled) return false;
+    this.cancelled = false;
+    this.loading = null;
+    this.prefetching = null;
+    this.attempts = Math.max(0, this.attempts - 1);
+    this.health = 'unknown';
+    this.onState('idle');
+    return true;
+  }
 
   /** распознавание сейчас невозможно: модели нет (dead) или ждём паузу перед второй попыткой */
   get unavailable() {
@@ -280,11 +402,12 @@ export class VoskAsr implements Asr {
   }
 
   private fail(why: string) {
+    this.ctrl?.abort(new Error(why));
     this.loading = null;
     this.prefetching = null;
     this.health = this.attempts >= MODEL_MAX_ATTEMPTS ? 'dead' : 'down';
     this.nextTryAt = performance.now() + MODEL_RETRY_MS;
-    this.onState('error', /no-model|404|fetch|load|html/i.test(why) ? `no-model ${why}` : why);
+    this.onState('error', /^no-model/.test(why) ? why : /no-model|404|fetch|load|html/i.test(why) ? `no-model ${why}` : why);
   }
 
   /** можно ли начать новую попытку (не dead, пауза прошла); засчитывает попытку */
@@ -304,20 +427,19 @@ export class VoskAsr implements Asr {
     if (this.model) return Promise.resolve(true);
     if (this.loading) return this.loading;
     if (this.prefetching) return this.prefetching;
+    if (this.downloaded) return Promise.resolve(true);
     if (!this.takeAttempt()) return Promise.resolve(false);
     this.prefetching = (async () => {
       try {
         this.onState('loading');
-        const h = await checkModel(this.modelUrl);
-        if (!h.ok) throw new Error(h.why);
-        await Promise.all([fetchModelWithProgress(this.modelUrl, (p) => this.onProgress(p)), import('vosk-browser')]);
+        await Promise.all([this.fetchArchive(), import('vosk-browser')]);
         // скачали — попытка засчитана, распаковка (preload) продолжит её без новой
         this.health = 'unknown';
         this.attempts--;
         this.onState('idle');
         return true;
       } catch (e) {
-        this.fail(String((e as Error)?.message ?? e));
+        if (!this.settleCancel()) this.fail(String((e as Error)?.message ?? e));
         return false;
       } finally {
         this.prefetching = null;
@@ -335,10 +457,8 @@ export class VoskAsr implements Asr {
     this.loading = (async () => {
       try {
         this.onState('loading');
-        const h = await checkModel(this.modelUrl);
-        if (!h.ok) throw new Error(h.why);
-        // модель (сеть или HTTP-кэш) и сам движок (≈2.4 МБ gzip) — параллельно
-        const [, vosk] = await Promise.all([fetchModelWithProgress(this.modelUrl, (p) => this.onProgress(p)), import('vosk-browser')]);
+        // архив (одна общая загрузка с prefetch; уже скачан — сразу) и сам движок (≈2.4 МБ gzip) — параллельно
+        const [, vosk] = await Promise.all([this.fetchArchive(), import('vosk-browser')]);
         let tm = 0 as unknown as ReturnType<typeof setTimeout>;
         const model = await Promise.race([
           vosk.createModel(new URL(asset(this.modelUrl), location.href).href),
@@ -350,7 +470,7 @@ export class VoskAsr implements Asr {
         this.onState('idle');
         return true;
       } catch (e) {
-        this.fail(String((e as Error)?.message ?? e));
+        if (!this.settleCancel()) this.fail(String((e as Error)?.message ?? e));
         return false;
       }
     })();
