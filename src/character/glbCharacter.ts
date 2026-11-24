@@ -1374,7 +1374,8 @@ export class GlbCharacter implements Character {
     // характер глаз (v2 — по умолчанию; ?models=v1 — без них): у Блёстки по рефу глаза широко открыты — пресеты «самодовольно/сонно/прищур»
     // в idle-клипах (зеркальце, кружение) прикрывают веки слабее
     const eyeK = modelsV2() ? PERSONA_EYES_V2[this.personaId] : undefined;
-    if (eyeK) for (const k in eyeK) if (W[k]) W[k] *= eyeK[k];
+    // Блёстка p3 (лицо по рефу): румянец в shy/offended — как на design/cut/glitter/face (у p1 он выключен)
+    if (eyeK) for (const k in eyeK) if (W[k] && !(this.p3Kit && k === 'blush')) W[k] *= eyeK[k];
     // складки и мягкость: щёки поднимаются при улыбке, морщинка у носа при хмурых бровях
     W.cheek_up = Math.max(W.cheek_up ?? 0, 0.5 * (W.smile ?? 0), 0.3 * (W.smirk ?? 0));
     W.nose_wrinkle = Math.max(W.nose_wrinkle ?? 0, 0.35 * (W.brow_down ?? 0));

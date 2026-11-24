@@ -337,6 +337,8 @@ export class EyeRig {
     uIris: { value: new THREE.Vector2(0.2, 0.2) },
     uPr0: { value: 0.5 },
     uHi: { value: 1 },
+    /** второй (нижний) блик: Блёстка p3 — 0, как на рефе один блик */
+    uHi2: { value: 1 },
   };
   private t = 0;
   private sacT = 0.6;
@@ -394,6 +396,7 @@ export class EyeRig {
     };
     const persona = (rig.eyes[0].pivot.userData as { persona?: string }).persona ?? '';
     const tone = LID_TONE[persona] ?? 1;
+    if (persona === 'glitter_p3') rig.uniforms.uHi2.value = 0;
     const lids = rig.eyes.map((e) => {
       const lo = meshOf(e.lo), up = meshOf(e.up);
       const nu = lo ? lo.geometry.attributes.position.count / LID_ROWS.length : 0;
@@ -497,7 +500,7 @@ export class EyeRig {
     m.onBeforeCompile = (sh) => {
       Object.assign(sh.uniforms, U);
       sh.fragmentShader =
-        'uniform float uPupil;\nuniform float uSpiral;\nuniform float uTime;\nuniform vec2 uIris;\nuniform float uPr0;\nuniform float uHi;\n' +
+        'uniform float uPupil;\nuniform float uSpiral;\nuniform float uTime;\nuniform vec2 uIris;\nuniform float uPr0;\nuniform float uHi;\nuniform float uHi2;\n' +
         sh.fragmentShader
           .replace(
             '#include <map_fragment>',
@@ -525,11 +528,11 @@ export class EyeRig {
     vec3 eyH2 = normalize(vec3(0.32, -0.3, 0.9));
     float eyS1 = smoothstep(0.968, 0.978, dot(normal, eyH1));
     float eyS2 = smoothstep(0.9925, 0.9965, dot(normal, eyH2));
-    totalEmissiveRadiance += vec3(1.0) * (eyS1 * 1.2 + eyS2 * 0.9) * uHi * (1.0 - 0.6 * uSpiral);
+    totalEmissiveRadiance += vec3(1.0) * (eyS1 * 1.2 + eyS2 * 0.9 * uHi2) * uHi * (1.0 - 0.6 * uSpiral);
   }`,
           );
     };
-    m.customProgramCacheKey = () => 'cat-eyeball-v1';
+    m.customProgramCacheKey = () => 'cat-eyeball-v2';
     m.needsUpdate = true;
   }
 
