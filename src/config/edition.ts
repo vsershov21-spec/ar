@@ -74,6 +74,7 @@ export const FEATURES = {
   'games.new': { mvp: false, lab: true, pilot: false, note: 'мини-игры «Угадай рожицу», «Камень-ножницы», «Делай как я» (emo/rps/simon): persona/content.ts убирает их диалоги' },
   'stickers.pack': { mvp: false, lab: true, pilot: false, note: 'новый пак наклеек СберКота и коллекция (fx/stickerPack, fxLayer)' },
   'home.bed': { mvp: false, lab: true, pilot: true, note: 'кровать в спальне «Мира кота»: уложить спать, сон, разбудить, время суток (src/home/bedFlow.ts; homeMode.ts — точка входа)' },
+  'home.bedGlb': { mvp: false, lab: true, pilot: false, note: 'GLB-кровать Meshy (public/models/props/bed.glb, только на сервере) вместо процедурной: в пилоте/MVP выкл. — без выравнивания позы и одеяла под неё кот лежал криво, оливковые «блобы» (docs/qa/bed/GLB_1123.md); ?bedglb=1|0 — сравнить (lab и /test), home/room.ts' },
   'anims.new': { mvp: false, lab: true, pilot: false, note: 'новые анимации по мере генерации (точка входа — у агента анимаций)' },
   'anims.meshy': { mvp: false, lab: true, pilot: true, note: 'клипы Meshy Text-to-Motion из /models/anims/meshy/manifest.json поверх anims_v1 (character/meshyClips.ts; GlbCharacter.load — точка входа); ?meshy=0 — без них' },
   'asr.web': { mvp: false, lab: true, pilot: false, note: '?asr=web — распознавание Web Speech (в Chrome звук уходит на серверы Google): только lab, в MVP и пилоте параметр вырезается — всегда офлайн Vosk (voice/asr.ts makeAsr)' },
@@ -111,7 +112,8 @@ export const PARAMS: Record<string, { feature: FeatureId; test?: boolean; keep?:
   cooldown: { feature: 'debug.flows', test: true }, // ?cooldown=10 — кулдаун смены кота пилота, с (config/pilot.ts cooldownMs); lab и /test
   swatch: { feature: 'card.paint' }, // ?flow=paint&swatch=0..2 — сразу раскраска цветом (src/card/paint.ts)
   bed: { feature: 'home.bed' }, // ?flow=home&zone=bedroom&bed=sleep|wake|night|morning (src/home/bedFlow.ts) — кровать в lab и пилоте
-  hour: { feature: 'home.bed' }, // &hour=21 — местный час для кровати (утро, тихий час, вечер)
+  hour: { feature: 'home.bed' },
+  bedglb: { feature: 'home.bedGlb', test: true }, // ?bedglb=1|0 — GLB-кровать вкл./выкл. для сравнения (home/room.ts bedGlbWanted); в пилоте/MVP — только со страницы /test // &hour=21 — местный час для кровати (утро, тихий час, вечер)
   nocard: { feature: 'tracker.nocard', test: true },
   desktop: { feature: 'tracker.nocard', test: true }, // ?desktop = ?nocard=off + вращение мышью (src/input/orbit.ts)
   anycard: { feature: 'card.anycard' },

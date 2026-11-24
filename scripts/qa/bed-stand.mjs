@@ -5,7 +5,7 @@
 // вершинам кожи), свисает ли с матраса, накрыто ли одеялом и не торчит ли сквозь него.
 //
 //   VITE_EDITION=pilot npx vite build --outDir /tmp/bedstand/dist      — сборка (или --build)
-//   node scripts/qa/bed-stand.mjs --dist /tmp/bedstand/dist --meshy DIR --tag after [--cats kind] [--morning]
+//   node scripts/qa/bed-stand.mjs --dist /tmp/bedstand/dist --meshy DIR --tag after [--cats kind] [--morning] [--hour 23] [--bed-glb FILE]
 //
 // DIR — папка с клипами Meshy (*.glb): ветка server-out, out/latest/meshy (git archive origin/server-out out/latest/meshy).
 // Выход: docs/qa/bed/<tag>_<кот>.png (лист: верх — камера пилота, низ — сверху; подписи — метрики кадра),
@@ -30,6 +30,13 @@ const CATS = arg('--cats', 'hooligan,kind,glitter').split(',');
 const OUT = path.join(root, 'docs/qa/bed');
 const PORT = Number(arg('--port', 4197));
 const PARAMS = arg('--params', '');
+// --bed-glb FILE: отдавать FILE как /models/props/bed.glb (GLB-кровать прода: ветка server-out, out/latest/props/bed.glb);
+// без флага — 404, сцена строит процедурную кровать. --hour N — час суток сцены (ночь у продакта ≈ 23), по умолчанию 14.
+const BED_GLB = arg('--bed-glb', '') ? path.resolve(arg('--bed-glb')) : '';
+const HOUR = Number(arg('--hour', 14));
+// --quick: только ключевые кадры (лёг, укрыт, спит 5 с, на месте) — для перегруженной машины
+const QUICK = flag('--quick');
+const QUICK_SHOTS = ['лёг', 'укрыт', 'спит 5 с', 'на месте'];
 const CHROME = process.env.CHROME || '/usr/bin/google-chrome';
 const log = (...a) => console.log(`[bed ${new Date().toISOString().slice(11, 19)}]`, ...a);
 fs.mkdirSync(OUT, { recursive: true });
@@ -45,7 +52,12 @@ const server = http
     let p = decodeURIComponent(q.url.split('?')[0]);
     if (p.endsWith('/')) p += 'index.html';
     const mm = MESHY && p.match(/^\/models\/anims\/meshy\/([\w.-]+)$/);
-    const f = mm ? path.join(MESHY, mm[1]) : path.join(DIST, path.normalize(p));
+    const bg = BED_GLB && /^\/models\/props\/bed\.glb$/.test(p);
+    const f = bg ? BED_GLB : mm ? path.join(MESHY, mm[1]) : path.join(DIST, path.normalize(p));
+    if (bg) {
+      r.setHeader('content-type', TYPES['.glb']);
+      return fs.createReadStream(f).pipe(r);
+    }
     if ((!mm && !f.startsWith(DIST)) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) {
       r.statusCode = 404;
       return r.end();
@@ -183,7 +195,7 @@ async function runCat(browser, cat, morning) {
   await page.setViewport({ width: 390, height: 844, deviceScaleFactor: Number(arg('--dpr', 1)), isMobile: true, hasTouch: true });
   page.on('pageerror', (e) => log(`  [${cat}] pageerror`, e.message.slice(0, 200)));
   await page.evaluateOnNewDocument(reactionClock, { persona: cat });
-  const q = `from=test&nocard=off&debug&flow=home&zone=bedroom&hour=14${morning ? '&bed=morning' : ''}${PARAMS ? '&' + PARAMS : ''}`;
+  const q = `from=test&nocard=off&debug&flow=home&zone=bedroom&hour=${HOUR}${morning ? '&bed=morning' : ''}${PARAMS ? '&' + PARAMS : ''}`;
   await page.goto(`http://localhost:${PORT}/?${q}`, { waitUntil: 'load' });
   await page.waitForFunction(() => window.__app?.director && window.__app.character?.kind === 'glb' && window.__app.character.mixer, { timeout: 120000 });
   await page.waitForFunction(() => !!document.querySelector('[data-a="wake"]'), { timeout: 60000 });
@@ -231,10 +243,12 @@ async function runCat(browser, cat, morning) {
   if (!morning) {
     await page.evaluate(() => window.__app.home.act('home:sleep'));
     for (const [ms, label] of PLAN) {
+      if (QUICK && !QUICK_SHOTS.includes(label)) continue;
       await until(ms);
       await shoot(label);
     }
     // ворочается: два тапа во сне (turn_over_sleep)
+    if (!QUICK) {
     await page.evaluate(() => window.__app.home.onTouch('tap_body'));
     await until(9300);
     await page.evaluate(() => window.__app.home.onTouch('tap_body'));
@@ -242,6 +256,7 @@ async function runCat(browser, cat, morning) {
     await shoot('ворочается');
     await until(11500);
     await shoot('после');
+    }
   } else {
     await until(1500);
     await shoot('утро: спит');
@@ -250,6 +265,7 @@ async function runCat(browser, cat, morning) {
   await page.evaluate(() => window.__app.home.act('home:wake'));
   t = 0;
   for (const [ms, label] of WAKE) {
+    if (QUICK && !QUICK_SHOTS.includes(label)) continue;
     await until(ms);
     await shoot(label);
   }
@@ -287,7 +303,7 @@ async function sheet(cat, shots) {
   return file;
 }
 
-const browser = await puppeteer.launch({ executablePath: CHROME, headless: true, args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
+const browser = await puppeteer.launch({ executablePath: CHROME, headless: true, protocolTimeout: 30 * 60000, args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
 const all = {};
 try {
   for (const cat of CATS) {

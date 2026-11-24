@@ -2,7 +2,8 @@
 # Без трат кредитов: зеркало пропсов сервера (/srv/ar-extra/models/props/*.glb, *.png) → ветка server-out, out/latest/props/.
 # Зачем: часть пропсов (bed.glb от Meshy и др.) лежит только на сервере, в git их нет — для локальной проверки на стенде.
 # Запуск задачей ar-auto (root): node scripts/automation/enqueue.mjs script scripts/deploy/mirror-props.sh --id mirror-props-<…> [-- bed sofa]
-#   аргументы (необязательно) — имена без расширения, иначе все файлы; файл > 30 МБ пропускается (см. _mirror.json).
+#   аргументы (необязательно) — имена без расширения: только они, дописываются к уже выгруженным; без аргументов — все
+#   файлы заново. Файл > 30 МБ пропускается (см. _mirror.json — что скопировано последним запуском).
 # Пишет прямо в выгрузку ar-auto ($AUTO_VAR/out/latest/props, по умолчанию /var/lib/ar-auto/out) и помечает её «dirty» —
 # ar-auto выгрузит вместе с итогом задачи. Можно вручную: sudo bash mirror-props.sh && sudo ar-auto push
 set -u
@@ -32,7 +33,12 @@ for p in "$SRC"/*.glb "$SRC"/*.png; do
   n=$((n + 1))
 done
 printf '{"updated":"%s","src":"%s","copied":%d,"files":[%s],"skipped":[%s]}\n' "$(date -u +%FT%TZ)" "$SRC" "$n" "${list%,}" "${skipped%,}" > "$tmp/_mirror.json"
-rm -rf "$DST" && mkdir -p "$(dirname "$DST")" && mv "$tmp" "$DST" && chmod 755 "$DST" || { echo "не удалось записать $DST"; exit 1; }
+if [ $# -gt 0 ] && [ -d "$DST" ]; then
+  # с именами — дописать к уже выгруженному (не стирать пропсы, выгруженные раньше без фильтра)
+  cp -p "$tmp"/* "$DST"/ && rm -rf "$tmp" || { echo "не удалось записать $DST"; exit 1; }
+else
+  rm -rf "$DST" && mkdir -p "$(dirname "$DST")" && mv "$tmp" "$DST" && chmod 755 "$DST" || { echo "не удалось записать $DST"; exit 1; }
+fi
 trap - EXIT
 date -Is > "$VAR/dirty"
 echo "готово: $n файлов → out/latest/props/ (выгрузка в server-out — вместе с итогом задачи)"

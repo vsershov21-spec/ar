@@ -14,6 +14,7 @@ import { ZONES, type ZoneId } from './zones';
 import { buildBed, loadBedGlb, type BedProp } from './bedProp';
 import { asset } from '../core/util';
 import { modelUrl } from '../core/modelUrl';
+import { feature } from '../config/edition';
 
 export const BACK_Z = -1.8;
 const ROOM_W = 12.4;
@@ -399,7 +400,7 @@ export function buildRoom(): Room {
   const bedMesh = bedB.mesh(mat, 'home-bed-static');
   group.add(bedMesh);
   group.add(bed.group);
-  if (typeof window !== 'undefined' && /^https?:/.test(location.protocol))
+  if (typeof window !== 'undefined' && /^https?:/.test(location.protocol) && bedGlbWanted(location.search))
     void loadBedGlb(asset(modelUrl('models/props/bed.glb'))).then((root) => {
       if (root && group.parent !== undefined) bed.attachGlb(root, () => (bedMesh.visible = false));
     });
@@ -563,3 +564,13 @@ export function buildRoom(): Room {
 
 /** зона по id → центр по X */
 export const zoneX = (id: ZoneId) => ZONES.find((z) => z.id === id)?.x ?? 0;
+
+/**
+ * GLB-кровать (public/models/props/bed.glb, Meshy) вместо процедурной — только где включена функция home.bedGlb (lab):
+ * в пилоте и MVP — проверенная процедурная (выравнивание позы по матрасу и одеяло по телу сделаны под неё).
+ * ?bedglb=1|0 — переопределить для сравнения (в пилоте/MVP параметр доходит только со страницы /test).
+ */
+export function bedGlbWanted(search: string, on = feature('home.bedGlb')): boolean {
+  const q = new URLSearchParams(search).get('bedglb');
+  return q === '1' ? true : q === '0' ? false : on;
+}
