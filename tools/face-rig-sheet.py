@@ -113,8 +113,10 @@ def lids_sheet(outdir):
     """веки крупно (мягкая кромка, ресницы, тон = мех вокруг): три кота, одни и те же кадры"""
     rows = []
     for persona in ['hooligan', 'kind', 'glitter']:
-        t, _ = shot(persona, [s for s, _ in LID_SHEET], 9, '&dy=0.45')
-        rows.append(row(f'{persona}: веки (eyeRig.ts, мягкие веки)', [label(x, n) for x, (_, n) in zip(t, LID_SHEET)]))
+        # p2 (риг лица морфами) и p1 (пилот: рот шейдером, ?face=shader) — веки общие (eyeRig.ts), кожа вокруг разная
+        for tag, extra in (('p2', ''), ('p1, пилот', '&face=shader')):
+            t, _ = shot(persona, [s for s, _ in LID_SHEET], 9, '&dy=0.45' + extra)
+            rows.append(row(f'{persona} {tag}: веки (eyeRig.ts: разрез, растворение в мех, тон меха)', [label(x, n) for x, (_, n) in zip(t, LID_SHEET)]))
     stack(rows).save(os.path.join(outdir, 'lids.jpg'), quality=86)
     print('lids ok')
 

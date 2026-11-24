@@ -97,3 +97,28 @@ describe('лицо v3: глаза «^», рот-накладка, тон мех�
     for (const n of ['EyeBall_L', 'MouthD', 'Tear_L', 'Blush', 'Whiskers', 'BD_Pads']) expect(FurTone.isFur(n), n).toBe(false);
   });
 });
+
+describe('мягкие веки: разрез глаза и растворение в мех (eyeRig.ts)', () => {
+  it('поле разреза: внутри < 0, снаружи > 0; сошедшиеся уголки не тянут полосу', async () => {
+    const { lidCutPolygon, polyDist } = await import('../src/character/eyeRig');
+    // кромки по столбцам: середина открыта, крайние столбцы сошлись
+    const nu = 7;
+    const mk = (ys: number[]) => {
+      const g = new THREE.BufferGeometry();
+      const p = new Float32Array(nu * 3);
+      for (let k = 0; k < nu; k++) {
+        const x = (k - 3) * 0.3;
+        p.set([x, ys[k], Math.sqrt(Math.max(0.01, 1 - x * x - ys[k] * ys[k]))], k * 3);
+      }
+      g.setAttribute('position', new THREE.BufferAttribute(p, 3));
+      return g;
+    };
+    const up = mk([0, 0, 0.4, 0.5, 0.4, 0, 0]);
+    const lo = mk([0, 0, -0.3, -0.4, -0.3, 0, 0]);
+    const poly = lidCutPolygon(up, lo, nu);
+    expect(poly.length).toBe(2 * 5); // по одному сошедшемуся столбцу с краёв
+    expect(polyDist(poly, 0, 0)).toBeLessThan(-0.2);
+    expect(polyDist(poly, 0, 0.8)).toBeGreaterThan(0.2);
+    expect(polyDist(poly, 0.85, 0)).toBeGreaterThan(0.1); // за уголком — снаружи, а не на «хвосте»
+  });
+});

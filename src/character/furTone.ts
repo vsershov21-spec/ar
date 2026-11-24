@@ -165,7 +165,11 @@ export class FurTone {
     return /^BD_Fur/.test(m.name) || ((m as THREE.SkinnedMesh).isSkinnedMesh && !/^BD_|^Blush|^Brows/.test(m.name) && (m.geometry.attributes.position?.count ?? 0) > 5000);
   }
 
-  patch(m: THREE.MeshStandardMaterial, spatial = false) {
+  /**
+   * rest — сетка не в координатах покоя тела (веки в пространстве глаза): матрица «вершина → координаты покоя тела»
+   * (обновляет владелец, см. EyeRig.toneLids) — маска лица (светлое кольцо вокруг глаз, морда) та же, что у кожи рядом.
+   */
+  patch(m: THREE.MeshStandardMaterial, spatial = false, rest?: { value: THREE.Matrix4 }) {
     if (!m || this.done.has(m) || !(m as THREE.MeshStandardMaterial).isMeshStandardMaterial) return;
     this.done.add(m);
     const U = this.uniforms;
@@ -177,7 +181,9 @@ export class FurTone {
       prev?.call(m, sh, r);
       Object.assign(sh.uniforms, U);
       if (spatial) {
-        sh.vertexShader = 'varying vec3 vFtP;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n  vFtP = position;');
+        if (rest) sh.uniforms.uFtRest = rest;
+        sh.vertexShader = (rest ? 'uniform mat4 uFtRest;\n' : '') + 'varying vec3 vFtP;\n' +
+          sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n  vFtP = ' + (rest ? '(uFtRest * vec4(position, 1.0)).xyz' : 'position') + ';');
       }
       sh.fragmentShader =
         (spatial ? '#define FT_SPATIAL\nvarying vec3 vFtP;\n' : '') +
@@ -243,7 +249,7 @@ export class FurTone {
         );
     };
     const prevKey = m.customProgramCacheKey?.bind(m);
-    m.customProgramCacheKey = () => (prevKey ? prevKey() : '') + (spatial ? '|fur-tone-v4s' : '|fur-tone-v4') + (v2 ? '|m2' : '');
+    m.customProgramCacheKey = () => (prevKey ? prevKey() : '') + (spatial ? (rest ? '|fur-tone-v4r' : '|fur-tone-v4s') : '|fur-tone-v4') + (v2 ? '|m2' : '');
     m.needsUpdate = true;
   }
 }

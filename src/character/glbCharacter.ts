@@ -456,6 +456,15 @@ export class GlbCharacter implements Character {
       console.info('[glb] мимика морфами', this.faceMorphs.meshCount, 'мешей');
     }
     this.eyes = EyeRig.find(model);
+    if (this.eyes) {
+      // копии материалов мягких век — тон меха с маской лица по месту века (как кожа вокруг глаза)
+      let body: THREE.SkinnedMesh | null = null;
+      model.traverse((o) => {
+        const m = o as THREE.SkinnedMesh;
+        if (!body && m.isSkinnedMesh && FurTone.isSpatial(m) && !/^BD_/.test(m.name)) body = m;
+      });
+      this.eyes.toneLids(body, (m, sp, rest) => this.furTone.patch(m, sp, rest));
+    }
     this.wrinkles = FaceWrinkles.attach(model);
     if (this.eyes) console.info('[glb] 3D-глаза');
     this.collider = new BodyCollider(this.object, (n) => this.bones.get(n) ?? model.getObjectByName('mixamorig' + n) ?? undefined);
