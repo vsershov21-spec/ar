@@ -91,6 +91,12 @@ export class CardVerifier {
   step(det: CardDetector, r: DetectResult, lo: Img, K: Intrinsics, now: number, crop?: CropIn | null, force = false): VerifyReport {
     const locked = det.locked;
     if (locked && !this.wasLocked) this.post.reset();
+    // кот ушёл с карты (LOST / пересадка): решение «Сбер» прежней карты новому кандидату не достаётся (CARD-02) —
+    // окно заново; узнанный дизайн (ev.known) остаётся: та же карта вернулась — хватает одного совпадения отпечатка
+    if (!locked && this.wasLocked) {
+      this.ev.reset();
+      this.track = null;
+    }
     this.wasLocked = locked;
     const rep: VerifyReport = { state: this.ev.state, postNotCard: false, line: this.line, checked: false, ms: 0, maybeSber: this.maybe() };
     const q = r.quad;

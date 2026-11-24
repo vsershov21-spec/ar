@@ -245,6 +245,15 @@ const WEAK_ROT_MAX = 0.2;
 const MIRROR_MAX_DIAG = 90;
 const tmpM = new THREE.Matrix4();
 const tmpQ = new THREE.Quaternion();
+/** свидетельство «Сбер» у кандидата после потери живёт на его дорожке не дольше (без кадров с ним), мс */
+const RELOCK_EV_MS = 1000;
+/** тот же кандидат: центр сместился меньше 0,25 диагонали, размер — меньше чем в 1,3 раза */
+function quadNear(a: Quad, b: Quad): boolean {
+  const ca = a.reduce((s, p) => ({ x: s.x + p.x / 4, y: s.y + p.y / 4 }), { x: 0, y: 0 });
+  const cb = b.reduce((s, p) => ({ x: s.x + p.x / 4, y: s.y + p.y / 4 }), { x: 0, y: 0 });
+  const da = quadDiag(a), db = quadDiag(b);
+  return Math.hypot(ca.x - cb.x, ca.y - cb.y) < 0.25 * db && Math.max(da, db) < 1.3 * Math.min(da, db);
+}
 
 export class CardSession {
   readonly fsm: CardFsm;
@@ -341,6 +350,13 @@ export class CardSession {
   private lastQuadT = 0;
   /** причины переходов и прочее для ?debug */
   readonly log: string[] = [];
+  /** после потери: кандидат, у которого свежая проверка сказала «Сбер» (CARD-01/02), и когда его видели */
+  private relockEv: { quad: Quad; at: number } | null = null;
+  /**
+   * AR-05: потеря карты — событие одно на подтверждённую посадку. После LOST кандидат то появляется, то пропадает
+   * (candidate ↔ lost) — раньше каждый такой переход слал card_lost (20 событий за эпизод в аудите).
+   */
+  private lostOpen = false;
 
   constructor(readonly verify = true) {
     this.fsm = new CardFsm(verify);
@@ -435,6 +451,8 @@ export class CardSession {
   /** «Пересадить кота» */
   reanchor(now: number, why = 'пересадка') {
     this.fsm.reset(now, why);
+    this.lostOpen = false;
+    this.relockEv = null;
     this.prevQuad = null;
     this.upN = null;
     this.rotJump = null;
@@ -507,7 +525,22 @@ export class CardSession {
     const inFrame = quad ? quad.filter((p) => p.x >= -1 && p.y >= -1 && p.x <= this.w && p.y <= this.h).length / 4 : 0;
     // до посадки ведение по поверхности тоже считается: детектор пускает его только после кадра с краями карты,
     // а «карта Сбера» проверяется только на кадрах полного поиска
-    const found = !!pose;
+    // CARD-01/02: кот сидит, карта была потеряна (HOLD/RELOCALIZE) — вернуть кота на кандидата можно только по свежей
+    // проверке класса ЭТОГО кандидата (pipeline.ts fresh): иначе первый же кадр чужой карты на том же месте давал
+    // locked за 83 мс с прежним «sber». Геометрия без свидетельств — только подсказка (кандидат «в кадре» для LOST_MAX_MS).
+    const relost = this.verify && (f.state === 'hold' || f.state === 'relocalize');
+    // свидетельство привязано к кандидату: проверка «Сбер» и годная поза бывают в разных кадрах (проверка — на кадре
+    // полного поиска, поза — на кадре ведения), поэтому «sber» держится за ту же дорожку (рядом, без перерыва > 1 с),
+    // пока следующая проверка не скажет иное
+    if (!relost || r.fresh === 'foreign' || r.fresh === 'none') this.relockEv = null;
+    else if (quad) {
+      const ev = this.relockEv;
+      const near = !!ev && now - ev.at < RELOCK_EV_MS && quadNear(quad, ev.quad);
+      if (r.fresh === 'sber' || near) this.relockEv = { quad, at: now };
+      else if (ev && !near) this.relockEv = null;
+    }
+    const found = !!pose && (!relost || !!this.relockEv);
+    if (relost && pose && r.fresh && r.fresh !== 'sber') this.note(now, `кандидат после потери: ${r.fresh === 'foreign' ? 'чужая карта' : 'нет признаков Сбера'} — не садим`);
     f.observe({
       t: now,
       found,
@@ -520,7 +553,8 @@ export class CardSession {
       still: !(angSpeed > 0.6),
       kind,
       postNotCard: !!r.ver?.postNotCard,
-      quad: !!quad,
+      // чужая карта по отпечатку после потери — не «карта в кадре»: «Где карта?» не откладываем до LOST_MAX_MS
+      quad: !!quad && !(relost && r.fresh === 'foreign'),
       maybeSber: r.ver ? r.ver.maybeSber : undefined,
     });
     if (f.state === 'search' && before !== 'search' && f.log.at(-1)?.why.startsWith('переверификация')) {
@@ -528,17 +562,21 @@ export class CardSession {
       this.reanchor(now, 'переверификация');
     }
     // поза в мир и фильтр
-    if (found && pose && f.anchored) {
+    if (found && f.anchored) {
       // новая посадка — с нуля; карту нашли заново после долгой потери (RELOCALIZE: телефон сдвинули, карта в другом
       // месте кадра) — тоже сразу на карту, без «подлёта» фильтром через весь экран
       if (f.state === 'locked' && before !== 'locked' && (before === 'candidate' || before === 'relocalize' || !this.hasW)) this.hasW = false;
-      this.measure(pose, capQ, capT, r.mode, shownAt);
+      this.measure(pose!, capQ, capT, r.mode, shownAt);
     }
     if (f.state === 'locked' && (before === 'candidate' || before === 'search' || before === 'lost')) {
       step.found = true;
+      this.lostOpen = true;
       this.note(now, `посадка: ${f.log.at(-1)?.why ?? ''}`);
     }
-    if (f.state === 'lost' && before !== 'lost' && wasEver) step.lost = true;
+    if (f.state === 'lost' && before !== 'lost' && wasEver && this.lostOpen) {
+      step.lost = true;
+      this.lostOpen = false;
+    }
     if (before !== f.state) this.note(now, `${before} → ${f.state}: ${f.log.at(-1)?.why ?? ''}`);
     step.quad = quad;
     step.pose = pose;
@@ -553,7 +591,10 @@ export class CardSession {
     const step: SessionStep = {};
     if (this.fsm.state !== before) {
       this.note(now, `${before} → ${this.fsm.state}: ${this.fsm.log.at(-1)?.why ?? ''}`);
-      if (this.fsm.state === 'lost') step.lost = true;
+      if (this.fsm.state === 'lost' && this.lostOpen) {
+        step.lost = true;
+        this.lostOpen = false;
+      }
     }
     return step;
   }

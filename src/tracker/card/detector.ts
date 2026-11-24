@@ -200,6 +200,12 @@ export class CardDetector {
   gyroRot: number[] | null = null;
   /** сверка с ключевым кадром в этом кадре (null — не было) */
   keyInfo: { zncc: number; inl: number } | null = null;
+  /**
+   * Кот сидит, а карта потеряна (HOLD/RELOCALIZE, главный поток шлёт lostMs > 0): ключевой кадр не переснимаем — в
+   * кадре может быть уже чужая карта, и шаблон «переезжал» на неё (CARD-01: после подмены ключевой кадр держал чужую,
+   * а вернувшуюся карту Сбера — нет). Снимаем снова, когда кота вернули на карту по проверке класса.
+   */
+  lost = false;
   /** почему в этом кадре так (debug) */
   why = '';
   /** кандидаты последнего полного поиска (лучшие первыми) — для проверки «это карта?» (verify.ts) */
@@ -255,6 +261,7 @@ export class CardDetector {
   }
   reset() {
     this.key.reset();
+    this.lost = false;
     this.keyH = null;
     this.keyVel = null;
     this.keyQuad = null;
@@ -535,16 +542,16 @@ export class CardDetector {
       const want = Math.max(20, Math.min(56, wPx / 2)) / this.key.scale;
       const scaleOff = (want < 0.7 || want > 1.45) && keyRes.inl > 0.75;
       const lookOff = keyRes.zncc < 0.88 && keyRes.inl > 0.88 && keyRes.vis > 0.9;
-      if ((scaleOff || lookOff) && this.frameNo - this.keyFrame > 15 && this.key.capture(this.gray, this.w, this.h, q, this.frameNo, keyRes.H)) this.keyFrame = this.frameNo;
+      if ((scaleOff || lookOff) && !this.lost && this.frameNo - this.keyFrame > 15 && this.key.capture(this.gray, this.w, this.h, q, this.frameNo, keyRes.H)) this.keyFrame = this.frameNo;
     } else {
       this.keyH = null;
       this.keyVel = null;
       if (useKey) this.keyFails++;
       // ключевой кадр устарел (карта сильно приблизилась/наклонилась, сменился свет) — а края карты её
       // уверенно подтверждают: новый ключевой кадр с этой позы
-      const stale = useKey && this.keyFails >= 4 && best && mode === 'track' && best.score >= 0.62 && this.frameNo - this.keyFrame > 8;
+      const stale = useKey && !this.lost && this.keyFails >= 4 && best && mode === 'track' && best.score >= 0.62 && this.frameNo - this.keyFrame > 8;
       if (stale) this.key.reset();
-      if (this.locked && p.keyframe && best && !this.key.ready && (mode === 'detect' || mode === 'track') && best.score >= 0.5) {
+      if (this.locked && !this.lost && p.keyframe && best && !this.key.ready && (mode === 'detect' || mode === 'track') && best.score >= 0.5) {
         if (this.key.capture(this.gray, this.w, this.h, best.quad, this.frameNo)) {
           this.keyFrame = this.frameNo;
           this.keyFails = 0;
@@ -558,7 +565,7 @@ export class CardDetector {
     // всю сессию — кот смещён и «кренится», поза с ошибкой > 4 px отбрасывается (стенд card:eval, наклон 25°,
     // угол обзора 56°). Полный поиск идёт и после посадки (переверификация): если его карта — та же (рядом), но
     // заметно лучше подтверждена краями, чем углы по шаблону, два раза подряд — новый ключевой кадр с её углов.
-    if (mode === 'key' && keyRes && best && detectOut && this.locked && p.keyframe) {
+    if (mode === 'key' && keyRes && best && detectOut && this.locked && !this.lost && p.keyframe) {
       const c = detectOut.candidates[0];
       const bq = best.quad;
       const diag = quadDiag(bq);
