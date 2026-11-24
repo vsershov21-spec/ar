@@ -20,7 +20,7 @@ describe('каталоги content/', () => {
   });
 
   it('для каждого клипа каталога есть процедурная заглушка рига', () => {
-    expect(CLIP_IDS.length).toBe(112); // + 10 клипов Meshy под шаблоны предметов/скейта/живой Блёстки (20.11) + 22 клипа только Meshy (раскраска: spray_shake, spray_low_sweep, admire_artwork, brush_dip_stroke) (treat_eat_*, tease_*, …; content/animations.json meshy)
+    expect(CLIP_IDS.length).toBe(116); // + 4 тела «предмет у груди» (hold_treat_low[_b], hold_sip_low[_b], 24.11) + 10 клипов Meshy под шаблоны предметов/скейта/живой Блёстки (20.11) + 22 клипа только Meshy (раскраска: spray_shake, spray_low_sweep, admire_artwork, brush_dip_stroke) (treat_eat_*, tease_*, …; content/animations.json meshy)
     const missing = CLIP_IDS.filter((id) => !RIG_CLIPS[id]);
     expect(missing).toEqual([]);
     for (const id of CLIP_IDS) {

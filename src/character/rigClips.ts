@@ -507,6 +507,11 @@ export const RIG_CLIPS: Record<string, ClipFn> = {
   hold_sip_body: (k, t) => RIG_CLIPS.idle_breathe(k, t),
   hold_mirror_body: (k, t) => RIG_CLIPS.idle_breathe(k, t),
   hold_treat_body: (k, t) => RIG_CLIPS.idle_breathe(k, t),
+  // предмет у груди, голова к нему (24.11): без клипа — покой
+  hold_treat_low: (k, t) => RIG_CLIPS.idle_breathe(k, t),
+  hold_treat_low_b: (k, t) => RIG_CLIPS.idle_breathe(k, t),
+  hold_sip_low: (k, t) => RIG_CLIPS.idle_breathe(k, t),
+  hold_sip_low_b: (k, t) => RIG_CLIPS.idle_breathe(k, t),
   skate_hop_on: (k, t) => RIG_CLIPS.idle_hooligan_skate(k, t),
   skate_cruise: (k, t) => RIG_CLIPS.idle_hooligan_skate(k, t),
   skate_ollie_air: (k, t) => RIG_CLIPS.idle_hooligan_skate(k, t),

@@ -2127,6 +2127,82 @@
       }
     },
     {
+      "id": "hold_treat_low",
+      "durationS": 4.5,
+      "loop": false,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 200,
+      "persona": "all",
+      "priority": "P2",
+      "usedBy": [
+        "act"
+      ],
+      "notes": "Угостить: тело под шаблон holdAction — предмет ниже, у груди; голова наклоняется к нему (лапу ведёт IK рыбки). Только Meshy (scripts/models/t2m_prompts_v2.json); без клипа — процедурная версия.",
+      "meshy": {
+        "loop": false,
+        "blendInMs": 200,
+        "blendOutMs": 300
+      }
+    },
+    {
+      "id": "hold_treat_low_b",
+      "durationS": 4.5,
+      "loop": false,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 200,
+      "persona": "all",
+      "priority": "P2",
+      "usedBy": [
+        "act"
+      ],
+      "notes": "Угостить: вариант — обе лапы у груди, корпус чуть вперёд, голова к лапам. Только Meshy (scripts/models/t2m_prompts_v2.json); без клипа — процедурная версия.",
+      "meshy": {
+        "loop": false,
+        "blendInMs": 200,
+        "blendOutMs": 300
+      }
+    },
+    {
+      "id": "hold_sip_low",
+      "durationS": 5.0,
+      "loop": false,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 200,
+      "persona": "kind",
+      "priority": "P2",
+      "usedBy": [
+        "act"
+      ],
+      "notes": "Какао: тело под шаблон holdAction — кружка у груди, голова наклоняется к ней (лапу ведёт IK кружки). Только Meshy (scripts/models/t2m_prompts_v2.json); без клипа — процедурная версия.",
+      "meshy": {
+        "loop": false,
+        "blendInMs": 200,
+        "blendOutMs": 300
+      }
+    },
+    {
+      "id": "hold_sip_low_b",
+      "durationS": 5.0,
+      "loop": false,
+      "rootMotion": false,
+      "layer": "body",
+      "blendInMs": 200,
+      "persona": "kind",
+      "priority": "P2",
+      "usedBy": [
+        "act"
+      ],
+      "notes": "Какао: вариант — обе лапы у груди, корпус чуть вперёд, голова к кружке. Только Meshy (scripts/models/t2m_prompts_v2.json); без клипа — процедурная версия.",
+      "meshy": {
+        "loop": false,
+        "blendInMs": 200,
+        "blendOutMs": 300
+      }
+    },
+    {
       "id": "skate_hop_on",
       "durationS": 2.0,
       "loop": false,

@@ -1555,6 +1555,66 @@
     "duration": 3.0,
     "mode": "prime"
    }
+  },
+  "hold_treat_low": {
+   "priority": "P2",
+   "group": "Предмет у груди, голова к нему (24.11)",
+   "durationS": 4.5,
+   "loop": false,
+   "start": "стойка idle",
+   "end": "стойка idle",
+   "replaces": "плечо/лапа сквозь шарф/наушники 6–7 мм (docs/qa/anim-audit/2026-11-24_tails п. 2): лапа короткая, у рта — в струну",
+   "trigger": "Угостить: тело под шаблон holdAction — предмет ниже, у груди; голова наклоняется к нему (лапу ведёт IK рыбки)",
+   "meshy": {
+    "prompt": "Starts standing upright facing forward, arms relaxed. The right hand comes up in front of the chest as if holding a small cookie, elbow down close to the side. The head bows down toward the hand for a small bite, lifts a little with happy chewing nods, then bows down again for a second bite. The hand stays low at chest height. Then the hand lowers to a relaxed standing pose, in place, no turning.",
+    "duration": 4.5,
+    "mode": "prime"
+   }
+  },
+  "hold_treat_low_b": {
+   "priority": "P2",
+   "group": "Предмет у груди, голова к нему (24.11)",
+   "durationS": 4.5,
+   "loop": false,
+   "start": "стойка idle",
+   "end": "стойка idle",
+   "replaces": "плечо/лапа сквозь шарф/наушники 6–7 мм (docs/qa/anim-audit/2026-11-24_tails п. 2): лапа короткая, у рта — в струну",
+   "trigger": "Угостить: вариант — обе лапы у груди, корпус чуть вперёд, голова к лапам",
+   "meshy": {
+    "prompt": "Starts standing upright facing forward, arms relaxed. Both hands come together in front of the chest as if holding a small snack, elbows close to the body. The upper body leans forward a little and the head bows down to the hands to nibble, lifts with small happy nods, then bows down to nibble again. The hands stay at chest height, then lower to a relaxed standing pose, in place, no turning.",
+    "duration": 4.5,
+    "mode": "prime"
+   }
+  },
+  "hold_sip_low": {
+   "priority": "P2",
+   "group": "Предмет у груди, голова к нему (24.11)",
+   "durationS": 5.0,
+   "loop": false,
+   "start": "стойка idle",
+   "end": "стойка idle",
+   "replaces": "плечо/лапа сквозь шарф/наушники 6–7 мм (docs/qa/anim-audit/2026-11-24_tails п. 2): лапа короткая, у рта — в струну",
+   "trigger": "Какао: тело под шаблон holdAction — кружка у груди, голова наклоняется к ней (лапу ведёт IK кружки)",
+   "meshy": {
+    "prompt": "Starts standing upright facing forward, arms relaxed. The right hand comes up in front of the chest as if holding a small cup, elbow down close to the side, left hand under it. The head bows down toward the cup for a slow sip, lifts a little, then bows down for a second sip. The head lifts with a content sigh, then the hands lower to a relaxed standing pose, in place, no turning.",
+    "duration": 5.0,
+    "mode": "prime"
+   }
+  },
+  "hold_sip_low_b": {
+   "priority": "P2",
+   "group": "Предмет у груди, голова к нему (24.11)",
+   "durationS": 5.0,
+   "loop": false,
+   "start": "стойка idle",
+   "end": "стойка idle",
+   "replaces": "плечо/лапа сквозь шарф/наушники 6–7 мм (docs/qa/anim-audit/2026-11-24_tails п. 2): лапа короткая, у рта — в струну",
+   "trigger": "Какао: вариант — обе лапы у груди, корпус чуть вперёд, голова к кружке",
+   "meshy": {
+    "prompt": "Starts standing upright facing forward, arms relaxed. Both hands come together in front of the chest as if holding a warm cup, elbows close to the body. The upper body leans forward a little and the head bows down to the hands for a slow sip, lifts, then bows again for a second sip. Then the head lifts with a happy sigh and the hands lower to a relaxed standing pose, in place, no turning.",
+    "duration": 5.0,
+    "mode": "prime"
+   }
   }
  },
  "props": {

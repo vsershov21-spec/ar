@@ -2941,6 +2941,10 @@
 | `hold_mirror_body` | P2 | glitter | 5.5 |  |  | act | Зеркальце (Блёстка): тело под шаблон — левую лапу ведёт IK зеркальца, правая поправляет бант. Только Meshy (scripts/models/t2m_prompts_v2.json); без клипа — процедурная версия. |
 | `hold_sip_body` | P2 | kind | 5.0 |  |  | act | Какао (Добряк): тело под шаблон holdAction — правую лапу ведёт IK кружки. Только Meshy (scripts/models/t2m_prompts_v2.json); без клипа — процедурная версия. |
 | `hold_treat_body` | P2 | all | 4.5 |  |  | act | Угостить (все): тело под шаблон — правую лапу ведёт IK рыбки. Только Meshy (scripts/models/t2m_prompts_v2.json); без клипа — процедурная версия. |
+| `hold_treat_low` | P2 | all | 4.5 |  |  | act | Угостить: тело под шаблон holdAction — предмет ниже, у груди; голова наклоняется к нему (лапу ведёт IK рыбки). Только Meshy (scripts/models/t2m_prompts_v2.json); без клипа — процедурная версия. |
+| `hold_treat_low_b` | P2 | all | 4.5 |  |  | act | Угостить: вариант — обе лапы у груди, корпус чуть вперёд, голова к лапам. Только Meshy (scripts/models/t2m_prompts_v2.json); без клипа — процедурная версия. |
+| `hold_sip_low` | P2 | kind | 5.0 |  |  | act | Какао: тело под шаблон holdAction — кружка у груди, голова наклоняется к ней (лапу ведёт IK кружки). Только Meshy (scripts/models/t2m_prompts_v2.json); без клипа — процедурная версия. |
+| `hold_sip_low_b` | P2 | kind | 5.0 |  |  | act | Какао: вариант — обе лапы у груди, корпус чуть вперёд, голова к кружке. Только Meshy (scripts/models/t2m_prompts_v2.json); без клипа — процедурная версия. |
 | `idle_glitter_alive` | P2 | glitter | 6.0 | да |  | act | Живой покой Блёстки, петля (слой aliveIdle поверх — вполсилы). Только Meshy (scripts/models/t2m_prompts_v2.json); без клипа — процедурная версия. |
 | `idle_tail_play` | P2 | all | 3.0 |  |  | idle | Ловит собственный хвост, полоборота. |
 | `sing` | P2 | all | 4.0 |  |  | sing | Поёт в воображаемый микрофон, качается. |
