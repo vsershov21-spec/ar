@@ -67,6 +67,9 @@ export function whyShort(why: string): string {
   return 'позже';
 }
 
+/** сколько после отпускания пальца ждём click раскрывшего колонки касания, мс */
+const SWALLOW_CLICK_MS = 450;
+
 export class TomMenu {
   readonly el: HTMLDivElement;
   private colL: HTMLDivElement;
@@ -205,13 +208,38 @@ export class TomMenu {
       if (!this.on) return;
       const now = performance.now();
       this.auto.touch(now);
+      this.swallow = null;
       const W = h.root.clientWidth;
       const tgt = e.target as HTMLElement | null;
       const edge = e.clientX < 30 ? 'l' : e.clientX > W - 30 ? 'r' : null;
-      if (edge && (this.hiddenNow || this.plan?.[edge === 'l' ? 'left' : 'right'].mode === 'tab')) this.reveal(edge);
+      if (edge && (this.hiddenNow || this.plan?.[edge === 'l' ? 'left' : 'right'].mode === 'tab')) {
+        this.reveal(edge);
+        // IMG-05: колонка выехала под пальцем — этот жест только раскрывает: его click ушёл бы в появившуюся кнопку
+        // («Обнять» вместо язычка). Поглощаем click этого же касания; следующий отдельный тап — ровно одно действие.
+        this.swallow = { id: e.pointerId, until: Infinity };
+      }
       if (this.popFor && !tgt?.closest?.('.tom-pop, .tom-games, .tom-gear, .tom-more')) this.closePop();
     }, true);
+    const release = (e: PointerEvent) => {
+      // click приходит сразу после pointerup (на iOS — до ~350 мс); дольше не ждём, чтобы не съесть следующий тап
+      if (this.swallow && this.swallow.id === e.pointerId && this.swallow.until === Infinity) this.swallow.until = performance.now() + SWALLOW_CLICK_MS;
+    };
+    document.addEventListener('pointerup', release, true);
+    document.addEventListener('pointercancel', release, true);
+    document.addEventListener('click', (e) => {
+      const sw = this.swallow;
+      if (!sw) return;
+      this.swallow = null;
+      // click с клавиатуры (Enter/пробел, detail 0) — не от этого касания
+      if ((e as MouseEvent).detail === 0 || performance.now() > sw.until) return;
+      // только то, что выехало под палец (колонка / язычок); кнопки дока у края работают как раньше
+      if (!(e.target as HTMLElement | null)?.closest?.('.tom-col, .tom-tab')) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+    }, true);
   }
+  /** касание у края раскрыло колонки — click этого касания не действует (IMG-05) */
+  private swallow: { id: number; until: number } | null = null;
   /** до первой игры кнопки приглушены: кот объясняет */
   private gate(b: HTMLElement): boolean {
     if (this.h.playing()) return false;
