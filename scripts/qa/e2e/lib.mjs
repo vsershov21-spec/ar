@@ -205,6 +205,18 @@ export class Phone {
   }
   /** тап пальцем по центру элемента (настоящее касание: закрытый чем-то элемент не нажмётся) */
   async tap(sel) {
+    // лист / карточка ещё въезжает (ps-in 0,32 с: снизу на 24 px) — координаты с первого кадра попадали в соседнюю
+    // кнопку («Не надо» → цвет, 06_paint 24.11). Палец ребёнка жмёт то, что уже стоит: ждём, пока рамка не замрёт
+    // (два замера через 100 мс; до 1,5 с — у кнопок с вечной анимацией берём как есть)
+    await this.ev(() => { window.__qaTapRect = null; }).catch(() => undefined);
+    await this.until((s) => {
+      const el = document.querySelector(s);
+      if (!el) return true;
+      const b = el.getBoundingClientRect(), k = `${Math.round(b.left)},${Math.round(b.top)},${Math.round(b.width)},${Math.round(b.height)}`;
+      const w = window.__qaTapRect, same = !!w && w.s === s && w.k === k;
+      window.__qaTapRect = { s, k };
+      return same;
+    }, 1500, sel);
     const r = await this.ev((s) => {
       const el = typeof s === 'string' ? document.querySelector(s) : null;
       if (!el) return null;
