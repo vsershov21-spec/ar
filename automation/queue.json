@@ -140,6 +140,16 @@
       ],
       "maxCredits": 800,
       "note": "36 новых имён × 3 кота = 108 слотов, 726 симв.; --only slot, уже озвученное пропускается по хэшу"
+    },
+    {
+      "id": "glitter-p3-meshy-1",
+      "kind": "meshy",
+      "args": [
+        "--only",
+        "glitter_p3_m71,glitter_p3_m6"
+      ],
+      "maxCredits": 100,
+      "note": "Блёстка p3: Meshy Multi-Image to 3D по 4 видам разворота 23.11 (7.1 и meshy-6)"
     }
   ]
 }
