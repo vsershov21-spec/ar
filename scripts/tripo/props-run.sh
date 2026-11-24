@@ -10,6 +10,25 @@
 # Готовое кладётся в /srv/ar-extra/models/props/<имя>.glb + <имя>.png (превью) и попадает на сайт со следующей
 # сборкой (attach-extra): https://ar.vershov.com/models/props/<имя>.glb. Уже готовые пропускаются (resume).
 set -u
+umask 022 # файлы для сайта: читаемы сборкой ar-update (ar-auto запускает с umask 077)
+# Права в /srv/ar-extra (ar-auto работает под root с umask 077): владелец/группа — как у каталога назначения или
+# ближайшего родителя не от root (обычно vershov-commander:caddy), файлы 0644, каталоги 0755. Иначе сборка
+# ar-update (не root) не прочитает файл. Та же функция — в meshy/motion-run.sh, tripo/props-run.sh, voice/el-run.sh.
+extra_perms() {
+  local d ref own
+  for d in "$@"; do
+    [ -e "$d" ] || continue
+    ref=$d
+    while [ "$ref" != / ] && { [ ! -e "$ref" ] || [ "$(stat -c %u "$ref" 2>/dev/null)" = 0 ]; }; do ref=$(dirname "$ref"); done
+    own=""
+    [ "$ref" != / ] && own=$(stat -c %U:%G "$ref" 2>/dev/null)
+    [ -z "$own" ] && id -u vershov-commander >/dev/null 2>&1 && getent group caddy >/dev/null 2>&1 && own=vershov-commander:caddy
+    [ -n "$own" ] && [ "$(id -u)" = 0 ] && chown -R "$own" "$d" 2>/dev/null
+    find "$d" -type d -exec chmod 0755 {} + 2>/dev/null
+    find "$d" -type f -exec chmod 0644 {} + 2>/dev/null
+  done
+  return 0
+}
 GO=0; ONLY=""; MAXCR=""
 while [ $# -gt 0 ]; do case "$1" in --go) GO=1;; --only) ONLY="$2"; shift;; --max-credits) MAXCR="$2"; shift;; esac; shift; done
 export TRIPO_CLIENT_APP=claude
@@ -62,7 +81,7 @@ while IFS=$'\t' read -r name prompt views vargs; do
   [ -s "$glb" ] && cp "$glb" "$OUT/$name.glb" && echo "✓ $name.glb $(du -h "$OUT/$name.glb" | cut -f1)"
   [ -s "$prev" ] && cp "$prev" "$OUT/$name.png"
 done < "$WORK/list.tsv"
-chown -R vershov-commander:caddy "$OUT" 2>/dev/null; chmod -R g+rX "$OUT" 2>/dev/null
+extra_perms "$OUT"
 [ $GO = 0 ] && echo "оценка ≈ $TOTAL кредитов"
 [ $GO = 0 ] && echo "к генерации: $TODO из $N (≈110 кредитов за предмет). Запуск: nohup bash /tmp/props.sh --go >/tmp/props.log 2>&1 &"
 [ $GO = 1 ] && echo "потрачено по оценке ≈ $SPENT кредитов"

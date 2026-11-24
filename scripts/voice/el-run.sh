@@ -12,6 +12,25 @@
 # сборка сайта (scripts/voice/pull-server-voice.mjs) подхватит файлы при следующем push в main или пересборке.
 # Уже озвученное (тот же текст, голос, модель) пропускается — повторный запуск продолжает с места остановки.
 set -euo pipefail
+umask 022 # файлы для сайта: читаемы сборкой ar-update (ar-auto запускает с umask 077)
+# Права в /srv/ar-extra (ar-auto работает под root с umask 077): владелец/группа — как у каталога назначения или
+# ближайшего родителя не от root (обычно vershov-commander:caddy), файлы 0644, каталоги 0755. Иначе сборка
+# ar-update (не root) не прочитает файл. Та же функция — в meshy/motion-run.sh, tripo/props-run.sh, voice/el-run.sh.
+extra_perms() {
+  local d ref own
+  for d in "$@"; do
+    [ -e "$d" ] || continue
+    ref=$d
+    while [ "$ref" != / ] && { [ ! -e "$ref" ] || [ "$(stat -c %u "$ref" 2>/dev/null)" = 0 ]; }; do ref=$(dirname "$ref"); done
+    own=""
+    [ "$ref" != / ] && own=$(stat -c %U:%G "$ref" 2>/dev/null)
+    [ -z "$own" ] && id -u vershov-commander >/dev/null 2>&1 && getent group caddy >/dev/null 2>&1 && own=vershov-commander:caddy
+    [ -n "$own" ] && [ "$(id -u)" = 0 ] && chown -R "$own" "$d" 2>/dev/null
+    find "$d" -type d -exec chmod 0755 {} + 2>/dev/null
+    find "$d" -type f -exec chmod 0644 {} + 2>/dev/null
+  done
+  return 0
+}
 
 BASE=/var/lib/vershov-commander/ar
 LOG="${EL_LOG:-$BASE/el-run.log}"
@@ -42,5 +61,8 @@ if pgrep -f "eleven.mjs --batch" >/dev/null; then
   exit 0
 fi
 echo "=== $(date -Is) el-run $* ===" >>"$LOG"
-nohup setsid node scripts/voice/eleven.mjs --batch voice-src/el_batch_all.jsonl --run "$@" >>"$LOG" 2>&1 < /dev/null &
+# после синтеза — права на вывод (/srv/ar-extra/voice-el или запасной $BASE/voice-el)
+export -f extra_perms
+export BASE
+nohup setsid bash -c 'node scripts/voice/eleven.mjs --batch voice-src/el_batch_all.jsonl --run "$@"; code=$?; extra_perms /srv/ar-extra/voice-el "$BASE/voice-el"; exit $code' _ "$@" >>"$LOG" 2>&1 < /dev/null &
 echo "Озвучка запущена в фоне (pid $!). Лог: tail -f $LOG"

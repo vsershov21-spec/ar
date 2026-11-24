@@ -7,6 +7,7 @@
 # Пишет прямо в выгрузку ar-auto ($AUTO_VAR/out/latest/props, по умолчанию /var/lib/ar-auto/out) и помечает её «dirty» —
 # ar-auto выгрузит вместе с итогом задачи. Можно вручную: sudo bash mirror-props.sh && sudo ar-auto push
 set -u
+umask 022 # выгрузка читаема всеми, даже если исходник root:root 600 (ar-auto работает с umask 077)
 SRC=${PROPS_SRC:-/srv/ar-extra/models/props}
 VAR=${AUTO_VAR:-/var/lib/ar-auto}
 DST="$VAR/out/latest/props"
@@ -26,7 +27,7 @@ for p in "$SRC"/*.glb "$SRC"/*.png; do
   if [ $# -gt 0 ]; then ok=0; for a in "$@"; do [ "$a" = "$base" ] && ok=1; done; [ $ok = 1 ] || continue; fi
   sz=$(stat -c %s "$p")
   if [ "$sz" -gt "$MAX" ]; then echo "пропуск (> 30 МБ): $f $sz"; skipped="$skipped{\"file\":\"$f\",\"bytes\":$sz},"; continue; fi
-  cp -p "$p" "$tmp/$f" || continue
+  cp --preserve=timestamps "$p" "$tmp/$f" || continue # без -p: режим 600 исходника не тащим
   sha=$(sha256sum "$p" | cut -c1-64); mt=$(date -u -d "@$(stat -c %Y "$p")" +%FT%TZ)
   echo "$f $sz $sha $mt"
   list="$list{\"file\":\"$f\",\"bytes\":$sz,\"sha256\":\"$sha\",\"mtime\":\"$mt\"},"
@@ -35,7 +36,7 @@ done
 printf '{"updated":"%s","src":"%s","copied":%d,"files":[%s],"skipped":[%s]}\n' "$(date -u +%FT%TZ)" "$SRC" "$n" "${list%,}" "${skipped%,}" > "$tmp/_mirror.json"
 if [ $# -gt 0 ] && [ -d "$DST" ]; then
   # с именами — дописать к уже выгруженному (не стирать пропсы, выгруженные раньше без фильтра)
-  cp -p "$tmp"/* "$DST"/ && rm -rf "$tmp" || { echo "не удалось записать $DST"; exit 1; }
+  cp --preserve=timestamps "$tmp"/* "$DST"/ && rm -rf "$tmp" || { echo "не удалось записать $DST"; exit 1; }
 else
   rm -rf "$DST" && mkdir -p "$(dirname "$DST")" && mv "$tmp" "$DST" && chmod 755 "$DST" || { echo "не удалось записать $DST"; exit 1; }
 fi

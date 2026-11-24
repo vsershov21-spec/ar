@@ -13,10 +13,30 @@
 # https://ar.vershov.com/models/anims/meshy/manifest.json. Состояние (id задач, сырые GLB) — /var/lib/vershov-commander/ar/meshy.
 # Повторный запуск продолжает с места: готовое пропускает, начатые задачи дожидается, оплаченное не переотправляет.
 set -u
+umask 022 # файлы для сайта: читаемы сборкой ar-update (ar-auto запускает с umask 077)
+# Права в /srv/ar-extra (ar-auto работает под root с umask 077): владелец/группа — как у каталога назначения или
+# ближайшего родителя не от root (обычно vershov-commander:caddy), файлы 0644, каталоги 0755. Иначе сборка
+# ar-update (не root) не прочитает файл. Та же функция — в meshy/motion-run.sh, tripo/props-run.sh, voice/el-run.sh.
+extra_perms() {
+  local d ref own
+  for d in "$@"; do
+    [ -e "$d" ] || continue
+    ref=$d
+    while [ "$ref" != / ] && { [ ! -e "$ref" ] || [ "$(stat -c %u "$ref" 2>/dev/null)" = 0 ]; }; do ref=$(dirname "$ref"); done
+    own=""
+    [ "$ref" != / ] && own=$(stat -c %U:%G "$ref" 2>/dev/null)
+    [ -z "$own" ] && id -u vershov-commander >/dev/null 2>&1 && getent group caddy >/dev/null 2>&1 && own=vershov-commander:caddy
+    [ -n "$own" ] && [ "$(id -u)" = 0 ] && chown -R "$own" "$d" 2>/dev/null
+    find "$d" -type d -exec chmod 0755 {} + 2>/dev/null
+    find "$d" -type f -exec chmod 0644 {} + 2>/dev/null
+  done
+  return 0
+}
 RAW=${MESHY_RAW:-https://raw.githubusercontent.com/vsershov21-spec/ar/main}
 BASE=/var/lib/vershov-commander/ar
 WORK=$BASE/meshy
 OUT=/srv/ar-extra/models/anims/meshy
+OUT3D=/srv/ar-extra/models/props # image3d.mjs (персонаж по видам)
 LOG=$BASE/meshy.log
 ENVF=/etc/ar-meshy.env
 mkdir -p "$WORK" "$OUT"
@@ -44,7 +64,7 @@ if [ -n "$ONLYV" ] && node -e 'const d=require(process.argv[1]).models3d||{};con
   curl -fsSL "$RAW/scripts/meshy/image3d.mjs" -o "$WORK/image3d.mjs" || { echo "не скачал image3d.mjs"; exit 1; }
 fi
 run() { node "$WORK/$SCRIPT" --prompts "$WORK/prompts.json" --env "$ENVF" --state "$WORK" --out "$OUT" "$@"; }
-fix() { chown -R vershov-commander:caddy "$OUT" 2>/dev/null; chmod -R g+rX,o+r "$OUT" 2>/dev/null; chmod 700 "$WORK" 2>/dev/null; }
+fix() { extra_perms "$OUT" "$OUT3D"; chmod 700 "$WORK" 2>/dev/null; }
 
 if [ $GO = 0 ]; then
   run "$@"
@@ -56,8 +76,8 @@ if pgrep -f "$WORK/(motion|image3d).mjs" >/dev/null; then
   exit 0
 fi
 echo "=== $(date -Is) meshy $* ===" >>"$LOG"
-export -f run fix
-export WORK OUT ENVF SCRIPT RAW
+export -f run fix extra_perms
+export WORK OUT OUT3D ENVF SCRIPT RAW
 nohup setsid bash -c 'run "$@"; code=$?; fix; echo "=== $(date -Is) код $code ==="; exit $code' _ "$@" >>"$LOG" 2>&1 </dev/null &
 echo "Генерация в фоне (pid $!). Лог: tail -f $LOG"
 echo "Готовые клипы — $OUT; на сайт — со следующей сборкой (любой push в main)."

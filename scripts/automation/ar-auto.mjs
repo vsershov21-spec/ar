@@ -476,10 +476,47 @@ const fsize = (f) => {
     return 0;
   }
 };
-function fixPerms(dir) {
-  spawnSync('chown', ['-R', 'vershov-commander:caddy', dir]);
-  spawnSync('chmod', ['-R', 'g+rX,o+r', dir]);
+/** владелец для файлов в /srv/ar-extra: как у ближайшего каталога-предка не от root (обычно vershov-commander:caddy) */
+export function extraOwner(dir) {
+  for (let d = path.resolve(dir); ; d = path.dirname(d)) {
+    try {
+      const st = fs.statSync(d);
+      if (st.uid !== 0) return { uid: st.uid, gid: st.gid };
+    } catch { /* ещё не создан — выше */ }
+    if (d === path.dirname(d)) return null;
+  }
 }
+/**
+ * права после генерации (ar-auto работает с umask 077): владелец/группа — как у каталога назначения или его
+ * родителя, файлы 0644, каталоги 0755 — иначе сборка ar-update (не root) не прочитает файл (EACCES)
+ */
+export function fixPerms(dir, owner = extraOwner(dir)) {
+  if (!fs.existsSync(dir)) return 0;
+  let n = 0;
+  const one = (f, isDir) => {
+    try {
+      if (owner && (process.getuid?.() ?? -1) === 0) fs.lchownSync(f, owner.uid, owner.gid);
+      fs.chmodSync(f, isDir ? 0o755 : 0o644);
+      n++;
+    } catch { /* не страшно: attach-extra пропустит нечитаемое */ }
+  };
+  const walkFix = (d) => {
+    one(d, true);
+    let list = [];
+    try {
+      list = fs.readdirSync(d, { withFileTypes: true });
+    } catch { return; }
+    for (const e of list) {
+      const f = path.join(d, e.name);
+      if (e.isDirectory()) walkFix(f);
+      else if (e.isFile()) one(f, false);
+    }
+  };
+  walkFix(dir);
+  return n;
+}
+/** каталоги /srv/ar-extra, куда пишет задача этого вида */
+export const extraDirsOf = (kind, { meshy, props, voice }) => (kind === 'meshy' ? [meshy, props] : kind === 'tripo' ? [props] : kind === 'eleven' ? [voice] : []);
 
 // ───────────────────────── выгрузка в server-out ─────────────────────────
 
@@ -699,10 +736,13 @@ async function jobMeshy(rec, log, ctx) {
   ctx.reserve(p.estimate);
   const logF = path.join(CMDR, 'meshy.log');
   const off = fsize(logF);
+  const t0 = Date.now();
   const go = await run('bash', [script, '--go', ...job.args, '--max-credits', String(d.limit)], { env, log, timeoutMs: 10 * 60000 });
   const pid = parseBgPid(go.out);
   if (!pid) return { status: 'failed', credits: 0, reason: /Уже идёт/.test(go.out) ? 'занято ручным запуском' : 'не запустилось (см. log.txt)' };
   await waitPid(pid, log, 'meshy');
+  // image3d.mjs (персонаж по видам) пишет в models/props, а не в манифест клипов — новое там тоже повод пересобрать
+  const props3d = (fs.existsSync(PROPS_DIR) ? fs.readdirSync(PROPS_DIR) : []).filter((f) => /^[a-z0-9_]+\.glb$/.test(f) && !f.endsWith('_geo.glb') && fs.statSync(path.join(PROPS_DIR, f)).mtimeMs >= t0 - 1000);
   const t = readFrom(logF, off);
   fs.appendFileSync(log, redact(t, SECRETS));
   const r = parseMeshyRun(t);
@@ -721,8 +761,8 @@ async function jobMeshy(rec, log, ctx) {
   if (credits == null) credits = fresh.length || r.submitted ? p.estimate : 0; // баланс не узнали — считаем по оценке
   return {
     status: r.code === 0 && !r.errors.length ? 'done' : fresh.length ? 'done' : 'failed', credits, estimate: p.estimate,
-    reason: r.errors.slice(0, 10).join(' | ') || undefined, extraChanged: fresh.length > 0,
-    files: { new: fresh.map((c) => c.id), copied: copied.map((f) => `out/${job.id}/meshy/${f}`), tooBig: big, exitCode: r.code },
+    reason: r.errors.slice(0, 10).join(' | ') || undefined, extraChanged: fresh.length > 0 || props3d.length > 0,
+    files: { new: fresh.map((c) => c.id), props: props3d, copied: copied.map((f) => `out/${job.id}/meshy/${f}`), tooBig: big, exitCode: r.code },
   };
 }
 
@@ -1096,10 +1136,9 @@ async function runJob(id) {
   Object.assign(rec, keep, { finished: now() });
   delete rec.reserved;
   delete rec.deferKind;
-  if (extraChanged) {
-    fixPerms(job.kind === 'meshy' ? MESHY_DIR : job.kind === 'tripo' ? PROPS_DIR : path.join(EXTRA, 'voice-el'));
-    rec.rebuild = await rebuild(log);
-  }
+  // права — всегда (и после неудачи: файлы могли успеть записаться), не только когда «есть новое»
+  for (const d of extraDirsOf(job.kind, { meshy: MESHY_DIR, props: PROPS_DIR, voice: path.join(EXTRA, 'voice-el') })) fixPerms(d);
+  if (extraChanged) rec.rebuild = await rebuild(log);
   saveRec(rec);
   logTo(log, `итог: ${rec.status} · ${rec.unit === 'chars' ? 'символов' : 'кредитов'} ${rec.credits}${rec.reason ? ' · ' + rec.reason : ''}`);
   stageJob(rec, log);

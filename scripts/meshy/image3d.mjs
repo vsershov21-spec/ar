@@ -271,6 +271,8 @@ const isMain = (() => {
   }
 })();
 if (isMain) {
+  // вывод идёт в /srv/ar-extra и на сайт: 0644/0755 даже при umask 077 у ar-auto (иначе сборка ar-update — EACCES)
+  process.umask(0o022);
   main().catch((e) => {
     log(`✗ ${e instanceof Stop ? 'стоп' : 'ошибка'}: ${e.message}`);
     process.exit(e instanceof Stop ? 2 : 1);

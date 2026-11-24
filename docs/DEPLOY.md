@@ -122,6 +122,11 @@ voice/manifest.json, voice/<характер>.<хэш>.json, voice/<характ
 из папок `$AR_EXTRA_PUBLIC`, **`/srv/ar-extra`**, `/var/lib/vershov-commander/ar/public-extra` в `dist/`.
 Нет ни одной (CI, ноутбук) — ничего не делает, сборка не падает, приложение работает без них: реплики — синтезом речи
 браузера, распознавание — «офлайн-модель не найдена» + чипы.
+Нечитаемый файл или папка пропускаются с предупреждением `attach-extra: пропуск … (EACCES)` — остальное (Vosk, озвучка)
+копируется. Служебные файлы генераций (`*_task.json`, `*_img<N>.png`, `*_thumb_*.png`, `*_geo.glb`) в релиз не идут.
+Скрипты, которые ar-auto (root, umask 077) запускает с записью в `/srv/ar-extra` (meshy/motion-run.sh + motion/image3d,
+tripo/props-run.sh, voice/el-run.sh), работают с umask 022 и после записи выставляют владельца как у каталога назначения
+(`vershov-commander:caddy`), файлы 0644, каталоги 0755; ar-auto повторяет это после каждой задачи (`fixPerms`).
 
 Сейчас всё готово в `/var/lib/vershov-commander/ar/public-extra/` (её видит только удалённый терминал: сервис сборки
 `ar-update` не может зайти в `/var/lib/private`). **Один раз от root** — перенести в место, которое видит сборка:
