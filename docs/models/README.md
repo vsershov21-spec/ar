@@ -19,6 +19,34 @@
 > румянец в faceWrinkles.ts, `PERSONA_FACE_V2`). Сравнение в приложении: `node tools/model-ab-shot.mjs <out>` →
 > `v2b_app_<кот>.png` (слева v1, справа v2).
 
+## Блёстка p3 (24.11): пересоздана по развороту 23.11 — Tripo по 4 видам, `?models=p3`
+
+Основа — модель продакта из веб-студии Tripo (4 вида разворота `design/refs/glitter_views/`, generate in parts,
+Detailed, H3.1, текстура 4K с remove lighting, ретопология quad ~14k): `design/models/glitter_tripo_quad14k.glb`
+(35 мешей `tripo_part_*`, у каждого свой материал). Сборка без ручных шагов:
+
+    python3 scripts/models/glitter_p3_parts.py design/models/glitter_tripo_quad14k.glb /tmp/p3/parts.npz
+    python3 scripts/models/glitter_p3.py /tmp/p3/parts.npz public/models/v2/glitter_p1.glb public/models/v2/glitter_p3.glb
+    python3 scripts/models/colliders.py glitter public/models/v2/glitter_p3.glb public/models/v2/glitter_p3_colliders.json
+
+- **Части** (по месту и цвету текстуры, печатаются): fur (голова, уши, кисти, ноги), cloth (худи, рукава, манжеты,
+  карман, шнурки), tutu, tail, gold (бант, звёзды, кант пояса); глаза с ресницами, рот, «морда» вокруг рта, брови и
+  крошки Tripo выброшены — их место занимают глаза/веки/брови/рот шейдером p1, по ним же берутся метки лица.
+  Дыры головы под ними (глазницы, рот, брови, щель подбородка) — заплатки-купола, цвет — мех вокруг (в 3D).
+- **Атлас**: 70 JPEG → один 2048² (картинки ×0.45, острова UV растянуты наружу против полос на швах); в сборке
+  model-opt → 1024² KTX2. GLB 6.7 МБ → **1.8 МБ** после model-opt (p1 — 2.1 МБ).
+- **Скелет и анимации** — скелет glitter_p1 байт в байт (тест `tests/glitterP3.test.ts`); сетка гнётся под кости
+  (сплайн по кистям, рукам, ногам, стопам), веса — с p1 (пачка — с фатина p1, хвост — по Tail1..4, бант — к голове).
+- **Материалы**: тело — атлас без металла; пачка `Skirt_P3` — alpha 0.82, двусторонняя (блёстки и кайма — из
+  текстуры Tripo; процедурного фатина `tulleFx` у p3 нет); `Bow_Glitter` — золото metallic 0.55 / roughness 0.32 +
+  лёгкая подсветка; мех — оболочки `BD_FurShell` на меховых частях (у глаз и рта — 0).
+- **Лицо**: глаза p1 (eyeRig: моргание, взгляд) поставлены в разрез глаз Tripo (×1.16–1.32), брови p1 — над ними,
+  рот — шейдером MouthD (как пилот p1); морф-риг p2 у p3 не собирался (`?face=morph` даёт тот же p3, рот шейдером).
+- **Флаг**: функция `model.glitterP3` — пока везде выкл.; посмотреть — `?models=p3` (lab; MVP и пилот — со страницы
+  /test, `?from=test`). Лист «реф | p1 | p3» — `docs/qa/glitter/glitter_p3_sheet.jpg` (`tools/glitter-p3-sheet.py`).
+- Не как на рефе: «морда» Tripo вокруг рта убрана (рот шейдером закрывала) — щёки у рта площе; пачка — текстура
+  Tripo, а не процедурный фатин с мерцанием; у рта на крупном плане видны грани (сетка quad 14k редкая, ключи рта p1).
+
 ## Блёстка по развороту продакта 23.11 (без генераций): `scripts/models/glitter_ref.py`
 
 Реф — `design/refs/glitter_turnaround_1123.png` (анфас, 3/4, профиль, спина). Лист «реф | было | стало» (виды, лицо,

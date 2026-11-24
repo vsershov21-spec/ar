@@ -84,6 +84,7 @@ export const FEATURES = {
   'card.grabExperimental': { mvp: false, lab: true, pilot: false, note: '?grab=bitmap|frame — экспериментальная подача кадра в воркер (cardTracker); ?grab=main остаётся' },
   'model.custom': { mvp: false, lab: true, pilot: false, note: '?glb=путь — своя модель вместо кота' },
   'face.morph': { mvp: false, lab: true, pilot: false, note: 'мимика морфами: модели models/v2/<кот>_p2.glb (scripts/models/face_rig.py — рот геометрией: полость, клычки, язык; виземы Rhubarb и эмоции морфами), драйвер character/faceMorphs.ts; выкл. — p1, рот шейдером. Сравнение ?face=morph|shader (character/modelVariant.ts faceMode); в пилоте — после просмотра продактом' },
+  'model.glitterP3': { mvp: false, lab: false, pilot: false, note: 'Блёстка p3 по умолчанию — пересоздана по развороту продакта 23.11 (Tripo по 4 видам, части; тот же скелет и лицо-накладки p1): models/v2/glitter_p3.glb (character/modelVariant.ts, scripts/models/glitter_p3.py); выкл. — p1. Посмотреть — ?models=p3 (lab; MVP и пилот — со страницы /test); включить по умолчанию — после листа docs/qa/glitter/glitter_p3_sheet.jpg' },
   'model.variants': { mvp: false, lab: true, pilot: false, note: 'по умолчанию везде коты v2 (public/models/v2/<кот>_p1.glb: основы по рефам, фатин, прокси; character/modelVariant.ts); ?models=v1 — прежний вид, ?models=v2h — геометрия v2 для сравнения' },
 } as const satisfies Record<string, FeatureSpec>;
 
@@ -119,7 +120,7 @@ export const PARAMS: Record<string, { feature: FeatureId; test?: boolean; keep?:
   anycard: { feature: 'card.anycard' },
   grab: { feature: 'card.grabExperimental', keep: ['main'] },
   glb: { feature: 'model.custom' },
-  models: { feature: 'model.variants', test: true, keep: ['v2'] }, // ?models=v1|v2h — прежний вид / геометрия v2 (lab и /test); v2 — по умолчанию, character/modelVariant.ts
+  models: { feature: 'model.variants', test: true, keep: ['v2'] }, // ?models=v1|v2h|p3 — прежний вид / геометрия v2 (lab и /test); v2 — по умолчанию, character/modelVariant.ts
   face: { feature: 'face.morph', test: true }, // ?face=morph|shader — лицо морфами (p2) или шейдером (p1); lab и /test, character/modelVariant.ts faceMode
   meshy: { feature: 'anims.meshy' }, // ?meshy=0 — lab без клипов Meshy (сравнить с опорами)
   asr: { feature: 'asr.web' }, // ?asr=web — Web Speech (звук уходит в облако): с детьми нельзя, даже со страницы /test

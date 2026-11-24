@@ -77,3 +77,46 @@ describe('glitter p3: Meshy Multi-Image to 3D (image3d.mjs)', () => {
     expect(ok(',glitter_p3_m71,wave')).toBe(false);
   });
 });
+
+describe('glitter p3: флаг ?models=p3', () => {
+  it('modelsVariant: явный параметр главнее функции, без параметра — по функции model.glitterP3', async () => {
+    const { modelsVariant, variantGlb, collidersUrl } = await import('../src/character/modelVariant');
+    expect(modelsVariant('?models=p3', false)).toBe('p3');
+    expect(modelsVariant('?models=v2', true)).toBe('v2');
+    expect(modelsVariant('', true)).toBe('p3');
+    expect(modelsVariant('', false)).toBe('v2');
+    expect(modelsVariant('?models=v1', true)).toBe('v1');
+    expect(variantGlb('/models/glitter_v1.glb', 'p3', 'shader')).toBe('/models/v2/glitter_p3.glb');
+    expect(variantGlb('/models/glitter_v1.glb', 'p3', 'morph')).toBe('/models/v2/glitter_p3.glb');
+    expect(variantGlb('/models/kind_v1.glb', 'p3', 'shader')).toBe('/models/v2/kind_p1.glb');
+    expect(collidersUrl('/models/v2/glitter_p3.glb')).toBe('/models/v2/glitter_p3_colliders.json');
+  });
+
+  it('редакции: p3 пока нигде не по умолчанию; ?models=p3 — lab, в MVP и пилоте — только со страницы /test', async () => {
+    const { featureIn, PARAMS, filterSearch } = await import('../src/config/edition');
+    expect(featureIn('lab', 'model.glitterP3')).toBe(false);
+    expect(filterSearch('?models=p3', 'lab').search).toBe('models=p3');
+    expect(filterSearch('?models=p3', 'pilot').search).toBe('');
+    expect(filterSearch('?from=test&models=p3', 'pilot').search).toBe('from=test&models=p3');
+    expect(featureIn('pilot', 'model.glitterP3')).toBe(false);
+    expect(featureIn('mvp', 'model.glitterP3')).toBe(false);
+    expect(PARAMS.models.test).toBe(true);
+    expect(PARAMS.models.keep).not.toContain('p3');
+  });
+
+  it('GLB и прокси на месте: скелет p1 байт в байт (имена и поза покоя костей), меши частей', () => {
+    const read = (f: string) => {
+      const b = fs.readFileSync(f);
+      return JSON.parse(b.subarray(20, 20 + b.readUInt32LE(12)).toString());
+    };
+    const p1 = read('public/models/v2/glitter_p1.glb'), p3 = read('public/models/v2/glitter_p3.glb');
+    const bones = (j: { skins: { joints: number[] }[]; nodes: { name: string; translation?: number[]; rotation?: number[] }[] }) =>
+      j.skins[0].joints.map((k) => [j.nodes[k].name, j.nodes[k].translation, j.nodes[k].rotation]);
+    expect(bones(p3)).toEqual(bones(p1));
+    const names = p3.nodes.map((n: { name: string }) => n.name);
+    for (const n of ['Skirt_P3', 'Bow_Glitter', 'BD_FurShell', 'EyeBall_L', 'LidUp_R', 'Brows', 'MouthD']) expect(names).toContain(n);
+    expect(p3.asset.extras.glitterP3).toBeTruthy();
+    const col = JSON.parse(fs.readFileSync('public/models/v2/glitter_p3_colliders.json', 'utf8'));
+    expect(col.volumes.map((v: { name: string }) => v.name)).toEqual(expect.arrayContaining(['head', 'torso', 'skirt']));
+  });
+});

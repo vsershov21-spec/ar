@@ -14,7 +14,14 @@
  */
 import { feature } from '../config/edition';
 
-export type ModelsVariant = 'v1' | 'v2' | 'v2h';
+/**
+ * p3 — Блёстка, пересозданная по развороту продакта 23.11 (Tripo multiview → scripts/models/glitter_p3.py: тот же
+ * скелет p1, лицо-накладки p1, рот шейдером) → models/v2/glitter_p3.glb + glitter_p3_colliders.json. Остальные коты —
+ * как v2. Включение: ?models=p3 (lab; MVP и пилот — только со страницы /test, ?from=test); по умолчанию — функция
+ * model.glitterP3 (lab — вкл., MVP и пилот — выкл., решит продакт по листу docs/qa/glitter/glitter_p3_sheet.jpg);
+ * ?models=v2 — явный p1 там, где p3 по умолчанию.
+ */
+export type ModelsVariant = 'v1' | 'v2' | 'v2h' | 'p3';
 
 /**
  * Лицо котов v2 (основа p1): 'morph' — риг лица p2 (scripts/models/face_rig.py: рот геометрией, полость, клычки,
@@ -38,10 +45,13 @@ export const V2_BASE: Record<string, 'v2' | 'p1'> = { glitter: 'p1', hooligan: '
  */
 export const P1_OWN_COLLIDERS = new Set(['glitter']);
 
-/** ?models=v1 → 'v1', ?models=v2h → 'v2h', иначе (и ?models=v2) — 'v2' (адрес уже прошёл guardUrl: в MVP/пилоте без /test параметра нет) */
-export function modelsVariant(search = typeof location !== 'undefined' ? location.search : ''): ModelsVariant {
+/**
+ * ?models=v1 → 'v1', ?models=v2h → 'v2h', ?models=p3 → 'p3', ?models=v2 → 'v2'; без параметра — 'p3', если включена
+ * функция model.glitterP3 (lab), иначе 'v2' (адрес уже прошёл guardUrl: в MVP/пилоте без /test параметра нет)
+ */
+export function modelsVariant(search = typeof location !== 'undefined' ? location.search : '', p3 = feature('model.glitterP3')): ModelsVariant {
   const m = new URLSearchParams(search).get('models');
-  return m === 'v1' ? 'v1' : m === 'v2h' ? 'v2h' : 'v2';
+  return m === 'v1' ? 'v1' : m === 'v2h' ? 'v2h' : m === 'p3' ? 'p3' : m === 'v2' ? 'v2' : p3 ? 'p3' : 'v2';
 }
 
 export const modelsV2 = (search?: string) => modelsVariant(search) !== 'v1';
@@ -54,6 +64,7 @@ export function variantGlb(p: string, variant: ModelsVariant = modelsVariant(), 
   if (variant === 'v1') return p;
   const m = p.match(/^(.*?)models\/(hooligan|kind|glitter)_v1\.glb$/);
   if (!m) return p;
+  if (variant === 'p3' && m[2] === 'glitter') return `${m[1]}models/v2/glitter_p3.glb`;
   let base: string = variant === 'v2h' ? 'v2' : V2_BASE[m[2]] ?? 'v2';
   if (base === 'p1' && face === 'morph') base = 'p2';
   return `${m[1]}models/v2/${m[2]}_${base}.glb`;
@@ -69,6 +80,8 @@ export function collidersUrl(glb: string): string | null {
   if (m && /(^|\/)v2\/$/.test(m[1] ?? '')) return `${m[1]}${m[2]}_colliders.json`;
   const m1 = glb.match(/^(.*\/)?(hooligan|kind|glitter)_v1\.glb$/);
   if (m1) return `${m1[1] ?? ''}${m1[2]}_v1_colliders.json`;
+  const p3 = glb.match(/^(.*\/)?v2\/glitter_p3\.glb$/);
+  if (p3) return `${p3[1] ?? ''}v2/glitter_p3_colliders.json`;
   // p2 (риг лица) — та же геометрия тела, что у p1: прокси те же
   const p1 = glb.match(/^(.*\/)?v2\/(hooligan|kind|glitter)_p[12]\.glb$/);
   if (!p1) return null;

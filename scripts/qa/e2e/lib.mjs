@@ -167,7 +167,9 @@ export class Phone {
   }
   async go(q) {
     this.navAt = Date.now();
-    await this.page.goto(`${this.server.base}/mvp/${q ? '?' + q.replace(/^\?/, '') : ''}`, { waitUntil: 'domcontentloaded', timeout: 120000 });
+    // E2E_Q — добавка ко всем адресам прогона (например E2E_Q='models=p3&from=test' — Блёстка p3)
+    q = [String(q ?? '').replace(/^\?/, ''), process.env.E2E_Q ?? ''].filter(Boolean).join('&');
+    await this.page.goto(`${this.server.base}/mvp/${q ? '?' + q : ''}`, { waitUntil: 'domcontentloaded', timeout: 120000 });
   }
   ev(f, ...a) {
     return this.page.evaluate(f, ...a);
