@@ -82,9 +82,10 @@ describe('быстрый вход: заставка', () => {
 });
 
 /** заставка в jsdom: встроенный скрипт, getUserMedia подменён */
-function mount(consent: 'notice' | 'checkbox' | 'parent', gum: (c: MediaStreamConstraints) => Promise<unknown>) {
-  const dom = new JSDOM(`<!doctype html><body>${html(consent)}<div id="app"></div></body>`, { runScripts: 'outside-only', url: 'https://ar.vershov.com/mvp/?src=sber123' });
+function mount(consent: 'notice' | 'checkbox' | 'parent', gum: (c: MediaStreamConstraints) => Promise<unknown>, pre?: Record<string, unknown>) {
+  const dom = new JSDOM(`<!doctype html><body>${html(consent)}<div id="app"><button class="app-btn">x</button></div></body>`, { runScripts: 'outside-only', url: 'https://ar.vershov.com/mvp/?src=sber123' });
   const w = dom.window as unknown as Window & typeof globalThis & { __quick: Record<string, any>; eval(s: string): unknown };
+  if (pre) (w as any).__quick = { ...pre };
   const calls: MediaStreamConstraints[] = [];
   Object.defineProperty(w.navigator, 'mediaDevices', { value: { getUserMedia: (c: MediaStreamConstraints) => (calls.push(c), gum(c)) } });
   (w as any).requestAnimationFrame = (f: () => void) => setTimeout(f, 0);
@@ -93,7 +94,14 @@ function mount(consent: 'notice' | 'checkbox' | 'parent', gum: (c: MediaStreamCo
   return { w, q, calls, Q: w.__quick };
 }
 const tick = () => new Promise((r) => setTimeout(r, 5));
-const stream = (audio: boolean) => ({ getAudioTracks: () => (audio ? [{}] : []), getVideoTracks: () => [{}] });
+const stream = (audio: boolean) => ({ getAudioTracks: () => (audio ? [{}] : []), getVideoTracks: () => [{}], getTracks: () => [] as { stop(): void }[] });
+/** поток с живыми дорожками: stop() → readyState 'ended' */
+const liveStream = () => {
+  const tracks = ['video', 'audio'].map((kind) => ({ kind, readyState: 'live', stop() { this.readyState = 'ended'; } }));
+  return { tracks, getAudioTracks: () => tracks.filter((t) => t.kind === 'audio'), getVideoTracks: () => tracks.filter((t) => t.kind === 'video'), getTracks: () => tracks };
+};
+const names = (Q: Record<string, any>) => (Q.ev as [string][]).map((e) => e[0]);
+const key = (w: any, k: string, shift = false) => w.document.activeElement?.dispatchEvent(new w.KeyboardEvent('keydown', { key: k, shiftKey: shift, bubbles: true, cancelable: true }));
 
 describe('быстрый вход: встроенный скрипт', () => {
   it('нажатие до бандла: камера+микрофон одним запросом, событие cta_tap (early), кнопка «Будим…»', async () => {
@@ -177,6 +185,120 @@ describe('быстрый вход: встроенный скрипт', () => {
     w.document.querySelector('.q-cta').click();
     expect(n).toBe(0);
     expect(w.__quick.tapped).toBe(true);
+  });
+});
+
+describe('быстрый вход: сбой загрузки приложения (BOOT-01)', () => {
+  it('бандл не пришёл за дедлайн: заставка сброшена, дорожки остановлены, видна «Попробовать снова»', async () => {
+    const s = liveStream();
+    const { q, Q } = mount('notice', async () => s, { bootMs: 30 });
+    q('.q-cta').click();
+    await Q.cam;
+    expect(q('.q-cta').textContent).toContain(QUICK_TEXT.busy);
+    await new Promise((r) => setTimeout(r, 60));
+    expect(q('.q-fail').classList.contains('hidden')).toBe(false);
+    expect(q('[data-q="reboot"]').textContent).toBe(QUICK_TEXT.failRetry);
+    expect(q('#quick').ownerDocument.activeElement).toBe(q('[data-q="reboot"]'));
+    expect(s.tracks.map((t) => t.readyState)).toEqual(['ended', 'ended']);
+    expect(q('.q-cta').classList.contains('busy')).toBe(false);
+    expect(q('#quick').classList.contains('q-open')).toBe(false);
+    expect(Q.cam).toBeNull();
+    expect(Q.failed).toBe('timeout');
+    expect(names(Q)).toContain('boot_fail');
+  });
+  it('главный скрипт не загрузился (404 / HTML вместо JS) — экран сбоя сразу, без дедлайна', async () => {
+    const s = liveStream();
+    const { w, q, Q } = mount('notice', async () => s, { bootMs: 60_000 });
+    q('.q-cta').click();
+    await Q.cam;
+    const el = w.document.createElement('script');
+    el.type = 'module';
+    w.document.head.appendChild(el);
+    el.dispatchEvent(new w.Event('error'));
+    await tick();
+    expect(Q.failed).toBe('script');
+    expect(q('.q-fail').classList.contains('hidden')).toBe(false);
+    expect(s.tracks.every((t) => t.readyState === 'ended')).toBe(true);
+    // CTA под экраном сбоя камеру больше не просит
+    q('.q-cta').click();
+    expect(Q.cam).toBeNull();
+  });
+  it('бандл исполнился вовремя — сбоя нет; App.init упал — экран сбоя (fail("init"))', async () => {
+    const { q, Q } = mount('notice', async () => liveStream(), { bootMs: 30 });
+    q('.q-cta').click();
+    Q.boot();
+    await new Promise((r) => setTimeout(r, 60));
+    expect(q('.q-fail').classList.contains('hidden')).toBe(true);
+    Q.fail('init');
+    expect(q('.q-fail').classList.contains('hidden')).toBe(false);
+  });
+  it('бандл пришёл после дедлайна: кнопка снова рабочая, одно нажатие — один новый захват (старый остановлен)', async () => {
+    const streams: ReturnType<typeof liveStream>[] = [];
+    const { q, Q, calls } = mount('notice', async () => (streams.push(liveStream()), streams[streams.length - 1]), { bootMs: 20 });
+    q('.q-cta').click();
+    await Q.cam;
+    await new Promise((r) => setTimeout(r, 50));
+    expect(Q.failed).toBe('timeout');
+    Q.boot();
+    expect(q('.q-fail').classList.contains('hidden')).toBe(true);
+    expect(Q.tapped).toBe(false);
+    q('.q-cta').click();
+    await Q.cam;
+    expect(calls).toHaveLength(2);
+    expect(streams[0].tracks.every((t) => t.readyState === 'ended')).toBe(true);
+    expect(streams[1].tracks.every((t) => t.readyState === 'live')).toBe(true);
+  });
+});
+
+describe('быстрый вход: диалог «Условия и конфиденциальность» (IMG-04)', () => {
+  it('фокус внутри: Tab / Shift+Tab не выходят, фон inert, Escape и «Понятно» возвращают фокус на «Условия»', () => {
+    const { w, q, calls } = mount('notice', async () => stream(true));
+    const doc = w.document;
+    const terms = q('[data-q="terms"]');
+    terms.focus();
+    terms.click();
+    const sheet = q('.q-sheet');
+    expect(sheet.classList.contains('hidden')).toBe(false);
+    expect(sheet.contains(doc.activeElement)).toBe(true);
+    for (const s of ['.q-foot', '.q-stage', '#app']) expect(q(s).hasAttribute('inert'), s).toBe(true);
+    const close = q('[data-q="close"]');
+    // единственный фокусируемый элемент — «Понятно»: Tab и Shift+Tab держат фокус на нём
+    key(w, 'Tab');
+    expect(doc.activeElement).toBe(close);
+    key(w, 'Tab');
+    expect(doc.activeElement).toBe(close);
+    key(w, 'Tab', true);
+    expect(doc.activeElement).toBe(close);
+    // фокус ушёл на фон (программно) — возвращается в диалог
+    q('.q-cta').focus();
+    expect(sheet.contains(doc.activeElement)).toBe(true);
+    // CTA и камера заблокированы, пока диалог открыт
+    q('.q-cta').click();
+    key(w, 'Enter');
+    expect(calls).toHaveLength(0);
+    key(w, 'Escape');
+    expect(sheet.classList.contains('hidden')).toBe(true);
+    expect(doc.activeElement).toBe(terms);
+    expect(q('.q-foot').hasAttribute('inert')).toBe(false);
+    terms.click();
+    q('[data-q="close"]').click();
+    expect(doc.activeElement).toBe(terms);
+    q('.q-cta').click();
+    expect(calls).toHaveLength(1);
+  });
+  it('со ссылкой на политику: Tab ходит по кругу между ссылкой и «Понятно»', () => {
+    const dom = new JSDOM(`<!doctype html><body>${quickSplash({ consent: 'notice', policyUrl: 'https://www.sberbank.ru/privacy' })}</body>`, { runScripts: 'outside-only', url: 'https://ar.vershov.com/mvp/' });
+    const w = dom.window as any;
+    w.requestAnimationFrame = () => 0;
+    w.eval(QUICK_SCRIPT);
+    const doc = w.document;
+    doc.querySelector('[data-q="terms"]').click();
+    const link = doc.querySelector('.q-sheet a'), close = doc.querySelector('[data-q="close"]');
+    link.focus();
+    key(w, 'Tab', true);
+    expect(doc.activeElement).toBe(close);
+    key(w, 'Tab');
+    expect(doc.activeElement).toBe(link);
   });
 });
 

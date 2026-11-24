@@ -123,6 +123,81 @@ export const TESTS = [
     },
   },
 
+  {
+    name: '01_entry_boot_fail',
+    title: 'BOOT-01: главный JS — HTML вместо JS (после нажатия) и 404 (до нажатия) → «Попробовать снова» ≤15 с, дорожки ended; ассет вернулся → поиск карты без дубля камеры',
+    timeout: 400,
+    allow: [
+      { re: /MIME type|Failed to load module script|Expected a JavaScript/i, why: 'сценарий сам отдаёт HTML вместо main.js' },
+    ],
+    async fn(t) {
+      const P = t.track(await openPhone(t.browser, t.server, { url: null }));
+      // дорожки камеры/микрофона, выданные странице: после сбоя все должны быть ended
+      await P.page.evaluateOnNewDocument(() => {
+        window.__qaTracks = [];
+        const md = navigator.mediaDevices, gum = md.getUserMedia.bind(md);
+        md.getUserMedia = async (c) => {
+          const s = await gum(c);
+          window.__qaTracks.push(...s.getTracks());
+          return s;
+        };
+      });
+      let mode = 'html';
+      const index = await (await fetch(`${t.server.base}/mvp/`)).text();
+      await P.page.setRequestInterception(true);
+      P.page.on('request', (r) => {
+        if (mode !== 'ok' && /\/mvp\/assets\/main-[^/]*\.js(\?|$)/.test(r.url())) {
+          // HTML вместо JS — с задержкой: ребёнок успевает нажать «Узнать, кто там» (камера уже открыта), потом сбой
+          if (mode === 'html') return void setTimeout(() => r.respond({ status: 200, contentType: 'text/html; charset=utf-8', body: index }).catch(() => undefined), 4000);
+          return void r.respond({ status: 404, contentType: 'text/plain', body: 'not found' });
+        }
+        r.continue().catch(() => undefined);
+      });
+      const failShown = () => !document.querySelector('#quick .q-fail').classList.contains('hidden');
+      const state = () => P.ev(() => ({
+        tracks: (window.__qaTracks ?? []).map((x) => x.readyState),
+        gum: window.__qaGum ?? 0,
+        cta: document.querySelector('#quick .q-cta-t').textContent,
+        busy: document.querySelector('#quick .q-cta').classList.contains('busy'),
+        focus: document.activeElement?.getAttribute('data-q'),
+        app: !!window.__app,
+      }));
+      // 1) HTML вместо main.js, нажали до сбоя
+      const nav = P.page.goto(`${t.server.base}/mvp/`, { waitUntil: 'domcontentloaded', timeout: 60000 });
+      await P.page.waitForSelector('#quick .q-cta', { timeout: 10000 });
+      const t0 = Date.now();
+      await P.tap('#quick .q-cta');
+      await P.must(() => (window.__qaTracks ?? []).length > 0, 5000, 'html: камера открыта заставкой до сбоя');
+      await nav;
+      await P.must(failShown, 15000, 'html: экран «Попробовать снова» за ≤15 с');
+      let st = await state();
+      t.note(`html: экран сбоя через ${((Date.now() - t0) / 1000).toFixed(1)} с после нажатия, дорожки ${st.tracks.join(',')}`);
+      assert(!st.app, 'html: приложение всё-таки стартовало');
+      assert(!st.busy && st.cta !== 'Будим…', 'html: кнопка осталась «Будим…»');
+      assert(st.tracks.length && st.tracks.every((x) => x === 'ended'), `html: ранние дорожки не остановлены (${st.tracks.join(',')})`);
+      assert(st.focus === 'reboot', `html: фокус не на «Попробовать снова» (${st.focus})`);
+      // 2) «Попробовать снова» → 404 на main.js: экран сбоя ещё до нажатия, камеру не спрашиваем
+      mode = '404';
+      await P.tap('#quick [data-q="reboot"]');
+      await P.must(() => /_boot=/.test(location.search) && !!document.querySelector('#quick .q-fail') && !document.querySelector('#quick .q-fail').classList.contains('hidden'), 20000, '404: перезагрузка с _boot и экран сбоя');
+      mode = 'ok'; // ассет вернулся
+      await P.tap('#quick [data-q="reboot"]');
+      await P.must(() => !!window.__quick?.booted, 60000, 'перезагрузка после восстановления ассета');
+      st = await state();
+      assert(st.gum === 0, `404: камеру спросили (${st.gum})`);
+      // 3) ассет на месте: одно нажатие → один захват камеры → поиск карты
+      await P.must(() => !!document.querySelector('#quick .q-cta') && !document.querySelector('#quick .q-cta').disabled, 10000, 'кнопка после перезагрузки');
+      await P.tap('#quick .q-cta');
+      await P.install();
+      await P.must(() => window.__app.director.state.phase !== 'start' && (window.__app.tracker.video?.readyState ?? 0) >= 2, 60000, 'камера и поиск карты');
+      const after = await P.ev(() => ({ gum: window.__qaGum ?? 0, live: (window.__qaTracks ?? []).filter((x) => x.readyState === 'live' && x.kind === 'video').length, url: location.search, phase: window.__app.director.state.phase }));
+      t.note(`после восстановления: фаза ${after.phase}, getUserMedia ×${after.gum}, живых видеодорожек ${after.live}`);
+      assert(after.gum === 1, `дубль захвата камеры: getUserMedia ×${after.gum}`);
+      assert(after.live === 1, `живых видеодорожек ${after.live}`);
+      assert(!/_boot=/.test(after.url), 'метка _boot осталась в адресе');
+    },
+  },
+
   // ───────────── 2. камера ─────────────
   {
     name: '02_camera_granted_meet',
@@ -215,6 +290,7 @@ export const TESTS = [
     title: 'микрофон запрещён → тост «жми кнопки», кот не зовёт «Скажи…»',
     timeout: 400,
     async fn(t) {
+      const n0 = t.server.requests.length;
       const P = t.track(await openPhone(t.browser, t.server, { denyMic: true, memory: MET('hooligan') }));
       await toPlay(P);
       await watchTexts(P);
@@ -228,6 +304,9 @@ export const TESTS = [
       const bad = [...texts, ...speak].filter((s) => SAY_RE.test(s.split(': ').slice(1).join(': ')));
       t.note(`показано ${texts.length} текстов, ${speak.length} реплик`);
       assert(!bad.length, `без микрофона кот зовёт говорить: ${bad.slice(0, 4).join(' | ')}`);
+      // OPT-01: без микрофона модель распознавания (46 МБ) не качаем — ни HEAD, ни GET (прогрев после посадки — 40 с)
+      const vosk = t.server.requests.slice(n0).filter((r) => /vosk/i.test(r.path)).map((r) => `${r.method} ${r.path}`);
+      assert(!vosk.length, `без микрофона запрошена модель Vosk: ${vosk.slice(0, 3).join(', ')}`);
     },
   },
 

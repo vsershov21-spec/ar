@@ -35,7 +35,21 @@ export const QUICK_TEXT = {
   /** камера уже есть, приложение ещё качается: плашка поверх камеры (кот — только в пробуждении) */
   searchTitle: 'Положи карту Сбера на&nbsp;стол и&nbsp;наведи камеру',
   searchSub: 'Кто-то просыпается…',
+  /** приложение не загрузилось (BOOT-01): главный JS не пришёл, пришёл HTML вместо JS или не стартовал за BOOT_MS */
+  failTitle: 'Кот не&nbsp;проснулся',
+  failSub: 'Не получилось загрузить игру. Проверь интернет и&nbsp;попробуй снова.',
+  failRetry: 'Попробовать снова',
 } as const;
+
+/**
+ * Дедлайн загрузки приложения после «Узнать, кто там» (BOOT-01), мс: бандл не исполнился за это время — заставка
+ * сбрасывается, ранние дорожки камеры и микрофона останавливаются, на экране «Попробовать снова» (перезагрузка с
+ * параметром _boot — мимо кэша страницы). Сбой скрипта (404, HTML вместо JS) — сразу, не дожидаясь дедлайна.
+ * Бандл всё же пришёл позже дедлайна — заставка возвращается к кнопке (камера — по новому нажатию, без дубля).
+ */
+export const BOOT_MS = 15_000;
+/** DOMContentLoaded был, а бандл так и не отметился (упал при исполнении модулей) — через столько мс экран сбоя */
+export const BOOT_GRACE_MS = 3_000;
 
 export interface SplashOptions {
   consent: ConsentMode;
@@ -168,10 +182,10 @@ const CSS = `
 #quick .q-need{font-size:13px;color:#ffd27a;text-align:center;min-height:0}
 #quick .q-fine{margin:0;font-size:11.5px;line-height:1.35;opacity:.72;text-align:center}
 #quick .q-link{appearance:none;border:0;background:none;color:#9ff0bd;font:inherit;text-decoration:underline;padding:2px;cursor:pointer}
-#quick .q-sheet,#quick .q-denied{position:absolute;inset:0;z-index:2;display:flex;align-items:flex-end;justify-content:center;background:rgba(3,8,6,.72)}
-#quick .q-denied{align-items:center;background:radial-gradient(120% 80% at 50% 30%,#1d2a24,#070c0a)}
+#quick .q-sheet,#quick .q-denied,#quick .q-fail{position:absolute;inset:0;z-index:2;display:flex;align-items:flex-end;justify-content:center;background:rgba(3,8,6,.72)}
+#quick .q-denied,#quick .q-fail{align-items:center;background:radial-gradient(120% 80% at 50% 30%,#1d2a24,#070c0a)}
 #quick .q-panel{width:100%;max-width:440px;max-height:86%;overflow:auto;background:#fff;color:#14201a;border-radius:22px 22px 0 0;padding:18px 18px calc(env(safe-area-inset-bottom,0px) + 16px)}
-#quick .q-denied .q-panel{background:none;color:#fff;border-radius:0;max-height:100%;text-align:center}
+#quick .q-denied .q-panel,#quick .q-fail .q-panel{background:none;color:#fff;border-radius:0;max-height:100%;text-align:center}
 #quick .q-panel h2{font-size:20px;margin:0 0 10px;line-height:1.2}
 #quick .q-panel p,#quick .q-panel li{font-size:14.5px;margin:0 0 10px}
 #quick .q-panel b{font-weight:700}
@@ -253,10 +267,12 @@ function hatch(){el.classList.add('q-open');var c=Q.ctx;if(c){try{var t=c.curren
 var own=!(qs.has('tracker')||qs.has('nocard')||qs.has('desktop')||qs.has('debug'));
 function vc(){var hd=qs.get('cam')==='720';return{facingMode:'environment',width:{ideal:hd?1280:960},height:{ideal:hd?720:540},frameRate:{ideal:30}}}
 function ac(){var aec=qs.get('aec')!=='0';return{echoCancellation:aec,noiseSuppression:aec,autoGainControl:false,channelCount:1}}
+Q.streams=[];
+function keep(s){if(s)Q.streams.push(s);return s}
 function camera(){var md=navigator.mediaDevices;if(!own||!md||!md.getUserMedia)return null;
  try{var as=navigator.audioSession;if(as&&!qs.get('session')&&as.type!=='play-and-record')as.type='play-and-record'}catch(e){}
- return md.getUserMedia({video:vc(),audio:ac()}).then(function(s){ev('camera_granted');ev(s.getAudioTracks().length?'mic_granted':'mic_denied');return{stream:s}},
-  function(e){return md.getUserMedia({video:vc(),audio:false}).then(function(s){ev('camera_granted');ev('mic_denied');return{stream:s,mic:e&&e.name}},
+ return md.getUserMedia({video:vc(),audio:ac()}).then(function(s){keep(s);ev('camera_granted');ev(s.getAudioTracks().length?'mic_granted':'mic_denied');return{stream:s}},
+  function(e){return md.getUserMedia({video:vc(),audio:false}).then(function(s){keep(s);ev('camera_granted');ev('mic_denied');return{stream:s,mic:e&&e.name}},
    function(e2){ev('camera_denied');return{error:{name:e2&&e2.name||'Error',message:String(e2&&e2.message||e2)}}})})}
 function motion(){var r=[],M=window.DeviceMotionEvent,O=window.DeviceOrientationEvent;
  try{if(M&&M.requestPermission)r.push(M.requestPermission().catch(function(){return'denied'}));if(O&&O.requestPermission)r.push(O.requestPermission().catch(function(){return'denied'}))}catch(e){}
@@ -266,22 +282,46 @@ function busy(on){cta.classList.toggle('busy',on);cta.disabled=on;txt.textConten
 Q.busy=busy;
 function sync(){if(chk){cta.classList.toggle('q-off',!chk.checked);cta.setAttribute('aria-disabled',chk.checked?'false':'true');if(chk.checked)need.classList.add('hidden')}}
 if(chk){chk.addEventListener('change',sync);sync()}
-function go(retry){ctx();motion();Q.cam=camera();busy(true);hatch();
- if(Q.cam)Q.cam.then(function(r){if(r.error&&!Q.ready)Q.denied(r.error,retry)});
+var sheet=el.querySelector('.q-sheet'),fail=el.querySelector('.q-fail'),bootT=0,BOOT=Q.bootMs||${BOOT_MS};
+function sheetOpen(){return !sheet.classList.contains('hidden')}
+function go(retry){if(sheetOpen()||Q.failed)return;ctx();motion();Q.cam=camera();busy(true);hatch();
+ if(Q.cam)Q.cam.then(function(r){if(r.error&&!Q.ready&&!Q.failed)Q.denied(r.error,retry)});
+ if(!Q.booted&&!bootT)bootT=setTimeout(function(){bootT=0;if(!Q.booted)fails('timeout')},BOOT);
  var h=retry?Q.onRetry:Q.onTap;if(h)h()}
-cta.addEventListener('click',function(){if(Q.tapped)return;
+function stopEarly(){Q.cam=null;var a=Q.streams;Q.streams=[];for(var i=0;i<a.length;i++){try{a[i].getTracks().forEach(function(t){t.stop()})}catch(e){}}}
+function fails(why){if(Q.ready||Q.failed)return;Q.failed=why;clearTimeout(bootT);bootT=0;ev('boot_fail',{why:why});stopEarly();busy(false);
+ el.classList.remove('q-open');el.classList.remove('q-searching');el.querySelector('.q-search').classList.add('hidden');den.classList.add('hidden');if(sheetOpen())closeSheet();
+ fail.classList.remove('hidden');try{fail.querySelector('[data-q="reboot"]').focus()}catch(e){}}
+Q.fail=fails;
+Q.boot=function(){Q.booted=true;clearTimeout(bootT);bootT=0;if(Q.failed==='timeout'){Q.failed=false;Q.tapped=false;fail.classList.add('hidden')}};
+window.addEventListener('error',function(e){var t=e&&e.target;if(Q.booted||!t||t===window||t.tagName!=='SCRIPT'||t.type!=='module')return;fails('script')},true);
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){setTimeout(function(){if(!Q.booted)fails('noboot')},${BOOT_GRACE_MS})});
+cta.addEventListener('click',function(){if(Q.tapped||sheetOpen()||Q.failed)return;
  if(chk&&!chk.checked){need.classList.remove('hidden');var l=chk.closest('.q-check');l.classList.remove('need');void l.offsetWidth;l.classList.add('need');return}
  Q.tapped=true;ev('cta_tap',{early:Q.ready?0:1});go(false)});
 var den=el.querySelector('.q-denied'),again=el.querySelector('.q-again');
 Q.nd=0;
-Q.denied=function(e,second){busy(false);el.classList.remove('q-open');den.classList.remove('hidden');Q.nd++;if(second||Q.nd>1)again.classList.remove('hidden');
+Q.denied=function(e,second){if(Q.failed)return;busy(false);el.classList.remove('q-open');den.classList.remove('hidden');Q.nd++;if(second||Q.nd>1)again.classList.remove('hidden');
  var ios=/iP(hone|ad|od)/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
  el.querySelector(ios?'.q-how-a':'.q-how-i').classList.add('q-later');var w=el.querySelector('.q-hows');var l=w.querySelector('.q-later');if(l)w.appendChild(l)};
 el.querySelector('[data-q="retry"]').addEventListener('click',function(){den.classList.add('hidden');ev('camera_retry');go(true)});
 el.querySelector('[data-q="reload"]').addEventListener('click',function(){location.reload()});
-var sheet=el.querySelector('.q-sheet');
-el.querySelector('[data-q="terms"]').addEventListener('click',function(){sheet.classList.remove('hidden');ev('terms_open')});
-el.querySelector('[data-q="close"]').addEventListener('click',function(){sheet.classList.add('hidden')});
+el.querySelector('[data-q="reboot"]').addEventListener('click',function(){ev('boot_retry');var u=new URL(location.href);u.searchParams.set('_boot',Date.now().toString(36));location.replace(u.href)});
+var terms=el.querySelector('[data-q="terms"]'),opener=null,bg=['.q-sky','.q-stage','.q-text','.q-foot','.q-search'];
+function inert(on){var n=bg.map(function(s){return el.querySelector(s)});n.push(document.getElementById('app'));
+ n.forEach(function(x){if(!x)return;if(on){x.setAttribute('inert','');x.setAttribute('aria-hidden','true')}else{x.removeAttribute('inert');x.removeAttribute('aria-hidden')}})}
+function tabbables(){return Array.prototype.filter.call(sheet.querySelectorAll('a[href],button,input,[tabindex]'),function(x){return !x.disabled&&x.getAttribute('tabindex')!=='-1'})}
+function openSheet(){if(sheetOpen())return;opener=document.activeElement&&document.activeElement!==document.body?document.activeElement:terms;sheet.classList.remove('hidden');inert(true);ev('terms_open');
+ var p=sheet.querySelector('.q-panel');try{p.focus()}catch(e){}}
+function closeSheet(){if(!sheetOpen())return;sheet.classList.add('hidden');inert(false);var o=opener||terms;opener=null;try{o.focus()}catch(e){}}
+terms.addEventListener('click',openSheet);
+el.querySelector('[data-q="close"]').addEventListener('click',closeSheet);
+sheet.addEventListener('click',function(e){if(e.target===sheet)closeSheet()});
+document.addEventListener('keydown',function(e){if(!sheetOpen())return;
+ if(e.key==='Escape'||e.key==='Esc'){e.preventDefault();closeSheet();return}
+ if(e.key!=='Tab')return;var f=tabbables();if(!f.length){e.preventDefault();return}var a=document.activeElement,i=f.indexOf(a);
+ if(e.shiftKey&&(i<=0)){e.preventDefault();f[f.length-1].focus()}else if(!e.shiftKey&&(i<0||i===f.length-1)){e.preventDefault();f[0].focus()}},true);
+document.addEventListener('focusin',function(e){if(sheetOpen()&&!sheet.contains(e.target)){var f=tabbables();if(f[0])f[0].focus()}},true);
 Q.search=function(){busy(false);el.classList.add('q-searching');el.querySelector('.q-search').classList.remove('hidden')};
 Q.hide=function(){el.classList.add('q-leave');setTimeout(function(){el.classList.add('hidden')},480)};
 })();`;
@@ -307,12 +347,20 @@ export function quickSplash(o: SplashOptions): string {
   </div>
   <div class="q-search hidden" role="status" aria-live="polite"><span class="q-slot" aria-hidden="true"><span class="q-eyes"><i></i><i></i></span></span><span><b>${t.searchTitle}</b><small>${t.searchSub}</small></span></div>
   <div class="q-sheet hidden" role="dialog" aria-modal="true" aria-label="${esc(CONSENT_TEXT.link)}">
-    <div class="q-panel">
+    <div class="q-panel" tabindex="-1">
       <h2>${esc(CONSENT_TEXT.link)}</h2>
       ${PRIVACY_SHEET.map(([h, p]) => `<p><b>${esc(h)}.</b> ${esc(p)}</p>`).join('')}
       ${policy}
       <p class="q-note">${esc(PRIVACY_DRAFT_NOTE)}</p>
       <button class="q-btn" type="button" data-q="close">Понятно</button>
+    </div>
+  </div>
+  <div class="q-fail hidden" role="alertdialog" aria-modal="true" aria-label="Не загрузилось">
+    <div class="q-panel">
+      <div class="q-noeye" aria-hidden="true"></div>
+      <h2>${t.failTitle}</h2>
+      <p>${t.failSub}</p>
+      <button class="q-btn" type="button" data-q="reboot">${t.failRetry}</button>
     </div>
   </div>
   <div class="q-denied hidden" role="alertdialog" aria-modal="true" aria-label="Нет доступа к камере">

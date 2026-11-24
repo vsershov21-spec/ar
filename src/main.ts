@@ -7,6 +7,10 @@ import { installCatApi } from './debug/catApi';
 import { perf } from './core/perf';
 import { bootProgress, trackSession } from './progress';
 import { bootAnalytics } from './analytics';
+import { bootFailed, markBooted } from './quick/early';
+
+// быстрый вход: бандл исполнился — заставка снимает дедлайн загрузки (BOOT-01, src/quick/splash.ts)
+markBooted();
 
 perf.enabled = new URLSearchParams(location.search).has('perf');
 (window as any).__perf = perf;
@@ -38,5 +42,6 @@ app
   })
   .catch((e) => {
     console.error(e);
+    bootFailed('init');
     document.body.insertAdjacentHTML('beforeend', `<div class="toast">Не удалось запустить: ${String(e?.message ?? e)}</div>`);
   });
