@@ -16,7 +16,8 @@ import { feature } from '../config/edition';
 
 /**
  * p3 — Блёстка, пересозданная по развороту продакта 23.11 (Tripo multiview → scripts/models/glitter_p3.py: тот же
- * скелет p1, лицо-накладки p1, рот шейдером) → models/v2/glitter_p3.glb + glitter_p3_colliders.json. Остальные коты —
+ * скелет p1; лицо по рефу — scripts/models/glitter_p3_face.py: свои глаза/веки, рот геометрией и все ключи рига
+ * face_rig.py, драйвер faceMorphs.ts) → models/v2/glitter_p3.glb + glitter_p3_colliders.json. Остальные коты —
  * как v2. Включение: ?models=p3 (lab; MVP и пилот — только со страницы /test, ?from=test); по умолчанию — функция
  * model.glitterP3 (lab — вкл., MVP и пилот — выкл., решит продакт по листу docs/qa/glitter/glitter_p3_sheet.jpg);
  * ?models=v2 — явный p1 там, где p3 по умолчанию.

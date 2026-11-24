@@ -121,6 +121,7 @@ class Frame:
         L = np.array(md['line'], np.float64)
         self.L = L[np.argsort(L[:, 0])]
         self.nose = float(md['nose'])
+        self.subdiv = [tuple(z) for z in md['subdiv']] if 'subdiv' in md else SUBDIV
         self.marks = marks
         self.persona = persona
         self.cfg = PERSONA[persona]
@@ -168,6 +169,9 @@ def blender_topology(fr, P, Fc, UVv, Nv, vfloat, vvec, ffur):
     from mathutils import Vector
 
     W = fr.W
+    if os.environ.get('FACE_DEBUG'):
+        d_ = (P - fr.O) / W
+        print('   вход: в эллипсе', int((((d_[:, 0] / 0.85) ** 2 + ((d_[:, 1] + 0.08) / 0.45) ** 2) < 1).sum()), 'из', len(P), 'треуг', len(Fc))
     # сварка по позиции: швы UV glTF — разные вершины, в bmesh — одна вершина с разными UV углов
     # шов симметрии Tripo (x = 0) и швы атласа: копии вершин расходятся до ~1e-5 — свариваем с допуском 3e-4 W
     from scipy.spatial import cKDTree
@@ -248,8 +252,14 @@ def blender_topology(fr, P, Fc, UVv, Nv, vfloat, vvec, ffur):
                 out.append(f)
         return out
 
-    for (rx, ry, cy, back) in SUBDIV:
+    # зоны подразбиения: по умолчанию SUBDIV; рамка рта может задать свои (Блёстка p3 — морда уже мелкой сеткой)
+    for (rx, ry, cy, back) in fr.subdiv:
         fs = zone(rx, ry, cy, back)
+        if os.environ.get('FACE_DEBUG'):
+            uvw_ = np.array([fuvw(v.co) for v in bm.verts])
+            inz = ((uvw_[:, 0] / rx) ** 2 + ((uvw_[:, 1] - cy) / ry) ** 2 <= 1)
+            print('   O', fr.O, 'W', W, 'bm bbox', np.array([v.co[:] for v in bm.verts]).min(0), np.array([v.co[:] for v in bm.verts]).max(0))
+            print(f'  зона подразбиения {rx}×{ry}: {len(fs)} граней; вершин в эллипсе {int(inz.sum())}, из них w<-back {int((inz & (uvw_[:, 2] < -back)).sum())}, всего {len(bm.verts)}')
         es = list({e for f in fs for e in f.edges})
         bmesh.ops.subdivide_edges(bm, edges=es, cuts=1, use_grid_fill=True)
         bmesh.ops.triangulate(bm, faces=[f for f in bm.faces if len(f.verts) > 3])
@@ -1290,6 +1300,10 @@ def main():
     # занавеской поверх рта)
     _u, _v, _ = fr.uvw(S['P'])
     _leak = int(((side > 0) & (_v - fr.line(np.clip(_u, -fr.cu, fr.cu)) < -0.15) & (np.abs(_u) < 0.3)).sum())
+    if _leak and os.environ.get('FACE_DEBUG'):
+        lk = (side > 0) & (_v - fr.line(np.clip(_u, -fr.cu, fr.cu)) < -0.15) & (np.abs(_u) < 0.3)
+        print('   утечка: u', np.round(np.percentile(_u[lk], [0, 50, 100]), 3), 'v', np.round(np.percentile(_v[lk], [0, 50, 100]), 3),
+              'w', np.round(np.percentile(fr.uvw(S['P'])[2][lk], [0, 50, 100]), 3), 'пары u', np.round([fr.uvw(S['P'][[p_[1][0] for p_ in S['pairs']]])[0].min(), fr.uvw(S['P'][[p_[1][0] for p_ in S['pairs']]])[0].max()], 3), 'cu', fr.cu)
     if _leak:
         sys.exit(f'разрез губ не замкнут: {_leak} вершин верхней губы ниже линии рта — проверь SUBDIV/линию рта')
 
@@ -1553,7 +1567,7 @@ def main():
     inv = np.linalg.inv(fr.IBM)
     for nm in ('Whiskers', 'FaceTufts', 'Brows'):
         ni = node_by(j, nm)
-        if ni is None:
+        if ni is None or 'mesh' not in nodes[ni]:  # у Блёстки p3 Brows — только разметка marks (брови — мех и ключи кожи)
             continue
         mi = nodes[ni]['mesh']
         pr = j['meshes'][mi]['primitives'][0]

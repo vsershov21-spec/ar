@@ -39,6 +39,8 @@ sys.path.insert(0, HERE)
 from glb_io import Glb, raster_uv  # noqa: E402
 
 TAG = 'glitterP3'
+# ярусы пачки (лицо kit): колокол ×flare к подолу, вынос out и спуск drop подола (м), непрозрачность
+TUTU_LAYERS = [(1.1, 0.0, 0.0, 0.78), (1.2, 0.012, 0.008, 0.5), (1.3, 0.024, 0.004, 0.34)]
 DROP = ('Blush', 'BD_Pads', 'BD_FurCards', 'BD_Metal_Stars', 'Whiskers', 'FaceTufts', 'Skirt_Glitter')
 
 
@@ -476,7 +478,7 @@ def main():
         face = {k: Vw[nv0 + i].copy() for i, k in enumerate(lk)}
         Vw = Vw[:nv0]; V1 = V1[:nv0]; UV = UV[:nv0]
         cv = {k: v[:nv0] for k, v in cv.items()}
-        print('лицо (по частям):', ' '.join(f'{k}={np.round(v, 3).tolist()}' for k, v in face.items()))
+        print('лицо (по частям):', ' '.join(f'{k}={np.round(v, 3).tolist()}' for k, v in face.items() if not k.startswith('eyeRim')))
     elif not a.no_face:
         face = face_landmarks(Vw, F, UV, img, a.debug)
         print('лицо:', ' '.join(f'{k}={np.round(v, 3).tolist()}' for k, v in face.items()))
@@ -492,6 +494,13 @@ def main():
         shared = np.zeros(wm.max() + 1, int); np.add.at(shared, wm[~cv_], 1)
         fixed = ~cv_ | (shared[wm] > 0)
         V = smooth_field(V, edges_of(F[capt]), len(V), 10, 0.5, fixed=fixed)
+    if role is not None and 'eye' not in set(role.tolist()) and face:
+        # лицо заново (glitter_p3_face.py): глазницы крупнее по рефу, морда — новая сетка по ровному полю высот
+        import glitter_p3_face as P3F
+        V, face = P3F.resurface(V, F, role, capt, face)
+        V, F, UV, role, capt, img, used_v, nv_old = P3F.remesh_face(V, F, UV, role, capt, img, face)
+        cv = {k: np.r_[v, np.zeros(len(used_v) - nv_old, v.dtype)][used_v] for k, v in cv.items()}
+        face = {k: v for k, v in face.items() if not k.startswith('_')}
     if role is not None:
         # роли частей вместо цвета: мех (голова, уши, кисти, ноги, морда), хвост, худи
         rv = np.full(len(V), '', dtype=object)
@@ -606,7 +615,11 @@ def build(a, g, wd, body, skirt, jname, marks, V, N, F, UV, img, cv, face, patch
     tnames = body['tnames']
     tripo_face = role is not None and 'eye' in set(role.tolist())
     a.tripo_face = tripo_face
-    if tripo_face:
+    kit = role is not None and not tripo_face and bool(face)
+    a.kit = kit
+    if kit:
+        pass  # ключи кожи — после глаз (glitter_p3_face.body_keys)
+    elif tripo_face:
         tnames, targets = face_morphs(V, F, cv['role'], face)
     elif body['targets']:
         dd, nn1 = cKDTree(body['P']).query(V, k=4)
@@ -630,7 +643,9 @@ def build(a, g, wd, body, skirt, jname, marks, V, N, F, UV, img, cv, face, patch
 
     mem('глаза')
     # ── глаза p1: та же глубина над новой поверхностью ──
-    if tripo_face:
+    if kit:
+        wd, targets, tnames, tex, mk3 = new_face(g, wd, V, F, UV, Jn, Wn, jname, tex, face, marks, role)
+    elif tripo_face:
         # глаза/веки/рот/брови p1 не нужны: узлы убираются в write_glb; разметка лица (marks) — по Tripo, на узле Brows без сетки
         bn = g.j['nodes'][wd.idx['Brows']]
         bn.pop('mesh', None)
@@ -652,6 +667,46 @@ def build(a, g, wd, body, skirt, jname, marks, V, N, F, UV, img, cv, face, patch
         nf = np.minimum(nf, np.clip((r - 1) / 0.5, 0, 1))
     cv = dict(cv); cv['furk'] = nf
     write_glb(g, wd, body, a, V, N, F, UV, Jn, Wn, targets, tnames, tex, sk_tri, cv, jname, tails, gold_tri)
+
+
+def new_face(g, wd, V, F, UV, Jn, Wn, jname, tex, face, marks1, cvrole=None):
+    """лицо p3 по рефу (glitter_p3_face.py): накладки p1 прочь, новые глаза, разметка, рамка рта, ключи кожи, текстура"""
+    import glitter_p3_face as P3F
+    j = g.j
+    old = [f'{k}_{sd}' for sd in 'LR' for k in ('Eye', 'EyeS', 'EyeBall', 'LidUp', 'LidLo', 'Tear')]
+    remove_nodes(j, {wd.idx[n] for n in old if n in wd.idx})
+    wd = World(j)
+    hn = wd.idx['mixamorig:Head']
+    sk = j['skins'][0]
+    hj = sk['joints'].index(hn)
+    IBM = g.acc(sk['inverseBindMatrices']).reshape(-1, 4, 4)[hj].T.astype(np.float64)
+    if cvrole is not None:
+        tex = P3F.desaturate(tex, V, F, UV, cvrole)
+    arr = np.asarray(tex).astype(np.float32)
+    front = np.where(vnormals(V, F)[:, 2] > 0.2)[0]
+    tq = cKDTree(V[front])
+
+    def color_at(P):
+        _, ii = tq.query(P)
+        c = sample_tex(arr, UV[front[ii]])
+        return P3F.srgb2lin(np.median(c, 0))
+    eyes = P3F.build_eyes(g, hn, IBM, face, color_at)
+
+    def surf_z(x, y):
+        t = ray_hit(V, F, np.array([x, y, 0.5]), np.array([0, 0, -1.0]))
+        return 0.5 - t if t is not None else face['mouthC'][2]
+    mk3, Wm, my, zc = P3F.face_marks(eyes, face, marks1, surf_z)
+    bn = j['nodes'][wd.idx['Brows']]
+    bn.pop('mesh', None)
+    bn.setdefault('extras', {})['marks'] = mk3
+    md = wd.idx['MouthD']
+    jaw = j['nodes'][md].get('extras', {}).get('mouth', {}).get('jaw', {})
+    P3F.mouth_frame(j, md, hn, IBM, Wm, my, float(face['nose'][1]) - 0.012, jaw)
+    headw = (np.isin(Jn, [jname.index('mixamorig:Head')]) * Wn).sum(1)
+    keys = P3F.body_keys(V, eyes, mk3, Wm, headw)
+    tex = P3F.paint_ref(tex, V, F, UV, eyes, mk3, Wm, cvrole)
+    print(f'лицо p3: W рта {Wm * 1000:.1f} мм, рот y={my:.3f} z={zc:.3f}; ключи кожи: {", ".join(keys)}')
+    return wd, [(d, None) for d in keys.values()], list(keys), tex, mk3
 
 
 def assign_tail(V, Dn, tails, wd, jname, tail_ids):
@@ -1103,11 +1158,11 @@ def write_glb(g, wd, body, a, V, N, F, UV, Jn, Wn, targets, tnames, tex, sk_tri,
     mat['name'] = 'glitter_p3_body'
 
     # пачка — отдельный меш на тех же буферах, полупрозрачный
-    def sub_mesh(name, tris, mat, extras):
+    def sub_mesh(name, tris, mat, extras, Vo=None):
         # свои буферы (только вершины части): общий буфер со всем телом рантайм скинил бы целиком второй раз,
         # а коррекция рук (bodyCollide) брала бы из «пачки» точки кистей
         sv, inv = np.unique(F[tris].ravel(), return_inverse=True)
-        sa = {'POSITION': g.add_acc(V[sv].astype(np.float32), 5126, 'VEC3', 34962), 'NORMAL': g.add_acc(N[sv].astype(np.float32), 5126, 'VEC3', 34962),
+        sa = {'POSITION': g.add_acc((V if Vo is None else Vo)[sv].astype(np.float32), 5126, 'VEC3', 34962), 'NORMAL': g.add_acc(N[sv].astype(np.float32), 5126, 'VEC3', 34962),
               'TEXCOORD_0': g.add_acc(UV[sv].astype(np.float32), 5126, 'VEC2', 34962), 'JOINTS_0': g.add_acc(Jn[sv], 5123, 'VEC4', 34962),
               'WEIGHTS_0': g.add_acc(Wn[sv], 5126, 'VEC4', 34962)}
         j['materials'].append(mat)
@@ -1116,7 +1171,24 @@ def write_glb(g, wd, body, a, V, N, F, UV, Jn, Wn, targets, tnames, tex, sk_tri,
         j['meshes'].append({'name': name, 'primitives': [sp]})
         add_skinned_node(j, name, len(j['meshes']) - 1, extras)
 
-    if sk_tri.any():
+    if sk_tri.any() and getattr(a, 'kit', False):
+        # пачка по рефу пышнее: колокол шире к подолу (×TUTU_FLARE) и ещё два яруса фатина снаружи — те же треугольники,
+        # подол дальше и ниже, прозрачнее (полупрозрачный фатин, без transmission); веса — те же
+        sv = np.unique(F[sk_tri].ravel())
+        hc = wd.p('mixamorig:Hips')
+        ytop = np.percentile(V[sv, 1], 92); ybot = V[sv, 1].min()
+        t = np.clip((ytop - V[:, 1]) / max(ytop - ybot, 1e-6), 0, 1)
+        dxz = V[:, [0, 2]] - hc[[0, 2]]
+        rr = np.linalg.norm(dxz, axis=1, keepdims=True); dn = dxz / np.maximum(rr, 1e-6)
+        for li, (flare, out, drop, alpha) in enumerate(TUTU_LAYERS):
+            Vl = V.copy()
+            Vl[:, [0, 2]] += dn * ((flare - 1) * rr * t[:, None] + out * t[:, None] ** 0.8)
+            Vl[:, 1] -= drop * t
+            sub_mesh('Skirt_P3' if li == 0 else f'Skirt_P3_{li}', sk_tri,
+                     {'name': f'Skirt_P3_mat{li}', 'alphaMode': 'BLEND', 'doubleSided': True,
+                      'pbrMetallicRoughness': {'baseColorTexture': {'index': bct}, 'baseColorFactor': [1, 1, 1, alpha], 'metallicFactor': 0.0, 'roughnessFactor': 0.55}},
+                     {'skirtP3': 1, 'tulle': 1, 'layer': li}, Vl)
+    elif sk_tri.any():
         sub_mesh('Skirt_P3', sk_tri, {'name': 'Skirt_P3_mat', 'alphaMode': 'BLEND', 'doubleSided': True,
                  'pbrMetallicRoughness': {'baseColorTexture': {'index': bct}, 'baseColorFactor': [1, 1, 1, 0.82], 'metallicFactor': 0.0, 'roughnessFactor': 0.55}},
                  {'skirtP3': 1, 'tulle': 1})
@@ -1162,7 +1234,7 @@ def write_glb(g, wd, body, a, V, N, F, UV, Jn, Wn, targets, tnames, tex, sk_tri,
     from body_detail import gc
     gc(g)
     j['asset'].setdefault('extras', {})[TAG] = {'version': 2, 'tris': int(len(F)), 'skirt': int(sk_tri.sum()),
-                                               **({'face': 'tripo'} if getattr(a, 'tripo_face', False) else {})}
+                                               **({'face': 'tripo'} if getattr(a, 'tripo_face', False) else {'face': 'kit'} if getattr(a, 'kit', False) else {})}
     size = g.save(a.out)
     print(f'→ {a.out}: {size / 1e6:.2f} МБ, вершин {nv}, треуг. {len(F)} (тело {len(body_tris)}, пачка {int(sk_tri.sum())})')
 

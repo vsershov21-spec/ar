@@ -19,6 +19,43 @@
 > румянец в faceWrinkles.ts, `PERSONA_FACE_V2`). Сравнение в приложении: `node tools/model-ab-shot.mjs <out>` →
 > `v2b_app_<кот>.png` (слева v1, справа v2).
 
+## Блёстка p3, третий проход (24.11): лицо заново по рефу, полная мимика — `glitter_p3_face.py` + `face_rig.py`
+
+Продакт: «Я не хочу, чтобы лицо было плохим. Нужно сделать её новую. И всю мимику учесть обязательно», «почти 1:1 с
+референсом». От p1 — только скелет и имена узлов (совместимость с кодом), лицо, мех и пачка — по рефу/Tripo. Сборка:
+
+    pip install triangle            # ограниченная триангуляция морды (плюс bpy==5.3.0 для face_rig — как раньше)
+    python3 scripts/models/glitter_p3_parts.py design/models/glitter_tripo_quad14k.glb /tmp/p3/parts.npz   # --face kit (по умолч.)
+    python3 scripts/models/glitter_p3.py /tmp/p3/parts.npz public/models/v2/glitter_p1.glb /tmp/p3/p3base.glb
+    /tmp/bpyenv/bin/python scripts/models/face_rig.py glitter /tmp/p3/p3base.glb public/models/v2/glitter_p3.glb --report /tmp/p3/rep
+    python3 scripts/models/colliders.py glitter public/models/v2/glitter_p3.glb public/models/v2/glitter_p3_colliders.json
+
+- **Части (`--face kit`)**: глаза, брови, рот и «морда» Tripo выброшены (по ним — только метки лица); край дыры глазницы
+  Tripo (27 точек) — разрез нового глаза (метки `eyeRim*`).
+- **Морда заново** (`glitter_p3_face.resurface/remesh_face`): голова по рефу (щёки на уровне глаз шире, «брыли» уже —
+  `HEAD_X`), разрез глаза к рефу (`EYE_K`: ширина ×0.9, ниже на 0.22 H — у Tripo глаз крупнее и выше носа), поле высот
+  по меху вокруг (без впадины рта Tripo, заплаток бровей/подбородка — светлой вертикальной линии на подбородке больше
+  нет), подушечки усов; морда — новая сетка (triangle, шаг ≈ 4 мм у рта и глаз, ≈ 9 мм дальше; контур и края
+  глазниц — те же вершины, Т-стыки соседей разбиты), свой блок атласа 379 px (цвет — мех Tripo вокруг, без губ/носа/банта).
+- **Глаза** (`build_eyes`): Eye_L/R → EyeS_* → EyeBall_*, LidUp_*, LidLo_*, Tear_* — имена и extras как ждёт
+  `eyeRig.ts` (взгляд, моргание, прищур, широко, сонный, подмигивание, «^»). Яблоко 0.62 W × 0.72 H × 0.45 A, край век =
+  край глазницы; радужка зелёная по рефу (`IRIS['glitter_p3']`, радиус 1.8 полувысоты разреза, зрачок 0.5); подводка
+  с «хвостиком» к внешнему уголку, 4 ресницы-лепестка; мягкие веки (11 рядов LID_ROWS), у закрытого века тон меха под
+  и над глазом (`LID_GAIN`), в рантайме — `LID_FUR/LID_LASH['glitter_p3']` (extras.persona глаза `glitter_p3`).
+- **Рот** — `face_rig.py` по рамке `MouthD.extras.mouth` (без сетки): ширина 0.5 расстояния между глазами, линия «ω»
+  (`mouth_line`), своё подразбиение (`subdiv` в рамке — морда уже мелкая); FaceSkin, MouthCavity, Teeth, Tongue и все
+  26 ключей p2 (vis_A…H, smile, smile_open, smirk, frown, surprise, pout, tongue_out, blink_L/R, squint, wide,
+  brow_up/down/angry/sad, cheek_up, cheeks_gum, nose_wrinkle); ключи кожи бровей/щёк/носа — `body_keys` (свои поля).
+  Проникновения зубов/языка/полости сквозь губы — 0 во всех ключах (отчёт face_rig).
+- **Текстура**: мех к рефу (насыщенность ×0.72), брови — мягкие тёмные дуги меха, светлая морда и подбородок (`paint_ref`);
+  в рантайме тон `FUR_TONE_P3` (furTone.ts: контраст 0.9, без белой морды/бровей шейдером) — по `asset.extras.glitterP3.face = 'kit'`.
+- **Пачка** пышнее: колокол ×1.1 к подолу + 2 внешних яруса фатина (×1.2/×1.3, вынос 12/24 мм, alpha 0.5/0.34), без
+  transmission (`TUTU_LAYERS`).
+- **Покой** (`PERSONA_FACE_P3` в glbCharacter): smile 0.5 + mouth_A 0.38 — открытая улыбка с зубками и язычком.
+- Размер: GLB 3.58 МБ → **1.83 МБ** после model-opt (KTX2 1024²). Листы: `docs/qa/glitter/glitter_p3_face.jpg` (все ключи
+  рядом с mouths.jpg и design/cut, реплика с липсинком), `glitter_p3_vs_ref.jpg` (4 ракурса и лицо: реф | p3 | 50 %) —
+  `tools/glitter-p3-face-sheet.py`. p3 по умолчанию по-прежнему нигде не включена (`?models=p3`).
+
 ## Шарф Добряка и наушники Хулигана у плеча (24.11): `scripts/models/shoulder_skin.py`
 
 Лапа с предметом у рта шла сквозь шарф/дугу наушников (docs/qa/anim-audit/2026-11-24_shoulder). Без Blender, только

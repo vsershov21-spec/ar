@@ -115,16 +115,23 @@ describe('glitter p3: флаг ?models=p3', () => {
     expect(bones(p3)).toEqual(bones(p1));
     const names = p3.nodes.map((n: { name: string }) => n.name);
     for (const n of ['Skirt_P3', 'Bow_Glitter', 'BD_FurShell', 'Brows']) expect(names).toContain(n);
-    // лицо — Tripo (глаза, брови, рот сеткой и текстурой): накладок p1 нет, разметка лица осталась на узле Brows
-    for (const n of ['EyeBall_L', 'LidUp_R', 'MouthD']) expect(names).not.toContain(n);
-    expect(p3.asset.extras.glitterP3.face).toBe('tripo');
+    // лицо по рефу (glitter_p3_face.py + face_rig.py): свои глаза и веки в узлах, которые ждёт eyeRig.ts, рот геометрией
+    for (const n of ['Eye_L', 'EyeS_R', 'EyeBall_L', 'LidUp_R', 'LidLo_L', 'Tear_R', 'FaceSkin', 'MouthCavity', 'Teeth', 'Tongue']) expect(names).toContain(n);
+    expect(names).not.toContain('MouthD');
+    expect(p3.asset.extras.glitterP3.face).toBe('kit');
+    expect(p3.asset.extras.faceRig).toBeTruthy();
+    const eye = p3.nodes.find((n: { name: string }) => n.name === 'Eye_L');
+    expect(eye.extras.persona).toBe('glitter_p3');
+    for (const k of ['A', 'B', 'C', 'closeUp', 'closeLo']) expect(eye.extras[k]).toBeGreaterThan(0);
     const brows = p3.nodes.find((n: { name: string }) => n.name === 'Brows');
     expect(brows.mesh).toBeUndefined();
     expect(brows.extras.marks.eyeOuterL).toHaveLength(3);
-    // моргание и рот — морфами тела (их ведёт цикл по MORPH_TARGETS), веса по умолчанию — нули
-    const body = p3.meshes.find((m: { extras?: { targetNames?: string[] } }) => m.extras?.targetNames?.includes('blink_L'));
-    expect(body.extras.targetNames).toEqual(expect.arrayContaining(['blink_L', 'blink_R', 'mouth_A', 'mouth_O', 'mouth_U', 'brow_up']));
-    expect(body.weights.every((w: number) => w === 0)).toBe(true);
+    // полный набор ключей рига (как у p2), веса по умолчанию — нули
+    const face = p3.meshes.find((m: { name: string }) => m.name === 'FaceSkin');
+    const keys = ['vis_A', 'vis_B', 'vis_C', 'vis_D', 'vis_E', 'vis_F', 'vis_G', 'vis_H', 'smile', 'smile_open', 'smirk', 'frown', 'surprise',
+      'pout', 'tongue_out', 'blink_L', 'blink_R', 'squint', 'wide', 'brow_up', 'brow_down', 'brow_angry', 'brow_sad', 'cheek_up', 'cheeks_gum', 'nose_wrinkle'];
+    expect(face.extras.targetNames).toEqual(keys);
+    expect(face.weights.every((w: number) => w === 0)).toBe(true);
     const col = JSON.parse(fs.readFileSync('public/models/v2/glitter_p3_colliders.json', 'utf8'));
     expect(col.volumes.map((v: { name: string }) => v.name)).toEqual(expect.arrayContaining(['head', 'torso', 'skirt']));
   });

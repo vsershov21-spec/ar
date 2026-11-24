@@ -22,6 +22,9 @@ from glb_io import Glb  # noqa: E402
 
 ROLES = ['fur', 'cloth', 'tutu', 'tail', 'gold', 'nose', 'muzzle', 'eye', 'mouth', 'brow', 'junk']
 DROP = {'junk'}
+# --face kit (по умолчанию с 24.11, третий проход): глаза, брови, рот и «морда» Tripo — прочь (по ним только метки лица),
+# лицо — свои меши: глаза/веки/брови p1 под разрез Tripo + рот геометрией (face_rig.py); --face tripo — второй проход
+DROP_KIT = {'junk', 'eye', 'mouth', 'brow', 'muzzle'}
 # лицо Tripo (глаза с ресницами, брови, нос, рот-улыбка, морда) остаётся сеткой и текстурой Tripo: моргание и рот —
 # морфами (glitter_p3.py face_morphs); глазницы под глазами закрываются вогнутой заплаткой цвета меха — «веко» при моргании
 
@@ -161,7 +164,11 @@ def main():
     ap.add_argument('src'); ap.add_argument('out')
     ap.add_argument('--atlas', type=int, default=2048)
     ap.add_argument('--scale', type=float, default=0.5)
+    ap.add_argument('--face', choices=('kit', 'tripo'), default='kit')
     a = ap.parse_args()
+    global DROP
+    if a.face == 'kit':
+        DROP = DROP_KIT
     g = Glb(a.src); j = g.j
     parts = []
     for n in j['nodes']:
@@ -231,8 +238,12 @@ def main():
             eye = any(k in land and np.linalg.norm(c - np.array(land[k])) < 0.06 for k in ('irisL', 'irisR'))
             if np.median(d) < 0.004 and not eye:  # край прилегает к другой части — она и закрывает
                 continue
-            # глазница — вогнутая (за глазом Tripo: видна только при моргании), щель подбородка — чуть наружу
+            # глазница — вогнутая (у kit — за новым яблоком; край дыры = разрез глаза), щель подбородка — чуть наружу
             nv, nt, q = cap_loop(p['V'], p['F'], loop, -0.45 if eye else 0.04)
+            if eye:
+                sd = 'L' if c[0] > 0 else 'R'
+                for k_, v_ in enumerate(L):
+                    land[f'eyeRim{sd}{k_:02d}'] = v_.tolist()
             arr = np.asarray(p['img']).astype(np.float32)
             hh, ww = arr.shape[:2]
             uvl = p['UV'][loop]
@@ -277,7 +288,7 @@ def main():
     np.savez_compressed(a.out, V=np.concatenate(Vs).astype(np.float32), F=np.concatenate(Fs), UV=np.concatenate(UVs).astype(np.float32),
                         tex=tex, texsize=np.array(atlas.size), role=np.array(roles), part=np.array(names), land=json.dumps(land))
     print(f'атлас {a.atlas}² (×{sc:.2f}) → {tex}; частей {len(keep)} из {len(parts)}, треуг. {sum(len(p["F"]) for p in keep)}')
-    print('метки лица:', ', '.join(land))
+    print('метки лица:', ', '.join(k for k in land if not k.startswith('eyeRim')), f'+ край глазниц {sum(k.startswith("eyeRim") for k in land)} точек')
 
 
 if __name__ == '__main__':

@@ -186,6 +186,14 @@ const PERSONA_FACE_MORPH: Record<string, Record<string, number>> = {
 };
 
 /**
+ * то же для Блёстки p3 (лицо по рефу, scripts/models/glitter_p3_face.py): в покое по развороту 23.11 — рот открыт сильнее
+ * («D»: видны верхние зубки и язычок), уголки вверх
+ */
+const PERSONA_FACE_P3: Record<string, Record<string, number>> = {
+  glitter: { smile: 0.5, mouth_A: 0.38 },
+};
+
+/**
  * язык по характеру (v2, по умолчанию): у Блёстки в покое открытая улыбка — язык маленький и глубже в тёмном рту, не до
  * нижней губы (иначе розовый овал во весь рот читается как высунутый язык; кадр КотоТом 17-11 — язык внутри)
  */
@@ -360,6 +368,8 @@ export class GlbCharacter implements Character {
    * её ключи mouth_A/smile у этой сетки открывали бы рот в покое
    */
   private tripoFace = false;
+  /** лицо Блёстки p3 по рефу (asset.extras.glitterP3.face = 'kit'): тон меха FUR_TONE_P3 (furTone.ts) */
+  private p3Kit = false;
 
   constructor(private url = 'models/character.glb', private animsUrl?: string) {
     this.object.name = 'character-glb';
@@ -382,7 +392,10 @@ export class GlbCharacter implements Character {
       loader.setDRACOLoader(new DRACOLoader());
     }
     const gltf = await loader.parseAsync(raw, asset(url).replace(/[^/]*$/, ''));
-    this.tripoFace = (gltf.parser.json as { asset?: { extras?: { glitterP3?: { face?: string } } } }).asset?.extras?.glitterP3?.face === 'tripo';
+    const p3face = (gltf.parser.json as { asset?: { extras?: { glitterP3?: { face?: string } } } }).asset?.extras?.glitterP3?.face;
+    this.tripoFace = p3face === 'tripo';
+    this.p3Kit = p3face === 'kit';
+    if (this.p3Kit && this.personaId) this.furTone.setPersona(this.personaId, true);
     const model = gltf.scene;
     this.model = model;
     model.updateMatrixWorld(true);
@@ -744,7 +757,7 @@ export class GlbCharacter implements Character {
   setPersona(p: Persona) {
     this.personaId = p.id;
     this.collider?.setPersona(p.id);
-    this.furTone.setPersona(p.id);
+    this.furTone.setPersona(p.id, this.p3Kit);
     const meta = personaMeta(p.id);
     this.setIdles();
     if (!this.model) return;
@@ -1356,7 +1369,7 @@ export class GlbCharacter implements Character {
       W.blink_R = Math.max(W.blink_R ?? 0, f.blink);
     }
     // характер в покое (референс): у Блёстки всегда чуть розовые щёчки и мягкая полуулыбка
-    const base = (this.faceMorphs ? PERSONA_FACE_MORPH : modelsV2() ? PERSONA_FACE_V2 : PERSONA_FACE)[this.personaId];
+    const base = (this.p3Kit ? PERSONA_FACE_P3 : this.faceMorphs ? PERSONA_FACE_MORPH : modelsV2() ? PERSONA_FACE_V2 : PERSONA_FACE)[this.personaId];
     if (base && !this.tripoFace) for (const k in base) W[k] = Math.max(W[k] ?? 0, base[k] * (1 - (W.frown ?? 0)));
     // характер глаз (v2 — по умолчанию; ?models=v1 — без них): у Блёстки по рефу глаза широко открыты — пресеты «самодовольно/сонно/прищур»
     // в idle-клипах (зеркальце, кружение) прикрывают веки слабее

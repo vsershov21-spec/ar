@@ -83,6 +83,15 @@ export const FUR_TONE_V2: Record<string, FurToneParams> = {
   },
 };
 
+/**
+ * Блёстка p3 с лицом по рефу (scripts/models/glitter_p3_face.py, asset.extras.glitterP3.face = 'kit'): текстура уже
+ * в тоне рефа (мех серо-голубой, брови — тёмные дуги, морда светлее) — перекраска мягкая: контраст почти 1 (брови
+ * и морда текстуры не гасятся), без своей белой морды и бровей шейдером
+ */
+export const FUR_TONE_P3: Record<string, FurToneParams> = {
+  glitter: { ...FUR_TONE_V2.glitter, src: S(132, 140, 172), dst: S(146, 155, 190), contrast: 0.9, desat: 0.0, face: 0.12, brow: 0 },
+};
+
 /** точки лица в координатах покоя тела (extras.marks узла Brows) */
 interface Marks {
   nose: number[];
@@ -116,9 +125,9 @@ export class FurTone {
   };
   private done = new WeakSet<THREE.Material>();
 
-  setPersona(id: string) {
+  setPersona(id: string, p3 = false) {
     const T = modelsV2() ? FUR_TONE_V2 : FUR_TONE;
-    const p = T[id] ?? T.kind;
+    const p = (p3 ? FUR_TONE_P3[id] : undefined) ?? T[id] ?? T.kind;
     this.uniforms.uFtSrc.value.set(...p.src);
     this.uniforms.uFtDst.value.set(...p.dst);
     this.uniforms.uFtK.value.set(p.contrast, p.desat);

@@ -204,12 +204,14 @@ export function patchLid(m: THREE.MeshStandardMaterial, soft = false, lidN?: { v
 
 /** ряды оболочки века от кромки (рад по оболочке) — как lid_mesh в scripts/models/face_detail.py */
 export const LID_ROWS = [0, 0.05, 0.12, 0.26, 0.44, 0.825, 1.21, 1.595, 1.98, 2.365, 2.75];
+/** Блёстка p3 (лицо по рефу, глаза glitter_p3_face.py — extras.persona 'glitter_p3'): закрытое веко = мех вокруг (лист docs/qa/glitter) */
+const LID_P3_TONE = 0.8;
 /** тон меха мягкого века к вершинному цвету (сверка по листам docs/qa/face: закрытое веко = мех вокруг глаза) */
 const LID_TONE: Record<string, number> = {};
 /** мягкие веки с тоном меха (FurTone, маска лица): яркость и подсветка меха века по коту — сверка по lids.jpg */
-const LID_FUR: Record<string, [number, number]> = { hooligan: [0.98, 0.08], kind: [0.98, 0.08], glitter: [0.95, 0.08] };
+const LID_FUR: Record<string, [number, number]> = { hooligan: [0.98, 0.08], kind: [0.98, 0.08], glitter: [0.95, 0.08], glitter_p3: [LID_P3_TONE, 0.03] };
 /** сила ресниц верхнего века (ширина подводки и длина ресниц; Блёстка — подводка толще, как на рефе) */
-const LID_LASH: Record<string, number> = { glitter: 1.6 };
+const LID_LASH: Record<string, number> = { glitter: 1.6, glitter_p3: 1.7 };
 
 /**
  * Мягкие веки: атрибут aLid (x — расстояние от кромки по рядам LID_ROWS, y — сила ресниц: верхнее 1, нижнее 0.35) и
