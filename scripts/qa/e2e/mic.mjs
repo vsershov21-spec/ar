@@ -282,10 +282,16 @@ try {
       await P.ev(() => window.__app.director.action('sleep'));
       await sleep(3000);
       const dz = await P.ev(() => window.__app.director.dozing);
+      const tw = await P.ev(() => Math.round(window.__qaReal.now()));
       const rw = await say(P, ph);
       FLOWS.push({ step: `сон: ${ph}`, ...rw });
       const after = await P.ev(() => window.__app.director.dozing);
-      res(`sleep: wake by voice «${ph}»`, rw.ok && dz && !after && /wake_up/.test(rw.speakId ?? ''), { dozingBefore: dz, dozingAfter: after, ...rw });
+      // реплики с начала фразы: громкость фразы (loud/whisper) может разбудить раньше текста — тогда wake_up до него,
+      // а сам текст второго ответа не даёт; «не понял» / приветствие поверх пробуждения — провал
+      const said = await P.ev((tw) => (window.__qaRec ?? []).filter((r) => r.kind === 'speak' && r.rt + window.__qaR0 >= tw).map((r) => r.id), tw);
+      const woke = said.some((id) => /wake_up/.test(id));
+      const extra = said.filter((id) => /\.(hello|unknown|help)\./.test(id));
+      res(`sleep: wake by voice «${ph}»`, rw.ok && dz && !after && woke && !extra.length, { dozingBefore: dz, dozingAfter: after, said, ...rw });
     }
     const gum = await P.ev(() => window.__gum);
     res('one_mic_request', gum.filter((g) => g.audio).length === 1, { gum: gum.map((g) => `${g.video ? 'v' : ''}${g.audio ? 'a' : ''}`).join(' ') });

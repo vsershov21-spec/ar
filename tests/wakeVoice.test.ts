@@ -81,3 +81,20 @@ describe('дрёма на карте: разбудить голосом', () => 
     expect(c.spoken.filter((s) => s.t >= t0).map((s) => s.event)).not.toContain('wake_up');
   });
 });
+
+describe('дрёма: разбудило касанием/громкостью, следом «просыпайся»', () => {
+  it('второго ответа нет (ни приветствия, ни «не понял»)', async () => {
+    const c = await dozed(51);
+    c.d.interaction('loud' as never);
+    c.d.interaction('tap_cat' as never);
+    await c.tick(300);
+    expect(c.d.dozing).toBe(false);
+    await c.until(c.quiet, 8000);
+    const t0 = c.T();
+    c.d.text('просыпайся');
+    await c.until(c.quiet, 6000);
+    const said = c.spoken.filter((s) => s.t >= t0).map((s) => s.event);
+    expect(said).not.toContain('hello');
+    expect(said).not.toContain('unknown');
+  });
+});

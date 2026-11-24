@@ -170,6 +170,8 @@ export class Director extends Emitter<DirectorEvents> {
   readonly ladder = new IdleLadder(performance.now());
   /** кот дремлет (сам после долгой тишины или кнопкой «Усыпи»): молчит, первое касание будит */
   dozing = false;
+  /** когда кот последний раз проснулся (реакция wake_up), performance.now() */
+  private wokeAt = -Infinity;
   /** какое занятие кот предложит следующим (по кругу OFFERS) */
   private offerIdx = 0;
   /** когда кот договорил последнюю реплику */
@@ -397,6 +399,13 @@ export class Director extends Emitter<DirectorEvents> {
       this.ladder.reset(this.lastUserAct);
       this.log(`«${t}» → wake (дрёма) ${wm.toFixed(2)}`);
       return this.dispatch({ type: 'interaction', kind: 'wake_up' });
+    }
+    // голос разбудил раньше текста (громкость фразы → loud/whisper → касание будит, «А? Я не спал!»): сама фраза
+    // «просыпайся» — уже исполнена, второго ответа («Привет!») не нужно
+    if (wm && performance.now() - this.wokeAt < WOKE_HOLD_MS) {
+      this.lastUserAct = performance.now();
+      this.ladder.reset(this.lastUserAct);
+      return this.log(`«${t}» → wake: уже проснулся ${Math.round(performance.now() - this.wokeAt)} мс назад`);
     }
     if (wm && !this.state.dialog) {
       this.childAct();
@@ -1154,6 +1163,7 @@ export class Director extends Emitter<DirectorEvents> {
     }
     if (event === 'wake_up') {
       this.dozing = false;
+      this.wokeAt = performance.now();
       this.stopSleepFx();
     }
     this.emotion(event);
@@ -1805,6 +1815,9 @@ export class Director extends Emitter<DirectorEvents> {
 
   static readonly kidsUrl = ASSETS.sberKidsUrl;
 }
+
+/** «просыпайся» вскоре после пробуждения (кот уже проснулся от голоса/касания) — без второго ответа, мс */
+const WOKE_HOLD_MS = 5000;
 
 /** полутоны → pitch speechSynthesis (0.5…2) */
 const semis = (st: number) => Math.max(0.5, Math.min(2, Math.pow(2, st / 12)));
