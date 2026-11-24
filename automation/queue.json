@@ -195,6 +195,14 @@
       ],
       "maxCredits": 60,
       "note": "Предмет у груди, голова к нему: 4 клипа удержания вместо позы «лапа в струну» (anim-audit 24.11 п. 2)"
+    },
+    {
+      "id": "caddy-static-1124",
+      "kind": "script",
+      "ref": "4bebe04588fb5db6fab899590e97f87f55cc007d",
+      "path": "scripts/deploy/caddy-static.sh",
+      "timeoutMin": 15,
+      "note": "PERF-02: статика терминальная, 404 без immutable, HTML no-cache; проверки curl -I"
     }
   ]
 }
