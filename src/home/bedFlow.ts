@@ -129,7 +129,7 @@ export class BedFlow {
   }
 
   /** реплика: озвучена — голосом, нет — только пузырём (строгий режим: новые реплики ждут озвучки) */
-  say(event: string, o: { background?: boolean } = {}): boolean {
+  say(event: string, o: { background?: boolean; valid?: () => boolean } = {}): boolean {
     const d = this.h.director;
     if (d.hasVoiced(event)) return d.speakEvent(event, o);
     const shown = d.showLine?.(event) ?? false;
@@ -158,6 +158,7 @@ export class BedFlow {
   private startTuck(why: TuckWhy): boolean {
     const now = this.now || performance.now();
     if (!this.m.tuck(now, why)) return false;
+    this.cycle++;
     this.stats.tucks++;
     track('sleep'); // воронка (src/analytics)
     const h = this.h;
@@ -203,6 +204,17 @@ export class BedFlow {
     return true;
   }
   private wakeLine: string | null = null;
+  /**
+   * Поколение цикла сна (BED-05): растёт с каждой укладкой. Отложенное по циклу — реплики пробуждения («wake_forced» с
+   * клипом wake_startle) и укладывания, ждущие очереди/записи, — проверяет его, когда доходит до дела: «Разбудить» →
+   * сразу «Уложить спать» — прошлое пробуждение позу нового сна не перебивает.
+   */
+  private cycle = 0;
+  /** реплика уместна, пока идёт тот же цикл и кот в нужном состоянии (awake — после пробуждения, inBed — во сне) */
+  private sameCycle(want: 'awake' | 'bed'): () => boolean {
+    const gen = this.cycle;
+    return () => this.cycle === gen && (want === 'awake' ? this.m.state === 'awake' : this.m.inBed);
+  }
 
   /** сон кончился (не важно как): Zzz, дрёма режиссёра, колыбельная, поправки поз */
   private afterAsleep() {
@@ -303,7 +315,7 @@ export class BedFlow {
       case 'murmur':
         this.stats.murmurs++;
         this.turnOver(now, 600, 0.35);
-        this.say('asleep_murmur', { background: true });
+        this.say('asleep_murmur', { background: true, valid: this.sameCycle('bed') });
         break;
       case 'twitch':
         this.turnOver(now, 450, 0.25);
@@ -371,6 +383,7 @@ export class BedFlow {
     const today = localDay(new Date());
     if (force === 'morning' || morningWake(this.hour(), today, mem?.morning)) {
       this.m.sleepNow(now, 'flow');
+      this.cycle++;
       this.morning = true;
       saveMemory({ home: { where: mem?.where ?? 'home', zone: 'bedroom', morning: today } });
       this.log('утро: кот ещё спит в кровати');
@@ -512,7 +525,7 @@ export class BedFlow {
         bed?.setHump(1);
         h.audio.play('whoosh', 0.3);
         const night = isNight(this.hour()) || this.m.tuckWhy === 'offer' && daypart(this.hour()) === 'evening';
-        this.say(night ? 'goodnight' : 'tuck_in');
+        this.say(night ? 'goodnight' : 'tuck_in', { valid: this.sameCycle('bed') });
         this.startLullaby();
         break;
       }
@@ -554,7 +567,7 @@ export class BedFlow {
     const line = this.wakeLine;
     this.wakeLine = null;
     this.morning = false;
-    if (line) this.say(line);
+    if (line) this.say(line, { valid: this.sameCycle('awake') });
     this.log('проснулся, на полу');
     h.suggest();
   }
@@ -1068,10 +1081,14 @@ export class BedFlow {
       case 'wake':
         if (this.m.state === 'awake') {
           this.m.sleepNow(this.now || performance.now());
+          this.cycle++;
           this.asleepVisuals(true);
           this.h.suggest();
         }
-        setTimeout(() => this.wake('flow'), 1500);
+        {
+          const gen = this.cycle;
+          setTimeout(() => this.cycle === gen && this.wake('flow'), 1500);
+        }
         break;
       case 'morning':
         // кот уже лежит (beforeEnter со force) — ждёт, когда разбудят

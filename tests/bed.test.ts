@@ -424,3 +424,34 @@ describe('кровать в доме', () => {
     expect(home.chips([]).map((c) => c.id)).toEqual(['home:dance', 'home:ball']);
   });
 });
+
+describe('BED-05: отложенное пробуждение не перебивает новый сон', () => {
+  it('«Разбудить» → сразу «Уложить спать» × 10: реплика пробуждения прошлого цикла не играет wake_startle поверх сна', async () => {
+    const env = await asleep();
+    const { home, bed, director, character } = env;
+    // озвучено: реплики идут через очередь режиссёра — отложенно (как при занятой очереди / записи, которая грузится)
+    director.hasVoiced.mockImplementation(() => true);
+    const queue: { event: string; valid?: () => boolean }[] = [];
+    director.speakEvent.mockImplementation(((event: string, o?: { valid?: () => boolean }) => (queue.push({ event, valid: o?.valid }), true)) as never);
+    const CLIP: Record<string, string> = { wake_forced: 'wake_startle', wake_morning: 'wake_startle', tuck_in: 'yawn', goodnight: 'yawn' };
+    /** очередь дошла до реплик: режиссёр играет клип реплики, если она ещё уместна (director.perform → valid) */
+    const flush = () => {
+      for (const q of queue.splice(0)) if (!q.valid || q.valid()) character.play(CLIP[q.event] ?? 'talk');
+    };
+    for (let k = 0; k < 10; k++) {
+      home.act('home:wake');
+      await tick(home, WAKE_MS + 100);
+      expect(bed.state).toBe('awake');
+      expect(queue.some((q) => /^wake_/.test(q.event))).toBe(true);
+      expect(queue.every((q) => !q.valid || q.valid())).toBe(true); // пока кот бодр — реплика уместна
+      home.act('home:sleep');
+      await tick(home, TUCK_MS + 200);
+      expect(bed.state).toBe('asleep');
+      character.play.mockClear();
+      flush();
+      // ни одной реплики пробуждения прошлого цикла; поза сна не перебита
+      expect(character.play).not.toHaveBeenCalledWith('wake_startle');
+      expect(director.dozing).toBe(true);
+    }
+  });
+});

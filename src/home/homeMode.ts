@@ -61,7 +61,7 @@ export interface HomeHost {
     ladder: { quietFor(now: number): number; reset(now: number): void };
     queue: { busy: boolean };
     dispatch(e: { type: 'card_found' } | { type: 'card_lost' } | { type: 'context_change' }): void;
-    speakEvent(event: string, o?: { background?: boolean; force?: boolean }): boolean;
+    speakEvent(event: string, o?: { background?: boolean; force?: boolean; valid?: () => boolean }): boolean;
     hasVoiced(event: string): boolean;
     action(id: string): void;
     interaction(kind: string): void;

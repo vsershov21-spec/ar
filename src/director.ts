@@ -1203,7 +1203,12 @@ export class Director extends Emitter<DirectorEvents> {
   }
 
   /** реплика сценария/диалога: визуал вместе с речью */
-  speakEvent(event: string, o: { force?: boolean; visuals?: boolean; node?: string; scenario?: boolean; background?: boolean } = {}): boolean {
+  /**
+   * valid — реплика ещё уместна (проверяется, когда очередь до неё дошла и запись готова, — до клипа и голоса): кровать
+   * привязывает реплики пробуждения/укладывания к своему циклу сна (BED-05), иначе отложенная «wake_forced» со своим
+   * wake_startle перебивала позу нового сна.
+   */
+  speakEvent(event: string, o: { force?: boolean; visuals?: boolean; node?: string; scenario?: boolean; background?: boolean; valid?: () => boolean } = {}): boolean {
     this.emotion(event);
     const r = this.currentRiddle();
     const pk = this.personas.line(event, { name: this.state.name, vars: r ? { answer: r.answer } : {}, force: o.force, prefer: this.prefer, strict: this.strictVoice, avoid: this.avoidInvite() });
@@ -1214,7 +1219,7 @@ export class Director extends Emitter<DirectorEvents> {
     // реплика сценария/диалога встаёт в очередь (не ниже 2), даже если событие само по себе — реакция («нет» в «Хочешь загадку?»)
     // фон (подсказка кота по своей инициативе) — любое действие ребёнка её перебивает
     const priority = (o.background ? 0 : o.scenario ? Math.max(pk.priority, 2) : pk.priority) as PickedLine['priority'];
-    return this.enqueue({ ...pk, priority }, o.visuals !== false, o.node, r?.id);
+    return this.enqueue({ ...pk, priority }, o.visuals !== false, o.node, r?.id, o.valid);
   }
 
   /**
@@ -1302,7 +1307,7 @@ export class Director extends Emitter<DirectorEvents> {
     this.enqueue(pk, true, node, r.id);
   }
 
-  private enqueue(pk: PickedLine, visuals: boolean, tag?: string, riddleId?: string): boolean {
+  private enqueue(pk: PickedLine, visuals: boolean, tag?: string, riddleId?: string, valid?: () => boolean): boolean {
     // нет микрофона — кот не зовёт говорить («Скажи „повторяй за мной“»): реплики тишины, подсказок и реакций с таким
     // призывом молчат (реплики сценария — нет: голосовые занятия без микрофона и так не начинаются)
     if ((INVITE_EVENTS.has(pk.event) || pk.priority < 2) && SAY_INVITE.test(pk.text) && this.d.voiceIn && !this.d.voiceIn().mic) {
@@ -1311,14 +1316,20 @@ export class Director extends Emitter<DirectorEvents> {
     }
     const ok = this.queue.say({
       persona: pk.persona, event: pk.event, priority: pk.priority, interruptible: pk.interruptible, tag, owner: this.owner || undefined,
-      run: () => this.perform(pk, visuals, riddleId, !tag),
+      run: () => this.perform(pk, visuals, riddleId, !tag, valid),
     });
     if (!ok) this.log(`реплика «${pk.line.id}» отброшена очередью`);
     return ok;
   }
 
-  private async perform(pk: PickedLine, visuals: boolean, riddleId?: string, free = true) {
+  private async perform(pk: PickedLine, visuals: boolean, riddleId?: string, free = true, valid?: () => boolean) {
     const p = this.personas.get(pk.persona)!;
+    const stale = () => {
+      if (!valid || valid()) return false;
+      this.log(`⌛ «${pk.line.id}» устарела (сцена сменилась) — пропуск`);
+      return true;
+    };
+    if (stale()) return;
     // новый кот говорит, когда его модель уже на сцене (не над прежним котом)
     if (this.charReady && !this.charReady(pk.persona)) {
       for (let i = 0; i < 50 && !this.charReady(pk.persona); i++) await wait(100);
@@ -1358,6 +1369,7 @@ export class Director extends Emitter<DirectorEvents> {
       if (this.queue.current !== mine) return; // пока грузилась — перебили: не звучим поверх новой
       this.log(`⏱ ${lineId}: запись готовилась ${Math.round(performance.now() - t0)} мс`);
     }
+    if (stale()) return;
     if (visuals) this.playVisual({ clip: pk.clip, fx: pk.fx ? [pk.fx] : [], sound: pk.sound, face: pk.face, ev: pk.event });
     else this.face(pk.face);
     // пузырь живёт ровно столько, сколько звучит реплика (скрывается в конце, а не по таймеру длины текста)
