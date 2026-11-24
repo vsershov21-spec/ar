@@ -91,6 +91,14 @@ export const MESHY_PEN_MAX_MM = 5;
  */
 const FOOT_FIX_MAX = 0.05;
 const FOOT_FIX_RATE = 3.5;
+/** IK ног в клипах с переступанием (stepLegIK): предел цели от стопы клипа (доли роста), вход/выход веса, с */
+const STEP_IK_MAX = 0.08;
+const STEP_IK_FADE = 0.12;
+/**
+ * где IK ног включён: только танец Хулигана (dance_05: лапы 5,6 → 3 мм). Танец Добряка (Meshy dance_kind) с IK — рывки
+ * бедра/стопы 48–53 рад/с, Блёстки (кружения на носке) — лапы 8 → 11 мм; остальные клипы с переступанием не проверены
+ */
+const STEP_IK_CLIPS = /^dance_hooligan$/;
 /** клипы с переступанием (танец, празднование): опора корня есть, поворот бедра к точке опоры — нет (стопы прыгали) */
 const STEP_CLIPS = /dance|celebrate|cheer|warm_up|jump|hop/;
 /** позы лёжа: пол держит тело (не ниже опоры), а не снимается, как для нырка */
@@ -2204,10 +2212,14 @@ export class GlbCharacter implements Character {
     // игра с хвостом, обнять себя) — поворотом бедра так, чтобы стопа вернулась к своей точке опоры. Одна кость
     // (без IK колена: у почти прямой ноги колено «переворачивалось» — рывки 70–90 рад/с); остаток по горизонтали,
     // высота — как в клипе. Поправка держится и уходит плавно (вход/выход 0,15 с, ≤ FOOT_FIX_RATE рад/с)
+    const step = STEP_CLIPS.test(id);
     [L, R].forEach((F, i) => {
       const U = this.bones.get(i ? 'RightUpLeg' : 'LeftUpLeg');
       if (!U) return;
-      const an = enabled && !STEP_CLIPS.test(id) ? this.footPin.anchor(i) : null;
+      // клипы с переступанием (танец): стоящая стопа — IK двух костей ноги к точке опоры (колено — куда его ведёт клип)
+      if (step && !this.stepIkOff && STEP_IK_CLIPS.test(id)) this.stepLegIK(i, U, F, enabled ? this.footPin.anchor(i) : null, dt);
+      else this.stepIk[i].w = 0;
+      const an = enabled && !step ? this.footPin.anchor(i) : null;
       const st = this.footFix[i];
       let want = 0;
       if (an) {
@@ -2242,6 +2254,51 @@ export class GlbCharacter implements Character {
     { ang: 0, axis: new THREE.Vector3(1, 0, 0) },
     { ang: 0, axis: new THREE.Vector3(1, 0, 0) },
   ];
+
+  /** стенд: выключить IK ног в клипах с переступанием (как до 24.11) */
+  stepIkOff = false;
+  private stepIk = [
+    { w: 0, x: 0, z: 0 },
+    { w: 0, x: 0, z: 0 },
+  ];
+  /**
+   * Танец и прочее переступание (STEP_CLIPS): сдвиг корня — среднее по опорным лапам, а клип разводит и сводит стопы,
+   * пока обе стоят, — одна едет по полу. Здесь стоящая стопа — к своей точке опоры IK бедро–колено–стопа; полюс —
+   * колено клипа (его отступ от линии бедро→стопа), у почти прямой ноги — вперёд кота (прямое колено без полюса и давало
+   * флип 70–90 рад/с в прошлой пробе). Вес входит/уходит за STEP_IK_FADE, цель — не дальше STEP_IK_MAX от стопы клипа;
+   * высота и поворот стопы в мире — как в клипе. Танец Хулигана (dance_05): лапы едут 5,6 → 3,1 мм. Клип, где стопа
+   * шаркает по полу секундами (прежний dance_01), так не лечится — его заменили (tripoAlias.ts).
+   */
+  private stepLegIK(i: number, U: THREE.Object3D, F: THREE.Object3D, an: { x: number; z: number } | null, dt: number) {
+    const st = this.stepIk[i];
+    const K = this.bones.get(i ? 'RightLeg' : 'LeftLeg');
+    if (!K) return;
+    const obj = this.object;
+    const cur = obj.worldToLocal(F.getWorldPosition(new THREE.Vector3()));
+    if (an) {
+      const dx = an.x - cur.x, dz = an.z - cur.z, l = Math.hypot(dx, dz);
+      const k = l > STEP_IK_MAX ? STEP_IK_MAX / l : 1;
+      st.x = dx * k;
+      st.z = dz * k;
+    }
+    st.w = clamp(st.w + (an ? 1 : -1) * (dt / STEP_IK_FADE), 0, 1);
+    if (st.w < 1e-3 || Math.hypot(st.x, st.z) < 1e-5) return;
+    const hip = obj.worldToLocal(U.getWorldPosition(new THREE.Vector3()));
+    const knee = obj.worldToLocal(K.getWorldPosition(new THREE.Vector3()));
+    const ax = cur.clone().sub(hip);
+    const off = knee.clone().sub(hip);
+    if (ax.lengthSq() > 1e-10) off.addScaledVector(ax, -off.dot(ax) / ax.lengthSq());
+    const poleL = off.length() > 0.004 ? off.normalize() : new THREE.Vector3(0, 0, 1);
+    const tgt = obj.localToWorld(cur.clone().add(new THREE.Vector3(st.x, 0, st.z)));
+    const pole = poleL.transformDirection(obj.matrixWorld);
+    const fq = F.getWorldQuaternion(new THREE.Quaternion());
+    twoBoneIK(U, K, F, tgt, pole, st.w);
+    // стопа — в мире как в клипе (подошва не наклоняется вместе с голенью)
+    K.updateWorldMatrix(true, false);
+    const pq = K.getWorldQuaternion(new THREE.Quaternion()).invert();
+    F.quaternion.slerp(pq.multiply(fq), st.w);
+    U.updateMatrixWorld(true);
+  }
 
   /** хвост и уши: сброс к покою и вторичная анимация TailRig поверх тела */
   private applyTailEars(dt: number, faceEars: number, facePresetId = this.faceMix.preset) {

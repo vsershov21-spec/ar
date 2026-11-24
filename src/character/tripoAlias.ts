@@ -36,11 +36,13 @@ export const TRIPO_ALIAS: Record<string, string[]> = {
   bow: ['bow'],
   heart_pose: ['idle_glitter_mirror'],
   sing_01: ['sing'],
-  dance_01: ['dance_hooligan'],
+  // dance_01 (23 с) шаркает стопой по полу секундами — «лапы едут» 16–20 мм в танце Хулигана (аудит 23.11);
+  // dance_05 — те же «бокс-грув» и кулаки, стопы отрываются от пола: 3 мм
+  dance_01: ['dance_01'],
   dance_02: ['dance_kind'],
   dance_03: ['dance_glitter', 'idle_glitter_twirl'],
   dance_04: ['dance_04'],
-  dance_05: ['dance_05'],
+  dance_05: ['dance_hooligan', 'dance_05'],
   dance_06: ['dance_06'],
   play_mobile_game: ['card'],
   wait: ['think'],
