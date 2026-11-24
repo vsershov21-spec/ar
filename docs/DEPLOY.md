@@ -290,3 +290,6 @@ sleep 25; cat /tmp/pilot-setup.log
 3. Проверки: `/mvp/` — `no-cache`; `/mvp` → 308 на `/mvp/`; `/mvp/x/y` отдаёт `index.html` пилота
    (`/mvp/assets/main-*`); ассеты — `immutable`; `/api/progress/health` — ok и `"events":true`;
    `/api/progress/stats` без токена — 401.
+
+## Права в /srv/ar-extra (24.11)
+Файлы, которые кладут задачи ar-auto, должны быть читаемы vershov-commander:caddy (0644/0755). Нечитаемый файл ломал attach-extra: в релиз не попадала модель Vosk (404). Исправлено вручную 24.11; скрипты правятся отдельно.
