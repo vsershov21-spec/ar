@@ -153,6 +153,9 @@ export async function openPhone(browser, server, o = {}) {
       } catch {}
     }, o.memory);
   const P = new Phone(page, ctx, server, errors);
+  // местный час для кровати (src/home/bedFlow.ts): утром (6–11) первый вход домой — кот спит в кровати, и сценарии
+  // «дома» зависели бы от часа прогона. Стенд — днём (?hour=14), утро — явно (o.hour = 8); o.hour = null — настоящий час
+  P.hour = o.hour === undefined ? 14 : o.hour;
   if (o.url !== null) await P.go(o.q ?? '');
   return P;
 }
@@ -164,11 +167,14 @@ export class Phone {
     this.server = server;
     this.errors = errors;
     this.navAt = 0;
+    /** ?hour= в каждом переходе (openPhone o.hour) */
+    this.hour = null;
   }
   async go(q) {
     this.navAt = Date.now();
     // E2E_Q — добавка ко всем адресам прогона (например E2E_Q='models=p3&from=test' — Блёстка p3)
     q = [String(q ?? '').replace(/^\?/, ''), process.env.E2E_Q ?? ''].filter(Boolean).join('&');
+    if (this.hour != null && !/(^|&)hour=/.test(q)) q = q ? `${q}&hour=${this.hour}` : `hour=${this.hour}`;
     await this.page.goto(`${this.server.base}/mvp/${q ? '?' + q : ''}`, { waitUntil: 'domcontentloaded', timeout: 120000 });
   }
   ev(f, ...a) {

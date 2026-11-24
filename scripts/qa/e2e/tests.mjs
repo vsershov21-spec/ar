@@ -558,6 +558,26 @@ export const TESTS = [
     },
   },
 
+  {
+    name: '07_sberkids_morning',
+    title: 'утро (?hour=8): дома кот спит — карточка СберKids ждёт (не будит и не мешает), «Разбудить» → карточка «home»',
+    timeout: 300,
+    async fn(t) {
+      const P = await playing(t, 'hooligan', '', { hour: 8 });
+      await P.tap('.tom-home');
+      await P.must(() => window.__app.home.phase === 'home', 20000, 'дома');
+      await P.must(() => window.__app.home.bed?.state === 'asleep', 15000, 'утром кот спит в кровати');
+      // кот спит (uiContext busy 'sleep') — карточку не показываем; через 6 с она была бы днём
+      await sleep(10000);
+      assert(await P.ev(() => document.querySelector('.kids-card').classList.contains('hidden')), 'карточка СберKids поверх спящего кота');
+      await P.must(() => !!document.querySelector('.tom-room [data-item="home:wake"]'), 10000, 'кнопка «Разбудить»');
+      await P.tap('.tom-room [data-item="home:wake"]');
+      await P.must(() => (window.__app.home.bed?.state ?? 'idle') !== 'asleep' && !window.__app.director.dozing, 30000, 'кот проснулся');
+      await P.must(() => !document.querySelector('.kids-card').classList.contains('hidden'), 40000, 'карточка «Войти в СберKids» дома после пробуждения');
+      assert(await P.ev(() => document.querySelector('.kids-card').dataset.where === 'home'), 'карточка не «home»');
+    },
+  },
+
   // ───────────── 8. аналитика ─────────────
   {
     name: '08_analytics_funnel',
@@ -572,10 +592,16 @@ export const TESTS = [
       await pick(P, 'pet');
       await settle(P, 'pet');
       await sleep(2500);
+      // события только этого телефона: сервер стенда общий, и session_end прошлого сценария (его вкладку закрыли —
+      // sendBeacon при pagehide) иногда доходит уже после n0 — без src=test1 (флейк 24.11 «события без src=test1: session_end»)
+      const device = await P.ev(() => window.__analytics?.o?.device ?? null);
+      assert(device, 'нет id устройства аналитики (window.__analytics)');
       // pagehide → session_end
       await P.page.goto('about:blank').catch(() => undefined);
       await sleep(1000);
-      const evs = events(t.server, n0);
+      const all = events(t.server, n0);
+      const evs = all.filter((e) => e.device === device);
+      if (all.length > evs.length) t.note(`чужих событий (прошлые вкладки): ${all.filter((e) => e.device !== device).map((e) => e.name).join(' ')}`);
       const names = evs.map((e) => e.name);
       t.note(`события: ${names.join(' ')}`);
       assert(names.includes('session_end'), 'нет session_end при уходе со страницы');
