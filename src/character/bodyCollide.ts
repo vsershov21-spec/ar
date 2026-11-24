@@ -54,6 +54,34 @@ export interface Proxy {
   bs?: number;
   wc?: THREE.Vector3;
   wr?: number;
+  /**
+   * одежда со скином на нескольких костях (шарф, дуга наушников у плеча — ключица/плечо): bone — вспомогательный узел,
+   * его matrixWorld каждый кадр = Σ wᵢ·Mᵢ·Rᵢ⁻¹·R (линейный скин, как вершины сетки рядом) — прокси едет вместе с тканью
+   */
+  blend?: ProxyBlend;
+}
+export interface ProxyBlend {
+  bones: THREE.Object3D[];
+  w: number[];
+  /** обратные матрицы костей в позе покоя (мир) */
+  restInv: THREE.Matrix4[];
+  /** узел-система прокси в позе покоя (мир) */
+  rest: THREE.Matrix4;
+}
+
+/** matrixWorld узла смешанного прокси: Σ wᵢ·(Mᵢ·Rᵢ⁻¹) · R */
+const bM = new THREE.Matrix4();
+export function updateBlend(px: Proxy) {
+  const bl = px.blend;
+  if (!bl) return;
+  const out = px.bone.matrixWorld.elements;
+  out.fill(0);
+  for (let i = 0; i < bl.bones.length; i++) {
+    const e = bM.multiplyMatrices(bl.bones[i].matrixWorld, bl.restInv[i]).elements;
+    const w = bl.w[i];
+    for (let k = 0; k < 16; k++) out[k] += w * e[k];
+  }
+  px.bone.matrixWorld.multiply(bl.rest);
 }
 /** карман: точки кисти в этой сфере (система кости) касаются тела без зазора */
 export interface Pocket {
@@ -68,7 +96,9 @@ export interface Pocket {
 /** формат public/models/v2/<кот>_colliders.json — координаты в пространстве модели (рост 1, поза покоя) */
 export interface CollidersJson {
   version?: number;
-  volumes?: { name: string; bone: string; type: 'ellipsoid' | 'capsule' | 'hull'; center?: number[]; radii?: number[]; a?: number[]; b?: number[]; r?: number; points?: number[][]; mesh?: string }[];
+  volumes?: { name: string; bone: string; type: 'ellipsoid' | 'capsule' | 'hull'; center?: number[]; radii?: number[]; a?: number[]; b?: number[]; r?: number; points?: number[][]; mesh?: string;
+    /** скин прокси: [кость, вес] (сумма 1; bone — только система координат) — прокси едет как вершины ткани с этими весами */
+    blend?: [string, number][] }[];
   pockets?: { bone: string; center: number[]; r: number }[];
 }
 
@@ -724,6 +754,18 @@ export class BodyCollider {
         px = this.mkEll(v.name, b, c, r.multiplyScalar(1.05), 'json');
       }
       if (!px) continue;
+      if (v.blend?.length) {
+        const bs = v.blend.map(([n, w]) => [this.bone(n), w] as const).filter((x): x is readonly [THREE.Object3D, number] => !!x[0] && x[1] > 0);
+        const sum = bs.reduce((a, x) => a + x[1], 0);
+        if (bs.length && sum > 0) {
+          const h = new THREE.Object3D();
+          h.name = `blend:${v.name}`;
+          h.matrixAutoUpdate = false;
+          h.matrixWorld.copy(b.matrixWorld);
+          px.blend = { bones: bs.map((x) => x[0]), w: bs.map((x) => x[1] / sum), restInv: bs.map((x) => x[0].matrixWorld.clone().invert()), rest: b.matrixWorld.clone() };
+          px.bone = h;
+        }
+      }
       if (v.mesh) px.mesh = model.getObjectByName(v.mesh) ?? undefined;
       if (/^(thigh|shin)_([LR])$/.test(v.name)) px.skip = new RegExp(`^${v.name.slice(-1)}(Shin|Knee)$`);
       this.proxies.push(px);
@@ -840,6 +882,7 @@ export class BodyCollider {
   /** кэш кадра: обратные матрицы костей прокси (кости тела/одежды за итерации коррекции рук не двигаются) */
   private prepare() {
     for (const px of this.proxies) {
+      if (px.blend) updateBlend(px);
       const mw = px.bone.matrixWorld;
       (px.inv ??= new THREE.Matrix4()).copy(mw).invert();
       const bs = (px.bs = tv.setFromMatrixScale(mw).x || 1);

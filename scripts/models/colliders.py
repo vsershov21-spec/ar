@@ -5,7 +5,9 @@
   python3 scripts/models/colliders.py <cat> model.glb public/models/<cat>_colliders.json
 
 Координаты — пространство модели в позе покоя (как GLB), кость — имя без mixamorig. Типы: ellipsoid (полуоси по осям
-модели), capsule (a, b, r), hull (точки выпуклой оболочки). `mesh` — прокси активен, пока меш виден.
+модели), capsule (a, b, r), hull (точки выпуклой оболочки). `mesh` — прокси активен, пока меш виден. `blend` — скин прокси
+[[кость, вес], …] (шарф, наушники, запечённые в сетку тела: средние веса вершин детали у капсулы) — рантайм ведёт прокси
+линейным скином, как ткань.
 Голова — 2…98-й перцентиль вершин головы + 6 мм меха; кепка, бант, юбка-фатин — выпуклая оболочка (≤ 48 точек);
 наушники — точно по детали headphones.py (чашки — капсулы по оси, дуга — цепочка капсул); шарф — кольцо капсул + хвост;
 ноги — капсулы бедра/голени; карманы — сферы у боковых входов «кенгуру».
@@ -224,6 +226,25 @@ def main():
             for s_ in (1, -1):
                 pockets.append({'name': f'pocket_{"L" if s_ > 0 else "R"}', 'bone': 'Spine1',
                                 'center': r5(cc + np.array([s_ * hx, (y1 - y0) * 0.1, -0.012])), 'r': round(float((y1 - y0) * 0.42), 5)})
+    # скин одежды у шеи (шарф, наушники — запечены в сетку тела, веса скина у ключицы/плеча/головы): прокси едет как
+    # вершины ткани рядом — blend = средние веса вершин детали у капсулы (≥ 4 %, до 4 костей); bone — только система
+    for v in V:
+        part = SCARF if v['name'].startswith('scarf') else PHONES if v['name'].startswith('headphones') else None
+        if part is None or v['type'] != 'capsule':
+            continue
+        a_, b_ = np.array(v['a']), np.array(v['b']); ab = b_ - a_
+        t = np.clip(((P - a_) @ ab) / max(ab @ ab, 1e-12), 0, 1)
+        near = used & (lab == part) & (np.linalg.norm(P - (a_ + t[:, None] * ab), axis=1) < v['r'] + 0.01)
+        if near.sum() < 8:
+            continue
+        acc = np.zeros(len(names))
+        np.add.at(acc, J[near].ravel(), (Wt[near] / np.maximum(Wt[near].sum(1, keepdims=True), 1e-9)).ravel())
+        acc /= acc.sum()
+        top = [k for k in np.argsort(-acc)[:4] if acc[k] >= 0.04]
+        w = acc[top] / acc[top].sum()
+        if len(top) == 1 and names[top[0]] == v['bone']:
+            continue
+        v['blend'] = [[names[k], round(float(x), 3)] for k, x in zip(top, w)]
     res = {'version': 1, 'cat': cat, 'source': 'scripts/models/colliders.py (поза покоя, координаты модели)', 'volumes': V, 'pockets': pockets}
     json.dump(res, open(out, 'w'), ensure_ascii=False, indent=1)
     print(f'{cat}: прокси {len(V)} ({", ".join(sorted(set(v["name"].split("_")[0] for v in V)))}), карманов {len(pockets)} → {out}')

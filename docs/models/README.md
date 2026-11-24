@@ -19,6 +19,21 @@
 > румянец в faceWrinkles.ts, `PERSONA_FACE_V2`). Сравнение в приложении: `node tools/model-ab-shot.mjs <out>` →
 > `v2b_app_<кот>.png` (слева v1, справа v2).
 
+## Шарф Добряка и наушники Хулигана у плеча (24.11): `scripts/models/shoulder_skin.py`
+
+Лапа с предметом у рта шла сквозь шарф/дугу наушников (docs/qa/anim-audit/2026-11-24_shoulder). Без Blender, только
+JOINTS_0/WEIGHTS_0 тела, оболочек меха и накладок (геометрия, морфы, кости — как были): у ткани детали вес Head → Neck
+(кроме вершин морды, Head ≥ 0.45 — набор FaceSkin и морфы p2 не меняются), у плечевого сустава вес ключицы → плечо
+(радиус: Добряк 0.22, Хулиган 0.16 роста). Затем p2 и прокси p1 со скином:
+
+    cd scripts/models
+    python3 shoulder_skin.py kind     <p1 до правки> ../../public/models/v2/kind_p1.glb
+    python3 shoulder_skin.py hooligan <p1 до правки> ../../public/models/v2/hooligan_p1.glb
+    /tmp/bpyenv/bin/python face_rig.py kind ../../public/models/v2/kind_p1.glb ../../public/models/v2/kind_p2.glb       # и hooligan
+    python3 colliders.py kind ../../public/models/v2/kind_p1.glb ../../public/models/v2/kind_p1_colliders.json        # и hooligan
+
+Проверено: у p2 после face_rig позиции и все морфы (int16) байт в байт как до правки, отличаются только веса скина.
+
 ## Блёстка p3 (24.11): пересоздана по развороту 23.11 — Tripo по 4 видам, `?models=p3`
 
 Основа — модель продакта из веб-студии Tripo (4 вида разворота `design/refs/glitter_views/`, generate in parts,

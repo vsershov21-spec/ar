@@ -210,5 +210,8 @@ describe('meshyClips: блок-лист пилота', () => {
     for (const id of ['hold_sip_body', 'hold_treat_body', 'hold_mirror_body', 'skate_hop_on', 'skate_cruise', 'skate_ollie_air', 'skate_hop_off', 'spray_low_sweep']) {
       expect(PILOT_MESHY_OFF[id], id).toBeTruthy();
     }
+    // тела «предмет у груди» (24.11): основные — в пилоте, варианты _b — нет
+    expect(PILOT_MESHY_OFF.hold_treat_low).toBeUndefined();
+    for (const id of ['hold_treat_low_b', 'hold_sip_low', 'hold_sip_low_b']) expect(PILOT_MESHY_OFF[id], id).toBeTruthy();
   });
 });

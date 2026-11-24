@@ -50,9 +50,24 @@ const BONES = ['Hips', 'Spine', 'Spine1', 'Spine2', 'Neck', 'Head', 'LeftArm', '
 
 /** клипы Meshy под шаблоны (scripts/models/t2m_prompts_v2.json, P2 20.11): тело действия; без клипа — покой */
 const ACT_BODY: Record<string, string> = { cocoa: 'hold_sip_body', mirror: 'hold_mirror_body', treat: 'hold_treat_body' };
+/**
+ * тело «предмет у груди, голова к нему» (Meshy hold_*_low, 24.11) по характеру — главнее ACT_BODY: у Хулигана и Добряка
+ * лапа к рту шла в струну сквозь дугу наушников / шарф (docs/qa/anim-audit/2026-11-24_shoulder)
+ */
+const ACT_BODY_LOW: Record<string, Partial<Record<string, string>>> = {
+  hooligan: { treat: 'hold_treat_low' },
+  kind: { treat: 'hold_treat_low' },
+};
+/** доля коррекции BodyCollider для лапы с предметом при теле hold_*_low (иначе — 0: лапа исключена, IK ведёт сам) */
+const HOLD_LOW_PUSH = 0.15;
+/** то же для какао Добряка без клипа (hold_sip_low кланяется над кружкой — морды не видно, кружка у груди) */
+const HOLD_PUSH: Partial<Record<string, number>> = { cocoa: 0.15 };
+/** доля поклона клипа hold_*_low (корпус, шея, голова) — остальное к позе покоя: морда видна с камеры сверху */
+const HOLD_LOW_BOW: Record<string, number> = { treat: 0.35 };
+const HOLD_LOW_BOW_BONES = ['Spine', 'Spine1', 'Spine2', 'Neck', 'Head'] as const;
 const SKATE_BODY: Partial<Record<string, string>> = { hop: 'skate_hop_on', push: 'skate_cruise', ride: 'skate_cruise', roll: 'skate_cruise', ollie: 'skate_ollie_air', flip: 'skate_ollie_air', hopoff: 'skate_hop_off', kickup: 'skate_hop_off' };
 
-const ACT_CLIPS = new Set<string>([...Object.values(ACT_BODY), ...(Object.values(SKATE_BODY) as string[])]);
+const ACT_CLIPS = new Set<string>([...Object.values(ACT_BODY), ...Object.values(ACT_BODY_LOW).flatMap((m) => Object.values(m) as string[]), ...(Object.values(SKATE_BODY) as string[])]);
 
 /** клипы-сцены с предметом → шаблон holdAction (play перенаправляет) */
 const SCENE_HOLD: Record<string, string> = { idle_glitter_mirror: 'mirror', idle_kind_cocoa: 'cocoa' };
@@ -576,6 +591,10 @@ export class GlbCharacter implements Character {
       const b = this.bones.get(n);
       if (b) this.armRest.set(b, b.position.clone());
     }
+    for (const n of HOLD_LOW_BOW_BONES) {
+      const b = this.bones.get(n);
+      if (b) this.bowRest.set(n, b.quaternion.clone());
+    }
     const head = this.bones.get('Head');
     if (head) {
       head.updateWorldMatrix(true, false);
@@ -636,7 +655,9 @@ export class GlbCharacter implements Character {
     this.act = { kind: 'hold', id, spec, t: 0 };
     this.props.hold(spec.prop);
     // тело: клип Meshy под шаблон (если пришёл, manifest.json) — иначе ровный покой; лапу с предметом ведёт шаблон
-    const body = ACT_BODY[id];
+    const low = ACT_BODY_LOW[this.personaId]?.[id];
+    const body = low && this.clipSource(low) === 'meshy' ? low : ACT_BODY[id];
+    this.holdLow = !!low && body === low;
     this.clips.play(body && this.clipSource(body) === 'meshy' ? body : 'idle_breathe', { loop: true, force: true });
     return holdDuration(spec);
   }
@@ -1576,6 +1597,11 @@ export class GlbCharacter implements Character {
   readonly propFx = new PropFx();
   /** стенд: растяжка лапы (1 — без), недолёт IK (доли роста), поворот ключицы (рад) */
   readonly holdDbg = { stretch: 1, miss: 0, clav: 0, want: new THREE.Vector3(), got: new THREE.Vector3() };
+  /** действие с предметом играет тело hold_*_low (ACT_BODY_LOW) */
+  private holdLow = false;
+  /** доля наклона корпуса/шеи/головы клипа hold_*_low (стенд — подбор) */
+  holdBowK: number | null = null;
+  private bowRest = new Map<string, THREE.Quaternion>();
   private holdF: { f: HoldFrame; side: 'Left' | 'Right'; off: THREE.Vector3; q: THREE.Quaternion; top: THREE.Vector3; look: THREE.Vector3 | null; hl: number } | null = null;
 
   /**
@@ -1772,7 +1798,7 @@ export class GlbCharacter implements Character {
     if (col) {
       col.exempt.clear();
       const k = clamp((f.w - 0.1) / 0.5, 0, 1);
-      col.exemptTo[side] = k * k * (3 - 2 * k);
+      col.exemptTo[side] = (1 - (this.holdLow ? HOLD_LOW_PUSH : (HOLD_PUSH[a.id] ?? 0))) * k * k * (3 - 2 * k);
     }
     const S = this.bones.get(side + 'Arm'), E = this.bones.get(side + 'ForeArm'), H = this.bones.get(side + 'Hand');
     if (!S || !E || !H) return;
@@ -1783,6 +1809,14 @@ export class GlbCharacter implements Character {
     const V = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
     const toW = (v: THREE.Vector3) => obj.localToWorld(v.clone());
     const dirW = (v: THREE.Vector3) => v.clone().transformDirection(obj.matrixWorld);
+    // 0. тело hold_*_low кланяется предмету глубоко (морды не видно сверху) — оставляем долю HOLD_LOW_BOW наклона клипа
+    if (this.holdLow) {
+      for (const n of HOLD_LOW_BOW_BONES) {
+        const b = this.bones.get(n), r = this.bowRest.get(n);
+        if (b && r) b.quaternion.slerp(r, 1 - (this.holdBowK ?? HOLD_LOW_BOW[a.id] ?? 0.35));
+      }
+      obj.updateMatrixWorld(true);
+    }
     // 1. тело навстречу предмету: корпус, шея и голова вперёд-вниз («ах» — назад), голова к плечу (кокетливо)
     const lean = f.headPitch * Math.min(1, W * 1.5);
     for (const [n, k] of [['Spine1', 0.3], ['Spine2', 0.4], ['Neck', 0.55], ['Head', 0.55]] as const) {

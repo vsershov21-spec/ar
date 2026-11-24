@@ -43,7 +43,7 @@ export const V2_BASE: Record<string, 'v2' | 'p1'> = { glitter: 'p1', hooligan: '
  * p1 со своими прокси (геометрия отличается от v1): Блёстка — юбка Tripo заменена фатином (tulle.py)
  * и звёзды-заколки → models/v2/glitter_p1_colliders.json (scripts/models/colliders.py по p1)
  */
-export const P1_OWN_COLLIDERS = new Set(['glitter']);
+export const P1_OWN_COLLIDERS = new Set(['glitter', 'hooligan', 'kind']);
 
 /**
  * ?models=v1 → 'v1', ?models=v2h → 'v2h', ?models=p3 → 'p3', ?models=v2 → 'v2'; без параметра — 'p3', если включена
