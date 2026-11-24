@@ -42,6 +42,8 @@ TAG = 'glitterP3'
 # ярусы пачки (лицо kit): колокол ×flare к подолу, вынос out и спуск drop подола (м), непрозрачность
 # пачка: доля перекраски тусклой каймы Tripo в яркое золото рефа и плотность золотых блёсток по фатину (tutu_gold)
 TUTU_GOLD, TUTU_SPARK = 0.75, 0.012
+# плотность блёсток: доля TUTU_SPARK у пояса и у подола (пятый проход: гуще к подолу)
+TUTU_SPARK_HEM = (0.35, 3.2)
 TUTU_LAYERS = [(1.1, 0.0, 0.0, 0.78), (1.2, 0.012, 0.008, 0.5), (1.3, 0.024, 0.004, 0.34)]
 DROP = ('Blush', 'BD_Pads', 'BD_FurCards', 'BD_Metal_Stars', 'Whiskers', 'FaceTufts', 'Skirt_Glitter')
 
@@ -102,6 +104,10 @@ def weld_map(V, tol=1e-5):
 
 def edges_of(F):
     return np.r_[F[:, [0, 1]], F[:, [1, 2]], F[:, [2, 0]]]
+
+
+# сглаживание силуэта щёк: высота от/до (м), итераций Таубина (пятый проход)
+CHEEK_SMOOTH = (0.52, 0.82, 12)
 
 
 def smooth_field(x, E, n, it, k=0.5, fixed=None):
@@ -503,6 +509,23 @@ def main():
         V, F, UV, role, capt, img, used_v, nv_old = P3F.remesh_face(V, F, UV, role, capt, img, face)
         cv = {k: np.r_[v, np.zeros(len(used_v) - nv_old, v.dtype)][used_v] for k, v in cv.items()}
         face = {k: v for k, v in face.items() if not k.startswith('_')}
+    if role is not None and face and CHEEK_SMOOTH:
+        # силуэт щёк (пятый проход): у Tripo по контуру щёк — рваные «пряди» геометрией (бахрома силуэта анфас);
+        # мех головы, смотрящий вбок, на высоте щёк — сглаживание Таубина (без усадки), лицо спереди не трогаем
+        wm_ = weld_map(V, 1e-6); nW_ = wm_.max() + 1
+        Pw_ = np.zeros((nW_, 3)); np.add.at(Pw_, wm_, V); Pw_ /= np.bincount(wm_, minlength=nW_)[:, None]
+        Nv_ = vnormals_welded(V, F)
+        Nw_ = np.zeros((nW_, 3)); np.add.at(Nw_, wm_, Nv_); Nw_ /= np.maximum(np.linalg.norm(Nw_, axis=1, keepdims=True), 1e-9)
+        rvw = np.zeros(nW_, bool)
+        for k in range(3):
+            rvw[wm_[F[role == 'fur', k]]] = True
+        side_ = rvw & (Pw_[:, 1] > CHEEK_SMOOTH[0]) & (Pw_[:, 1] < CHEEK_SMOOTH[1]) & (np.abs(Nw_[:, 0]) > 0.35) & (np.abs(Pw_[:, 0]) > 0.1)
+        Ew_ = wm_[edges_of(F)]
+        for _ in range(CHEEK_SMOOTH[2]):
+            Pw_ = smooth_field(Pw_, Ew_, nW_, 1, 0.5, fixed=~side_)
+            Pw_ = smooth_field(Pw_, Ew_, nW_, 1, -0.53, fixed=~side_)
+        V = Pw_[wm_]
+        print(f'щёки: силуэт сглажен ({int(side_.sum())} вершин)')
     if role is not None:
         # роли частей вместо цвета: мех (голова, уши, кисти, ноги, морда), хвост, худи
         rv = np.full(len(V), '', dtype=object)
@@ -529,6 +552,17 @@ def main():
         patch = (np.arange(len(V) - len(vs), len(V)), ringv)
         cv = {k: np.r_[v, v[vs]] for k, v in cv.items()}
         print(f'рот: {mouthv.sum()} вершин залиты, {tm.sum()} треуг. — на латку меха')
+    if capt is not None and capt.any():
+        # заплатки дыр (брови Tripo на лбу): обход треугольников — наружу. Купол заплатки вывернут — у двустороннего
+        # материала лоб над глазами светился изнанкой: тёмные «уступы» по форме бровей (пятый проход)
+        ci = np.nonzero(capt)[0]
+        fn = np.cross(V[F[ci, 1]] - V[F[ci, 0]], V[F[ci, 2]] - V[F[ci, 0]])
+        hv = V[V[:, 1] > 0.55]
+        c0 = np.array([0.0, float(np.median(hv[:, 1])), float(np.median(hv[:, 2]))])
+        out_ = ((V[F[ci]].mean(1) - c0) * fn).sum(1) < 0
+        if out_.any():
+            F = F.copy(); F[ci[out_]] = F[ci[out_]][:, [0, 2, 1]]
+        print(f'заплатки: вывернуто {int(out_.sum())} из {len(ci)} треуг. — развёрнуты наружу')
     N = vnormals_welded(V, F)
 
     np.savez_compressed(os.path.join(a.debug or '/tmp', 'p3_warped.npz'), V=V, F=F, UV=UV)
@@ -1118,7 +1152,7 @@ def fur_length(V, F, cv, Jn, Wn, jname):
     return L.astype(np.float32)
 
 
-def tutu_gold(tex, UV, Ft, seed=11):
+def tutu_gold(tex, UV, Ft, seed=11, V=None):
     """пачка по рефу: золотая кайма ярче и насыщеннее (у Tripo — тусклая охра), по фатину — золотые блёстки (точки 1–2 px,
     плотность TUTU_SPARK) — текстура атласа только в островах пачки"""
     from PIL import ImageDraw
@@ -1137,7 +1171,17 @@ def tutu_gold(tex, UV, Ft, seed=11):
     arr[mask] = c
     rng = np.random.default_rng(seed)
     ys, xs = np.nonzero(mask)
-    k = rng.random(len(ys)) < TUTU_SPARK
+    dens = np.ones(len(ys))
+    if V is not None:
+        # пятый проход: блёстки гуще к подолу (реф — россыпь у края фатина, у пояса реже): плотность по высоте текселя
+        pos, _, tid = raster_uv(V, np.tile([0, 0, 1.0], (len(V), 1)), UV, Ft, S)
+        y_ = pos[ys, xs, 1]
+        ok = tid[ys, xs] >= 0
+        if ok.any():
+            lo_, hi_ = np.percentile(y_[ok], [2, 98])
+            t_ = np.clip((hi_ - y_) / max(hi_ - lo_, 1e-6), 0, 1)  # 0 — пояс, 1 — подол
+            dens = np.where(ok, TUTU_SPARK_HEM[0] + (TUTU_SPARK_HEM[1] - TUTU_SPARK_HEM[0]) * t_ ** 1.6, 1.0)
+    k = rng.random(len(ys)) < TUTU_SPARK * dens
     col = np.where(rng.random((int(k.sum()), 1)) < 0.7, np.array([[250, 222, 130.0]]), np.array([[255, 250, 230.0]]))
     arr[ys[k], xs[k]] = col
     big = k & (rng.random(len(ys)) < 0.35)
@@ -1183,7 +1227,7 @@ def write_glb(g, wd, body, a, V, N, F, UV, Jn, Wn, targets, tnames, tex, sk_tri,
     j['images'][src]['mimeType'] = 'image/jpeg'
     j['images'][src]['name'] = 'glitter_p3_base'
     if sk_tri.any() and getattr(a, 'kit', False):
-        tex = tutu_gold(tex, UV, F[sk_tri])
+        tex = tutu_gold(tex, UV, F[sk_tri], V=V)
     g.set_image(src, tex)
     mat.pop('normalTexture', None)
     mat.pop('emissiveTexture', None); mat.pop('emissiveFactor', None)  # блёстки p1 (BD_sparkle) — в UV p1

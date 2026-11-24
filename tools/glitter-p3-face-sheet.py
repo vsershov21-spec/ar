@@ -86,8 +86,45 @@ def cut_ref(name):
     return im.crop((int(w * 0.12), int(h * 0.12), int(w * 0.88), int(h * 0.76))).resize((T, T))
 
 
+# крупно «лицо реф | лицо p3»: покой (вид спереди разворота) и 4 ключевые эмоции (design/cut/glitter/face)
+PAIRS = [('laugh', 'laugh'), ('wink_r', 'wink'), ('surprised', 'surprised'), ('sad', 'sad')]
+TB = 440
+
+
+def face_pairs():
+    """строка пар реф | p3 крупно (тайл TB): покой — голова анфас того же масштаба, эмоции — emo-preview"""
+    port = os.environ.get('PORT', '4391')
+    out = '/tmp/p3sheet_pairs'
+    subprocess.run(['node', os.path.join(ROOT, 'tools/persona-shot.mjs'), out, 'f', 'glitter'], timeout=900, capture_output=True,
+                   env={**os.environ, 'PORT': port, 'Q': f'v=front&w=1200&h=1410&m={M}&face=morph&bg=ffffff'})
+    HB = (330, 150, 870, 690)
+    p3 = Image.open(f'{out}/f_glitter.png').convert('RGB').crop(HB).resize((TB, TB))
+    rf = Image.open(os.path.join(ROOT, 'design/refs/glitter_views/front_white.png')).convert('RGB').crop((112, 60, 912, 1000)).resize((1200, 1410)).crop(HB).resize((TB, TB))
+    pairs = [(rf, 'реф: покой (разворот)'), (p3, 'p3: покой')]
+    tmp = f'/tmp/p3sheet_pairs/e.png'
+    subprocess.run(['node', os.path.join(ROOT, 'tools/face-shot.mjs'), tmp, f'p=glitter&m={M}&face=morph&s={",".join(s_ for s_, _ in PAIRS)}&cols={len(PAIRS)}&tile={TB}&dist=7'],
+                   env={**os.environ, 'PAGE': 'emo-preview'}, capture_output=True, text=True, timeout=900)
+    em = Image.open(tmp).convert('RGB')
+    for i, (st, c) in enumerate(PAIRS):
+        im = Image.open(os.path.join(ROOT, 'design/cut/glitter/face', c + '.png')).convert('RGBA')
+        bg = Image.new('RGBA', im.size, BG + (255,)); bg.alpha_composite(im); im = bg.convert('RGB')
+        w, h = im.size
+        pairs += [(im.crop((int(w * 0.12), int(h * 0.12), int(w * 0.88), int(h * 0.76))).resize((TB, TB)), f'реф: {c}'),
+                  (em.crop((i * TB, 0, i * TB + TB, TB)), f'p3: {c}')]
+    outim = Image.new('RGB', (len(pairs) * TB, TB + 32), BG)
+    d = ImageDraw.Draw(outim)
+    d.text((8, 4), 'лицо крупно: реф | p3 (покой и 4 ключевые эмоции)', fill=(20, 20, 30), font=FONT_B)
+    for i, (im, lab) in enumerate(pairs):
+        t = im.copy(); dd = ImageDraw.Draw(t)
+        dd.rectangle((0, TB - 26, TB, TB), fill=(255, 255, 255)); dd.text((6, TB - 23), lab, fill=(20, 20, 30), font=FONT_B)
+        outim.paste(t, (i * TB, 32))
+        if i % 2 == 1:
+            d.line((i * TB + TB - 1, 32, i * TB + TB - 1, TB + 32), fill=(90, 90, 100), width=3)
+    return outim
+
+
 def face_sheet():
-    rows = []
+    rows = [face_pairs()]
     t, _ = shot([s for s, _, _ in VIS], 9)
     rows.append(row('виземы Rhubarb (vis_X…vis_H, faceMorphs.ts) — p3', [label(x, n) for x, (_, n, _) in zip(t, VIS)]))
     rows.append(row('рты рефа design/sheets/mouths.jpg (ближайший тайл)', [mouth_ref(i) for _, _, i in VIS]))

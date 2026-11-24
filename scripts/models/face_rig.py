@@ -124,7 +124,12 @@ class Frame:
         self.subdiv = [tuple(z) for z in md['subdiv']] if 'subdiv' in md else SUBDIV
         self.marks = marks
         self.persona = persona
-        self.cfg = PERSONA[persona]
+        # рамка может уточнить параметры рта кота (Блёстка p3: язык крупнее и выше — розовый в открытой улыбке покоя)
+        self.cfg = {**PERSONA[persona], **{k: (tuple(v) if isinstance(v, list) else v) for k, v in (md.get('cfg') or {}).items()}}
+        self.p3 = bool(md.get('p3'))
+        # рамка может уточнить состав ключей рта (Блёстка p3: открытая улыбка покоя — «D», а не «V»; только эта модель)
+        for k, comp in (md.get('mouthKeys') or {}).items():
+            MOUTH[k] = {**MOUTH.get(k, {}), **comp}
         # шарнир челюсти: за ртом и чуть выше линии (у основания ушей)
         # глубина в рамке — в единицах «W Хулигана»: у Блёстки рот уже (W меньше), а голова той же величины —
         # пороги «спереди/вглубь», шарнир и полость по глубине считаются в абсолютной мере
@@ -225,7 +230,8 @@ def blender_topology(fr, P, Fc, UVv, Nv, vfloat, vvec, ffur):
     # щель фильтрума у Блёстки (Tripo: две стороны верхней губы не сшиты, края в 0.02 W друг от друга) — сшить, иначе
     # сквозь неё видна полость рта
     crack = []
-    for v in bm.verts:
+    # у p3 (морда — своя сетка без щели) край у фильтрума — это край дыры под носом: не сшивать
+    for v in ([] if fr.p3 else bm.verts):
         if any(e.is_boundary for e in v.link_edges):
             uu, vv_, ww = fuvw(v.co)
             if abs(uu) < 0.06 and -0.05 < vv_ < fr.nose + 0.08 and ww > -1.2:
@@ -668,7 +674,8 @@ def profile_fix(fr, T, P, side, pairs):
         yup = np.interp(u, pu_, d[up_i, 1])
         c = int(np.argmin(np.abs(pu_)))
         drop = min(0.0, float(d[lo_i[c], 1] - d[up_i[c], 1]))  # раскрытие в середине (< 0)
-        prof = sm(h * 1.15, 0.0, np.abs(u)) ** 0.7  # купол без излома на краю — мягкие уголки
+        # купол без излома на краю — мягкие уголки; flatb > 0 — плоское дно проёма до flatb·open («D» вместо «V»)
+        prof = sm(h * 1.15, h * comp.get('flatb', 0.0), np.abs(u)) ** 0.7
         # цель: край нижней губы = верхняя губа + раскрытие·профиль; за проёмом — сомкнуто (щель покоя тоже)
         close = 0.5 * gap * qrest * W * (1 - prof)
         tgt_lo = yup + drop * prof + close
@@ -1108,7 +1115,7 @@ def tongue(fr, rig, S, cav, ang_d, body=None):
     top = np.where(y > 0, y, 0) / np.maximum(s, 1e-6)  # 0..1 по верху
     groove = 0.018 * np.exp(-(x / 0.22) ** 2) * (y > 0)
     th_ = (0.12 * s ** 0.7) * np.where(y > 0, np.clip(top, 0, 1) * 1.0, 0) + 0.012 * np.clip(-y, 0, 1)
-    Y = fr.O[1] + (floor_v + 0.012 + 0.02 * s + th_ - groove * s - TONGUE_DROP) * W
+    Y = fr.O[1] + (floor_v + 0.012 + 0.02 * s + th_ - groove * s - fr.cfg.get('tongue_drop', TONGUE_DROP)) * W
     V = np.column_stack([X, Y, Z])
     # язык целиком за кожей морды (≥ 0.05 W): у узкой выпуклой морды (Блёстка) — глубже
     zs = front_surface(fr, S['P'])(V[:, 0], V[:, 1])

@@ -465,7 +465,7 @@ def bl2m(p2):
     return np.asarray(p2, np.float64)
 
 
-def eye_texture(persona, rx, ry, pr0, S=512):
+def eye_texture(persona, rx, ry, pr0, S=512, flat=False):
     """белок, радужка с градиентом и прожилками, зрачок; uv: u = 0.5 + 0.5·X, v = 0.5 − 0.5·Y (единичная сфера спереди)"""
     yy, xx = np.mgrid[0:S, 0:S].astype(np.float64)
     X = (xx + 0.5) / S * 2 - 1
@@ -476,10 +476,10 @@ def eye_texture(persona, rx, ry, pr0, S=512):
     rim, mid, hi = (np.array(c, np.float64) for c in IRIS[persona])
     # белок: чуть голубоватый к краю, тень сверху (от века)
     scl = np.array([246, 247, 250.0])
-    edge = np.array([196, 202, 218.0])
+    edge = np.array([196, 202, 218.0]) if not flat else np.array([232, 236, 244.0])
     s_k = smooth(0.35, 1.0, rho)
     sclera = scl * (1 - s_k[..., None]) + edge * s_k[..., None]
-    top_sh = smooth(0.0, 0.9, Y) * 0.16
+    top_sh = smooth(0.0, 0.9, Y) * (0.16 if not flat else 0.1)
     sclera *= (1 - top_sh)[..., None]
     # радужка
     t = np.clip((d - pr0) / (1 - pr0), 0, 1)
