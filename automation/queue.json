@@ -142,6 +142,7 @@
       "note": "36 новых имён × 3 кота = 108 слотов, 726 симв.; --only slot, уже озвученное пропускается по хэшу"
     },
     {
+<<<<<<< HEAD
       "id": "glitter-p3-meshy-1",
       "kind": "meshy",
       "args": [
@@ -164,6 +165,17 @@
         "glitter_p3_m71_thumb_left"
       ],
       "timeoutMin": 10
+=======
+      "id": "voice-names36-check-2411",
+      "kind": "script",
+      "ref": "a53ea5dbadfaa06d8675010b7020f29fd71ccafa",
+      "path": "scripts/deploy/voice-headers.sh",
+      "args": [
+        "names=227"
+      ],
+      "timeoutMin": 40,
+      "note": "после пересборки: 227 имён × 3 кота в манифесте сайта, все mp3 имён 200"
+>>>>>>> 6275878 (ar-auto: voice-names36-check-2411 — проверка новых имён на сайте после пересборки (без трат); коммит заодно пересобирает сайт с новым манифестом голосов)
     }
   ]
 }

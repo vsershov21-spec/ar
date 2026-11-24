@@ -3,6 +3,8 @@
 #   curl -fsSL https://raw.githubusercontent.com/vsershov21-spec/ar/main/scripts/deploy/voice-headers.sh | bash
 #   H=https://ar.vershov.com P=kind N=5 bash scripts/deploy/voice-headers.sh     # кот (kind — Добряк), сколько mp3
 #   ALL=1 bash scripts/deploy/voice-headers.sh                                   # + HEAD на каждый mp3 манифеста
+#   bash scripts/deploy/voice-headers.sh names=227      # имена: ждать (до 25 мин), пока в манифесте сайта у каждого кота
+#                                                       # ≥227 слотов имени, затем HEAD на все mp3 имён + 2–3 образца целиком
 # Что проверяет (iPhone 22.11: «звук зависал и не грузился»):
 #   манифест voice/el/manifest.json — 200, JSON, Cache-Control no-cache (после пересборки хэши файлов новые);
 #   mp3 — 200, audio/mpeg, БЕЗ Content-Encoding (mp3 не жмётся повторно), Content-Length = скачанному, начало файла —
@@ -20,6 +22,36 @@ hdr() { tr -d '\r' | awk -F': ' -v k="$1" 'tolower($1)==k{print $2}' | head -1; 
 T=$(mktemp -d); trap 'rm -rf "$T"' EXIT
 
 echo "=== озвучка $H (кот $P) ==="
+# режим names=<N> (аргумент — так его можно задать задачей ar-auto, где env ограничен)
+NAMES_N=""; for a in "$@"; do case "$a" in names=[0-9]*) NAMES_N=${a#names=} ;; esac; done
+if [ -n "$NAMES_N" ]; then
+  # кириллица в пути — percent-encoding, как шлёт браузер
+  urlenc() { local LC_ALL=C s="$1" o="" c i; for ((i = 0; i < ${#s}; i++)); do c=${s:i:1}; case "$c" in [A-Za-z0-9./_~-]) o+=$c ;; *) o+=$(printf '%%%02X' "'$c") ;; esac; done; printf '%s' "$o"; }
+  export -f urlenc
+  for i in $(seq 1 25); do
+    curl -s -o "$T/man.json" -H "$AE" -H "$UA" --compressed "$H/voice/el/manifest.json"
+    ok=1; line=""
+    for p in hooligan kind glitter; do
+      c=$(grep -o "\"f\":\"el/$p/$p\.slot\.name\.[^\"]*\.mp3\"" "$T/man.json" | sort -u | grep -c . || true)
+      line="$line $p=$c"; [ "$c" -ge "$NAMES_N" ] || ok=0
+    done
+    echo "попытка $i: слотов имени в манифесте:$line (ждём ≥ $NAMES_N)"
+    [ "$ok" = 1 ] && break
+    [ "$i" = 25 ] && { echo "ИТОГ: ПЛОХО (новые имена не попали в манифест сайта — пересборка не прошла?)"; exit 1; }
+    sleep 60
+  done
+  FILES=$(grep -o '"f":"el/[a-z]*/[a-z]*\.slot\.name\.[^"]*\.mp3"' "$T/man.json" | cut -d'"' -f4 | sort -u)
+  echo "--- HEAD на все $(printf '%s\n' "$FILES" | grep -c .) mp3 имён ---"
+  miss=$(printf '%s\n' $FILES | xargs -P 8 -I{} bash -c 'c=$(curl -s -o /dev/null -I -w "%{http_code}" "$0/voice/$(urlenc "{}")"); [ "$c" = 200 ] || echo "$c {}"' "$H")
+  [ -z "$miss" ] && echo "  все 200" || { echo "  ПЛОХО: не отвечают:"; printf '%s\n' "$miss" | head -10; bad=1; }
+  for f in $(printf '%s\n' $FILES | grep -E 'kind\.slot\.name\.Александра\.|hooligan\.slot\.name\.Тихон\.|glitter\.slot\.name\.Слава\.'); do
+    code=$(curl -s -o "$T/a.mp3" -D "$T/a.h" -H "$UA" -w '%{http_code}' "$H/voice/$(urlenc "$f")")
+    echo "$f: $code $(hdr content-type < "$T/a.h") $(wc -c < "$T/a.mp3") б magic=$(head -c 3 "$T/a.mp3" | od -An -tx1 | tr -d ' \n')"
+    [ "$code" = 200 ] || bad=1
+  done
+  [ "$bad" = 1 ] && { echo "ИТОГ: ПЛОХО"; exit 1; }
+  echo "ИТОГ: OK (имена в манифесте и отдаются)"; exit 0
+fi
 code=$(curl -s -o "$T/man.json" -D "$T/man.h" -H "$AE" -H "$UA" --compressed -w '%{http_code}' "$H/voice/el/manifest.json")
 ct=$(hdr content-type < "$T/man.h"); cc=$(hdr cache-control < "$T/man.h"); ce=$(hdr content-encoding < "$T/man.h")
 echo "manifest: $code  type=$ct  encoding=${ce:-нет}  cache=${cc:-нет}  $(wc -c < "$T/man.json") байт"
