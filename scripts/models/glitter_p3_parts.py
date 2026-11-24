@@ -21,7 +21,9 @@ sys.path.insert(0, HERE)
 from glb_io import Glb  # noqa: E402
 
 ROLES = ['fur', 'cloth', 'tutu', 'tail', 'gold', 'nose', 'muzzle', 'eye', 'mouth', 'brow', 'junk']
-DROP = {'eye', 'mouth', 'brow', 'junk', 'muzzle'}
+DROP = {'junk'}
+# лицо Tripo (глаза с ресницами, брови, нос, рот-улыбка, морда) остаётся сеткой и текстурой Tripo: моргание и рот —
+# морфами (glitter_p3.py face_morphs); глазницы под глазами закрываются вогнутой заплаткой цвета меха — «веко» при моргании
 
 
 def classify(parts):
@@ -226,10 +228,11 @@ def main():
             if len(loop) > 60 or r > 0.075:
                 continue
             d, _ = tq.query(L)
-            if np.median(d) < 0.004:  # край прилегает к другой части — она и закрывает
-                continue
             eye = any(k in land and np.linalg.norm(c - np.array(land[k])) < 0.06 for k in ('irisL', 'irisR'))
-            nv, nt, q = cap_loop(p['V'], p['F'], loop, 0.12 if eye else 0.04)
+            if np.median(d) < 0.004 and not eye:  # край прилегает к другой части — она и закрывает
+                continue
+            # глазница — вогнутая (за глазом Tripo: видна только при моргании), щель подбородка — чуть наружу
+            nv, nt, q = cap_loop(p['V'], p['F'], loop, -0.45 if eye else 0.04)
             arr = np.asarray(p['img']).astype(np.float32)
             hh, ww = arr.shape[:2]
             uvl = p['UV'][loop]

@@ -8,7 +8,8 @@
       for c in "dance_glitter&ct=1.3" "sit&ct=1.6" "sleep_loop&ct=1.0"; do
         Q="v=tq&w=300&h=440&face=shader&m=$m&clip=$c" node tools/persona-shot.mjs $D ${p}a_${c%%&*} glitter; done
     done
-    python3 tools/glitter-p3-sheet.py $D docs/qa/glitter/glitter_p3_sheet.jpg
+    /tmp/bpyenv/bin/python tools/glitter-p3-tripo-face.py -- design/models/glitter_tripo_quad14k.glb $D/tripo_face.png   # Tripo-оригинал (Cycles)
+    python3 tools/glitter-p3-sheet.py $D docs/qa/glitter/glitter_p3_sheet2.jpg
 """
 import os, sys
 from PIL import Image, ImageDraw, ImageFont
@@ -38,6 +39,18 @@ def ref_face_states():
     return [im.crop((95, 95, 395, 395)).resize((T, T))]
 
 
+def face_cmp(d):
+    """лица крупно одним масштабом: реф, Tripo-оригинал (рендер Cycles), p3 и p1 (вид face из persona-shot)"""
+    out = [ref_views()[4]]
+    tf = os.path.join(d, 'tripo_face.png')
+    t = Image.new('RGB', (T, H), BG)
+    if os.path.exists(tf):
+        t.paste(Image.open(tf).convert('RGB').resize((T, T)), (0, 40))
+    out.append(t)
+    out += [tiles(f'{d}/nv_glitter.png', 5)[4], tiles(f'{d}/ov_glitter.png', 5)[4]]
+    return out
+
+
 def tiles(path, n, w=T, h=H):
     im = Image.open(path).convert('RGB')
     return [im.crop((i * w, 0, (i + 1) * w, h)) for i in range(n)]
@@ -65,7 +78,9 @@ def main():
     A = [('dance_glitter', 'танец'), ('sit', 'сидит'), ('sleep_loop', 'лежит (сон)')]
     rows = [row('реф: design/refs/glitter_turnaround_1123.png (разворот продакта 23.11)', [lab(t, v) for t, v in zip(ref_views(), V)]),
             row('p1 — пилот сейчас (glitter_p1.glb, рот шейдером)', [lab(t, v) for t, v in zip(tiles(f'{d}/ov_glitter.png', 5), V)]),
-            row('p3 — новая (Tripo по 4 видам, части → скелет, глаза и рот p1; ?models=p3)', [lab(t, v) for t, v in zip(tiles(f'{d}/nv_glitter.png', 5), V)]),
+            row('p3 — новая (Tripo по 4 видам, части; лицо Tripo, моргание и рот — морфами; ?models=p3)', [lab(t, v) for t, v in zip(tiles(f'{d}/nv_glitter.png', 5), V)]),
+            row('лицо: реф | Tripo-оригинал (design/models/glitter_tripo_quad14k.glb) | p3 в покое | p1 в покое',
+                [lab(t, v) for t, v in zip(face_cmp(d), ['реф', 'Tripo-оригинал', 'p3', 'p1'])]),
             row('лицо p1: покой, моргание, рот а/о/у', [lab(t, s) for t, s in zip(tiles(f'{d}/of.png', 5, T, T), S)]),
             row('лицо p3: покой, моргание, рот а/о/у', [lab(t, s) for t, s in zip(tiles(f'{d}/nf.png', 5, T, T), S)])]
     an = []

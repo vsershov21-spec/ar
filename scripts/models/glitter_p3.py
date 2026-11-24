@@ -498,7 +498,7 @@ def main():
         for k in range(3):
             rv[F[:, k]] = role
         cv = dict(cv)
-        cv['fur'] = np.isin(rv, ['fur', 'muzzle']); cv['purple'] = rv == 'tail'; cv['lavender'] = rv == 'cloth'
+        cv['fur'] = rv == 'fur'; cv['purple'] = rv == 'tail'; cv['lavender'] = rv == 'cloth'
         cv['role'] = rv
     if face and role is None:
         V, mouthv, ringv = close_mouth(V, face)
@@ -586,6 +586,9 @@ def build(a, g, wd, body, skirt, jname, marks, V, N, F, UV, img, cv, face, patch
         gv = np.zeros(len(V), bool); gv[F[gold_tri].ravel()] = True
         gh = gv & (V[:, 1] > wd.p('mixamorig:Neck')[1] + 0.05)
         Dn[gh] = 0; Dn[gh, jname.index('mixamorig:Head')] = 1
+        # лицо Tripo (глаза, брови, нос, рот, морда) — жёстко к голове (рот и веки — морфами)
+        fv = np.isin(cv['role'], ['eye', 'brow', 'nose', 'mouth', 'muzzle'])
+        Dn[fv] = 0; Dn[fv, jname.index('mixamorig:Head')] = 1
     Dn = assign_tail(V, Dn, tails, wd, jname, tail_ids)
     # сглаживание весов по сетке (сшитые швы UV)
     wm = weld_map(V)
@@ -598,10 +601,14 @@ def build(a, g, wd, body, skirt, jname, marks, V, N, F, UV, img, cv, face, patch
     Jn, Wn = top4(Dn)
 
     mem('морфы')
-    # ── 4. морфы тела p1 → новая сетка (только морда) ──
+    # ── 4. морфы: лицо Tripo — свои (моргание, рот, брови); иначе — тела p1 → новая сетка (только морда) ──
     targets = []
     tnames = body['tnames']
-    if body['targets']:
+    tripo_face = role is not None and 'eye' in set(role.tolist())
+    a.tripo_face = tripo_face
+    if tripo_face:
+        tnames, targets = face_morphs(V, F, cv['role'], face)
+    elif body['targets']:
         dd, nn1 = cKDTree(body['P']).query(V, k=4)
         w1 = 1.0 / np.maximum(dd, 1e-4) ** 2; w1 /= w1.sum(1, keepdims=True)
         near = dd[:, 0] < 0.02
@@ -614,13 +621,22 @@ def build(a, g, wd, body, skirt, jname, marks, V, N, F, UV, img, cv, face, patch
     mem('текстура')
     # ── 5. текстура: закрасить нарисованные глаза и рот ──
     mk3 = new_marks(marks, face)
-    tex = paint_face(img, V, F, UV, face, mk3, a, patch)
+    if tripo_face:  # лицо — текстура Tripo как есть
+        tex = Image.fromarray(img).resize((a.tex, a.tex), Image.LANCZOS) if img.shape[0] != a.tex else Image.fromarray(img)
+    else:
+        tex = paint_face(img, V, F, UV, face, mk3, a, patch)
     if role is None:
         tex = tail_tint(tex, V, F, UV, Jn, Wn, jname)
 
     mem('глаза')
     # ── глаза p1: та же глубина над новой поверхностью ──
-    fit_face_kit(g, wd, body, V, F, a, marks, mk3)
+    if tripo_face:
+        # глаза/веки/рот/брови p1 не нужны: узлы убираются в write_glb; разметка лица (marks) — по Tripo, на узле Brows без сетки
+        bn = g.j['nodes'][wd.idx['Brows']]
+        bn.pop('mesh', None)
+        bn.setdefault('extras', {})['marks'] = mk3
+    else:
+        fit_face_kit(g, wd, body, V, F, a, marks, mk3)
 
     mem('сборка')
     # ── сборка GLB ──
@@ -835,6 +851,61 @@ def close_mouth(V, face):
     return V, mouthv, ringv
 
 
+def face_morphs(V, F, rv, face):
+    """морфы лица Tripo (их ведёт прежний цикл glbCharacter по MORPH_TARGETS, faceMorphs у p3 нет):
+    blink_L/R — глаз Tripo (с ресницами) сжимается к линии у нижней трети разреза, за ним — вогнутая заплатка
+    глазницы цвета меха (закрытое веко); mouth_A/E/O/U — «челюсть»: всё ниже линии рта у рта (губы головы, низ полости,
+    низ морды) вниз-назад, O/U — уже к середине, E — шире; brow_up/down/sad — брови Tripo."""
+    names, T = [], []
+    def add(n, dP):
+        names.append(n); T.append((dP.astype(np.float32), None))
+    for side, s_ in (('L', 1), ('R', -1)):
+        m = (rv == 'eye') & (s_ * V[:, 0] > 0)
+        dP = np.zeros_like(V)
+        if m.any() and f'eyeTop{side}' in face:
+            top, bot = face[f'eyeTop{side}'][1], face[f'eyeBottom{side}'][1]
+            y0 = bot + 0.3 * (top - bot)
+            dP[m, 1] = (y0 - V[m, 1]) * 0.96
+            # назад к краю глазницы: белок уходит, остаётся линия ресниц (у Tripo глаз выступает ~2 см над краем)
+            zr = np.percentile(V[m, 2], 15)
+            dP[m, 2] = -np.clip(V[m, 2] - zr, 0, None) * 0.75
+        add(f'blink_{side}', dP)
+    if 'mouthL' in face:
+        L_, R_ = np.array(face['mouthL']), np.array(face['mouthR'])
+        c = (L_ + R_) / 2; rx = np.linalg.norm(L_ - R_) / 2
+        cy = c[1] + 0.002
+        dxy = np.hypot((V[:, 0] - c[0]) / (rx * 2.2), (V[:, 1] - c[1]) / (rx * 1.9))
+        near = (np.abs(V[:, 2] - c[2]) < 0.07) & (V[:, 2] > c[2] - 0.06)
+        fall = np.clip(1 - dxy, 0, 1) ** 1.5 * near
+        below = np.clip((cy - V[:, 1]) / 0.008, 0, 1)
+        corner = np.clip(np.abs(V[:, 0] - c[0]) / rx, 0, 1.4)
+        for n, drop, sx in (('mouth_A', 0.55, 1.0), ('mouth_E', 0.22, 1.12), ('mouth_O', 0.45, 0.78), ('mouth_U', 0.2, 0.66)):
+            dP = np.zeros_like(V)
+            w = fall * below
+            dP[:, 1] = -drop * rx * w
+            dP[:, 2] = -0.25 * drop * rx * w
+            # уже/шире: сдвиг к середине по x у рта (верх и низ), сильнее у уголков
+            wx = fall * np.clip(1.2 - np.abs(V[:, 1] - c[1]) / (rx * 0.9), 0, 1)
+            dP[:, 0] = (sx - 1) * (V[:, 0] - c[0]) * wx * np.clip(corner, 0, 1)
+            add(n, dP)
+    for n in ('brow_up', 'brow_down', 'brow_sad'):
+        dP = np.zeros_like(V)
+        for s_ in (1, -1):
+            m = (rv == 'brow') & (s_ * V[:, 0] > 0)
+            if not m.any():
+                continue
+            ax = np.abs(V[m, 0]); t = (ax - ax.min()) / max(np.ptp(ax), 1e-6)  # 0 — у переносицы
+            if n == 'brow_up':
+                dP[m, 1] = 0.007
+            elif n == 'brow_down':
+                dP[m, 1] = -0.0045 * (1 - 0.5 * t); dP[m, 0] = -s_ * 0.002
+            else:
+                dP[m, 1] = 0.007 * (1 - t) - 0.002 * t
+        add(n, dP)
+    print('морфы лица Tripo:', ', '.join(names))
+    return names, T
+
+
 def new_marks(marks, face):
     """разметка лица (Brows.extras.marks: мировые точки, их читают furTone/faceWrinkles/mouthRig) — по новой сетке"""
     m = dict(marks)
@@ -982,7 +1053,8 @@ def fur_length(V, F, cv, Jn, Wn, jname):
     head = bw(lambda n: 'Head' in n or 'Ear' in n)
     hand = bw(lambda n: 'Hand' in n)
     foot = bw(lambda n: 'Foot' in n or 'Toe' in n)
-    L = 0.0075 * lo * (1 - 0.3 * np.clip(head, 0, 1)) * (1 + 0.4 * np.clip(tail, 0, 1)) * (1 - 0.35 * np.clip(foot, 0, 1))
+    # короткий плюш (реф — гладкий): голова 2.3 мм, тело 5 мм; длинный мех на силуэте головы давал белую бахрому
+    L = 0.005 * lo * (1 - 0.55 * np.clip(head, 0, 1)) * (1 + 0.4 * np.clip(tail, 0, 1)) * (1 - 0.35 * np.clip(foot, 0, 1))
     L *= 1 - np.clip((hand - 0.1) / 0.4, 0, 1)
     if 'furk' in cv:
         L *= cv['furk']
@@ -1068,15 +1140,29 @@ def write_glb(g, wd, body, a, V, N, F, UV, Jn, Wn, targets, tnames, tex, sk_tri,
         fm.setdefault('extras', {})['targetNames'] = list(tnames)
     else:
         fp.pop('targets', None)
+    fx = fn.setdefault('extras', {}).setdefault('fur', {})
+    fx['tip'] = [0.97, 0.97, 0.99]  # кончики не светлее меха — без белого ореола по контуру
     print(f'мех: {len(ftri)} треуг., длина до {L.max() * 1000:.1f} мм')
     mesh.setdefault('extras', {})['targetNames'] = list(tnames)
+    mesh['extras'].pop('faceStageTargets', None)
+    # веса по умолчанию — нули по числу ключей (у p1 было 13 значений, часть = 1: при другом наборе ключей
+    # загрузчик открыл бы рот и закрыл глаза в покое)
+    for mm in (mesh, fm):
+        if tg:
+            mm['weights'] = [0.0] * len(tg)
+        else:
+            mm.pop('weights', None)
 
     # убрать лишние узлы p1
-    drop = {wd.idx[n] for n in DROP if n in wd.idx}
+    dl = list(DROP)
+    if getattr(a, 'tripo_face', False):
+        dl += ['MouthD'] + [f'{k}_{sd}' for sd in 'LR' for k in ('Eye', 'EyeS', 'EyeBall', 'LidUp', 'LidLo', 'Tear')]
+    drop = {wd.idx[n] for n in dl if n in wd.idx}
     remove_nodes(j, drop)
     from body_detail import gc
     gc(g)
-    j['asset'].setdefault('extras', {})[TAG] = {'version': 1, 'tris': int(len(F)), 'skirt': int(sk_tri.sum())}
+    j['asset'].setdefault('extras', {})[TAG] = {'version': 2, 'tris': int(len(F)), 'skirt': int(sk_tri.sum()),
+                                               **({'face': 'tripo'} if getattr(a, 'tripo_face', False) else {})}
     size = g.save(a.out)
     print(f'→ {a.out}: {size / 1e6:.2f} МБ, вершин {nv}, треуг. {len(F)} (тело {len(body_tris)}, пачка {int(sk_tri.sum())})')
 

@@ -114,8 +114,17 @@ describe('glitter p3: флаг ?models=p3', () => {
       j.skins[0].joints.map((k) => [j.nodes[k].name, j.nodes[k].translation, j.nodes[k].rotation]);
     expect(bones(p3)).toEqual(bones(p1));
     const names = p3.nodes.map((n: { name: string }) => n.name);
-    for (const n of ['Skirt_P3', 'Bow_Glitter', 'BD_FurShell', 'EyeBall_L', 'LidUp_R', 'Brows', 'MouthD']) expect(names).toContain(n);
-    expect(p3.asset.extras.glitterP3).toBeTruthy();
+    for (const n of ['Skirt_P3', 'Bow_Glitter', 'BD_FurShell', 'Brows']) expect(names).toContain(n);
+    // лицо — Tripo (глаза, брови, рот сеткой и текстурой): накладок p1 нет, разметка лица осталась на узле Brows
+    for (const n of ['EyeBall_L', 'LidUp_R', 'MouthD']) expect(names).not.toContain(n);
+    expect(p3.asset.extras.glitterP3.face).toBe('tripo');
+    const brows = p3.nodes.find((n: { name: string }) => n.name === 'Brows');
+    expect(brows.mesh).toBeUndefined();
+    expect(brows.extras.marks.eyeOuterL).toHaveLength(3);
+    // моргание и рот — морфами тела (их ведёт цикл по MORPH_TARGETS), веса по умолчанию — нули
+    const body = p3.meshes.find((m: { extras?: { targetNames?: string[] } }) => m.extras?.targetNames?.includes('blink_L'));
+    expect(body.extras.targetNames).toEqual(expect.arrayContaining(['blink_L', 'blink_R', 'mouth_A', 'mouth_O', 'mouth_U', 'brow_up']));
+    expect(body.weights.every((w: number) => w === 0)).toBe(true);
     const col = JSON.parse(fs.readFileSync('public/models/v2/glitter_p3_colliders.json', 'utf8'));
     expect(col.volumes.map((v: { name: string }) => v.name)).toEqual(expect.arrayContaining(['head', 'torso', 'skirt']));
   });

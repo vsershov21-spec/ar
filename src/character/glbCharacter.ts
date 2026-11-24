@@ -339,6 +339,12 @@ export class GlbCharacter implements Character {
   readonly groundDbg = { min: 0, name: '', lift: 0, final: 0 };
   private lookYaw = 0;
   private lookPitch = 0;
+  /**
+   * лицо — сетка и текстура Tripo (Блёстка p3, asset.extras.glitterP3.face = 'tripo'): в покое нарисованная улыбка и
+   * глаза как на рефе, поэтому базовая полуулыбка/приоткрытый рот характера (PERSONA_FACE_V2) не подмешивается —
+   * её ключи mouth_A/smile у этой сетки открывали бы рот в покое
+   */
+  private tripoFace = false;
 
   constructor(private url = 'models/character.glb', private animsUrl?: string) {
     this.object.name = 'character-glb';
@@ -361,6 +367,7 @@ export class GlbCharacter implements Character {
       loader.setDRACOLoader(new DRACOLoader());
     }
     const gltf = await loader.parseAsync(raw, asset(url).replace(/[^/]*$/, ''));
+    this.tripoFace = (gltf.parser.json as { asset?: { extras?: { glitterP3?: { face?: string } } } }).asset?.extras?.glitterP3?.face === 'tripo';
     const model = gltf.scene;
     this.model = model;
     model.updateMatrixWorld(true);
@@ -1329,7 +1336,7 @@ export class GlbCharacter implements Character {
     }
     // характер в покое (референс): у Блёстки всегда чуть розовые щёчки и мягкая полуулыбка
     const base = (this.faceMorphs ? PERSONA_FACE_MORPH : modelsV2() ? PERSONA_FACE_V2 : PERSONA_FACE)[this.personaId];
-    if (base) for (const k in base) W[k] = Math.max(W[k] ?? 0, base[k] * (1 - (W.frown ?? 0)));
+    if (base && !this.tripoFace) for (const k in base) W[k] = Math.max(W[k] ?? 0, base[k] * (1 - (W.frown ?? 0)));
     // характер глаз (v2 — по умолчанию; ?models=v1 — без них): у Блёстки по рефу глаза широко открыты — пресеты «самодовольно/сонно/прищур»
     // в idle-клипах (зеркальце, кружение) прикрывают веки слабее
     const eyeK = modelsV2() ? PERSONA_EYES_V2[this.personaId] : undefined;
