@@ -175,6 +175,16 @@
       ],
       "timeoutMin": 40,
       "note": "после пересборки: 227 имён × 3 кота в манифесте сайта, все mp3 имён 200"
+    },
+    {
+      "id": "glitter-p3-meshy-2",
+      "kind": "meshy",
+      "args": [
+        "--only",
+        "glitter_p3_m6"
+      ],
+      "maxCredits": 50,
+      "note": "Блёстка p3: вариант meshy-6 (без geometry_resolution) для сравнения с 7.1"
     }
   ]
 }
