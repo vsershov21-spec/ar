@@ -97,9 +97,12 @@ export interface EyeInput {
  * светлее — под мех вокруг (оболочки меха светлеют наружу, голая оболочка века выходила голубее и темнее).
  */
 export function patchLid(m: THREE.MeshStandardMaterial, soft = false, lidN?: { value: THREE.Vector3 }, cut?: LidCut) {
-  m.roughness = 0.95;
+  // веко с текстурой морды (Блёстка p3, LidCut.fx.w > 0): шероховатость и окружение — как у кожи вокруг (материал из модели)
+  if (!(cut && cut.fx.w > 0)) {
+    m.roughness = 0.95;
+    m.envMapIntensity = 0;
+  }
   m.metalness = 0;
-  m.envMapIntensity = 0;
   const prev = m.onBeforeCompile;
   m.onBeforeCompile = (sh, r) => {
     prev?.call(m, sh, r);
@@ -109,15 +112,17 @@ export function patchLid(m: THREE.MeshStandardMaterial, soft = false, lidN?: { v
       sh.uniforms.uLidR = cut.rot;
       sh.uniforms.uLidBand = cut.band;
       sh.uniforms.uLidTone = { value: cut.tone };
+      sh.uniforms.uLidFx = { value: cut.fx };
+      sh.uniforms.uLidFade = { value: cut.fade };
     }
     sh.vertexShader = 'varying vec3 vLidP;\n' + (soft ? 'attribute vec2 aLid;\nvarying vec2 vLid;\n' : '') + (lidN ? 'uniform vec3 uLidN;\n' : '') +
-      (cut ? 'uniform mat3 uLidR;\nvarying vec3 vLidE;\n' : '') + sh.vertexShader
+      (cut ? 'uniform mat3 uLidR;\nuniform vec4 uLidFx;\nvarying vec3 vLidE;\n' : '') + sh.vertexShader
       .replace(
         '#include <beginnormal_vertex>',
         // нормаль к «лицу» (ось глаза +Z) — веко освещено, как кожа вокруг глаза; у кромки — своя (скруглённый край)
         soft
           ? `#include <beginnormal_vertex>
-  objectNormal = normalize(mix(objectNormal, ${lidN ? 'uLidN' : 'vec3(0.0, 0.25, 1.0)'}, 0.94));`
+  objectNormal = normalize(mix(objectNormal, ${lidN ? 'uLidN' : 'vec3(0.0, 0.25, 1.0)'}, ${cut ? '(uLidFx.w > 0.0 ? uLidFx.w : 0.94)' : '0.94'}));`
           : `#include <beginnormal_vertex>
   objectNormal = normalize(mix(objectNormal, vec3(0.0, 0.25, 1.0), 0.8));`,
       )
@@ -129,7 +134,7 @@ export function patchLid(m: THREE.MeshStandardMaterial, soft = false, lidN?: { v
     {
       vec3 cutE = normalize(vLidE);
       float cutD = cutE.z > 0.05 ? (texture2D(uLidCut, cutE.xy * ${(0.5 / CUT_SPAN).toFixed(4)} + 0.5).r - 0.5) * ${(2 * CUT_RANGE).toFixed(3)} : 1.0;
-      float cutV = 1.0 - smoothstep(${CUT_FADE[0].toFixed(3)}, ${CUT_FADE[1].toFixed(3)}, cutD);
+      float cutV = 1.0 - smoothstep(uLidFade.x, uLidFade.y, cutD);
       // порог растворения: пряди (столбцы вдоль x, вытянуты по y, как мех морды) + мелкий шум экрана
       float cutS = fract(sin(dot(floor(cutE.xy * vec2(90.0, 14.0)), vec2(12.9898, 78.233))) * 43758.5453);
       float cutN = mix(fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715)))), cutS, 0.6);
@@ -138,14 +143,14 @@ export function patchLid(m: THREE.MeshStandardMaterial, soft = false, lidN?: { v
     }` : ''}
     // мех по всей оболочке (вершинный цвет у кромки — тоже мех), тон — под мех вокруг: чуть светлее и теплее
     float lidL0 = dot(diffuseColor.rgb, vec3(0.299, 0.587, 0.114));
-    diffuseColor.rgb = mix(vec3(lidL0), diffuseColor.rgb, 0.9) * ${cut ? 'vec3(1.0)' : 'vec3(1.1, 1.0, 0.96)'};
+    diffuseColor.rgb = mix(vec3(lidL0), diffuseColor.rgb, ${cut ? 'uLidFx.x' : '0.9'}) * ${cut ? 'vec3(1.0)' : 'vec3(1.1, 1.0, 0.96)'};
     vec3 q1 = vLidP * vec3(140.0, 22.0, 140.0);
     vec3 q2 = vLidP * vec3(60.0, 10.0, 60.0) + 7.0;
     float n1 = fract(sin(dot(floor(q1), vec3(12.9898, 78.233, 37.719))) * 43758.5453);
     float n2 = fract(sin(dot(floor(q2), vec3(39.346, 11.135, 83.155))) * 43758.5453);
-    diffuseColor.rgb *= ${cut ? 'uLidTone.x' : '1.34'} + 0.08 * (n1 - 0.5) + 0.1 * (n2 - 0.5);
+    diffuseColor.rgb *= ${cut ? 'uLidTone.x' : '1.34'} + ${cut ? 'uLidFx.z * ' : ''}(0.08 * (n1 - 0.5) + 0.1 * (n2 - 0.5));
     ${cut ? `// закрытое веко — мягкий купол (реф: светлее к середине), к краю разреза — тон кожи вокруг
-    diffuseColor.rgb *= 1.0 + 0.07 * smoothstep(0.0, -0.45, lidCutD);` : ''}
+    diffuseColor.rgb *= 1.0 + uLidFx.y * smoothstep(0.0, -0.45, lidCutD);` : ''}
     // подводка: тонкая линия у края (≈ 0.02 рад) + ресницы (по столбцам вдоль кромки — разной длины), мягко в мех
     float e = vLid.x, ls = vLid.y;
     float col = vLidP.x * 38.0;
@@ -174,7 +179,7 @@ export function patchLid(m: THREE.MeshStandardMaterial, soft = false, lidN?: { v
     lidFur = fur;
   }`;
     sh.fragmentShader = 'varying vec3 vLidP;\nfloat lidFur = 0.0;\nfloat lidCutD = -1.0;\n' + (soft ? 'varying vec2 vLid;\n' : '') +
-      (cut ? 'uniform sampler2D uLidCut;\nuniform vec2 uLidBand;\nuniform vec2 uLidTone;\nuniform mat4 projectionMatrix;\nvarying vec3 vLidE;\n' : '') + sh.fragmentShader.replace(
+      (cut ? 'uniform sampler2D uLidCut;\nuniform vec2 uLidBand;\nuniform vec2 uLidTone;\nuniform vec4 uLidFx;\nuniform vec2 uLidFade;\nuniform mat4 projectionMatrix;\nvarying vec3 vLidE;\n' : '') + sh.fragmentShader.replace(
       '#include <color_fragment>',
       `#include <color_fragment>
   ${furCode}`,
@@ -198,20 +203,35 @@ export function patchLid(m: THREE.MeshStandardMaterial, soft = false, lidN?: { v
   }`,
       );
   };
-  m.customProgramCacheKey = () => (soft ? (lidN ? (cut ? 'cat-lid-soft-cut-v1' : 'cat-lid-soft-n-v1') : 'cat-lid-soft-v1') : 'cat-lid-v2');
+  m.customProgramCacheKey = () => (soft ? (lidN ? (cut ? 'cat-lid-soft-cut-v3' : 'cat-lid-soft-n-v1') : 'cat-lid-soft-v1') : 'cat-lid-v2');
   m.needsUpdate = true;
 }
 
 /** ряды оболочки века от кромки (рад по оболочке) — как lid_mesh в scripts/models/face_detail.py */
 export const LID_ROWS = [0, 0.05, 0.12, 0.26, 0.44, 0.825, 1.21, 1.595, 1.98, 2.365, 2.75];
 /** Блёстка p3 (лицо по рефу, глаза glitter_p3_face.py — extras.persona 'glitter_p3'): закрытое веко = мех вокруг (лист docs/qa/glitter) */
-const LID_P3_TONE = 0.8;
+const LID_P3_TONE = 0.88;
 /** тон меха мягкого века к вершинному цвету (сверка по листам docs/qa/face: закрытое веко = мех вокруг глаза) */
 const LID_TONE: Record<string, number> = {};
 /** мягкие веки с тоном меха (FurTone, маска лица): яркость и подсветка меха века по коту — сверка по lids.jpg */
-const LID_FUR: Record<string, [number, number]> = { hooligan: [0.98, 0.08], kind: [0.98, 0.08], glitter: [0.95, 0.08], glitter_p3: [LID_P3_TONE, 0.03] };
+const LID_FUR: Record<string, [number, number]> = { hooligan: [0.98, 0.08], kind: [0.98, 0.08], glitter: [0.95, 0.08], glitter_p3: [LID_P3_TONE, 0] };
+/**
+ * мех века в шейдере (LidCut.fx): x — доля цвета (1 — без обесцвечивания), y — «купол» светлее к середине, z — сила шума
+ * прядей, w > 0: у века текстура морды из модели (Блёстка p3, glitter_p3_face.py: UV блока морды по месту закрытого
+ * века) — шероховатость и окружение материала модели, нормаль к оси глаза с долей w (у прочих — 0.94: закрытое веко
+ * освещено, как кожа рядом; у p3 сфера века продолжает яблоко и кожу вокруг — своя нормаль ближе к коже)
+ */
+const LID_FX: Record<string, [number, number, number, number]> = { glitter_p3: [1, 0, 0.35, 1.6] };
+const LID_FX_DEFAULT: [number, number, number, number] = [0.9, 0.07, 1, 0];
+/**
+ * растворение века за разрезом по коту (по умолчанию CUT_FADE): Блёстка p3 — почти по самому краю разреза: мех века
+ * (текстура морды) продолжает кожу, а светлый «капюшон» оболочки над кожей за разрезом выдавал веко
+ */
+const LID_FADE: Record<string, [number, number]> = { glitter_p3: [0, 0.16] };
 /** сила ресниц верхнего века (ширина подводки и длина ресниц; Блёстка — подводка толще, как на рефе) */
-const LID_LASH: Record<string, number> = { glitter: 1.6, glitter_p3: 1.7 };
+const LID_LASH: Record<string, number> = { glitter: 1.6, glitter_p3: 2.3 };
+/** сила подводки нижнего века (по умолчанию 0.35; Блёстка p3 — тёмный контур вокруг всего глаза, как на рефе) */
+const LID_LASH_LO: Record<string, number> = { glitter_p3: 1.5 };
 
 /**
  * Мягкие веки: атрибут aLid (x — расстояние от кромки по рядам LID_ROWS, y — сила ресниц: верхнее 1, нижнее 0.35) и
@@ -252,6 +272,10 @@ export interface LidCut {
   band: { value: THREE.Vector2 };
   /** яркость меха века (x) и подсветка (y) — под мех оболочек вокруг (у века оболочек нет) */
   tone: THREE.Vector2;
+  /** мех века в шейдере — см. LID_FX */
+  fx: THREE.Vector4;
+  /** растворение века за разрезом (единицы глаза) — CUT_FADE, у Блёстки p3 — LID_FADE */
+  fade: THREE.Vector2;
 }
 /** поле разреза: квадрат ±CUT_SPAN единиц глаза, расстояние ±CUT_RANGE (> 0 — снаружи разреза) */
 const CUT_SPAN = 1.3;
@@ -409,8 +433,8 @@ export class EyeRig {
         const l = lids[i];
         // контур — до правки цвета/атрибутов (позиции те же); одна текстура на глаз, поворот — свой у каждого века
         const tex = lidCutTexture(lidCutPolygon(l.up!.geometry, l.lo!.geometry, l.nu));
-        for (const lid of [e.up, e.lo]) cuts.set(lid, { tex, rot: { value: new THREE.Matrix3() }, band: { value: new THREE.Vector2() }, tone: new THREE.Vector2(...(LID_FUR[persona] ?? LID_FUR.kind)) });
-        softLidGeometry(l.lo!.geometry, l.nu, 0.35, tone);
+        for (const lid of [e.up, e.lo]) cuts.set(lid, { tex, rot: { value: new THREE.Matrix3() }, band: { value: new THREE.Vector2() }, tone: new THREE.Vector2(...(LID_FUR[persona] ?? LID_FUR.kind)), fx: new THREE.Vector4(...(LID_FX[persona] ?? LID_FX_DEFAULT)), fade: new THREE.Vector2(...(LID_FADE[persona] ?? CUT_FADE)) });
+        softLidGeometry(l.lo!.geometry, l.nu, LID_LASH_LO[persona] ?? 0.35, tone);
         softLidGeometry(l.up!.geometry, l.nu, LID_LASH[persona] ?? 1, tone);
       });
     for (const e of rig.eyes)

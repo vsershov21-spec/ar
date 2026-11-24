@@ -40,6 +40,8 @@ from glb_io import Glb, raster_uv  # noqa: E402
 
 TAG = 'glitterP3'
 # ярусы пачки (лицо kit): колокол ×flare к подолу, вынос out и спуск drop подола (м), непрозрачность
+# пачка: доля перекраски тусклой каймы Tripo в яркое золото рефа и плотность золотых блёсток по фатину (tutu_gold)
+TUTU_GOLD, TUTU_SPARK = 0.75, 0.012
 TUTU_LAYERS = [(1.1, 0.0, 0.0, 0.78), (1.2, 0.012, 0.008, 0.5), (1.3, 0.024, 0.004, 0.34)]
 DROP = ('Blush', 'BD_Pads', 'BD_FurCards', 'BD_Metal_Stars', 'Whiskers', 'FaceTufts', 'Skirt_Glitter')
 
@@ -1116,6 +1118,37 @@ def fur_length(V, F, cv, Jn, Wn, jname):
     return L.astype(np.float32)
 
 
+def tutu_gold(tex, UV, Ft, seed=11):
+    """пачка по рефу: золотая кайма ярче и насыщеннее (у Tripo — тусклая охра), по фатину — золотые блёстки (точки 1–2 px,
+    плотность TUTU_SPARK) — текстура атласа только в островах пачки"""
+    from PIL import ImageDraw
+    S = tex.size[0]
+    m = Image.new('L', (S, S), 0); d = ImageDraw.Draw(m)
+    for t in Ft:
+        d.polygon([(float(UV[i, 0] * S), float(UV[i, 1] * S)) for i in t], fill=255)
+    mask = np.asarray(m) > 0
+    arr = np.asarray(tex).astype(np.float32).copy()
+    c = arr[mask]
+    r, g_, b = c[:, 0], c[:, 1], c[:, 2]
+    gold = np.clip(((r - b) - 12) / 30, 0, 1) * np.clip(((g_ - b) + 5) / 20, 0, 1)
+    lum = c.mean(1, keepdims=True)
+    tgt = np.array([236, 196, 98.0]) * np.clip(lum / 150, 0.75, 1.25)
+    c = c * (1 - TUTU_GOLD * gold[:, None]) + tgt * (TUTU_GOLD * gold[:, None])
+    arr[mask] = c
+    rng = np.random.default_rng(seed)
+    ys, xs = np.nonzero(mask)
+    k = rng.random(len(ys)) < TUTU_SPARK
+    col = np.where(rng.random((int(k.sum()), 1)) < 0.7, np.array([[250, 222, 130.0]]), np.array([[255, 250, 230.0]]))
+    arr[ys[k], xs[k]] = col
+    big = k & (rng.random(len(ys)) < 0.35)
+    for dy, dx in ((0, 1), (1, 0), (1, 1)):
+        yy = np.clip(ys[big] + dy, 0, S - 1); xx = np.clip(xs[big] + dx, 0, S - 1)
+        ok = mask[yy, xx]
+        arr[yy[ok], xx[ok]] = np.array([250, 222, 130.0])
+    print(f'пачка: золото {int((gold > 0.3).sum())} текс., блёсток {int(k.sum())}')
+    return Image.fromarray(np.clip(arr, 0, 255).astype(np.uint8))
+
+
 def write_glb(g, wd, body, a, V, N, F, UV, Jn, Wn, targets, tnames, tex, sk_tri, cv, jname, tails, gold_tri=None):
     j = g.j
     bi = body['mesh']
@@ -1149,6 +1182,8 @@ def write_glb(g, wd, body, a, V, N, F, UV, Jn, Wn, targets, tnames, tex, sk_tri,
     src = j['textures'][bct]['source']
     j['images'][src]['mimeType'] = 'image/jpeg'
     j['images'][src]['name'] = 'glitter_p3_base'
+    if sk_tri.any() and getattr(a, 'kit', False):
+        tex = tutu_gold(tex, UV, F[sk_tri])
     g.set_image(src, tex)
     mat.pop('normalTexture', None)
     mat.pop('emissiveTexture', None); mat.pop('emissiveFactor', None)  # блёстки p1 (BD_sparkle) — в UV p1
@@ -1156,6 +1191,11 @@ def write_glb(g, wd, body, a, V, N, F, UV, Jn, Wn, targets, tnames, tex, sk_tri,
     mat['pbrMetallicRoughness']['metallicFactor'] = 0.0
     mat['pbrMetallicRoughness']['roughnessFactor'] = 0.78
     mat['name'] = 'glitter_p3_body'
+    # веки p3 (glitter_p3_face.build_eyes, extras.lidUV) — тот же атлас, что у тела: закрытый глаз = мех морды
+    # (без шина тела: на тёмной подводке он давал серую полосу вдоль линии ресниц)
+    for m_ in j['materials']:
+        if m_.get('extras', {}).get('lidUV'):
+            m_['pbrMetallicRoughness']['baseColorTexture'] = {'index': bct}
 
     # пачка — отдельный меш на тех же буферах, полупрозрачный
     def sub_mesh(name, tris, mat, extras, Vo=None):

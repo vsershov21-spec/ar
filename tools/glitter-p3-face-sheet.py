@@ -111,17 +111,19 @@ def vs_ref():
     subprocess.run(['node', os.path.join(ROOT, 'tools/persona-shot.mjs'), out, 'v', 'glitter'], timeout=900, capture_output=True,
                    env={**os.environ, 'PORT': port, 'Q': f'v=front,tq,side,back&w=400&h=470&m={M}&face=morph&bg=ffffff'})
     vv = Image.open(f'{out}/v_glitter.png').convert('RGB')
+    # голова крупно в том же масштабе, что реф: анфас ×3 (тот же кадр, что у ракурсов) и вид спереди рефа ×3, одна рамка
     subprocess.run(['node', os.path.join(ROOT, 'tools/persona-shot.mjs'), out, 'f', 'glitter'], timeout=900, capture_output=True,
-                   env={**os.environ, 'PORT': port, 'Q': f'v=face&w=400&h=400&m={M}&face=morph&fz=10&bg=ffffff'})
-    ff = Image.open(f'{out}/f_glitter.png').convert('RGB')
+                   env={**os.environ, 'PORT': port, 'Q': f'v=front&w=1200&h=1410&m={M}&face=morph&bg=ffffff'})
+    HB = (225, 0, 975, 880)
+    ff = Image.open(f'{out}/f_glitter.png').convert('RGB').crop(HB).resize((400, 470))
     refs = [Image.open(os.path.join(ROOT, f'design/refs/glitter_views/{n}_white.png')).convert('RGB').crop((112, 60, 912, 1000)).resize((400, 470))
             for n in ('front', 'threequarter', 'right', 'back')]
     mine = [vv.crop((i * 400, 0, i * 400 + 400, 470)) for i in range(4)]
-    rf = Image.open(os.path.join(ROOT, 'design/refs/glitter_turnaround_1123.png')).convert('RGB').crop((95, 95, 395, 395)).resize((400, 400))
+    rf = Image.open(os.path.join(ROOT, 'design/refs/glitter_views/front_white.png')).convert('RGB').crop((112, 60, 912, 1000)).resize((1200, 1410)).crop(HB).resize((400, 470))
     W = 5 * 400
     sheet = Image.new('RGB', (W, 3 * 470 + 3 * 34), BG)
     d = ImageDraw.Draw(sheet)
-    for ri, (title, ims) in enumerate((('реф: разворот 23.11 + лицо', refs + [rf]), ('p3 (?models=p3): анфас, 3/4, профиль, спина, лицо', mine + [ff]),
+    for ri, (title, ims) in enumerate((('реф: разворот 23.11 + голова (тот же масштаб)', refs + [rf]), ('p3 (?models=p3): анфас, 3/4, профиль, спина, голова', mine + [ff]),
                                         ('наложение 50 % (реф + p3)', [Image.blend(a, b.resize(a.size), 0.5) for a, b in zip(refs + [rf], mine + [ff])]))):
         y = ri * (470 + 34)
         d.text((8, y + 6), title, fill=(20, 20, 30), font=FONT_B)

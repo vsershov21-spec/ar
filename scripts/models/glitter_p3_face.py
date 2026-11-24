@@ -30,8 +30,12 @@ PERSONA = 'glitter'
 EYE_PERSONA = 'glitter_p3'
 # радужка по рефу (sRGB): обод, середина, светлая часть у зрачка — пробы design/refs/glitter_turnaround_1123.png
 IRIS['glitter_p3'] = ((34, 84, 50), (70, 150, 78), (128, 196, 100))
-# разрез глаза относительно дыры Tripo: по рефу глаз меньше (ширина глаза ≈ 0.22 ширины головы, у Tripo ≈ 0.25)
-EYE_K = (0.9, 0.98, -0.22)
+# разрез глаза относительно дыры Tripo: по рефу глаз меньше (ширина глаза ≈ 0.22 ширины головы, у Tripo ≈ 0.25);
+# четвёртое — сдвиг к переносице (м): по наложению анфас на реф (тот же масштаб) радужки p3 на 34 % дальше друг от друга
+EYE_K = (0.8, 1.0, -0.22, 0.022)
+# ось глаза: нормаль плоскости края дыры с долей EYE_FWD «вперёд» (+Z). Меньше — край разреза ровнее по яблоку (у
+# внешнего уголка он уходит за голову): моргание сходится по всему разрезу одним углом, линия ресниц — посередине глаза
+EYE_FWD = 0.1
 # яблоко: полуоси A (доля ширины разреза), B (доля высоты, не меньше 0.8 A), глубина C (доля A) — крупнее разреза,
 # чтобы край дыры лежал на яблоке без глаз «навыкате»
 EYE_BALL = (0.62, 0.72, 0.45)
@@ -39,14 +43,16 @@ EYE_BALL = (0.62, 0.72, 0.45)
 LID_GAIN = (0.7, 1.4)
 # насыщенность меха к рефу
 FUR_SAT = 0.72
-# брови: дуга над верхним краем глаза на BROW_Y·B (реф — высоко, мягкая тёмная дуга меха)
+# брови: дуга над верхним краем глаза на BROW_Y·B (реф — высоко, мягкая тёмная дуга меха, не тёмная полоса)
 BROW_Y = 0.6
-# форма головы: (+доля ширины на высоте y, y, −доля у подбородка, y подбородка)
-HEAD_X = (0.05, 0.71, 0.07, 0.6)
-# верхнее веко в покое (доля закрытия): по рефу касается радужки
-REST_UP = 0.08
-# радужка: радиус в долях полувысоты разреза (реф — радужка ≈ 0.72 высоты открытого глаза), зрачок — доля радужки
-IRIS_K, PUPIL = 1.8, 0.5
+# форма головы: ширина ×(1 + Σ доля·exp(−((y − y0)/σ)²)) — по наложению анфас на реф в одном масштабе
+# (tools/glitter-p3-face-sheet.py): щёки на уровне глаз и над ними шире (только у края силуэта), «брыли» у подбородка уже (подбородок выше)
+HEAD_X = ((0.13, 0.715, 0.035), (0.09, 0.79, 0.05), (-0.15, 0.578, 0.035), (-0.03, 0.645, 0.025))
+# верхнее веко в покое (доля закрытия): по рефу касается радужки сверху, не закрывая её (наложение анфас); подводка и
+# лепестки ресниц — ниже кромки кожи, видны целиком
+REST_UP = 0.1
+# радужка: радиус в долях полувысоты разреза (реф — радужка ≈ 0.6 высоты открытого глаза, по наложению), зрачок — доля радужки
+IRIS_K, PUPIL = 1.0, 0.5
 # подводка и ресницы (линейный цвет): реф ≈ #29313F
 LASH = np.array([0.022, 0.03, 0.05])
 # ширина рта (W) в долях расстояния между центрами глаз: реф mouths.jpg/разворот ≈ 0.7
@@ -104,10 +110,12 @@ def resurface(V, F, role, capt, face, nv_land=None):
     # 0) голова по рефу: щёки на уровне глаз шире, «брыли» у подбородка уже (у Tripo голова грушей)
     hv = np.r_[head, np.zeros(len(allp) - nV, bool)] | (np.arange(len(allp)) >= nV)
     y_ = allp[:, 1]
-    sx = 1 + HEAD_X[0] * np.exp(-((y_ - HEAD_X[1]) / 0.045) ** 2) - HEAD_X[2] * np.exp(-((y_ - HEAD_X[3]) / 0.035) ** 2)
+    # расширение — только к краю силуэта (|x| > 0.1): глаза и рот на месте
+    side = sm(0.1, 0.2, np.abs(allp[:, 0]))
+    sx = 1 + sum(a * np.exp(-((y_ - y0) / sg) ** 2) * (side if a > 0 else 1) for a, y0, sg in HEAD_X)
     allp[hv, 0] *= sx[hv]
     # 1) глазницы: сдвиг в плоскости xy от центра дыры (край дыры → ×k), спад к 2.2 радиуса
-    kx, ky, up = EYE_K
+    kx, ky, up = EYE_K[:3]
     for s, rim in R.items():
         c = rim.mean(0)
         rx = np.abs(rim[:, 0] - c[0]).max(); ry = np.abs(rim[:, 1] - c[1]).max()
@@ -117,7 +125,7 @@ def resurface(V, F, role, capt, face, nv_land=None):
         front = allp[:, 2] > c[2] - 0.05
         f = f * front
         H = 2 * ry
-        allp[:, 0] += (allp[:, 0] - c[0]) * (kx - 1) * f
+        allp[:, 0] += ((allp[:, 0] - c[0]) * (kx - 1) - np.sign(c[0]) * EYE_K[3]) * f
         allp[:, 1] += ((allp[:, 1] - c[1]) * (ky - 1) + up * H) * f
     V = allp[:nV]
     face = {k: allp[nV + i] for i, k in enumerate(keys)}
@@ -201,7 +209,7 @@ def eye_frames(face):
         Q = rim - c
         _, _, vt = np.linalg.svd(Q)
         n = vt[2] if vt[2][2] > 0 else -vt[2]
-        f = norm(0.65 * n + 0.35 * np.array([0, 0, 1.0]))
+        f = norm((1 - EYE_FWD) * n + EYE_FWD * np.array([0, 0, 1.0]))
         r = norm(np.array([1.0, 0, 0]) - f * f[0])
         u = np.cross(f, r)
         Rm = np.stack([r, u, f], 1)
@@ -286,7 +294,10 @@ def build_eyes(g, head_node, IBM, face, color_at):
     ii = g.add_image(img, 'eye_iris_p3')
     ti = g.add_texture(ii)
     m_eye = add_material(g, 'EyeBall_mat', tex=ti, rough=0.12)
-    m_lid = add_material(g, 'EyeLid_mat', rough=0.82, double=True)
+    # веко p3 — текстура морды (атлас тела, UV — блок морды по месту закрытого века): закрытый глаз = мех вокруг, тот же
+    # тон и шум; атлас и шин тела подставляет glitter_p3.py (extras.lidUV); вершинный цвет — 1 (мех) и подводка
+    m_lid = add_material(g, 'EyeLid_mat', rough=0.78, double=True)
+    g.j['materials'][m_lid]['extras']['lidUV'] = 1
     NA_, NP = 40, 24
     V, Nn, UV = [], [], []
     for pi_ in range(NP + 1):
@@ -308,20 +319,13 @@ def build_eyes(g, head_node, IBM, face, color_at):
         cl = color_at(E['bot3'] - np.array([0, 0.01, -0.004])) * LID_GAIN[1]
         Vl, Nl, Fl = lid_mesh(E['ag'], E['th_t'], True)
         nu = len(E['ag'])
-        col = np.zeros((len(Vl), 3))
-        for jr in range(len(Vl) // nu):
-            k = [1.0, 1.0, 0.9, 0.2][jr] if jr < 4 else 0.0
-            # закрытое веко: у кромки (низ закрытого глаза) — тон меха под глазом, дальше — над глазом
-            tg = min(max((jr - 3) / 5, 0.0), 1.0)
-            cz = cl * (1 - tg) + cu * tg
-            col[jr * nu:(jr + 1) * nu] = LASH * k + cz * (1 - k)
-        # подводка к внешнему уголку толще и с «хвостиком» (реф): ряд 3 темнее у внешней трети
-        ext = np.clip((outer * E['ag'] / max(E['ag'].max(), 1e-6) - 0.35) / 0.5, 0, 1)
-        col[3 * nu:4 * nu] = LASH * np.maximum(0.2, ext)[:, None] + cu * (1 - np.maximum(0.2, ext))[:, None]
+        # мех века — из текстуры морды (вершинный цвет 1); кромочные ряды рантайм (softLidGeometry) берёт с ряда 4
+        col = np.ones((len(Vl), 3))
         # ресницы: 4 загнутых лепестка у внешней половины (реф: длинные, вверх-наружу, кончики загнуты)
         exV, exF, exC, exN = [], [], [], []
         amax = E['ag'][(E['ag'] > -1.4) & (E['ag'] < 1.4)]
-        for k, (a_rel, ln, wd_) in enumerate([(0.42, 0.42, 0.06), (0.6, 0.55, 0.075), (0.76, 0.62, 0.08), (0.9, 0.52, 0.07)]):
+        # (третий проход, 24.11: длиннее и наружу от кожи — у прежних из-под кромки кожи торчали только кончики)
+        for k, (a_rel, ln, wd_) in enumerate([(0.42, 0.55, 0.075), (0.6, 0.72, 0.095), (0.76, 0.82, 0.1), (0.9, 0.7, 0.09)]):
             target = outer * a_rel * np.abs(amax).max()
             ai = int(np.argmin(np.abs(E['ag'] - target)))
             a = E['ag'][ai]; te = E['th_t'][ai]
@@ -329,7 +333,7 @@ def build_eyes(g, head_node, IBM, face, color_at):
             pts = []
             for s_ in np.linspace(0, 1, 7):
                 th = te + 0.04 + s_ * 0.42
-                r = 1.06 + s_ * ln * 0.5
+                r = 1.08 + s_ * ln * 0.85
                 aa = a + outer * s_ * (0.22 + 0.25 * a_rel)
                 p = np.array([r * math.sin(aa), r * math.cos(aa) * math.sin(th), r * math.cos(aa) * math.cos(th)])
                 p[1] += s_ * s_ * ln * 0.32
@@ -345,14 +349,11 @@ def build_eyes(g, head_node, IBM, face, color_at):
                 exF += [(a0, a0 + 1, a0 + 3), (a0, a0 + 3, a0 + 2)]
         Vl = np.concatenate([Vl, np.array(exV)]); Nl = np.concatenate([Nl, np.array(exN)])
         col = np.concatenate([col, np.array(exC)]); Fl = orient(Vl, list(Fl) + exF, Nl)
-        m_up = add_mesh(g, f'LidUp_{side}', Vl, Nl, Fl, m_lid, col=col)
+        m_up = add_mesh(g, f'LidUp_{side}', Vl, Nl, Fl, m_lid, col=col, uv=lid_uv(E, Vl, E['close_up']))
         V2, N2, F2 = lid_mesh(E['ag'], E['th_b'], False)
-        col2 = np.zeros((len(V2), 3))
-        for jr in range(len(V2) // nu):
-            k = [0.7, 0.45, 0.12, 0.0][jr] if jr < 4 else 0.0
-            col2[jr * nu:(jr + 1) * nu] = LASH * k + cl * (1 - k)
+        col2 = np.ones((len(V2), 3))
         F2 = orient(V2, F2, N2)
-        m_lo = add_mesh(g, f'LidLo_{side}', V2, N2, F2, m_lid, col=col2)
+        m_lo = add_mesh(g, f'LidLo_{side}', V2, N2, F2, m_lid, col=col2, uv=lid_uv(E, V2, -E['close_lo']))
         Rl = IR @ E['R']
         tl = IR @ E['O'] + It
         ex = {'side': side, 'A': E['A'], 'B': E['B'], 'C': E['C'], 'closeUp': E['close_up'], 'closeLo': E['close_lo'],
@@ -370,6 +371,15 @@ def build_eyes(g, head_node, IBM, face, color_at):
         print(f'  глаз {side}: углы {E["ag"][[0,-1]].round(2)}, край верх {E["th_t"].min():.2f}..{E["th_t"].max():.2f} низ {E["th_b"].min():.2f}..{E["th_b"].max():.2f}; A={E["A"]:.4f} B={E["B"]:.4f} C={E["C"]:.4f} выступ {E["P"] * 1000:.1f} мм, '
               f'закрытие {E["close_up"]:.2f}/{E["close_lo"]:.2f}, радужка {E["Ri"]:.4f}')
     return eyes
+
+
+def lid_uv(E, Vl, ang):
+    """UV века: вершина в положении «глаз закрыт» (поворот вокруг X на ang, как EyeRig: верхнее +closeUp, нижнее
+    −closeLo) → меш (O + R·diag(A, B, C)·v) → блок морды в атласе (вид спереди)"""
+    c, s_ = math.cos(ang), math.sin(ang)
+    Rx = np.array([[1, 0, 0], [0, c, -s_], [0, s_, c]])
+    P = E['O'] + ((Vl @ Rx.T) * np.array([E['A'], E['B'], E['C']])) @ E['R'].T
+    return block_uv(P)
 
 
 # ───────────────────────── разметка, рамка рта ─────────────────────────
@@ -488,7 +498,7 @@ def paint_ref(tex, V, F, UV, eyes, marks, Wm, role=None):
         d, k = tree.query(pos[..., :2].reshape(-1, 2))
         d = d.reshape(pos.shape[:2]); k = k.reshape(pos.shape[:2])
         th = 0.013 * (0.75 + 0.5 * np.sin(np.pi * np.clip(k / 39, 0, 1)))  # толще в середине
-        a = np.exp(-(d / th) ** 2) * ((tid >= 0) & (nrm[..., 2] > -0.3) & (np.abs(pos[..., 0] - E['O'][0]) < 0.09)) * 0.8 * sm(0, 0.12, k / 39) * (1 - sm(0.85, 1.0, k / 39))
+        a = np.exp(-(d / th) ** 2) * ((tid >= 0) & (nrm[..., 2] > -0.3) & (np.abs(pos[..., 0] - E['O'][0]) < 0.09)) * 0.5 * sm(0, 0.12, k / 39) * (1 - sm(0.85, 1.0, k / 39))
         out = out * (1 - a[..., None]) + brow * a[..., None]
     # морда: светлее вокруг рта и носа (подушечки усов, подбородок)
     mz = np.array([196, 203, 216.0])
@@ -500,10 +510,38 @@ def paint_ref(tex, V, F, UV, eyes, marks, Wm, role=None):
     # шум меха поверх
     rng = np.random.default_rng(5)
     out += rng.normal(0, 2.5, out.shape).astype(np.float32) * has[..., None]
+    # блок морды: тексели без треугольников (дыры глазниц — там лежит закрытое веко, UV век — блок морды) — мех
+    # вокруг после всех правок (насыщенность, брови, светлая морда), а не сиреневая заливка Tripo до desaturate
+    if BLOCK:
+        b = BLOCK
+        y0, x0, n = b['by'], b['bx'], b['B']
+        blk = out[y0:y0 + n, x0:x0 + n]
+        known = (tid[y0:y0 + n, x0:x0 + n] >= 0).astype(np.float32)
+        from scipy.ndimage import gaussian_filter
+        fill = blk.copy(); got = known.copy()
+        for sg in (2, 4, 8, 16):
+            w = gaussian_filter(known, sg)
+            c = np.stack([gaussian_filter(blk[..., k] * known, sg) for k in range(3)], -1) / np.maximum(w, 1e-6)[..., None]
+            new = (got < 0.5) & (w > 0.02)
+            fill[new] = c[new]; got[new] = 1
+        hole = known < 0.5
+        fill[hole] += rng.normal(0, 2.5, (int(hole.sum()), 3)).astype(np.float32)
+        out[y0:y0 + n, x0:x0 + n] = np.where(hole[..., None], fill, blk)
     return Image.fromarray(np.clip(out, 0, 255).astype(np.uint8))
 
 
 # ───────────────────────── морда: новая сетка ─────────────────────────
+BLOCK = {}
+
+
+def block_uv(P):
+    """точки лица (x, y меша) → UV блока морды в атласе (вид спереди, см. remesh_face); вне блока — к краю"""
+    b = BLOCK
+    u = (b['bx'] + 2 + np.clip((P[:, 0] - b['lo'][0]) / b['span'], 0, 1) * (b['B'] - 4)) / b['S']
+    v = (b['by'] + 2 + (1 - np.clip((P[:, 1] - b['lo'][1]) / b['span'], 0, 1)) * (b['B'] - 4)) / b['S']
+    return np.c_[u, v]
+
+
 def remesh_face(V, F, UV, role, capt, img, face, step=0.0042):
     """Морда (мех головы спереди в эллипсе области, без глазниц) — заново: ограниченная триангуляция Делоне (triangle,
     `pip install triangle`) с шагом step по контуру выреза (вершины контура — те же, края глазниц — тоже), высота — поле
@@ -668,6 +706,8 @@ def remesh_face(V, F, UV, role, capt, img, face, step=0.0042):
     B = int(best[0]) - 8; by, bx = int(best[1]) - best[0] + 5, int(best[2]) - best[0] + 5
     lo_ = Pn[:, :2].min(0); span = (Pn[:, :2].max(0) - lo_).max() * 1.02
     UVn = np.c_[(bx + 2 + (Pn[:, 0] - lo_[0]) / span * (B - 4)) / S, (by + 2 + (1 - (Pn[:, 1] - lo_[1]) / span) * (B - 4)) / S]
+    # то же отображение «вид спереди → блок атласа» — для век (закрытый глаз = мех морды, build_eyes)
+    BLOCK.update(bx=bx, by=by, B=B, lo=lo_.copy(), span=span, S=S)
     # цвет блока: 3D-точка текселя → среднее k ближайших «хороших» текселей меха Tripo (не заплатки, не рот, не губы)
     from glb_io import raster_uv
     from glitter_p3 import vnormals
