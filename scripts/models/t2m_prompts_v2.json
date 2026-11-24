@@ -1760,5 +1760,62 @@
    ]
   }
  },
- "meshy": "Meshy Text-to-Motion (scripts/meshy/motion-run.sh, docs/animations/MESHY.md): specs[id].meshy = {prompt ≤400, duration 2–10 шаг 0,5 = durationS ТЗ вверх до 0,5 и не меньше 2, mode}. Промпты — только движение тела одного персонажа, на месте, без хвоста/ушей/лица; старт/финиш — стойка, кроме цепочек сна и сидения."
+ "meshy": "Meshy Text-to-Motion (scripts/meshy/motion-run.sh, docs/animations/MESHY.md): specs[id].meshy = {prompt ≤400, duration 2–10 шаг 0,5 = durationS ТЗ вверх до 0,5 и не меньше 2, mode}. Промпты — только движение тела одного персонажа, на месте, без хвоста/ушей/лица; старт/финиш — стойка, кроме цепочек сна и сидения.",
+ "models3d": {
+  "$comment": "Meshy Multi-Image to 3D (scripts/meshy/image3d.mjs через motion-run.sh: задача kind meshy --only <id>). Результат — /srv/ar-extra/models/props/<id>_geo.glb + <id>_img*.png (+ <id>.glb ≤ 28 МБ); в server-out — задачей script scripts/deploy/mirror-props.sh. Блёстка p3 — по развороту продакта 23.11 (scripts/models/glitter_p3_views.py → scripts/models/glitter_p3.py).",
+  "glitter_p3_m71": {
+   "images": [
+    "design/refs/glitter_views/front.png",
+    "design/refs/glitter_views/threequarter.png",
+    "design/refs/glitter_views/right.png",
+    "design/refs/glitter_views/back.png"
+   ],
+   "estimate": 40,
+   "params": {
+    "geometry_resolution": "2k",
+    "should_texture": true,
+    "enable_pbr": true,
+    "texture_resolution": "4k",
+    "texture_prompt": "Cute cartoon kitten girl, plush short blue-grey fur (#8E98C0) with lighter muzzle and chin, big green eyes with black lashes, small pink nose. Lilac lavender hoodie (#C9B3EC) with thin shiny gold piping on hood, cuffs and hem, mint (#9EE3CF) hood lining, mint cuffs, mint pocket trims, round mint badge on left chest. Puffy mint tulle tutu skirt with fine gold glitter and a sparkly gold scalloped hem. Shiny gold bow with a gold star on top of the head, small gold stars on the forehead. Tail lavender fading to purple at the tip with gold glitter. Soft plush toy look, clean colors, no text.",
+    "should_remesh": true,
+    "topology": "triangle",
+    "target_polycount": 100000,
+    "symmetry_mode": "on",
+    "pose_mode": "a-pose",
+    "remove_lighting": true,
+    "target_formats": [
+     "glb"
+    ],
+    "multi_view_thumbnails": true,
+    "ai_model": "latest"
+   }
+  },
+  "glitter_p3_m6": {
+   "images": [
+    "design/refs/glitter_views/front.png",
+    "design/refs/glitter_views/threequarter.png",
+    "design/refs/glitter_views/right.png",
+    "design/refs/glitter_views/back.png"
+   ],
+   "estimate": 40,
+   "params": {
+    "geometry_resolution": "2k",
+    "should_texture": true,
+    "enable_pbr": true,
+    "texture_resolution": "4k",
+    "texture_prompt": "Cute cartoon kitten girl, plush short blue-grey fur (#8E98C0) with lighter muzzle and chin, big green eyes with black lashes, small pink nose. Lilac lavender hoodie (#C9B3EC) with thin shiny gold piping on hood, cuffs and hem, mint (#9EE3CF) hood lining, mint cuffs, mint pocket trims, round mint badge on left chest. Puffy mint tulle tutu skirt with fine gold glitter and a sparkly gold scalloped hem. Shiny gold bow with a gold star on top of the head, small gold stars on the forehead. Tail lavender fading to purple at the tip with gold glitter. Soft plush toy look, clean colors, no text.",
+    "should_remesh": true,
+    "topology": "triangle",
+    "target_polycount": 100000,
+    "symmetry_mode": "on",
+    "pose_mode": "a-pose",
+    "remove_lighting": true,
+    "target_formats": [
+     "glb"
+    ],
+    "multi_view_thumbnails": true,
+    "ai_model": "meshy-6"
+   }
+  }
+ }
 }

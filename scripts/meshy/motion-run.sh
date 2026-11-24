@@ -36,7 +36,14 @@ fi
 curl -fsSL "$RAW/scripts/meshy/motion.mjs" -o "$WORK/motion.mjs" || { echo "не скачал motion.mjs"; exit 1; }
 curl -fsSL "$RAW/scripts/models/t2m_prompts_v2.json" -o "$WORK/prompts.json" || { echo "не скачал промпты"; exit 1; }
 
-run() { node "$WORK/motion.mjs" --prompts "$WORK/prompts.json" --env "$ENVF" --state "$WORK" --out "$OUT" "$@"; }
+# персонаж по видам (Meshy Multi-Image to 3D, scripts/meshy/image3d.mjs): все id из --only — в models3d промптов
+SCRIPT=motion.mjs
+ONLYV=""; prev=""; for a in "$@"; do { [ "$prev" = "--only" ] || [ "$prev" = "--redo" ]; } && ONLYV="$ONLYV,$a"; prev="$a"; done
+if [ -n "$ONLYV" ] && node -e 'const d=require(process.argv[1]).models3d||{};const ids=process.argv[2].split(",").filter(Boolean);process.exit(ids.length&&ids.every(i=>d[i])?0:1)' "$WORK/prompts.json" "$ONLYV"; then
+  SCRIPT=image3d.mjs
+  curl -fsSL "$RAW/scripts/meshy/image3d.mjs" -o "$WORK/image3d.mjs" || { echo "не скачал image3d.mjs"; exit 1; }
+fi
+run() { node "$WORK/$SCRIPT" --prompts "$WORK/prompts.json" --env "$ENVF" --state "$WORK" --out "$OUT" "$@"; }
 fix() { chown -R vershov-commander:caddy "$OUT" 2>/dev/null; chmod -R g+rX,o+r "$OUT" 2>/dev/null; chmod 700 "$WORK" 2>/dev/null; }
 
 if [ $GO = 0 ]; then
@@ -44,13 +51,13 @@ if [ $GO = 0 ]; then
   fix
   exit 0
 fi
-if pgrep -f "$WORK/motion.mjs" >/dev/null; then
+if pgrep -f "$WORK/(motion|image3d).mjs" >/dev/null; then
   echo "Уже идёт генерация (pgrep motion.mjs). Лог: tail -f $LOG"
   exit 0
 fi
 echo "=== $(date -Is) meshy $* ===" >>"$LOG"
 export -f run fix
-export WORK OUT ENVF
+export WORK OUT ENVF SCRIPT RAW
 nohup setsid bash -c 'run "$@"; code=$?; fix; echo "=== $(date -Is) код $code ==="; exit $code' _ "$@" >>"$LOG" 2>&1 </dev/null &
 echo "Генерация в фоне (pid $!). Лог: tail -f $LOG"
 echo "Готовые клипы — $OUT; на сайт — со следующей сборкой (любой push в main)."

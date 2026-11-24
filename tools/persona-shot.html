@@ -5,6 +5,7 @@
 // свет приложения (полусфера 2.2 + направленный 1.6), взгляд и голова — на камеру (как в приложении), моргания и
 // микромимика выключены, idle в покое. Виды: pilot — во весь рост сверху (≈ кадр пилота, камера над столом 30°),
 // front / tq — во весь рост почти горизонтально (как рефы), face — лицо крупно, faceup — лицо сверху (пилот).
+// &clip=dance_glitter&t=1.5 — вместо покоя клип, кадр через t с (листы анимаций, tools/glitter-p3-sheet.py)
 // ?p=kind&m=/models/kind_v1.glb&v=pilot,front,tq,face&w=300&h=440&fur=3 [&models=v1 — рантайм-значения v1; без параметра — v2, модель по умолчанию — variantGlb]
 import * as THREE from 'three';
 let seed = 12345; Math.random = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
@@ -28,7 +29,9 @@ ch.setPersona?.({ id: persona });
 ch.clips?.setIdles?.(['idle'], persona);
 sc.add(ch.object);
 if (q.get('hide')) ch.object.traverse((o) => { if (new RegExp(q.get('hide')).test(o.name)) o.visible = false; });
-ch.play?.('idle');
+const clipQ = q.get('clip');
+ch.play?.(clipQ || 'idle');
+if (clipQ) for (let k = 0, n = Math.round(+(q.get('t') || 1) * 30); k < n; k++) ch.update(1 / 30);
 if (ch.faceMix) ch.faceMix.nextBlink = 1e9;
 if (ch.life) ch.life.nextMicro = 1e9;
 // без взглядов в сторону и микросаккад: глаза ровно на камеру
