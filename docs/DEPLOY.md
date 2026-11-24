@@ -25,6 +25,14 @@
 | `/personas/` | JSON характеров | обычный |
 | `index.html` | | **без кэша** |
 
+Правила Caddy — `scripts/deploy/caddy-static.sh` (PERF-02, задачей ar-auto): статика **терминальная** — нет файла →
+404 с `no-store` (никакого HTML вместо JS/GLB); `immutable` на год — только **существующим** файлам с хэшем в имени
+(`/assets`, `/mvp/assets`, `/lab/assets`, `/test/assets`, `/models/opt`, `/voice/el/*.mp3`); файлы без хэша
+(`/models/*.glb`, Vosk, звуки, видео, маркеры) — `max-age=86400` с ревалидацией; HTML — `no-cache`.
+**Окно совместимости:** последний шаг `npm run build` — `scripts/build/keep-assets.mjs`: хэшированные ассеты прошлых
+релизов (48 ч, пул `/srv/ar/asset-pool`, ≤ 1 ГБ) кладутся в новый релиз симлинками — открытая до релиза страница
+догружает свои чанки и модели по старым хэшам.
+
 **Меняете ассет в долгокэшируемой папке — меняйте имя файла** (`card-v2.mind`, `character-2026-12.glb`) и путь
 в `src/config.ts`/манифесте. Иначе телефоны будут показывать старую версию.
 
@@ -133,7 +141,8 @@ sudo chown -R vershov-commander:caddy /srv/ar-extra && sudo chmod -R g+rX /srv/a
   и запускает `npm run voice:piper`; готовые файлы не пересобираются, лог — `voice-run.log`). Подробно — docs/VOICE.md;
 - **модель Vosk** — `bash scripts/voice/fetch-vosk.sh /srv/ar-extra` (скачивает zip,
   перепаковывает в tar.gz). Новая версия модели — новая папка (`vosk-ru-small-0.23/`) и путь `VOSK_MODEL_URL`
-  в `src/voice/asr.ts`: `/models/*` кэшируется у телефонов навсегда (`immutable`).
+  в `src/voice/asr.ts`: `/models/*` кэшируется у телефонов на сутки (дальше — ревалидация), распакованная модель
+  живёт в IndexedDB воркера.
 
 Если хочется отдавать модель напрямую Caddy, а не копировать в каждый релиз (5 релизов × 45 МБ), — добавить в блок
 `ar.vershov.com` (нужен root): `handle_path /models/vosk-ru-small-0.22/* { root * /srv/ar-extra/models/vosk-ru-small-0.22; file_server }`
