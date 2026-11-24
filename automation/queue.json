@@ -150,6 +150,20 @@
       ],
       "maxCredits": 100,
       "note": "Блёстка p3: Meshy Multi-Image to 3D по 4 видам разворота 23.11 (7.1 и meshy-6)"
+    },
+    {
+      "id": "mirror-p3-m71-1",
+      "kind": "script",
+      "ref": "d3f51048a3ad04f7925257c52db120fd38902fcf",
+      "path": "scripts/deploy/mirror-props.sh",
+      "args": [
+        "glitter_p3_m71",
+        "glitter_p3_m71_thumb_front",
+        "glitter_p3_m71_thumb_right",
+        "glitter_p3_m71_thumb_back",
+        "glitter_p3_m71_thumb_left"
+      ],
+      "timeoutMin": 10
     }
   ]
 }

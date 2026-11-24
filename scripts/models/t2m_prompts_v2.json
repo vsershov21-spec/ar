@@ -1799,7 +1799,6 @@
    ],
    "estimate": 40,
    "params": {
-    "geometry_resolution": "2k",
     "should_texture": true,
     "enable_pbr": true,
     "texture_resolution": "4k",

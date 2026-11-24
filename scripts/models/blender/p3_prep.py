@@ -13,8 +13,36 @@ ap = argparse.ArgumentParser()
 ap.add_argument('src'); ap.add_argument('out'); ap.add_argument('--tris', type=int, default=32000)
 a = ap.parse_args(sys.argv[sys.argv.index('--') + 1:] if '--' in sys.argv else sys.argv[1:])
 
+def rejoin(src):
+    """<id>_geo.glb (image3d.mjs: картинки вынесены в <id>_img<k>.png) → полный GLB рядом во временном файле"""
+    import json, struct
+    b = open(src, 'rb').read()
+    jl = struct.unpack('<I', b[12:16])[0]; j = json.loads(b[20:20 + jl]); o = 20 + jl
+    bl = struct.unpack('<I', b[o:o + 4])[0]; binb = bytearray(b[o + 8:o + 8 + bl])
+    if not any('uri' in im for im in j.get('images', [])):
+        return src
+    stem = src[:-len('_geo.glb')]
+    for k, im in enumerate(j['images']):
+        data = open(f'{stem}_img{k}.png', 'rb').read()
+        while len(binb) % 4: binb.append(0)
+        j['bufferViews'].append({'buffer': 0, 'byteOffset': len(binb), 'byteLength': len(data)})
+        binb += data
+        im.pop('uri'); im['bufferView'] = len(j['bufferViews']) - 1
+        im['mimeType'] = 'image/jpeg' if data[:2] == b'\xff\xd8' else 'image/png'
+    while len(binb) % 4: binb.append(0)
+    j['buffers'] = [{'byteLength': len(binb)}]
+    js = json.dumps(j).encode(); js += b' ' * ((4 - len(js) % 4) % 4)
+    out = src.replace('_geo.glb', '_full.glb')
+    with open(out, 'wb') as f:
+        f.write(struct.pack('<III', 0x46546C67, 2, 28 + len(js) + len(binb)))
+        f.write(struct.pack('<I', len(js)) + b'JSON' + js + struct.pack('<I', len(binb)) + b'BIN\x00' + bytes(binb))
+    print('склеил', out)
+    return out
+
+
+src = rejoin(os.path.abspath(a.src)) if a.src.endswith('_geo.glb') else os.path.abspath(a.src)
 bpy.ops.wm.read_factory_settings(use_empty=True)
-bpy.ops.import_scene.gltf(filepath=os.path.abspath(a.src))
+bpy.ops.import_scene.gltf(filepath=src)
 objs = [o for o in bpy.context.scene.objects if o.type == 'MESH']
 for o in bpy.context.scene.objects:
     o.select_set(o in objs)
