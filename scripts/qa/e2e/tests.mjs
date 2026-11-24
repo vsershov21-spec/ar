@@ -522,7 +522,9 @@ export const TESTS = [
     timeout: 500,
     async fn(t) {
       const n0 = t.server.requests.length;
-      const P = await playing(t, 'hooligan');
+      // день (hour=14): утром первый вход в дом — кот спит в кровати (home/bedFlow.ts), карточка СберKids ждёт его
+      // пробуждения — сценарий зависел от часов стенда (24.11 в 09:00 падал и на main)
+      const P = await playing(t, 'hooligan', 'hour=14');
       await P.tap('.tom-home');
       await P.must(() => window.__app.home.phase === 'home', 20000, 'дома');
       await P.must(() => !document.querySelector('.kids-card').classList.contains('hidden'), 20000, 'карточка «Войти в СберKids» дома');
