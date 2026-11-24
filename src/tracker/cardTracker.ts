@@ -232,8 +232,15 @@ export class CardTracker extends TrackerBase implements Tracker {
   private mutedRun = 0;
   private rvfcGen = 0;
   private reviving = false;
+  /**
+   * Слушатели document на время жизни камеры трекера (AR-04): watchCamera зовётся при каждом открытии видео (каждый
+   * «Мой дом» → «На карту»), и visibilitychange копился — 5 → 6 → 7 → 8. Снимаем в stop() и перед новой подпиской.
+   */
+  private camAbort: AbortController | null = null;
   private watchCamera() {
     clearInterval(this.camTimer);
+    this.camAbort?.abort();
+    this.camAbort = new AbortController();
     this.camTimer = window.setInterval(() => {
       const v = this.video;
       if (!v || !this.running || document.visibilityState !== 'visible') return;
@@ -250,9 +257,13 @@ export class CardTracker extends TrackerBase implements Tracker {
       this.mutedRun = t?.muted ? this.mutedRun + 1 : 0;
       if (!t || t.readyState === 'ended' || v.paused || this.staleRun >= 2 || this.mutedRun >= 3) void this.reviveCamera(this.staleRun >= 2 ? 'stale' : this.mutedRun >= 3 ? 'muted' : t?.readyState ?? 'no-track');
     }, 1000);
-    document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible' && this.video?.paused) void this.video.play().catch(() => undefined);
-    });
+    document.addEventListener(
+      'visibilitychange',
+      () => {
+        if (document.visibilityState === 'visible' && this.video?.paused) void this.video.play().catch(() => undefined);
+      },
+      { signal: this.camAbort.signal },
+    );
   }
 
   private async reviveCamera(why: string) {
@@ -326,6 +337,8 @@ export class CardTracker extends TrackerBase implements Tracker {
 
   stop() {
     clearInterval(this.camTimer);
+    this.camAbort?.abort();
+    this.camAbort = null;
     this.running = false;
     this.worker?.terminate();
     this.worker = null;
