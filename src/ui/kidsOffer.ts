@@ -4,6 +4,8 @@
  *   · 'home' — ребёнок пришёл к коту домой (через несколько секунд, когда осмотрелся);
  *   · 'play' — онбординг пройден и ребёнок поиграл: N действий или несколько минут игры (что раньше).
  * Не чаще KIDS_OFFER.perSession раз за сессию и каждое место — раз за сессию (localStorage, ui/hints.ts SessionMarks).
+ * В счёт — показ, который ребёнок видел: закрыл, нажал, карточка ушла сама или пробыла ≥ KIDS_OFFER.seenMs. Убрал её
+ * «занятый» кот сразу (кот позвал домой, уснул — диалог начался в ту же секунду) — место не тратится, карточка вернётся.
  * Клик: диплинк из config/sberkids.ts (если задан), иначе / если приложение не открылось — веб-страница.
  * Аналитика (без PII): sberkids_click { kind: deeplink_home|deeplink_play|web_home|web_play|close_home|close_play }.
  */
@@ -33,6 +35,7 @@ export class KidsOffer {
   private playSince = 0;
   private homeSince = 0;
   private where: KidsWhere | null = null;
+  private shownAt = 0;
   private hideTimer = 0;
   private timer = 0;
 
@@ -77,7 +80,7 @@ export class KidsOffer {
     if (!home) this.homeSince = 0;
     if (this.visible) {
       this.place();
-      if (h.busy()) this.hide();
+      if (h.busy()) this.hide(performance.now() - this.shownAt >= KIDS_OFFER.seenMs);
       return;
     }
     if (!h.playing() || h.busy() || this.count() >= KIDS_OFFER.perSession) return;
@@ -91,7 +94,7 @@ export class KidsOffer {
 
   private show(where: KidsWhere) {
     this.where = where;
-    this.marks.mark(where);
+    this.shownAt = performance.now();
     this.el.dataset.where = where;
     this.el.classList.remove('hidden');
     this.place();
@@ -99,8 +102,10 @@ export class KidsOffer {
     clearTimeout(this.hideTimer);
     this.hideTimer = window.setTimeout(() => this.hide(), KIDS_OFFER.autoHideSec * 1000);
   }
-  hide() {
+  /** seen = false — карточку убрали сразу (кот занят): показ не в счёт, место ещё свободно */
+  hide(seen = true) {
     clearTimeout(this.hideTimer);
+    if (this.visible && this.where && seen) this.marks.mark(this.where);
     this.el.classList.add('hidden');
   }
 
