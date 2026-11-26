@@ -6,6 +6,7 @@
 // микромимика выключены, idle в покое. Виды: pilot — во весь рост сверху (≈ кадр пилота, камера над столом 30°),
 // front / tq — во весь рост почти горизонтально (как рефы), face — лицо крупно, faceup — лицо сверху (пилот).
 // &clip=dance_glitter&t=1.5 — вместо покоя клип, кадр через t с (листы анимаций, tools/glitter-p3-sheet.py)
+// &act=cocoa&at=1.5 — действие с предметом (runAct: cocoa|mirror|treat|gum), кадр через at с, поза заморожена
 // ?p=kind&m=/models/kind_v1.glb&v=pilot,front,tq,face&w=300&h=440&fur=3 [&models=v1 — рантайм-значения v1; без параметра — v2, модель по умолчанию — variantGlb]
 import * as THREE from 'three';
 let seed = 12345; Math.random = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
@@ -32,7 +33,8 @@ if (q.get('hide')) ch.object.traverse((o) => { if (new RegExp(q.get('hide')).tes
 const clipQ = q.get('clip');
 // ?clip=sit&ct=0.6 — кадр клипа, поза заморожена на все виды, без взгляда на камеру (лист пачки/хвоста, glitter-ref-sheet.py
 // --pass2); с &t= (без ct) — как раньше: клип, кадр через t с, дальше виды по очереди
-const clip = q.get('ct') ? clipQ : null, ct = +(q.get('ct') || 0.5);
+const actQ = q.get('act');
+const clip = q.get('ct') ? clipQ : actQ ? 'act' : null, ct = +(q.get('ct') || 0.5);
 ch.play?.(clip ? 'idle' : clipQ || 'idle');
 if (clipQ && !clip) for (let k = 0, n = Math.round(+(q.get('t') || 1) * 30); k < n; k++) ch.update(1 / 30);
 if (ch.faceMix) ch.faceMix.nextBlink = 1e9;
@@ -42,7 +44,8 @@ if (ch.eyes) { ch.eyes.awayT = 1e9; ch.eyes.sacT = 1e9; }
 const bone = (n) => { let b = null; ch.object.traverse((o) => { if (!b && o.name.replace(/^mixamorig:?/, '') === n) b = o; }); return b; };
 const cam = new THREE.PerspectiveCamera(22, W / H, 0.01, 50);
 for (let k = 0; k < 20; k++) ch.update(1 / 30, cam);
-if (clip) { ch.play(clip, { loop: true }); for (let k = 0; k < Math.round(ct * 30); k++) ch.update(1 / 30, cam); }
+if (actQ) { ch.runAct(actQ); await new Promise((res) => setTimeout(res, 4000)); for (let k = 0; k < Math.round(+(q.get('at') || 1.5) * 30); k++) ch.update(1 / 30, cam); }
+else if (clip) { ch.play(clip, { loop: true }); for (let k = 0; k < Math.round(ct * 30); k++) ch.update(1 / 30, cam); }
 ch.object.updateMatrixWorld(true);
 const box = new THREE.Box3();
 ch.object.traverse((o) => { if (o.isSkinnedMesh && o.visible && !/^BD_Fur/.test(o.name)) box.expandByObject(o, true); });

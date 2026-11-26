@@ -39,6 +39,7 @@ import { attachTulle, tulleMotion, tulleOf, type TulleMotion } from './tulleFx';
 import { alivePose } from './aliveIdle';
 import { attachTailSparkle } from './tailSparkle';
 import { FaceMixer, EMOTE_FACE, MORPH_TARGETS, facePreset, type FacePreset } from './face';
+import { applyV5Lids, type V5Lids } from './v5Face';
 import { EyeRig } from './eyeRig';
 import { FaceWrinkles } from './faceWrinkles';
 import { FurTone } from './furTone';
@@ -363,6 +364,11 @@ export class GlbCharacter implements Character {
    * её ключи mouth_A/smile у этой сетки открывали бы рот в покое
    */
   private tripoFace = false;
+  /**
+   * Блёстка v5 (asset.extras.glitterV5, scripts/models/build_glitter_v5.sh): вид Tripo 1:1 — без тона меха (FurTone),
+   * лицо Tripo с веками Lids_V5 (v5Face.ts) и ключами рта тела
+   */
+  private v5Lids: V5Lids | null = null;
 
   constructor(private url = 'models/character.glb', private animsUrl?: string) {
     this.object.name = 'character-glb';
@@ -385,8 +391,9 @@ export class GlbCharacter implements Character {
       loader.setDRACOLoader(new DRACOLoader());
     }
     const gltf = await loader.parseAsync(raw, asset(url).replace(/[^/]*$/, ''));
-    const assetEx = (gltf.parser.json as { asset?: { extras?: { glitterP3?: { face?: string }; glitterP4?: unknown } } }).asset?.extras;
-    this.tripoFace = assetEx?.glitterP3?.face === 'tripo';
+    const assetEx = (gltf.parser.json as { asset?: { extras?: { glitterP3?: { face?: string }; glitterP4?: unknown; glitterV5?: unknown } } }).asset?.extras;
+    const v5 = !!assetEx?.glitterV5;
+    this.tripoFace = assetEx?.glitterP3?.face === 'tripo' || v5;
     // Блёстка p4 (scripts/models/build_glitter_p4.sh): тон меха своей текстуры Tripo, без краски одежды/бровей/носа (furTone.ts)
     this.furTone.setP4(!!assetEx?.glitterP4);
     const model = gltf.scene;
@@ -478,7 +485,12 @@ export class GlbCharacter implements Character {
     // остальные движения и клипы Meshy — лениво: loadDeferred() после посадки кота (app.ts), или когда попросят клип,
     // которого ещё нет; без пакетов — только Meshy (как раньше)
     this.setFaceObj('usual');
-    this.furTone.attach(model);
+    // v5 — цвета текстуры Tripo как есть (без тона меха)
+    if (!v5) this.furTone.attach(model);
+    if (v5) {
+      const lids = model.getObjectByName('Lids_V5') as THREE.Mesh | undefined;
+      this.v5Lids = lids?.morphTargetDictionary ? { mesh: lids } : null;
+    }
     // фатин Блёстки с разметкой (models/v2/glitter_p1.glb): сетка, золотые блёстки и полоса по подолу
     // …и хвост с искрой к кончику (только эта модель — tailSparkle.ts)
     if (attachTulle(model)) attachTailSparkle(model);
@@ -1500,6 +1512,7 @@ export class GlbCharacter implements Character {
         inf[i] = W[key] ?? 0;
       }
     }
+    if (this.v5Lids) applyV5Lids(this.v5Lids, W);
     this.applyTailEars(dt, ears, facePresetId);
     this.bones.get('LeftEye')?.scale.setScalar(pupils);
     this.bones.get('RightEye')?.scale.setScalar(pupils);

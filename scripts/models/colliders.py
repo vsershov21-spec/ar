@@ -206,6 +206,11 @@ def main():
         X = g.acc(pr['attributes']['POSITION']).astype(np.float64)
         # фатин (Блёстка p1, 20.11): запас 20 мм — кисть и манжета ложатся на пачку, а не в неё
         hull('skirt', 'Hips', X, mesh=tn['name'], pad=0.02)
+    elif cat == 'glitter' and j['asset'].get('extras', {}).get('glitterV5'):
+        # Блёстка v5: пачка Tripo — часть цельной сетки тела (не свой меш): оболочка по вершинам пачки, запас 20 мм
+        X = P[used & (lab == SKIRT)]
+        if len(X) > 100:
+            hull('skirt', 'Hips', X, pad=0.02)
     # ноги: бедро и голень — капсулы по вершинам кости
     for side, S_ in (('L', 'Left'), ('R', 'Right')):
         for nm_, bone in (('thigh', f'{S_}UpLeg'), ('shin', f'{S_}Leg')):

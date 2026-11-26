@@ -125,7 +125,7 @@ export const PARAMS: Record<string, { feature: FeatureId; test?: boolean; keep?:
   anycard: { feature: 'card.anycard' },
   grab: { feature: 'card.grabExperimental', keep: ['main'] },
   glb: { feature: 'model.custom' },
-  models: { feature: 'model.variants', test: true, keep: ['v2'] }, // ?models=v1|v2h|p3|p4 — прежний вид / геометрия v2 (lab и /test); v2 — по умолчанию, character/modelVariant.ts
+  models: { feature: 'model.variants', test: true, keep: ['v2'] }, // ?models=v1|v2h|p3|p4|v5 — прежний вид / геометрия v2 (lab и /test); v2 — по умолчанию, character/modelVariant.ts
   face: { feature: 'face.morph', test: true }, // ?face=morph|shader — лицо морфами (p2) или шейдером (p1); lab и /test, character/modelVariant.ts faceMode
   meshy: { feature: 'anims.meshy' }, // ?meshy=0 — lab без клипов Meshy (сравнить с опорами)
   asr: { feature: 'asr.web' }, // ?asr=web — Web Speech (звук уходит в облако): с детьми нельзя, даже со страницы /test

@@ -61,7 +61,9 @@ def hsv(c):
 def label_parts(cat, g, prim, P, I):
     """метка части на вершину (по треугольникам вокруг, большинство): 0 — тело (мех, нос, уши, подушечки)"""
     j = g.j
-    marks = next(n for n in j['nodes'] if n.get('name') == 'Brows')['extras']['marks']
+    # точки лица: узел Brows (face_detail.py) или asset.extras.glitterV5.marks (Блёстка v5 — лицо Tripo без накладок)
+    br = next((n for n in j['nodes'] if n.get('name') == 'Brows'), None)
+    marks = br['extras']['marks'] if br else j['asset']['extras']['glitterV5']['marks']
     eyeY = marks['eyeOuterL'][1]
     chinY = (marks['mouthL'][1] + marks['mouthR'][1]) / 2 - 0.5 * np.linalg.norm(np.array(marks['eyeOuterL']) - marks['eyeOuterR'])
     col = tri_colors(g, prim, I)
