@@ -158,6 +158,10 @@ export class PropRig {
   get object(): THREE.Object3D | null {
     return this.active?.obj ?? null;
   }
+  /** id реквизита на сцене (PROPS) — хват по поверхности (gripSolver.ts) */
+  get activeId(): string | null {
+    return this.active?.clip ?? null;
+  }
 
   /** навести реквизит: point — куда смотрит сопло (кончик), null — держать как в клипе */
   aim(point: THREE.Vector3 | null, w = 1) {

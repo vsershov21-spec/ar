@@ -3,7 +3,7 @@
 //   node scripts/qa/anim-audit/table.mjs <tag> [<tagДо>] [<perfTag>]
 // С <tagДо> в ячейке — «было → стало»; с <perfTag> (прогон --cpu 4) — таблица idle-клипов с дрожью покоя.
 // Пишет table_<tag>.md (и idle_<tag>.md) рядом со сводками. Пороги: плохо — ω > 30 рад/с в любом кадре, лапы > 15 мм,
-// проникновение > 5 мм (или > 3 мм в > 2 % кадров), тело ниже опоры > 5 мм (лёжа > 10 мм); терпимо — ω 15–30 / щелчок на
+// проникновение > 5 мм (или > 3 мм в > 2 % кадров), предмета в кота > 2 мм, тело ниже опоры > 5 мм (лёжа > 10 мм); терпимо — ω 15–30 / щелчок на
 // стыке > 10,5, лапы > 6, проникн. > 1, пол > 2.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -36,6 +36,9 @@ function grade(tag) {
     if ((o.floor.gbody ?? 0) < -5) bad(`пол ${o.floor.gbody}`); else if ((o.floor.gbody ?? 0) < -2) tol(`пол ${o.floor.gbody}`);
     if (ss !== null && ss < -10) bad(`лёжа в опоре ${ss}`); else if (ss !== null && ss < -2) tol(`лёжа ${ss}`);
     if (o.notes.some((n) => /не вернулся в покой/.test(n)) && !/^(st_|switch|paint|riddle|echo|rest|idleclip_|look_)/.test(o.id)) tol(`висит ${o.endClip}`);
+    // предмет в лапах (26.11): проникновение предмета в кисть/пальцы/тело — норма ≤ 2 мм
+    const pp = o.props?.penProp ?? 0;
+    if (pp > 2) bad(`пр.предмета ${pp}`); else if (pp > 1) tol(`пр.предмета ${pp}`);
     if (o.bind > 0.5) bad('T-поза');
     (rows[o.id] ||= {})[o.cat] = { v, why, W, o };
   }

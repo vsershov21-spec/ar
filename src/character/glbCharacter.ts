@@ -31,8 +31,10 @@ import { PoseFade } from './poseFade';
 import { curlFingers, lowestPoint, rotWorld as rotW, twoBoneIK, type GroundVolume } from './limbIK';
 import { HOLD_SPECS, holdDuration, holdPose, type HoldFrame, type HoldSpec } from './holdAction';
 import { PropFx } from './propFx';
-import { BOARD, FEET_ON_DECK, SKATE_TOTAL, setSkateFit, skatePose, type SkateFrame } from './skateRig';
+import { BOARD, FEET_ON_DECK, SKATE_SHOW_ORDER, SKATE_SHOW_TOTAL, SKATE_TOTAL, setSkateFit, skatePose, type SkateFrame } from './skateRig';
 import { buildFurShells } from './furShell';
+import { bodyMeshes, propPenetration, type PropPen } from './propPen';
+import { measureHand, newGripState, PropSDF, solveGrip, type HandCaps } from './gripSolver';
 import { attachTulle, tulleMotion, tulleOf, type TulleMotion } from './tulleFx';
 import { alivePose } from './aliveIdle';
 import { attachTailSparkle } from './tailSparkle';
@@ -341,7 +343,7 @@ export class GlbCharacter implements Character {
   readonly W: Record<string, number> = {};
   private gazeV = new THREE.Vector3();
   /** действие с предметом (holdAction.ts) или скейт (skateRig.ts): расписание поверх клипа покоя */
-  private act: { kind: 'hold'; id: string; spec: HoldSpec; t: number } | { kind: 'skate'; id: string; t: number; f: SkateFrame; dir: 1 | -1; wheel: number; fw?: THREE.Vector3; bw?: THREE.Vector3 } | null = null;
+  private act: { kind: 'hold'; id: string; spec: HoldSpec; t: number } | { kind: 'skate'; id: string; t: number; f: SkateFrame; dir: 1 | -1; wheel: number; fw?: THREE.Vector3; bw?: THREE.Vector3; order?: typeof SKATE_SHOW_ORDER } | null = null;
   /** куда смотрит голова на время действия (зеркальце, доска); null — как обычно */
   private actLook: THREE.Vector3 | null = null;
   /** нормаль ладони в системе кости кисти (по подушечкам BD_Pads) и пальцы [палец][фаланга 1..3] */
@@ -557,6 +559,7 @@ export class GlbCharacter implements Character {
         if (ch.length) chains.push(ch);
       }
       this.fingers.set(side, chains);
+      for (const ch of chains) for (const b of ch) this.fingerRest.push([b, b.quaternion.clone()]);
       const hp = hand.getWorldPosition(new THREE.Vector3());
       const tip = byName(`${side}HandMiddle4`) ?? byName(`${side}HandMiddle3`);
       const m1 = byName(`${side}HandMiddle1`);
@@ -589,6 +592,13 @@ export class GlbCharacter implements Character {
     }
     const hl = lens.length ? lens.reduce((a, b) => a + b, 0) / lens.length : 0;
     if (this.props && hl > 0.02 && hl < 0.3) this.props.handLen = hl;
+    // капсулы кисти для хвата по поверхности предмета (gripSolver.ts): радиусы ладони и фаланг по сетке кота
+    for (const side of ['Left', 'Right'] as const) {
+      const H = this.bones.get(side + 'Hand');
+      const pn = H ? (this.palmN.get(side) ?? new THREE.Vector3(0, 0, 1)).clone().applyQuaternion(H.getWorldQuaternion(new THREE.Quaternion())).normalize() : undefined;
+      const caps = measureHand(model, side, this.object.getWorldScale(new THREE.Vector3()).y || 1, pn);
+      if (caps) this.gripCaps.set(side, caps);
+    }
     // длины звеньев рук (reachAssist тянет и возвращает), рот и бант в системе головы
     for (const n of ['LeftForeArm', 'RightForeArm', 'LeftHand', 'RightHand']) {
       const b = this.bones.get(n);
@@ -644,14 +654,16 @@ export class GlbCharacter implements Character {
     if (!this.model || !this.props) return 0;
     this.cancelAct();
     this.finishPropOut();
-    if (id === 'skate') {
-      this.act = { kind: 'skate', id, t: 0, f: skatePose(0), dir: 1, wheel: 0 };
+    if (id === 'skate' || id === 'skate_show') {
+      // skate_show — выезд при появлении (cat.attrs): доска из искры под лапами, проезд, соскок, доска уходит искрой
+      const order = id === 'skate_show' ? SKATE_SHOW_ORDER : undefined;
+      this.act = { kind: 'skate', id, t: 0, f: skatePose(0, undefined, order), dir: 1, wheel: 0, order };
       this.props.rebuild('skateboard');
       this.props.hold('skateboard');
       // ровный покой на всё действие (варианты покоя — оглядеться, наушники — сбивали бы позу на доске); клипы Meshy
       // стойки на доске (если пришли) — по фазам в skatePre
       this.clips.play('idle_breathe', { loop: true, force: true });
-      return SKATE_TOTAL;
+      return order ? SKATE_SHOW_TOTAL : SKATE_TOTAL;
     }
     const spec = HOLD_SPECS[id];
     if (!spec || !this.bones.has(spec.hand + 'Arm')) return 0;
@@ -664,6 +676,95 @@ export class GlbCharacter implements Character {
     this.clips.play(body && this.clipSource(body) === 'meshy' ? body : 'idle_breathe', { loop: true, force: true });
     return holdDuration(spec);
   }
+  // ───────────── хват по поверхности предмета (gripSolver.ts, продакт 26.11) ─────────────
+  /** стенд «до/после»: выключить хват по поверхности (пальцы — прежним кулаком, предмет — где поставил шаблон) */
+  gripOff = false;
+  private gripCaps = new Map<string, HandCaps>();
+  private gripSdf = new Map<string, PropSDF | null>();
+  private gripSt = { Left: newGripState(), Right: newGripState() };
+  private holdGripW = 0;
+  private holdIkW = 0;
+  /** действие/реквизит, для которого копится выталкивание (новый — с нуля) */
+  private gripKey = '';
+  /** стенд: что решил хват на этом кадре */
+  readonly gripDbg = { side: '', id: '', pen: 0, push: 0, on: false };
+  /** предмет хватается по поверхности этой лапой (есть капсулы кисти) */
+  private gripActive(side: string): boolean {
+    return !this.gripOff && this.gripCaps.has(side);
+  }
+  private sdfFor(id: string, po: THREE.Object3D): PropSDF | null {
+    const key = `${id}:${(this.props?.handLen ?? 0).toFixed(4)}`;
+    if (!this.gripSdf.has(key)) this.gripSdf.set(key, PropSDF.build(po));
+    return this.gripSdf.get(key) ?? null;
+  }
+  /**
+   * Кадр хвата: предмет «Угостить/Какао/Зеркальце» (шаблон holdAction) и реквизит клипа в лапе (палочка пузырей,
+   * кисть/баллончик раскраски) — предмет из ладони наружу по поверхности, пальцы сгибаются до касания. Скейт и
+   * предмет двумя лапами — без хвата. Реквизит клипа, висящий рядом с лапой, ставится в кулак (attach).
+   */
+  private solveGripFrame(dt: number) {
+    const po = this.props?.object;
+    this.gripDbg.on = false;
+    if (this.gripOff || !po || !po.visible || !this.props) return;
+    const a = this.act;
+    let side: 'Left' | 'Right', w: number, push: boolean, attach = false, pushW = 1;
+    const id = this.props.activeId ?? '';
+    const def = PROPS[id];
+    if (!def || def.free || def.both) return;
+    if (a?.kind === 'hold') {
+      side = a.spec.hand;
+      w = this.holdGripW;
+      // выталкивание — для кружки (лежит боком на подушечках); ручка зеркальца и хвост рыбки — в кулаке, их ставит
+      // шаблон, пальцы обхватывают (выталкивание тонкой ручки вдоль ладони на подъёме давало дрожь 2–3 мм)
+      push = a.spec.use === 'sip';
+      pushW = this.holdIkW * this.holdIkW * (3 - 2 * this.holdIkW);
+    } else if (!a) {
+      side = def.bone === 'LeftHand' ? 'Left' : 'Right';
+      w = 1;
+      // раскраска: сопло/кисть наводит toolIK — предмет не двигаем, только пальцы
+      push = !/^paint_/.test(id);
+      attach = push;
+    } else return;
+    const caps = this.gripCaps.get(side);
+    if (!caps) return;
+    const H = caps.hand;
+    H.updateWorldMatrix(true, true);
+    const cs = this.object.getWorldScale(new THREE.Vector3()).y || 1;
+    const palmN = (this.palmN.get(side) ?? new THREE.Vector3(0, 0, 1)).clone().applyQuaternion(H.getWorldQuaternion(new THREE.Quaternion())).normalize();
+    if (attach && po.parent) {
+      // реквизит клипа — в кулак: точка хвата (начало узла) у ладони со стороны подушечек
+      const hp = H.getWorldPosition(new THREE.Vector3());
+      const pe = caps.palmTo ? caps.palmTo.getWorldPosition(new THREE.Vector3()) : hp.clone();
+      const at = hp.lerp(pe, 0.6).addScaledVector(palmN, caps.palmR * 1.1 * cs);
+      po.position.copy(po.parent.worldToLocal(at));
+    }
+    const sdf = this.sdfFor(id, po);
+    if (!sdf) return;
+    const st = this.gripSt[side];
+    const key = `${a ? a.id + ':' + a.kind : id}:${po.uuid}`;
+    if (key !== this.gripKey) {
+      this.gripKey = key;
+      st.push = 0;
+      st.dir.set(0, 0, 0);
+    }
+    solveGrip({ prop: po, sdf, caps, palmN, w, push, pushW, obj: this.object, st, dt });
+    Object.assign(this.gripDbg, { side, id, pen: st.pen, push: st.push, on: true });
+  }
+
+  /** стенд (anim-audit, props-grip): проникновение предмета в лапу/пальцы/тело на этом кадре (propPen.ts); null — предмета нет */
+  propPen(stride = 1): PropPen | null {
+    const po = this.props?.object;
+    if (!this.model || !po || !po.visible) return null;
+    this.penBody ??= bodyMeshes(this.model);
+    this.object.updateWorldMatrix(true, false);
+    const unit = this.object.getWorldScale(new THREE.Vector3()).y || 1;
+    const a = this.act;
+    return propPenetration(po, this.penBody, unit, stride, a?.kind === 'hold' && a.spec.use !== 'look');
+  }
+  private penBody: ReturnType<typeof bodyMeshes> | null = null;
+  /** пальцы в покое (позa загрузки): сброс каждый кадр — клипы пальцы не двигают */
+  private fingerRest: [THREE.Object3D, THREE.Quaternion][] = [];
+
   /** прервать действие: предмет убрать, лапа — к клипу */
   cancelAct() {
     if (!this.act) return;
@@ -1291,6 +1392,9 @@ export class GlbCharacter implements Character {
     const f = this.faceMix.update(dt);
 
     this.skatePre(dt);
+    // пальцы: в клипах их дорожек нет (anims_v1 и Meshy) — без сброса каждый кадр сгиб (кулак, хват) копился и
+    // оставался после действия (замер 26.11: палец согнут и после какао). Сгиб кладут слои кадра поверх покоя
+    for (const [b, q] of this.fingerRest) b.quaternion.copy(q);
     if (this.mixer && this.actions.has(cs.cur.id)) {
       this.mixer.update(dt);
       this.anim?.post(dt, cs, this.model ?? this.object);
@@ -1465,8 +1569,17 @@ export class GlbCharacter implements Character {
     if (!this.act) this.propFx.hide();
     this.applyTulle(dt);
     this.groundFinal(dt, cs.cur.id);
+    // доска скейта стоит на карте: подъём тела полом (groundFinal) её не двигает (e2e/grip 26.11: скачок 1,2 мм на соскоке)
+    if (this.skatePlace && this.act?.kind === 'skate' && this.props) {
+      const sp = this.skatePlace, obj = this.object;
+      this.inner.updateWorldMatrix(true, false);
+      const qi = this.inner.getWorldQuaternion(new THREE.Quaternion()).invert().multiply(obj.getWorldQuaternion(new THREE.Quaternion())).multiply(sp.q);
+      this.props.place(this.inner.worldToLocal(obj.localToWorld(sp.p.clone())), qi, sp.s);
+    }
+    if (this.act?.kind !== 'skate') this.skatePlace = null;
     this.props?.aim(ik.aimW > 0.01 ? ik.aimPoint : null, ik.aimW);
     this.props?.update(this.clips.cur.id);
+    this.solveGripFrame(dt);
     // глаза — после головы: взгляд на зрителя (или на точку lookAt), веки, зрачки
     if (this.eyes) {
       const tgt = this.actLook ?? this.look ?? camera.getWorldPosition(this.gazeV);
@@ -1850,7 +1963,8 @@ export class GlbCharacter implements Character {
       // камера AR — сверху: край чуть выше губ, иначе с телефона кружка «у подбородка» (листы 20.11)
       const rim = M.clone().add(V(0, 0.026 + 0.014 * f.tilt, dims.r * 0.55 - 0.018 * f.tilt));
       near.copy(rim).addScaledVector(Y, -hTop * 0.97);
-      far.set(sx * 0.03, 0.4, 0.27);
+      // у груди — чуть дальше вперёд и выше: кружка (её выталкивает из ладони) не задевает живот и бедро на опускании
+      far.set(sx * 0.03, 0.42, 0.31);
     } else if (spec.use === 'look') {
       // зеркальце: стекло вертикально к морде на ширину головы, сбоку-спереди; «чмок» — ближе к рту
       Y.set(sx * 0.08, 1, -0.1).normalize();
@@ -1860,8 +1974,9 @@ export class GlbCharacter implements Character {
       far.set(sx * 0.12, 0.42, 0.25);
       look = G;
     } else {
-      // рыбка/жвачка: хвост (край) в кулаке, голова — ко рту; укус — до губ
-      Y.set(-sx * 0.42, 0.85, -0.32).normalize();
+      // рыбка/жвачка: хвост (край) в кулаке, голова — ко рту; укус — до губ. У груди (take, toMouth = 0) голова рыбки
+      // смотрит вперёд-вверх, от тела: иначе длинная рыбка входила головой в шею и шарф (аудит хвата 26.11: 2,4 мм)
+      Y.set(-sx * 0.42, 0.85, -0.32).lerp(new THREE.Vector3(-sx * 0.25, 0.7, 0.65), 1 - f.toMouth).normalize();
       // голова рыбки — к губам (камера сверху: чуть выше линии рта), укус — в рот
       const top = M.clone().add(V(0, 0.022 - 0.012 * f.peck, 0.03 * (1 - f.peck) - 0.008));
       near.copy(top).addScaledVector(Y, -hTop * 0.95 * (1 - f.eaten));
@@ -1890,7 +2005,10 @@ export class GlbCharacter implements Character {
     const ws = obj.getWorldScale(new THREE.Vector3()).y || 1;
     this.holdDbg.miss = twoBoneIK(S, E, H, wristW, pole, W) / ws;
     this.orientHand(H, side, fd, pn, W, 'hold');
-    this.fist(side, f.grip * (spec.use === 'pop' ? 0.75 : spec.use === 'sip' ? 0.85 : 0.95));
+    // пальцы: хват по поверхности предмета (solveGripFrame — после того, как предмет поставлен); без него — кулак
+    this.holdGripW = f.grip * f.scale;
+    this.holdIkW = W;
+    if (!this.gripActive(side)) this.fist(side, f.grip * (spec.use === 'pop' ? 0.75 : spec.use === 'sip' ? 0.85 : 0.95));
     // 4. вторая лапа — поправить бант (зеркальце)
     if (spec.use === 'look' && f.bow > 0.01) {
       const os = side === 'Left' ? 'Right' : 'Left', ox = -sx;
@@ -1944,7 +2062,10 @@ export class GlbCharacter implements Character {
     this.holdDbg.got.copy(pos);
     const pw = obj.localToWorld(pos.clone());
     const qi = this.inner.getWorldQuaternion(new THREE.Quaternion()).invert().multiply(obj.getWorldQuaternion(new THREE.Quaternion())).multiply(q);
-    this.props.place(this.inner.worldToLocal(pw), qi, f.scale, 1 - f.eaten);
+    // предмет растёт из искры, когда лапа уже поднялась (вес позы ≥ 0,3): у бедра лапа ещё внизу — большая кружка
+    // у её ладони входила в живот/бедро (e2e 26.11: 2,7 мм на появлении какао)
+    const wk = clamp((f.w - 0.3) / 0.5, 0, 1);
+    this.props.place(this.inner.worldToLocal(pw), qi, f.scale * wk * wk * (3 - 2 * wk), 1 - f.eaten);
     // смотрит на зеркальце / на предмет у морды (глоток — глаза «^^» и так закрыты)
     this.actLook = hf.look ? obj.localToWorld(hf.look.clone()) : f.toMouth > 0.3 && a.spec.use !== 'pop' ? pw : null;
     // пар над краем кружки, искра у кулака (появление / уход)
@@ -2098,7 +2219,7 @@ export class GlbCharacter implements Character {
       return;
     }
     a.t += dt;
-    skatePose(a.t, a.f);
+    skatePose(a.t, a.f, a.order);
     if (a.f.phase === 'done') return this.cancelAct();
     this.standY = a.f.standOn + a.f.lift - a.f.crouch * 0.075;
     // тело на доске — клипом Meshy фазы, если он пришёл (стопы, лапы и доску всё равно ведёт skateRig)
@@ -2108,6 +2229,8 @@ export class GlbCharacter implements Character {
   }
   /** крен в поворот (рад, вокруг оси хода X — корень inner) */
   private skateLean = 0;
+  /** доска кадра в системе кота (applySkate) — переставляется после groundFinal */
+  private skatePlace: { p: THREE.Vector3; q: THREE.Quaternion; s: number } | null = null;
   /** направление носа доски по X кота: +1 / −1 (режиссёр: stage.walkTo side — кот боком к ходу, лицом к зрителю) */
   setSkateDir(dir: 1 | -1) {
     if (this.act?.kind === 'skate') this.act.dir = dir;
@@ -2211,6 +2334,8 @@ export class GlbCharacter implements Character {
     const pw = obj.localToWorld(bp.clone());
     const qi = this.inner.getWorldQuaternion(new THREE.Quaternion()).invert().multiply(obj.getWorldQuaternion(new THREE.Quaternion())).multiply(q);
     this.props.place(this.inner.worldToLocal(pw.clone()), qi, f.boardScale);
+    // доска — в системе кота (опора), а не тела: после groundFinal (тело приподняли/опустили) ставится заново
+    this.skatePlace = { p: bp.clone(), q: q.clone(), s: f.boardScale };
     // колёса: оборот по пути доски, пока она на колёсах
     const po = this.props.object;
     if (a.bw && dt > 0 && f.carry < 0.01 && f.board.y < 0.004 && f.pitch < 0.05) {

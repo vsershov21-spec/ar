@@ -51,7 +51,7 @@ import { QUICK_SEARCH_LINES, hintCaption, quickEntry } from './quick/entry';
 
 /** кот выглядывает из нижней плашки поиска карты */
 const PEEK: Record<string, string> = { hooligan: 'video/sprites/hooligan/turn_front.webp', kind: 'video/sprites/kind/turn_front.webp', glitter: 'video/sprites/glitter/pose_wave.webp' };
-import { SwitchCooldown, cooldownMs, cutRedirect, fxAllowed, waitLabel } from './config/pilot';
+import { APPEAR_ATTR, SwitchCooldown, cooldownMs, cutRedirect, fxAllowed, waitLabel } from './config/pilot';
 import { wireSwitchCooldown } from './scenario/switchGate';
 import { track } from './analytics';
 import { startCardPaint, type CardPaint } from './card/paint';
@@ -691,6 +691,8 @@ export class App {
         return true;
       };
     if (feature('pilot.fx')) d.fxGate = (pid, fx) => fxAllowed(pid, fx);
+    // фирменный предмет при появлении кота (из карты и после выбора листом): скейт / какао / зеркальце
+    if (feature('cat.attrs')) d.appearAttr = (p) => APPEAR_ATTR[p] ?? null;
     // воронка: игры, имя (только факт), смена кота, карта найдена / потеряна, СберKids
     d.on('game', (g) => track(g.start ? 'game_start' : 'game_end', { id: g.id }));
     d.on('named', () => track('named', {}, true));
@@ -1115,14 +1117,25 @@ export class App {
   }
 
   private charMode: CharacterMode = 'sprite';
+  /** номер последнего запроса модели: поздняя загрузка прошлого кота не подменяет нового (запись 26.11) */
+  private charGen = 0;
   async setCharacterMode(mode: CharacterMode) {
     this.charMode = mode;
+    const gen = ++this.charGen;
     const pid = this.director.persona.id;
     const ch = await makeCharacter(mode, pid);
     try {
       await ch.load();
     } catch (e) {
       console.error('[character] load failed', e);
+    }
+    // пока модель грузилась, ребёнок выбрал другого кота (его модель уже пришла из кэша или ещё грузится):
+    // эта загрузка устарела — модель на сцене не трогаем. Раньше побеждала та, что пришла последней, и
+    // голос/пузырь были нового кота, а модель — прошлого
+    if (gen !== this.charGen) {
+      ch.dispose();
+      this.director.log(`модель ${pid} пришла поздно (кот уже ${this.director.persona.id}) — не ставим`);
+      return;
     }
     this.character?.dispose();
     this.character = ch;

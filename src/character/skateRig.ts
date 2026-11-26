@@ -17,8 +17,8 @@
  */
 import * as THREE from 'three';
 
-import { RIDE_FROM, RIDE_TO, SKATE_ORDER as ORDER, SKATE_T, SKATE_TOTAL, type SkatePhase } from './skateTiming';
-export { RIDE_FROM, RIDE_TO, SKATE_T, SKATE_TOTAL, type SkatePhase };
+import { RIDE_FROM, RIDE_TO, SKATE_ORDER as ORDER, SKATE_SHOW_ORDER, SKATE_SHOW_TOTAL, SKATE_T, SKATE_TOTAL, skateT, type SkatePh, type SkatePhase } from './skateTiming';
+export { RIDE_FROM, RIDE_TO, SKATE_SHOW_ORDER, SKATE_SHOW_TOTAL, SKATE_T, SKATE_TOTAL, type SkatePhase };
 
 /** доска в ростах кота: длина, ширина, высота верха деки над опорой, толщина, радиус колеса */
 export const BOARD = { len: 0.36, wid: 0.12, deck: 0.062, thick: 0.012, wheelR: 0.018 };
@@ -98,13 +98,14 @@ const BLEND_S = 0.14;
 const NUM: (keyof SkateFrame)[] = ['pitch', 'roll', 'boardScale', 'carry', 'spin', 'standOn', 'lift', 'crouch', 'feetW', 'push', 'sweep', 'feetUp', 'kick', 'arms', 'leanK', 'lookDown', 'spark'];
 const prevF = newSkateFrame();
 
-export function skatePose(t: number, out?: SkateFrame): SkateFrame {
-  const f = rawSkatePose(t, out);
+/** order — порядок фаз: номер каталога (SKATE_ORDER) или выезд при появлении (SKATE_SHOW_ORDER) */
+export function skatePose(t: number, out?: SkateFrame, order: readonly SkatePh[] = ORDER): SkateFrame {
+  const f = rawSkatePose(t, out, order);
   if (f.phase === 'done') return f;
-  const i = ORDER.indexOf(f.phase as (typeof ORDER)[number]);
-  const into = f.k * SKATE_T[ORDER[i]];
+  const i = order.indexOf(f.phase as SkatePh);
+  const into = f.k * skateT(order, order[i]);
   if (i <= 0 || into >= BLEND_S) return f;
-  rawSkatePose(t - into - 1e-4, prevF);
+  rawSkatePose(t - into - 1e-4, prevF, order);
   const w = ss(into / BLEND_S);
   const F = f as unknown as Record<string, number>, P = prevF as unknown as Record<string, number>;
   // оборот кикфлипа (2π) ≡ 0: от ближайшего
@@ -116,17 +117,18 @@ export function skatePose(t: number, out?: SkateFrame): SkateFrame {
   return f;
 }
 
-function rawSkatePose(t: number, out?: SkateFrame): SkateFrame {
+function rawSkatePose(t: number, out?: SkateFrame, order: readonly SkatePh[] = ORDER): SkateFrame {
   const f = out ?? newSkateFrame();
   let acc = 0;
   let ph: SkatePhase = 'done', k = 1;
-  for (const p of ORDER) {
-    if (t < acc + SKATE_T[p]) {
+  for (const p of order) {
+    const d = skateT(order, p);
+    if (t < acc + d) {
       ph = p;
-      k = (t - acc) / SKATE_T[p];
+      k = (t - acc) / d;
       break;
     }
-    acc += SKATE_T[p];
+    acc += d;
   }
   f.phase = ph;
   f.k = k;
@@ -173,6 +175,30 @@ function rawSkatePose(t: number, out?: SkateFrame): SkateFrame {
       f.lookDown = 1 - 0.6 * e;
       break;
     }
+    case 'rise': {
+      // выезд при появлении: кот подпрыгивает на месте, под лапами из искры вырастает доска (пока стопы в воздухе —
+      // не сквозь них), приземляется на деку в стойку боком; доска всё время на колёсах под ним
+      const up = Math.sin(Math.min(1, k / 0.75) * Math.PI);
+      f.board.set(0, 0, UNDER_Z);
+      f.boardScale = Math.min(1, ss(k / 0.4) * 1.06 - 0.06 * ss((k - 0.4) / 0.2));
+      f.lift = up * 0.1;
+      f.standOn = D * ss((k - 0.25) / 0.45);
+      f.feetW = ss((k - 0.15) / 0.45);
+      f.crouch = k < 0.15 ? 0.35 * ss(k / 0.15) : k > 0.7 ? 0.4 * Math.sin(((k - 0.7) / 0.3) * Math.PI) + 0.2 * ss((k - 0.85) / 0.15) : 0.1;
+      f.arms = 0.6 * ss(k / 0.5);
+      f.spark = k < 0.5 ? 1 - k * 2 : 0;
+      f.hand.set(0, 0.02, UNDER_Z);
+      f.lookDown = 0.5 * Math.sin(k * Math.PI);
+      break;
+    }
+    case 'fade':
+      // доска осталась позади на колёсах: кот оборачивается на неё, она уменьшается искрой (без подброса в лапу)
+      f.board.set(0, 0, BEHIND_Z);
+      f.boardScale = 1 - ss((k - 0.1) / 0.75);
+      f.spark = k > 0.1 ? Math.min(1, (k - 0.1) / 0.6) : 0;
+      f.hand.set(0, 0.03, BEHIND_Z);
+      f.lookDown = 0.6 * Math.sin(Math.min(1, k / 0.8) * Math.PI);
+      break;
     case 'push':
       // задняя лапа: хвост → опора сбоку, мах назад → снова на хвост
       onBoard();

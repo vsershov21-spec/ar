@@ -111,7 +111,11 @@ export type Action =
   | { type: 'echo'; text: string }
   | { type: 'appear' }
   | { type: 'offer_choice' }
+  /** лист «Выбери своего кота» (знакомство) / «Позвать другого кота» (игра) — cfg.pickCat */
+  | { type: 'offer_pick'; where: 'intro' | 'play' }
   | { type: 'hide_choice' }
+  /** кот выбран листом/голосом (cfg.pickCat): вспышка, на карте — выбранный кот со своим предметом (тот же — только предмет) */
+  | { type: 'swap_persona'; persona: PersonaId }
   | { type: 'set_persona'; persona: PersonaId }
   | { type: 'signature'; silent?: boolean }
   | { type: 'remember'; patch: { name?: string | null; persona?: PersonaId; met?: boolean } }
@@ -140,10 +144,43 @@ export interface ScenarioConfig {
   /** если в момент outro идёт диалог — отложить */
   outroRetryMs: number;
   random: () => number;
+  /**
+   * выбор кота листом (пилот, feature pilot.catPick): после имени — «Выбери, кто будет с тобой!» и карточки трёх котов,
+   * дальше знакомится выбранный; «Другой кот» / «давай другого» — лист «Позвать другого кота», выбранный появляется со
+   * вспышкой (без наклеек и встряски: это разные коты, а не переодевание одного)
+   */
+  pickCat: boolean;
 }
 
 export function makeScenarioConfig(dialogs: DialogsFile, o: Partial<Omit<ScenarioConfig, 'dialogs'>> = {}): ScenarioConfig {
-  return { dialogs, defaultPersona: 'hooligan', appearMs: 1500, outroMinMs: 4 * 60_000, outroMaxMs: 6 * 60_000, outroRetryMs: 20_000, random: Math.random, ...o };
+  const cfg: ScenarioConfig = { dialogs, defaultPersona: 'hooligan', appearMs: 1500, outroMinMs: 4 * 60_000, outroMaxMs: 6 * 60_000, outroRetryMs: 20_000, random: Math.random, pickCat: false, ...o };
+  return cfg.pickCat ? { ...cfg, dialogs: withPick(cfg.dialogs) } : cfg;
+}
+
+/** сколько лист выбора ждёт касания: знакомство — 25 с и ещё 25 с (потом знакомится тот, кто вышел), игра — 15 с */
+export const PICK_INTRO_MS = 25_000;
+export const PICK_PLAY_MS = 15_000;
+
+/**
+ * Выбор кота (cfg.pickCat) поверх dialogs.json, без правки общего контента: в знакомстве после имени узел pick
+ * (лист и ожидание касания), выбранный кот представляется сам (self → skills → @met); в игре — диалог pick
+ * («Другой кот»: лист, 15 с, «Не сейчас» / тишина — лист уходит, кот прежний).
+ */
+export function withPick(f: DialogsFile): DialogsFile {
+  const intro = f.dialogs.intro;
+  if (!intro || intro.nodes.pick) return f;
+  const nodes = { ...intro.nodes };
+  for (const n of ['nice', 'noname']) if (nodes[n]?.next === 'self') nodes[n] = { ...nodes[n], next: 'pick' };
+  nodes.pick = { do: ['hide_name', 'offer_pick:intro'], listen: { mode: 'intent', ms: PICK_INTRO_MS }, on: { picked: 'self', timeout: 'pick_wait', '*': 'pick_wait' } };
+  nodes.pick_wait = { listen: { mode: 'intent', ms: PICK_INTRO_MS }, on: { picked: 'self', timeout: 'pick_auto', '*': 'pick_wait' } };
+  nodes.pick_auto = { do: ['pick_auto'], next: 'self' };
+  const pick = {
+    title: 'Позвать другого кота',
+    trigger: 'Пилот (pilot.catPick): кнопка «Другой кот», «давай другого», «поменяйся» — лист с двумя другими котами; касание карточки — вспышка и новый кот; «Не сейчас» / 15 с — лист уходит.',
+    start: 'ask',
+    nodes: { ask: { do: ['offer_pick:play'], listen: { mode: 'intent' as const, ms: PICK_PLAY_MS }, on: { no: '@pick_close', skip: '@pick_close', echo_stop: '@pick_close', timeout: '@pick_close', '*': '@end' } } },
+  };
+  return { ...f, dialogs: { ...f.dialogs, intro: { ...intro, nodes }, pick } };
 }
 
 export function initialState(memory: { name?: string | null; persona?: PersonaId | null; visits?: number; met?: boolean } = {}, context: ContextEvent | null = null): ScenarioState {
@@ -190,6 +227,7 @@ function enterPlay(s: ScenarioState, cfg: ScenarioConfig, a: Action[]): Scenario
 function stopDialog(s: ScenarioState, a: Action[]): ScenarioState {
   if (!s.dialog) return s;
   a.push({ type: 'stop_listen' });
+  if (s.dialog.id === 'pick') a.push({ type: 'hide_choice' });
   return { ...s, dialog: null, game: null };
 }
 
@@ -263,6 +301,24 @@ function choosePersona(s: ScenarioState, p: PersonaId, cfg: ScenarioConfig, a: A
   return enterPlay({ ...s, persona: p }, cfg, a);
 }
 
+/**
+ * Кот выбран (cfg.pickCat): касанием карточки или голосом («хочу Добряка»). Знакомство — дальше представляется
+ * выбранный (self → skills → @met), игра — он здоровается (meet_self: «А я Добряк — кот из твоей карты») и играем.
+ */
+function pickPersona(s: ScenarioState, p: PersonaId, cfg: ScenarioConfig, a: Action[]): ScenarioState {
+  const intro = s.dialog?.id === 'intro' && s.phase === 'choose';
+  if (!intro) s = stopDialog(s, a);
+  a.push({ type: 'hide_choice' }, { type: 'swap_persona', persona: p }, { type: 'remember', patch: { persona: p } });
+  s = { ...s, persona: p, boredCount: 0 };
+  if (intro) {
+    const r = answerDialog(cfg.dialogs, s.dialog!, 'picked');
+    s = { ...s, phase: 'ask_name' };
+    return r ? runDialog(s, r, cfg, a) : s;
+  }
+  a.push({ type: 'say', key: 'meet_self', force: true });
+  return enterPlay(s, cfg, a);
+}
+
 function doAction(s: ScenarioState, action: string, arg: string | undefined, heardText: string, cfg: ScenarioConfig, a: Action[]): ScenarioState {
   switch (action) {
     case 'name_prompt':
@@ -283,6 +339,20 @@ function doAction(s: ScenarioState, action: string, arg: string | undefined, hea
     case 'offer_choice':
       a.push({ type: 'ui', ui: 'name_prompt', show: false }, { type: 'offer_choice' });
       return { ...s, phase: 'choose' };
+    case 'offer_pick':
+      a.push({ type: 'offer_pick', where: arg === 'play' ? 'play' : 'intro' });
+      if (arg === 'play') return s;
+      a.push({ type: 'ui', ui: 'name_prompt', show: false });
+      return { ...s, phase: 'choose' };
+    case 'pick_auto': {
+      // знакомство: лист так и не тронули — знакомится тот, кто вышел из карты
+      const p = s.persona ?? cfg.defaultPersona;
+      a.push({ type: 'hide_choice' }, { type: 'remember', patch: { persona: p } });
+      return { ...s, persona: p, phase: 'ask_name' };
+    }
+    case 'pick_close':
+      a.push({ type: 'hide_choice' });
+      return s;
     case 'riddle_next':
       return { ...s, riddleSeq: s.riddleSeq + 1 };
     case 'game':
@@ -387,6 +457,9 @@ function expects(cfg: ScenarioConfig, d: DialogState, key: string) {
 function onHeard(s: ScenarioState, h: Heard, cfg: ScenarioConfig, a: Action[]): ScenarioState {
   // безопасность — всегда первой, прерывает любой диалог
   if (cfg.dialogs.interrupts.includes(h.type)) return triggerDialog({ ...s, unknownStreak: 0 }, h.type, cfg, a) ?? s;
+  // выбор кота голосом («Добряк», «хочу Блёстку»): лист знакомства или «Другой кот» открыт — это ответ
+  if (cfg.pickCat && h.type.startsWith('choose_') && isPersonaId(h.type.slice(7)) && ((s.phase === 'choose' && s.dialog?.id === 'intro') || s.dialog?.id === 'pick'))
+    return pickPersona(s, h.type.slice(7) as PersonaId, cfg, a);
   // кот переспросил «Другой кот?», а ребёнок нажал «Другой кот» ещё раз — это «да»
   if (h.button && h.type === 'change_persona' && s.dialog?.id === 'switch') return startSwitch(stopDialog(s, a), a);
   // «Повтори движение»: кнопка движения («Прыгни», «Сальто»…) — это ответ, а не конец игры
@@ -432,10 +505,17 @@ function onHeard(s: ScenarioState, h: Heard, cfg: ScenarioConfig, a: Action[]): 
   const t = h.type;
   // кнопка / чип «Другой кот» — одно касание могло быть случайным: кот переспрашивает («Давай!» / «Не надо», 8 с).
   // Голосом («давай другого») ребёнок просит сам — смена сразу
+  // выбор кота листом (пилот): «Другой кот» и «давай другого» — лист «Позвать другого кота» (ребёнок сам выбирает кого)
+  if (t === 'change_persona' && cfg.pickCat) return runDialog(s, startDialog(cfg.dialogs, 'pick'), cfg, a);
   if (t === 'change_persona') return h.button && cfg.dialogs.dialogs.switch ? runDialog(s, startDialog(cfg.dialogs, 'switch'), cfg, a) : startSwitch(s, a);
   if (t.startsWith('choose_')) {
     const p = t.slice(7);
     if (!isPersonaId(p)) return s;
+    // «хочу Добряка» в игре: сразу он, со вспышкой (тот же кот — просто ответ «это я»)
+    if (cfg.pickCat) {
+      if (p === s.persona) return a.push({ type: 'react', event: 'yes' }), s;
+      return pickPersona(s, p, cfg, a);
+    }
     a.push({ type: 'say', key: t });
     if (p === s.persona) return s;
     return startSwitch(s, a, p);
@@ -557,6 +637,8 @@ export function step(s: ScenarioState, e: ScenarioEvent, cfg: ScenarioConfig): S
 
     case 'ask_name':
     case 'choose': {
+      if (e.type === 'choose' && cfg.pickCat && s.phase === 'choose' && s.dialog?.id === 'intro') return done(pickPersona(s, e.persona, cfg, a));
+      if (e.type === 'choose' && cfg.pickCat) return done(s); // лист уже выбран (двойное касание) — ничего
       if (e.type === 'choose') return done(choosePersona(s, e.persona, cfg, a));
       if (e.type === 'name') return done(onHeard(s, { type: 'name', name: e.name, known: e.known ?? false, text: e.name }, cfg, a));
       if (e.type === 'skip_name') return done(onHeard(s, { type: 'skip' }, cfg, a));
@@ -580,7 +662,9 @@ export function step(s: ScenarioState, e: ScenarioEvent, cfg: ScenarioConfig): S
         else a.push({ type: 'react', event: kind });
         return done({ ...s, boredCount: 0 });
       }
-      if (e.type === 'switch_request') return done(startSwitch(s, a));
+      if (e.type === 'switch_request') return done(cfg.pickCat ? runDialog(stopDialog(s, a), startDialog(cfg.dialogs, 'pick'), cfg, a) : startSwitch(s, a));
+      // лист «Позвать другого кота» (пилот): касание карточки — выбранный кот со вспышкой
+      if (e.type === 'choose' && cfg.pickCat) return done(e.persona === s.persona ? stopDialog(s, a) : pickPersona(s, e.persona, cfg, a));
       // выбор характера листом (debug, старый поток) уже в игре — сразу, без заклеивания экрана
       if (e.type === 'choose') return done(e.persona === s.persona ? s : choosePersona(s, e.persona, cfg, a));
       if (e.type === 'silence') {

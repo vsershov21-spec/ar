@@ -164,7 +164,8 @@ function scenarios(cat, durs = {}) {
         { op: 'js', at: 100, label: 'cd reset', code: 'app.switchCooldown && (app.switchCooldown.last = -Infinity)' },
         { op: 'action', at: 300, id: SIG[cat][0] },
         { op: 'action', at: 1200, id: 'other' },
-        { op: 'js', at: 2000, label: 'да', code: "app.director.text('да')" },
+        // пилот (pilot.catPick, 26.11): «Другой кот» — лист, выбираем следующего; без листа (lab/MVP) — «да» на «Другой кот?»
+        { op: 'js', at: 2000, label: 'выбор (лист)', code: "{ const ids = ['hooligan', 'kind', 'glitter']; const d = app.director; if (d.state.dialog?.id === 'pick') d.dispatch({ type: 'choose', persona: ids[(ids.indexOf(d.persona.id) + 1) % 3] }); else d.text('да'); }" },
         { op: 'js', at: 4500, label: 'shake', code: "app.director.interaction('shake')" },
       ],
     },
@@ -173,7 +174,7 @@ function scenarios(cat, durs = {}) {
       steps: [
         { op: 'js', at: 100, label: 'cd reset', code: 'app.switchCooldown && (app.switchCooldown.last = -Infinity)' },
         { op: 'action', at: 300, id: 'other' },
-        { op: 'js', at: 2300, label: 'да', code: "app.director.text('да')" },
+        { op: 'js', at: 2300, label: 'выбор (лист)', code: "{ const ids = ['hooligan', 'kind', 'glitter']; const d = app.director; if (d.state.dialog?.id === 'pick') d.dispatch({ type: 'choose', persona: ids[(ids.indexOf(d.persona.id) + 1) % 3] }); else d.text('да'); }" },
         { op: 'js', at: 5200, label: 'shake', code: "app.director.interaction('shake')" },
       ],
     },

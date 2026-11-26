@@ -169,3 +169,15 @@ export function laterText(ms: number): string {
   const when = s >= 60 ? `через ${Math.ceil(s / 60)} мин` : `через ${Math.max(1, s)} с`;
   return `Чуть позже! Другой кот — ${when}. Давай ещё поиграем со мной.`;
 }
+
+/**
+ * Фирменный предмет при появлении кота (feature cat.attrs, director.playAttr): из карты и после выбора листом.
+ * Значение — действие персонажа (GlbCharacter.runAct): skate_show — короткий выезд на скейте (без кикфлипа и подброса
+ * доски в лапу), cocoa — какао в лапах с глотком, mirror — смотрится в зеркальце. null — кот появляется без предмета
+ * (так выключают предмет, у которого на стенде нечистый хват: docs/qa/props/GRIP.md, правило «MVP без багов»).
+ */
+export const APPEAR_ATTR: Readonly<Record<PersonaId, string | null>> = {
+  hooligan: 'skate_show',
+  kind: 'cocoa',
+  glitter: 'mirror',
+};

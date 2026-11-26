@@ -10,7 +10,9 @@
  * за 1,5 с: короткий столб, кот выскакивает, маленький салют.
  *
  * Свой вариант для каждого образа:
- *   hooligan — граффити-брызги на карте и неоновые спреи, вылетает на скейте с переворотом (сальто);
+ *   hooligan — граффити-брызги на карте и неоновые спреи, выпрыгивает резко и высоко (без сальто и без скейта в
+ *              сцене: запись 26.11 — «вылезает на скейте вверх ногами», скейт «вылетал из кота»; скейт теперь —
+ *              фирменный предмет после приземления, стопы на деке — director.playAttr → skate_show);
  *   kind     — пузыри и мягкие сердечки, выплывает медленно в облаке пузырей, покачиваясь;
  *   glitter  — звёздная пыль и блёстки по спирали вокруг столба, вылетает с вращением (2 оборота).
  */
@@ -117,7 +119,7 @@ interface Style {
 }
 
 const STYLE: Record<PersonaId, Style> = {
-  hooligan: { flight: 0.9, peak: 0.62, depth: 0.75, flips: 1, spins: 0, sway: 0, flightClip: 'jump' },
+  hooligan: { flight: 0.9, peak: 0.62, depth: 0.75, flips: 0, spins: 0, sway: 0, flightClip: 'jump' },
   kind: { flight: 1.2, peak: 0.42, depth: 0.7, flips: 0, spins: 0, sway: 0.16, flightClip: 'idle_yawn' },
   glitter: { flight: 0.95, peak: 0.55, depth: 0.75, flips: 0, spins: 2, sway: 0, flightClip: 'jump' },
 };
@@ -263,11 +265,8 @@ export function awakePlan(persona: PersonaId, kind: AwakeKind): AwakePlan {
       return { h: easeOut((t - 0.05) / 0.3) * 0.75, k: win(t, 0.05, 0.2, tPop + 0.05, tLand) };
     },
     silhouette: (t) => (first ? win(t, PILLAR_FIRST + 0.1, tPop - 0.1, tPop, tPop + 0.25) * 0.75 : 0),
-    skate: (t) => {
-      if (persona !== 'hooligan' || !first || t < tPop) return 0;
-      if (t < tLand + 0.55) return 1;
-      return 1 + clamp01((t - tLand - 0.55) / 0.8) + (t > tLand + 1.35 ? 1 : 0);
-    },
+    // доска сцены больше не появляется (26.11): она не держалась за стопы и при сальто «вылетала из кота»
+    skate: () => 0,
     sparks: (t) => (first ? win(t, PILLAR_FIRST - 0.1, PILLAR_FIRST + 0.25, tLand - 0.2, tLand + 0.3) : win(t, 0, 0.1, tPop, tLand)),
     flair: (t) => (first ? win(t, PILLAR_FIRST + 0.05, PILLAR_FIRST + 0.35, tLand + 0.5, tLand + 1.6) : win(t, 0.1, 0.2, tLand, tLand + 0.4)),
   };

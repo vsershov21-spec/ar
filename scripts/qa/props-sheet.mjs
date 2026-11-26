@@ -32,7 +32,7 @@ const DIST = arg('--dist', '') ? path.resolve(arg('--dist')) : '';
 const PORT = Number(arg('--port', 4197));
 const URL0 = arg('--url', `http://localhost:${PORT}/`);
 const CATS = arg('--cats', 'kind,glitter,hooligan').split(',');
-const ACTS = { kind: ['cocoa', 'treat'], glitter: ['mirror', 'treat'], hooligan: ['skate', 'bubbles', 'treat'] };
+const ACTS = { kind: ['cocoa', 'treat', 'bubbles'], glitter: ['mirror', 'treat'], hooligan: ['skate', 'bubbles', 'treat'] };
 const ONLY = arg('--acts', '') ? arg('--acts').split(',') : null;
 const N = Number(arg('--frames', 12));
 const log = (...a) => console.log(`[props ${new Date().toISOString().slice(11, 19)}]`, ...a);

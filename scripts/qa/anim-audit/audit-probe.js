@@ -118,6 +118,15 @@ export function extraProbe() {
         if (hb) m = Math.min(m, po.getWorldPosition(new V()).distanceTo(hb.getWorldPosition(new V())) / cs);
       }
       r.propHand = Number.isFinite(m) ? +(m * (rx.__catMM ?? 77)).toFixed(1) : -1;
+      // проникновение предмета в кота (26.11: «предметы проникают в руки»): точки сетки кота внутри предмета, мм —
+      // character/propPen.ts; дорого (скиннинг всех точек) — каждый 2-й кадр с предметом
+      if (typeof c.propPen === 'function' && (rx.__ppN = (rx.__ppN ?? 0) + 1) % 2 === 0 && r.propScale > 0.05) {
+        const pp = c.propPen(2);
+        if (pp) {
+          r.ppen = +(pp.depth * (rx.__catMM ?? 77)).toFixed(2);
+          r.ppenPart = pp.depth > 0 ? `${pp.part}:${pp.bone}` : '';
+        }
+      }
     }
     // все объекты-предметы, висящие в сцене видимыми без действия (застрявшие)
     r.stuck = po && po.visible && !c.actState && !/skate/.test(c.clips.cur.id) ? 1 : 0;

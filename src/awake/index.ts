@@ -97,6 +97,10 @@ export class AwakeController {
   get active() {
     return !!this.run || this.salute.active;
   }
+  /** идёт сама сцена (без хвоста салюта): кот уже на карте и свободен, когда false (предмет появления — director) */
+  get scenePlaying() {
+    return !!this.run;
+  }
 
   resize(w: number, h: number) {
     this.salute.resize(w, h);

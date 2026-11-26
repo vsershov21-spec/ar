@@ -58,11 +58,15 @@ describe('пробуждение кота из карты: хореографи�
     });
   }
 
-  it('образы различаются: Хулиган — сальто и скейт, Блёстка — вращение, Добряк — покачивание', () => {
+  it('образы различаются: Хулиган — без сальто и без скейта в сцене (26.11), Блёстка — вращение, Добряк — покачивание', () => {
     const h = awakePlan('hooligan', 'first'), g = awakePlan('glitter', 'first'), k = awakePlan('kind', 'first');
     const mid = (p: typeof h) => p.pose(p.tPop + (p.tLand - p.tPop) * 0.5);
-    expect(Math.abs(mid(h).flip)).toBeGreaterThan(1);
-    expect(h.skate(h.tPop + 0.1)).toBe(1);
+    // запись 26.11: «вылезает на скейте вверх ногами» — переворота нет ни в одном кадре, доски сцены нет
+    for (let t = h.tPop; t < h.tLand; t += 0.02) {
+      expect(Math.abs(h.pose(t).flip)).toBe(0);
+      expect(h.skate(t)).toBe(0);
+    }
+    expect(mid(h).lift).toBeGreaterThan(mid(g).lift * 0.9);
     expect(Math.abs(mid(g).spin)).toBeGreaterThan(3);
     expect(g.skate(g.tPop + 0.1)).toBe(0);
     let sway = 0;

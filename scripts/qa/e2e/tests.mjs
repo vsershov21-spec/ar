@@ -247,6 +247,9 @@ export const TESTS = [
       await P.tap('.namebox input');
       await P.page.keyboard.type('Ксюша');
       await P.tap('.namebox [data-a="name"]');
+      // выбор кота (pilot.catPick): лист после имени — касание карточки того, кто вышел
+      await P.must(() => !document.querySelector('.choice-sheet').classList.contains('hidden'), 30000, 'лист «Выбери своего кота»');
+      await P.tap(`.choice-sheet .choice[data-p="${await P.ev(() => window.__app.director.persona.id)}"]`);
       await P.must(() => ['play', 'free'].includes(window.__app.director.state.phase), 60000, 'игра после имени');
       // пилот без «ласки» (pilot.noCare): meet_skills звучит озвученным вариантом help («Я умею сальто, танцы…») — с его id
       await P.must(() => (window.__qaRec ?? []).some((r) => r.kind === 'speak' && /meet_skills|\.help\./.test(r.id ?? '')), 60000, 'кот договорил знакомство (meet_skills)');
@@ -423,6 +426,9 @@ export const TESTS = [
       const b2 = await catBox(Q);
       if (b2) for (let i = 0; i < 6; i++) await Q.tapXY(b2.cx, b2.head), await sleep(150);
       await Q.tap('.namebox [data-a="skip"]');
+      // после «Пропустить» — лист «Выбери своего кота» (pilot.catPick): выбираем того, кто вышел
+      await Q.must(() => !document.querySelector('.choice-sheet').classList.contains('hidden'), 30000, 'лист выбора кота после «Пропустить»');
+      await Q.tap(`.choice-sheet .choice[data-p="${await Q.ev(() => window.__app.director.persona.id)}"]`);
       await Q.must(() => ['play', 'free'].includes(window.__app.director.state.phase), 60000, 'игра после «Пропустить»');
       const mem = await Q.ev(() => JSON.parse(localStorage.getItem('sber-ar-cat:v1') || '{}'));
       assert(!mem.name, 'после «Пропустить» в памяти есть имя');
@@ -430,59 +436,59 @@ export const TESTS = [
   },
   {
     name: '04_switch_cooldown',
-    title: 'смена кота: кулдаун (таймер на кнопке, «Чуть позже»), отказ на наклейках, ?cooldown=0 — смена ×3',
+    title: 'смена кота листом «Позвать другого кота» (26.11): «Не сейчас» (кот прежний, кулдаун цел) → карточка → новый кот со вспышкой; таймер на кнопке, «Чуть позже»; ?cooldown=0 — смена ×3',
     timeout: 600,
     async fn(t) {
       const P = await playing(t, 'hooligan');
-      // «Другой кот» переспрашивает (случайное касание): чипы «Давай!» / «Не надо»; «Не надо» — кот прежний
+      // «Другой кот» — лист с двумя другими котами и «Не сейчас»; «Не сейчас» — кот прежний, кулдаун цел
       await pick(P, 'other');
-      assert(await tapChip(P, 'не надо'), 'нет чипа «Не надо» на «Другой кот?»');
-      await settle(P, '«Не надо»', 20000);
+      await P.must(() => !document.querySelector('.choice-sheet').classList.contains('hidden'), 8000, 'лист «Позвать другого кота»');
+      const sheet = await P.ev(() => ({ title: document.querySelector('.choice-sheet .sheet-title').textContent, cards: [...document.querySelectorAll('.choice-sheet .choice')].map((b) => b.dataset.p) }));
+      t.note(`лист: ${sheet.title} — ${sheet.cards.join(', ')}`);
+      assert(sheet.title === 'Позвать другого кота', `заголовок листа: ${sheet.title}`);
+      assert(sheet.cards.length === 2 && !sheet.cards.includes('hooligan'), `карточки: ${sheet.cards.join(', ')}`);
+      assert(await P.ev(() => !document.querySelector('.sticker, .stickers-cover') && window.__app.director.state.phase !== 'switching'), 'наклейки при «Другой кот»');
+      await P.tap('.choice-sheet .choice-close');
+      await P.must(() => document.querySelector('.choice-sheet').classList.contains('hidden'), 5000, '«Не сейчас» закрыл лист');
+      await settle(P, '«Не сейчас»', 20000);
       await sleep(900); // то же действие сразу после конца — «повтор» (оркестратор, REPEAT_MS)
-      assert(await P.ev(() => window.__app.director.persona.id === 'hooligan' && window.__app.switchCooldown.allow(performance.now())), '«Не надо»: кот сменился или кулдаун потрачен');
-      // «Давай!» → наклейки → «нет» на наклейках — отмена, кулдаун не тратится
+      assert(await P.ev(() => window.__app.director.persona.id === 'hooligan' && window.__app.switchCooldown.allow(performance.now())), '«Не сейчас»: кот сменился или кулдаун потрачен');
+      // карточка → новый кот (модель, голос, пузырь — его)
       await pick(P, 'other');
-      assert(await tapChip(P, 'давай'), 'нет чипа «Давай!»');
-      await P.must(() => window.__app.director.state.phase === 'switching', 10000, 'наклейки (switching)');
-      await sleep(1500);
-      await P.ev(() => window.__app.director.text('нет'));
-      await P.must(() => window.__app.director.state.phase !== 'switching', 15000, 'отказ на наклейках вернул игру');
-      assert(await P.ev(() => window.__app.director.persona.id === 'hooligan'), 'после «нет» кот сменился');
-      assert(await P.ev(() => window.__app.switchCooldown.allow(performance.now())), 'отказ на наклейках потратил кулдаун');
-      await settle(P, 'отказ', 20000);
-      await sleep(900);
-      // смена: «Давай!» → встряска кнопкой «Сдёрнуть наклейки»
-      await pick(P, 'other');
-      assert(await tapChip(P, 'давай'), 'нет чипа «Давай!» (2)');
-      await P.must(() => window.__app.director.state.phase === 'switching', 10000, 'наклейки');
-      await P.must(() => !document.querySelector('.shakebtn').classList.contains('hidden'), 15000, 'кнопка «Сдёрнуть наклейки»');
-      await P.tap('.shakebtn');
-      await P.must(() => window.__app.director.persona.id !== 'hooligan' && window.__app.director.state.phase !== 'switching', 20000, 'новый кот');
+      await P.must(() => !document.querySelector('.choice-sheet').classList.contains('hidden'), 8000, 'лист (2)');
+      const r0 = await rt(P);
+      await P.tap('.choice-sheet .choice[data-p="kind"]');
+      await P.must(() => window.__app.director.persona.id === 'kind', 10000, 'выбран Добряк');
+      await P.must(() => window.__app.charFor === 'kind' && /kind/.test(window.__app.character.url ?? ''), 30000, 'модель Добряка');
       await P.must(SETTLED, 30000, 'новый кот свободен');
+      const s1 = await since(P, r0);
+      t.note(`после выбора: ${s1.speak.join(', ')} | ${s1.bubble.join(' | ')}`);
+      assert(s1.speak.some((id) => /^kind\.meet_self/.test(id)), `Добряк не представился своим голосом: ${s1.speak.join(', ')}`);
+      assert(!s1.speak.some((id) => /^hooligan\./.test(id)), `после выбора говорил Хулиган: ${s1.speak.join(', ')}`);
       // кулдаун: таймер на кнопке, «Чуть позже»
       const wait = await P.ev(() => document.querySelector('[data-act="other"], [data-item="other"]')?.dataset.wait ?? null);
       t.note(`таймер на «Другой кот»: ${wait}`);
       assert(wait && /^\d:\d\d$/.test(wait), `нет таймера на кнопке «Другой кот» (${wait})`);
-      const r0 = await rt(P);
+      const r1 = await rt(P);
       await pick(P, 'other');
-      const later = await P.until((r0) => (window.__qaRec ?? []).some((x) => x.rt >= r0 && ((x.kind === 'bubble' && /Чуть позже/.test(x.txt ?? '')) || (x.kind === 'speak' && /switch_later/.test(x.id ?? '')))), 10000, r0);
-      const s = await since(P, r0);
+      const later = await P.until((r0) => (window.__qaRec ?? []).some((x) => x.rt >= r0 && ((x.kind === 'bubble' && /Чуть позже/.test(x.txt ?? '')) || (x.kind === 'speak' && /switch_later/.test(x.id ?? '')))), 10000, r1);
+      const s = await since(P, r1);
       assert(later, `нет «Чуть позже» (${s.bubble.join(' | ')})`);
-      assert(await P.ev(() => window.__app.director.state.phase !== 'switching'), 'кулдаун пропустил смену');
+      assert(await P.ev(() => document.querySelector('.choice-sheet').classList.contains('hidden') && window.__app.director.persona.id === 'kind'), 'кулдаун пропустил смену (лист открылся)');
       await P.close();
       // ?cooldown=0 (страница /test): смена ×3 подряд
       const Q = await playing(t, 'hooligan', 'from=test&cooldown=0');
       const seen = [await Q.ev(() => window.__app.director.persona.id)];
       for (let i = 0; i < 3; i++) {
         await pick(Q, 'other');
-        assert(await tapChip(Q, 'давай'), `смена ${i + 1}: нет чипа «Давай!»`);
-        if (!(await Q.until(() => window.__app.director.state.phase === 'switching', 10000))) throw new Error(`смена ${i + 1}: «Давай!» не начал смену (${(await Q.log()).slice(-4).join(' | ')})`);
-        await Q.must(() => !document.querySelector('.shakebtn').classList.contains('hidden'), 15000, `смена ${i + 1}: кнопка встряски`);
-        await Q.tap('.shakebtn');
-        await Q.must((p) => window.__app.director.persona.id !== p && window.__app.director.state.phase !== 'switching', 20000, `смена ${i + 1}`, seen[seen.length - 1]);
-        seen.push(await Q.ev(() => window.__app.director.persona.id));
+        if (!(await Q.until(() => !document.querySelector('.choice-sheet').classList.contains('hidden'), 10000))) throw new Error(`смена ${i + 1}: лист не открылся (${(await Q.log()).slice(-4).join(' | ')})`);
+        const to = await Q.ev(() => document.querySelector('.choice-sheet .choice').dataset.p);
+        await Q.tap(`.choice-sheet .choice[data-p="${to}"]`);
+        await Q.must((p) => window.__app.director.persona.id === p, 20000, `смена ${i + 1}`, to);
+        seen.push(to);
         await Q.must(() => window.__app.charFor === window.__app.director.persona.id, 30000, `смена ${i + 1}: модель нового кота`);
         await settle(Q, `смена ${i + 1}`, 30000);
+        await sleep(900);
       }
       t.note(`cooldown=0: ${seen.join(' → ')}`);
     },
@@ -1039,6 +1045,143 @@ export const TESTS = [
       for (const id of ['pet', 'scratch', 'tickle', 'hug', 'cheek']) assert(!items.some((i) => i.id === id), `в каталоге пилота «${id}»`);
     },
   },
+  // ───────────── 13. персонажи (26.11): выбор кота, смена, предмет появления ─────────────
+  {
+    name: '13_pick_after_skip',
+    title: 'новый ребёнок: «Пропустить» имя → лист «Выбери своего кота» (3 карточки, пузырь «Выбери, кто будет с тобой!») → Добряк: вспышка, его модель, он знакомится своим голосом, какао в лапах',
+    timeout: 400,
+    async fn(t) {
+      const P = t.track(await openPhone(t.browser, t.server, { q: '' }));
+      await toPlay(P, { pick: 'kind' });
+      await P.must(() => window.__app.charFor === 'kind', 30000, 'модель Добряка загружена');
+      const r = await P.ev(() => ({ p: window.__app.director.persona.id, url: window.__app.character.url, charFor: window.__app.charFor, picks: window.__e2ePick ?? null }));
+      t.note(JSON.stringify(r));
+      assert(r.picks && r.picks.title === 'Выбери своего кота', `заголовок листа: ${r.picks?.title}`);
+      assert(r.picks.cards.join(',') === 'hooligan,kind,glitter', `карточки: ${r.picks.cards.join(',')}`);
+      assert(r.p === 'kind' && /kind/.test(r.url) && r.charFor === 'kind', `кот ${r.p}, модель ${r.url}`);
+      const tx = await P.ev(() => window.__e2eTexts ?? []);
+      assert(tx.some((x) => /Выбери, кто будет с тобой/.test(x.t ?? '')) || (await P.rec('bubble')).some((x) => /Выбери, кто будет с тобой/.test(x.txt ?? '')), 'нет пузыря «Выбери, кто будет с тобой!»');
+      const sp = (await P.rec('speak')).map((x) => x.id);
+      t.note(`реплики: ${sp.join(', ')}`);
+      assert(sp.some((id) => /^kind\.meet_self/.test(id)), 'Добряк не представился (meet_self)');
+      assert(!sp.some((id) => /^hooligan\.meet_self/.test(id)), 'meet_self сказал Хулиган');
+      assert(!sp.some((id) => /choose_|switch_start|hello_new/.test(id)), `реплики «переодевания»: ${sp.join(', ')}`);
+      const att = await P.until(() => (window.__qaRec ?? []).some((x) => x.kind === 'log' && /предмет появления: cocoa/.test(x.s)), 20000);
+      assert(att, 'нет какао при появлении Добряка');
+    },
+  },
+  {
+    name: '13_pick_after_name',
+    title: 'имя полем → лист выбора → Блёстка (модель, зеркальце); без листа «Каким мне быть?»',
+    timeout: 400,
+    async fn(t) {
+      const P = t.track(await openPhone(t.browser, t.server, { q: '' }));
+      await toPlay(P, { name: 'Маша', pick: 'glitter' });
+      await P.must(() => window.__app.charFor === 'glitter', 30000, 'модель Блёстки загружена');
+      const r = await P.ev(() => ({ p: window.__app.director.persona.id, url: window.__app.character.url, phase: window.__app.director.state.phase }));
+      assert(r.p === 'glitter' && /glitter/.test(r.url), `кот ${r.p}, модель ${r.url}`);
+      assert(await P.until(() => (window.__qaRec ?? []).some((x) => x.kind === 'log' && /предмет появления: mirror/.test(x.s)), 20000), 'нет зеркальца при появлении Блёстки');
+      assert(!(await P.ev(() => document.body.innerText.includes('Каким мне быть'))), 'лист «Каким мне быть?»');
+    },
+  },
+  {
+    name: '13_switch_from_play',
+    title: 'смена кота из игры: «давай другого» голосом → лист → Блёстка; событие choose (запись 26.11) меняет модель, голос и пузырь; гонка загрузок моделей',
+    timeout: 400,
+    async fn(t) {
+      const P = await playing(t, 'hooligan', 'from=test&cooldown=0');
+      // голосом — тот же лист
+      await P.ev(() => window.__app.director.text('давай другого'));
+      await P.must(() => !document.querySelector('.choice-sheet').classList.contains('hidden'), 8000, 'лист по «давай другого»');
+      const r0 = await rt(P);
+      await P.tap('.choice-sheet .choice[data-p="glitter"]');
+      await P.must(() => window.__app.charFor === 'glitter' && /glitter/.test(window.__app.character.url ?? ''), 30000, 'модель Блёстки');
+      await P.must(SETTLED, 30000, 'Блёстка свободна');
+      let s = await since(P, r0);
+      assert(s.speak.some((id) => /^glitter\./.test(id)) && !s.speak.some((id) => /^hooligan\./.test(id)), `голос после смены: ${s.speak.join(', ')}`);
+      // событие choose в игре (запись 26.11: «сменилась только подпись в пузыре»): модель, голос, пузырь — нового
+      await sleep(1000);
+      const r1 = await rt(P);
+      await P.ev(() => window.__app.director.dispatch({ type: 'choose', persona: 'kind' }));
+      await P.must(() => window.__app.director.persona.id === 'kind', 10000, 'режиссёр: кот kind');
+      await P.must(() => window.__app.charFor === 'kind' && /kind/.test(window.__app.character.url ?? ''), 30000, 'модель Добряка');
+      await P.must(SETTLED, 30000, 'Добряк свободен');
+      s = await since(P, r1);
+      t.note(`choose → kind: ${s.speak.join(', ')} | ${s.bubble.join(' | ')}`);
+      assert(s.speak.some((id) => /^kind\./.test(id)) && !s.speak.some((id) => /^glitter\./.test(id)), `голос после choose: ${s.speak.join(', ')}`);
+      const st = await P.ev(() => ({ n: window.__app.stage.root.children.filter((c) => c.name === 'character-glb').length, inStage: window.__app.stage.root.children.includes(window.__app.character.object) }));
+      assert(st.n === 1 && st.inStage, `в сцене котов: ${st.n}`);
+      // гонка загрузок: модель Хулигана — медленно (8 с), Добряк уже в кэше; ребёнок передумал — поздняя модель не подменяет
+      await sleep(1000);
+      await P.page.setRequestInterception(true);
+      P.page.on('request', (q) => {
+        if (q.isInterceptResolutionHandled()) return;
+        if (/hooligan[^/]*\.glb/.test(q.url())) setTimeout(() => q.continue().catch(() => undefined), 8000);
+        else q.continue().catch(() => undefined);
+      });
+      await P.ev(() => window.__app.director.dispatch({ type: 'choose', persona: 'hooligan' }));
+      await sleep(700);
+      await P.ev(() => window.__app.director.dispatch({ type: 'choose', persona: 'kind' }));
+      await sleep(12000);
+      const st2 = await P.ev(() => ({ p: window.__app.director.persona.id, url: window.__app.character.url, charFor: window.__app.charFor, n: window.__app.stage.root.children.filter((c) => c.name === 'character-glb').length }));
+      t.note(`гонка: ${JSON.stringify(st2)}`);
+      assert(st2.p === 'kind' && /kind/.test(st2.url) && st2.charFor === 'kind' && st2.n === 1, `гонка загрузок: кот ${st2.p}, модель ${st2.url}`);
+      await P.page.setRequestInterception(false).catch(() => undefined);
+    },
+  },
+  ...['hooligan', 'kind', 'glitter'].map((cat) => ({
+    name: `13_attr_${cat}`,
+    title: `появление ${cat} из карты — с фирменным предметом (${({ hooligan: 'скейт', kind: 'какао', glitter: 'зеркальце' })[cat]}): предмет у кости (кисть / стопы на деке), проникновение в кота ≤ 2 мм, предмет не улетает`,
+    timeout: 300,
+    async fn(t) {
+      const P = t.track(await openPhone(t.browser, t.server, { q: `cat=${cat}`, memory: MET(cat) }));
+      await toPlay(P);
+      const act = { hooligan: 'skate_show', kind: 'cocoa', glitter: 'mirror' }[cat];
+      await P.must((a) => window.__app.character.actState?.id === a, 20000, `предмет появления ${act}`, act);
+      // кадры предмета: положение относительно кости (кисть / стопы на деке), проникновение (character/propPen.ts)
+      const fr = [];
+      for (let i = 0; i < 30; i++) {
+        const f = await P.ev(() => {
+          const c = window.__app.character, st = c.actState, po = c.props?.object;
+          if (!st || !po || !po.visible) return null;
+          const V = c.object.position.constructor;
+          const s = c.object.getWorldScale(new V()).y || 1;
+          const mm = window.__app.stage.cfg.height * 85.6;
+          const pen = c.propPen(2);
+          const r = { ph: st.phase, scale: +(po.getWorldScale(new V()).y / s).toFixed(2), pen: pen ? +(pen.depth * mm).toFixed(2) : 0, part: pen?.part ?? '' };
+          if (st.id === 'skate_show') {
+            r.deck = +(c.skateDbg.deck * mm).toFixed(1);
+            r.onDeck = c.skateDbg.onDeck;
+            // доска под котом: не дальше 0,6 роста от корня по горизонтали, не выше колен
+            const p = c.object.worldToLocal(po.getWorldPosition(new V()));
+            r.far = +(Math.hypot(p.x, p.z) * mm).toFixed(1);
+            r.up = +(p.y * mm).toFixed(1);
+          } else {
+            const hand = c.bones.get(st.id === 'mirror' ? 'LeftHand' : 'RightHand');
+            r.hand = +((po.getWorldPosition(new V()).distanceTo(hand.getWorldPosition(new V())) / s) * mm).toFixed(1);
+          }
+          return r;
+        });
+        if (f) fr.push(f);
+        await sleep(150);
+      }
+      t.note(`${act}: кадров ${fr.length}, ${JSON.stringify(fr.filter((_, i) => i % 6 === 0))}`);
+      assert(fr.length >= 8, `предмет виден в ${fr.length} кадрах`);
+      const pen = Math.max(...fr.map((f) => f.pen));
+      assert(pen <= 2, `проникновение предмета ${pen} мм (${fr.find((f) => f.pen === pen)?.part})`);
+      if (cat === 'hooligan') {
+        const deck = Math.max(...fr.filter((f) => f.onDeck).map((f) => f.deck), 0);
+        assert(deck <= 6, `стопы не на деке: ${deck} мм`);
+        assert(fr.every((f) => f.far <= 60 && f.up <= 15), `доска улетела от кота: ${JSON.stringify(fr.find((f) => f.far > 60 || f.up > 15))}`);
+      } else {
+        const full = fr.filter((f) => f.scale > 0.95);
+        const far = Math.max(...full.map((f) => f.hand), 0);
+        assert(far <= 25, `предмет оторвался от кисти: ${far} мм`);
+      }
+      await P.must(() => !window.__app.character.actState, 15000, 'предмет убран');
+      assert(await P.ev(() => !window.__app.character.props?.object?.visible), 'предмет остался на сцене');
+    },
+  })),
 ];
 
 // ───────────── 10. ошибки за весь прогон ─────────────

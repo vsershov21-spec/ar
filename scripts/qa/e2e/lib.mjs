@@ -270,7 +270,7 @@ export class Phone {
  * Быстрый путь до игры: «Узнать, кто там» → камера → карта → пробуждение → знакомство (имя полем ввода или «Пропустить»)
  * → phase play/free. memory — «уже знакомы» (без знакомства).
  */
-export async function toPlay(P, { name = null, timeout = 240000 } = {}) {
+export async function toPlay(P, { name = null, pick = null, timeout = 240000 } = {}) {
   await P.must(() => !!document.querySelector('#quick .q-cta'), 20000, 'кнопка «Узнать, кто там»');
   await P.tap('#quick .q-cta');
   await P.install();
@@ -279,6 +279,14 @@ export async function toPlay(P, { name = null, timeout = 240000 } = {}) {
   while (Date.now() - t0 < timeout) {
     const ph = await P.phase();
     if (ph === 'play' || ph === 'free') return;
+    // выбор кота (pilot.catPick, 26.11): лист «Выбери своего кота» после имени — карточка pick (по умолчанию — тот, кто вышел)
+    if (ph === 'choose' && (await P.visible('.choice-sheet .choice'))) {
+      const info = await P.ev(() => ({ title: document.querySelector('.choice-sheet .sheet-title')?.textContent ?? '', cards: [...document.querySelectorAll('.choice-sheet .choice')].map((b) => b.dataset.p), cur: window.__app.director.persona.id }));
+      await P.ev((i) => (window.__e2ePick = i), info);
+      await P.tap(`.choice-sheet .choice[data-p="${pick ?? info.cur}"]`);
+      await sleep(500);
+      continue;
+    }
     if (ph === 'ask_name' && (await P.visible('.namebox input'))) {
       if (name) {
         await P.tap('.namebox input');

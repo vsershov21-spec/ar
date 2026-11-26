@@ -54,6 +54,13 @@ for (const c of run.cats) {
           handMax: Math.max(...pv.map((f) => f.propHand ?? -1)), detach: pv.filter((f) => (f.propHand ?? 0) > 15).length,
           scale: [Math.min(...pv.map((f) => f.propScale ?? 1)), Math.max(...pv.map((f) => f.propScale ?? 1))],
           stuck: fr.filter((f) => f.stuck).length, stuckAtEnd: !!fr[fr.length - 1]?.stuck, visFrames: pv.length,
+          // проникновение предмета в кисть/пальцы/тело, мм (audit-probe → GlbCharacter.propPen), и где
+          penProp: Math.max(0, ...pv.map((f) => f.ppen ?? 0)),
+          penPropPct: (() => {
+            const m = pv.filter((f) => f.ppen !== undefined);
+            return m.length ? +((m.filter((f) => f.ppen > 2).length / m.length) * 100).toFixed(1) : 0;
+          })(),
+          penPropAt: pv.reduce((w, f) => ((f.ppen ?? 0) > (w.v ?? 0) ? { v: f.ppen, p: f.ppenPart, act: f.act ?? f.clip } : w), {}),
         }
       : null;
     // покой: дрожь (угловая скорость в кадрах покоя без смены клипа, p95) и скольжение

@@ -45,6 +45,8 @@ export const ACT_SPEC: Record<string, ActSpec> = {
   skate: SHOW(6000, 11_000), cocoa: SHOW(4200, 9000), mirror: SHOW(3600, 9000), bubbles: SHOW(1800), sticker: SHOW(900),
   draw: SHOW(800), glass: SHOW(1500), knock: CARE, surprise: CARE, tease: CARE, laugh: SAY, shy: SAY, dizzy: SHOW(1200),
   sleep: CARE,
+  // фирменный предмет при появлении кота (director.playAttr): скейт ~3,8 с, какао ~4,8 с, зеркальце ~5,3 с
+  appear: SHOW(2500, 9000),
   riddle: GAME, echo: GAME, emo: GAME, rps: GAME, simon: GAME, other: GAME,
   switch: { cls: 'scene', minMs: 0, maxMs: 30_000 },
 };

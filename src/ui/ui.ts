@@ -1120,11 +1120,18 @@ ${TOUR ? OB_TOUR : ''}
     }, true);
   }
 
-  /** лист «Каким мне быть?»; onPick — выбор пальцем (голосом выбирают в обход листа) */
-  showChoice(options: ChoiceOption[], onPick: (id: string) => void) {
+  /** лист выбора кота («Выбери своего кота» / «Позвать другого кота», прежний — «Каким мне быть?»); onPick — выбор пальцем (голосом выбирают в обход листа) */
+  showChoice(options: ChoiceOption[], onPick: (id: string) => void, o: { title?: string; close?: string; onClose?: () => void } = {}) {
     this.onPick = onPick;
+    // заголовок листа: «Выбери своего кота» / «Позвать другого кота» (выбор кота пилота); без — прежний «Каким мне быть?»
+    const ttl = this.choice.querySelector('.sheet-title') as HTMLElement;
+    ttl.textContent = o.title ?? 'Каким мне быть?';
+    this.choice.classList.toggle('titled', !!o.title);
+    this.choice.setAttribute('aria-label', o.title ?? 'Выбери характер');
+    this.choice.querySelector('.choice-close')?.remove();
     const box = this.choice.querySelector('.choices') as HTMLDivElement;
     box.innerHTML = '';
+    box.dataset.n = String(options.length);
     for (const o of options) {
       const meta = PERSONA_UI[o.id] ?? { img: '', tagline: '', color: o.palette?.accent ?? '#21a038', soft: '#eef3f1' };
       const b = document.createElement('button');
@@ -1144,6 +1151,14 @@ ${TOUR ? OB_TOUR : ''}
         this.onPick?.(o.id);
       };
       box.appendChild(b);
+    }
+    if (o.close) {
+      const c = document.createElement('button');
+      c.type = 'button';
+      c.className = 'btn btn-text btn-block choice-close';
+      c.textContent = o.close;
+      c.onclick = () => o.onClose?.();
+      this.choice.appendChild(c);
     }
     this.choice.classList.remove('hidden');
     this.layoutBubble();
