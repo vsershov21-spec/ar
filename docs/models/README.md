@@ -54,6 +54,12 @@ Tripo Auto Rig Humanoid/Mixamo — 65 костей `mixamorig:*`, 35 мешей,
 design/cut/glitter/face, Хулиган для сравнения, анимации — `docs/qa/glitter/glitter_p4_sheet.jpg` (`tools/glitter-p4-sheet.py`,
 Tripo-оригинал — `tools/glitter-p4-tripo-views.py`).
 
+Проверки 26.11: tsc, vitest (1206), build, e2e:pilot с `E2E_Q='models=p4&from=test'` (39/39) — зелёные. Аудит анимаций
+(`scripts/qa/anim-audit/audit.mjs --cats glitter --only rest,zone_head,zone_paw,zone_tail,stroke,tap_spam,doze_wake,home_bed,home_bed_wake,st_mix_fast`,
+p4 — `--params "from=test&models=p4"`, рядом p1): пики ω и щелчки того же порядка (10–18 рад/с), проникновение кисти в
+пачку при поглаживании 8.7 мм (p1 — 9.7), «лапы едут» 4.8 мм (p1 — 7.8); хвост-тап — щелчок 18 рад/с (p1 — 12);
+кровать: уложить — реакция через 2.3 с (у p1 без видимой реакции в окне), разбудить — без видимой реакции в окне (p1 — 0.23 с).
+
 Не как у рефа / не сделано:
 - **Риг лица p2 (p4m) не собран**: `face_rig.py` у этой сетки не замыкает разрез губ (верхняя губа протекает вниз у
   уголков — край дыры рта и полоса вшивки морды; заплатка ровной сеткой `P4_GRID_MOUTH=1` не помогла). При
