@@ -125,27 +125,8 @@ export class KidsOffer {
   /** «Войти в СберKids»: диплинк (в жесте ребёнка) → не открылось за ~1,4 с → веб-страница */
   private go() {
     const where = this.where ?? 'play';
-    const { deeplink, web } = kidsTargets();
     this.hide();
-    if (deeplink && /^https:/i.test(deeplink)) {
-      // универсальная ссылка: приложение есть — откроется оно, нет — её же веб-страница
-      track('sberkids_click', { kind: `deeplink_${where}` });
-      if (!openTab(deeplink)) this.h.showSheet(deeplink);
-      return;
-    }
-    if (deeplink) {
-      track('sberkids_click', { kind: `deeplink_${where}` });
-      const t0 = performance.now();
-      const fallback = window.setTimeout(() => {
-        // страница всё ещё видна — приложение не открылось: веб-фолбэк (лист со ссылкой — новый жест, без блокировки окна)
-        if (document.visibilityState === 'visible' && performance.now() - t0 < KIDS_OFFER.fallbackMs + 1500) this.h.showSheet(web);
-      }, KIDS_OFFER.fallbackMs);
-      document.addEventListener('visibilitychange', () => document.visibilityState === 'hidden' && clearTimeout(fallback), { once: true });
-      location.href = deeplink;
-      return;
-    }
-    track('sberkids_click', { kind: `web_${where}` });
-    if (!openTab(web)) this.h.showSheet(web);
+    goKids(where, (url) => this.h.showSheet(url));
   }
 
   dispose() {
@@ -155,7 +136,7 @@ export class KidsOffer {
 }
 
 /** новая вкладка в жесте ребёнка (с noopener window.open всегда отдаёт null — поэтому opener обнуляем сами) */
-function openTab(url: string): boolean {
+export function openTab(url: string): boolean {
   try {
     const w = window.open(url, '_blank');
     if (!w) return false;
@@ -164,4 +145,37 @@ function openTab(url: string): boolean {
   } catch {
     return false;
   }
+}
+
+/**
+ * Переход в СберKids (карточка-чип и онборд СберKids, ui/serviceOnboard.ts) — в жесте ребёнка:
+ * универсальная https-ссылка — новой вкладкой; схема приложения — location.href и через ~1,4 с, если страница всё ещё
+ * видна, веб-страница листом; диплинка нет — веб-страница (config/sberkids.ts kidsTargets).
+ * mark — метка точки к ссылке (онборд: utm_source=ar_cat, utm_content=onb, utm_campaign=<?src>, config/onboards.ts withMark).
+ * Аналитика: sberkids_click { kind: deeplink_<where> | web_<where> }. Возвращает, куда ушли.
+ */
+export function goKids(where: string, showSheet: (url: string) => void, mark?: (url: string) => string): 'deeplink' | 'web' {
+  const t = kidsTargets();
+  const deeplink = t.deeplink && mark ? mark(t.deeplink) : t.deeplink;
+  const web = mark ? mark(t.web) : t.web;
+  if (deeplink && /^https:/i.test(deeplink)) {
+    // универсальная ссылка: приложение есть — откроется оно, нет — её же веб-страница
+    track('sberkids_click', { kind: `deeplink_${where}` });
+    if (!openTab(deeplink)) showSheet(deeplink);
+    return 'deeplink';
+  }
+  if (deeplink) {
+    track('sberkids_click', { kind: `deeplink_${where}` });
+    const t0 = performance.now();
+    const fallback = window.setTimeout(() => {
+      // страница всё ещё видна — приложение не открылось: веб-фолбэк (лист со ссылкой — новый жест, без блокировки окна)
+      if (document.visibilityState === 'visible' && performance.now() - t0 < KIDS_OFFER.fallbackMs + 1500) showSheet(web);
+    }, KIDS_OFFER.fallbackMs);
+    document.addEventListener('visibilitychange', () => document.visibilityState === 'hidden' && clearTimeout(fallback), { once: true });
+    location.href = deeplink;
+    return 'deeplink';
+  }
+  track('sberkids_click', { kind: `web_${where}` });
+  if (!openTab(web)) showSheet(web);
+  return 'web';
 }

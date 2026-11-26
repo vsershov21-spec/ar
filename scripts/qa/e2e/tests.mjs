@@ -48,6 +48,14 @@ async function since(P, from) {
   }, from);
 }
 const rt = (P) => P.ev(() => window.__qaT().rt);
+/** пилот без «ласки» (pilot.noCare): этих слов нет в меню, подсказках и репликах */
+const NO_CARE_RE = /(^|[^а-яё])(по)?глад(ь|ить|ят|ишь|ит)(?![а-яё])|(по)?щекоч|щекотать|щекотк|обним|обнять|обнима|ласк|почеш|почесать/i;
+/** кадр экрана: E2E_SHOTS=<папка> — jpg туда (иначе в bench-out/e2e) */
+async function shot(t, P, name) {
+  const dir = process.env.E2E_SHOTS || t.out;
+  await P.ev(() => window.__qaDraw?.(2)).catch(() => undefined);
+  await P.page.screenshot({ path: `${dir}/${name}.jpg`, type: 'jpeg', quality: 82 }).catch(() => undefined);
+}
 
 export const TESTS = [
   // ───────────── 1. вход intro.quick ─────────────
@@ -313,7 +321,7 @@ export const TESTS = [
   // ───────────── 3. каждый кот: каталог, фирменное, касания ─────────────
   ...PERSONAS.map((persona) => ({
     name: `03_cat_${persona}`,
-    title: `${persona}: все кнопки каталога пилота, фирменное, двойной тап, погладить/почесать/щекотка — без зависших поз`,
+    title: `${persona}: все кнопки каталога пилота, фирменное, двойной тап, касания пальцем — без зависших поз`,
     timeout: 900,
     async fn(t) {
       const P = await playing(t, persona);
@@ -615,7 +623,8 @@ export const TESTS = [
       await settle(P, 'на карту', 20000);
       // после игры: 12 действий и ≥ 90 с игры (время ×6)
       await P.setK(6);
-      const acts = ['pet', 'scratch', 'tickle', 'paw', 'hug', 'dance', 'flip', 'treat', 'pet', 'scratch', 'tickle', 'paw', 'hug'];
+      // пилот без «ласки» (pilot.noCare): угостить, лапа, танец, сальто
+      const acts = ['paw', 'dance', 'flip', 'treat', 'paw', 'dance', 'flip', 'treat', 'paw', 'dance', 'flip', 'treat', 'paw'];
       for (const a of acts) {
         await pick(P, a);
         await P.until(SETTLED, 8000);
@@ -668,8 +677,8 @@ export const TESTS = [
       const P = t.track(await openPhone(t.browser, t.server, { q: 'src=test1' }));
       await toPlay(P, { name: NAME });
       await P.must(SETTLED, 40000, 'кот договорил');
-      await pick(P, 'pet');
-      await settle(P, 'pet');
+      await pick(P, 'paw');
+      await settle(P, 'paw');
       await sleep(2500);
       // события только этого телефона: сервер стенда общий, и session_end прошлого сценария (его вкладку закрыли —
       // sendBeacon при pagehide) иногда доходит уже после n0 — без src=test1 (флейк 24.11 «события без src=test1: session_end»)
@@ -769,7 +778,7 @@ export const TESTS = [
         return { tag, heap: Math.round(m.JSHeapUsedSize / 1048576), listeners: m.JSEventListeners, ...a };
       };
       // прогрев: всё, что сессия сделает, — один раз (первые загрузки моделей, клипов, звуков — не утечка)
-      const loop = ['pet', 'dance', 'flip', 'skate', 'scratch', 'treat', 'tickle', 'hug', 'paw', 'glass'];
+      const loop = ['paw', 'dance', 'flip', 'skate', 'treat', 'glass'];
       const cycle = async () => {
         for (const a of loop) {
           await pick(P, a);
@@ -920,6 +929,113 @@ export const TESTS = [
       assert(reasons.some((r) => /^(net_|http_|no_audio|decode_)/.test(r)), `в voice_issue нет сетевой причины: ${reasons.join(', ')}`);
       for (const e of vi) assert(Object.keys(e.props ?? {}).every((k) => ['reason', 'ms', 'net', 'dec', 'warm', 'ev', 'ctx', 'src'].includes(k)), `лишнее в voice_issue: ${JSON.stringify(e.props)}`);
       await cdp.detach().catch(() => undefined);
+    },
+  },
+
+  // ───────────── 12. онборды в сервисы и пилот без «ласки» (продакт 26.11, docs/scenario/ONBOARDS.md) ─────────────
+  {
+    name: '12_onb_samokat',
+    title: 'онборд Самоката: значок «Самокат?» → кот собирает 6 продуктов в корзину → лист «Перекус от …» → «Отправить маме на оплату»',
+    timeout: 300,
+    async fn(t) {
+      const n0 = t.server.requests.length;
+      const P = await playing(t, 'kind');
+      assert(await P.ev(() => !!document.querySelector('.tom [data-item="svc:samokat"]')), 'нет значка «Самокат» в меню');
+      const how = await pick(P, 'svc:samokat');
+      t.note(`значок «Самокат?»: ${how}`);
+      await P.must(() => window.__app.onb?.active === 'samokat', 5000, 'онборд Самоката открылся');
+      await P.must(() => window.__app.onb.cart >= 2, 15000, 'продукты летят в корзину');
+      await shot(t, P, 'onb_samokat_cart');
+      await P.must(() => window.__app.onb.stage === 'sheet', 20000, 'лист «Перекус от …»');
+      const cart = await P.ev(() => window.__app.onb.cart);
+      assert(cart === 6, `в корзине ${cart}, а не 6`);
+      const head = await P.ev(() => document.querySelector('.onb-head b')?.textContent ?? '');
+      assert(/^Перекус от Добряка$/.test(head), `заголовок листа: «${head}»`);
+      await P.must(() => !!document.querySelector('.onb [data-k="send"]'), 3000, 'кнопка «Отправить маме на оплату»');
+      await sleep(600);
+      await shot(t, P, 'onb_samokat_sheet');
+      await P.tap('.onb [data-k="send"]');
+      await P.must(() => window.__app.onb.stage === 'sent', 3000, '«Отправить» — заглушка «покажи маме»');
+      await shot(t, P, 'onb_samokat_sent');
+      await P.tap('.onb [data-k="done"]');
+      await P.must(() => !window.__app.onb.active, 3000, 'онборд закрылся');
+      const said = await P.ev(() => window.__e2eTexts.filter((x) => x.sel === '.bubble .txt').map((x) => x.t));
+      for (const re of [/Это Самокат/, /собираю нам перекус/, /Отправим маме/]) assert(said.some((x) => re.test(x)), `кот не сказал ${re}: ${said.slice(-6).join(' | ')}`);
+      await settle(P, 'после онборда', 15000);
+      await sleep(800);
+      const st = events(t.server, n0).filter((e) => e.name === 'onb_step' && e.props.svc === 'samokat').map((e) => e.props.step);
+      t.note(`onb_step: ${st.join(' ')}`);
+      for (const k of ['open', 'hello', 'collect', 'item', 'sheet', 'send', 'done']) assert(st.includes(k), `нет шага ${k} в onb_step`);
+      for (const e of events(t.server, n0).filter((e) => e.name === 'onb_step')) assert(Object.keys(e.props ?? {}).every((k) => ['svc', 'step', 'n', 'kind', 'at', 'src'].includes(k)), `лишнее в onb_step: ${JSON.stringify(e.props)}`);
+    },
+  },
+  {
+    name: '12_onb_kids',
+    title: 'онборд СберKids: значок «СберKids?» → копилка с монетками → экскурс 3 шага → «Войти в СберKids»',
+    timeout: 300,
+    async fn(t) {
+      const n0 = t.server.requests.length;
+      const P = await playing(t, 'glitter', 'src=onbtest');
+      t.note(`значок «СберKids?»: ${await pick(P, 'svc:kids')}`);
+      await P.must(() => window.__app.onb?.active === 'kids', 5000, 'онборд СберKids открылся');
+      await P.must(() => window.__app.onb.piggy >= 40, 15000, 'монетки летят в копилку');
+      await shot(t, P, 'onb_kids_piggy');
+      await P.must(() => window.__app.onb.stage === 'tour', 15000, 'экскурс');
+      await sleep(500);
+      await shot(t, P, 'onb_kids_tour');
+      // «Дальше» по шагам экскурса (шаг сам листается через 5,2 с — сколько нажатий, зависит от темпа стенда)
+      const seen = new Set();
+      for (let k = 0; k < 4 && (await P.ev(() => window.__app.onb.stage)) === 'tour'; k++) {
+        seen.add(await P.ev(() => document.querySelector('.onb-tour')?.getAttribute('data-t')));
+        await P.tap('.onb [data-k="next"]').catch(() => undefined);
+        await sleep(500);
+      }
+      t.note(`экскурс: ${[...seen].join(' → ')}`);
+      await P.must(() => window.__app.onb.stage === 'go' && !!document.querySelector('.onb [data-k="kids_go"]'), 5000, 'кнопка «Войти в СберKids»');
+      await sleep(600);
+      await shot(t, P, 'onb_kids_go');
+      const popup = new Promise((r) => t.browser.once('targetcreated', (tg) => r(tg.url())));
+      await P.tap('.onb [data-k="kids_go"]');
+      const url = await Promise.race([popup, sleep(5000).then(() => null)]);
+      const sheet = await P.visible('.kids-sheet');
+      t.note(`«Войти в СберKids»: ${url ? 'вкладка ' + url : sheet ? 'лист со ссылкой' : 'ничего'}`);
+      assert(url || sheet, '«Войти в СберKids» ничего не открыл');
+      if (url) assert(/utm_source=ar_cat/.test(url) && /utm_campaign=onbtest/.test(url), `нет метки точки в ссылке: ${url}`);
+      await sleep(800);
+      const ev = events(t.server, n0);
+      const said = await P.ev(() => window.__e2eTexts.filter((x) => x.sel === '.bubble .txt').map((x) => x.t));
+      for (const re of [/Тут живут твои деньги и копилка/, /Заходи в СберKids/]) assert(said.some((x) => re.test(x)), `кот не сказал ${re}: ${said.slice(-6).join(' | ')}`);
+      const st = ev.filter((e) => e.name === 'onb_step' && e.props.svc === 'kids').map((e) => e.props.step);
+      t.note(`onb_step: ${st.join(' ')}`);
+      for (const k of ['open', 'hello', 'piggy', 'coin', 'tour', 'go_offer', 'go']) assert(st.includes(k), `нет шага ${k} в onb_step`);
+      assert(ev.some((e) => e.name === 'sberkids_click' && /_onb$/.test(e.props.kind)), 'нет sberkids_click *_onb');
+      for (const pg of await t.browser.pages()) if (/sber|kids|rustore/i.test(pg.url()) && !pg.url().includes('127.0.0.1')) await pg.close().catch(() => undefined);
+    },
+  },
+  {
+    name: '12_no_care_words',
+    title: 'пилот без «ласки»: новый ребёнок — знакомство и игра; в меню, подсказках и репликах нет «погладь / пощекочи / обними / ласка»',
+    timeout: 400,
+    async fn(t) {
+      const P = t.track(await openPhone(t.browser, t.server, { q: 'cat=hooligan' }));
+      await toPlay(P);
+      await P.must(SETTLED, 40000, 'кот договорил знакомство');
+      await P.ev(() => window.__app.ui.tom?.reveal());
+      await sleep(1200);
+      await shot(t, P, 'onb_menu');
+      await sleep(12000); // подсказки «нажми сюда», чипы, пузырь-подсказка
+      const items = await catalogItems(P);
+      const menu = await P.ev(() => [...document.querySelectorAll('.tom .tom-btn, .tom .tom-head, .tom-col, .tom-dbtn, .chips .sug')].flatMap((e) => [e.textContent ?? '', e.getAttribute('aria-label') ?? '']).filter(Boolean));
+      const left = await P.ev(() => [...document.querySelectorAll('.tom-col.l [data-item]')].map((e) => e.getAttribute('data-item')));
+      t.note(`слева: ${left.join(', ')}`);
+      assert(left.includes('svc:samokat') && left.includes('svc:kids'), `в левой колонке нет значков сервисов: ${left.join(', ')}`);
+      const texts = await P.ev(() => window.__e2eTexts.map((x) => x.t));
+      const speak = (await P.rec('speak')).map((r) => `${r.id}: ${r.text}`);
+      const all = [...items.map((i) => i.label), ...menu, ...texts, ...speak];
+      const bad = all.filter((x) => NO_CARE_RE.test(x));
+      t.note(`проверено: ${items.length} пунктов, ${menu.length} подписей меню, ${texts.length} текстов, ${speak.length} реплик`);
+      assert(!bad.length, `слова ласки: ${[...new Set(bad)].slice(0, 5).join(' | ')}`);
+      for (const id of ['pet', 'scratch', 'tickle', 'hug', 'cheek']) assert(!items.some((i) => i.id === id), `в каталоге пилота «${id}»`);
     },
   },
 ];

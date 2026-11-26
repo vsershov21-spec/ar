@@ -49,5 +49,8 @@ export const CAT_ICON: Record<string, string> = {
   sun: S('<circle cx="12" cy="12" r="4" fill="currentColor" fill-opacity=".25"/><path d="M12 2.8v2.4M12 18.8v2.4M2.8 12h2.4M18.8 12h2.4M5.5 5.5l1.7 1.7M16.8 16.8l1.7 1.7M5.5 18.5l1.7-1.7M16.8 7.2l1.7-1.7"/>'),
   chev_l: S('<path d="M14.5 5.5 8 12l6.5 6.5"/>', 2.8),
   chev_r: S('<path d="M9.5 5.5 16 12l-6.5 6.5"/>', 2.8),
+  // онборды сервисов (config/onboards.ts): Самокат — самокат с пакетом вкусняшек, СберKids — копилка-свинка; «?» — CSS
+  svc_samokat: S('<path d="M5 18.5h9.5l3.5-11.5h2.5"/><circle cx="5.5" cy="18.5" r="2.2" fill="currentColor" fill-opacity=".25"/><circle cx="17.5" cy="18.5" r="2.2" fill="currentColor" fill-opacity=".25"/><path d="M5.5 9.5h6.5l-.8 5H6.3z" fill="currentColor" fill-opacity=".3"/><path d="M7.5 9.5a1.6 1.6 0 0 1 3.2 0" stroke-width="1.8"/>'),
+  svc_kids: S('<path d="M5 12.5c0-3.6 3.1-6 7-6 1.5 0 2.9.3 4 .9l2-1.4v3c.8.9 1.3 2 1.4 3.2H21v3h-1.9a6.6 6.6 0 0 1-2.6 2.6V20h-2.5v-1.6h-4V20H7.5v-2.3A6 6 0 0 1 5 12.5z" fill="currentColor" fill-opacity=".22"/><path d="M10 7.2h4" stroke-width="2.4"/><path d="M15.5 11h.01" stroke-width="3"/><path d="M3 11.5c.6 0 1.4.4 2 1"/>'),
   trophy: F('<path d="M12 2.8l2.7 5.6 6.1.8-4.5 4.2 1.1 6.1L12 16.6l-5.4 2.9 1.1-6.1-4.5-4.2 6.1-.8z"/>'),
 };

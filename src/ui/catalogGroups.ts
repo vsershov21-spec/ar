@@ -6,6 +6,7 @@
  * Без DOM.
  */
 import type { CatalogItem, CatalogSection } from './actionCatalog';
+import { feature } from '../config/edition';
 
 export type GroupId = 'often' | 'care' | 'tricks' | 'games' | 'say' | 'look' | 'world' | 'service';
 
@@ -18,7 +19,8 @@ export interface CatalogGroup {
 
 export const GROUP_META: Record<GroupId, { title: string; icon: string }> = {
   often: { title: 'Часто', icon: 'star' },
-  care: { title: 'Ласка', icon: 'heart' },
+  // без «ласки» (pilot.noCare) левая группа — «Сюрпризы»: онборды сервисов (svc:*), угостить, дай лапу
+  care: { title: feature('pilot.noCare') ? 'Сюрпризы' : 'Ласка', icon: 'heart' },
   tricks: { title: 'Трюки', icon: 'flip' },
   games: { title: 'Игры', icon: 'quest' },
   say: { title: 'Фразы', icon: 'chat' },
@@ -49,6 +51,8 @@ const ITEM_GROUP: Record<string, GroupId> = {
 export function groupOf(item: CatalogItem, sectionId: string): GroupId {
   if (ITEM_GROUP[item.id]) return ITEM_GROUP[item.id];
   if (item.id.startsWith('home:') || item.id.startsWith('zone:')) return 'world';
+  // онборды сервисов (Самокат?, СберKids?, config/onboards.ts) — в левой колонке меню, рядом с угощением
+  if (item.id.startsWith('svc:')) return 'care';
   return SECTION_GROUP[sectionId] ?? 'service';
 }
 

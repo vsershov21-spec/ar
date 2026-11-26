@@ -11,9 +11,15 @@
 import type { PersonaId } from '../persona/types';
 import type { ActionId } from '../scenario/actions';
 import { ACTION_ROUTE } from '../scenario/actions';
+import { feature } from './edition';
 
-/** 8 общих действий у каждого кота */
-export const PILOT_COMMON: readonly ActionId[] = ['pet', 'scratch', 'tickle', 'treat', 'paw', 'hug', 'dance', 'flip'];
+/** «ласка» (feature 'pilot.noCare', продакт 26.11): в пилоте их нет ни в меню, ни в репликах */
+export const CARE_ACTIONS: readonly ActionId[] = ['pet', 'scratch', 'tickle', 'hug', 'cheek'];
+/** 8 общих действий у каждого кота (как было до 26.11) */
+const COMMON_ALL: readonly ActionId[] = ['pet', 'scratch', 'tickle', 'treat', 'paw', 'hug', 'dance', 'flip'];
+/** общие действия пилота: без «ласки» — угостить, дай лапу, танец, сальто (+ онборды сервисов, config/onboards.ts) */
+export const pilotCommon = (noCare = feature('pilot.noCare')): readonly ActionId[] => (noCare ? COMMON_ALL.filter((id) => !CARE_ACTIONS.includes(id)) : COMMON_ALL);
+export const PILOT_COMMON: readonly ActionId[] = pilotCommon();
 
 /**
  * 2 фирменных действия характера (id каталога). Хулиган: скейт + «К стеклу» (прижимается к стеклу, glass_cat — в каталоге
@@ -31,24 +37,24 @@ export const PILOT_SIGNATURE: Record<PersonaId, readonly ActionId[]> = {
 export const PILOT_GAMES: readonly ActionId[] = ['riddle', 'other'];
 
 /** все действия кота в пилоте: 8 общих + 2 фирменных (без игр и «Другого кота») */
-export const pilotActions = (p: PersonaId): ActionId[] => [...PILOT_COMMON, ...PILOT_SIGNATURE[p]];
+export const pilotActions = (p: PersonaId, noCare = feature('pilot.noCare')): ActionId[] => [...pilotCommon(noCare), ...PILOT_SIGNATURE[p]];
 /** раскраска карты (card.paint, src/card/paint.ts): «Раскрасить карту» и «Стереть рисунок» — во вкладке «Образ» у всех котов */
 export const PILOT_PAINT: readonly string[] = ['ui:paint', 'ui:paint_erase'];
 
 /** что можно нажать в каталоге (действия): 10 + загадка, повторялка, «Другой кот» */
-export const pilotAllowed = (p: PersonaId): Set<string> => new Set<string>([...pilotActions(p), ...PILOT_GAMES]);
+export const pilotAllowed = (p: PersonaId, noCare = feature('pilot.noCare')): Set<string> => new Set<string>([...pilotActions(p, noCare), ...PILOT_GAMES]);
 
-/** пункт каталога пилота: разрешённое действие или служебный пункт (мир, комнаты, микрофон, пересадка) */
-export function pilotItemAllowed(p: PersonaId, id: string): boolean {
-  if (/^(home:|zone:)/.test(id)) return true;
+/** пункт каталога пилота: разрешённое действие или служебный пункт (мир, комнаты, микрофон, пересадка, онборды сервисов) */
+export function pilotItemAllowed(p: PersonaId, id: string, noCare = feature('pilot.noCare')): boolean {
+  if (/^(home:|zone:|svc:)/.test(id)) return true;
   if (id === 'ui:micmode' || id === 'ui:reanchor' || id === 'ui:unstick') return true;
   if (PILOT_PAINT.includes(id)) return true;
-  return pilotAllowed(p).has(id);
+  return pilotAllowed(p, noCare).has(id);
 }
 
 /** разделы каталога → только пункты пилота (пустые разделы — прочь); «Скажи мне» (фразы) в пилоте нет */
-export function limitCatalog<S extends { id: string; items: { id: string }[] }>(p: PersonaId, secs: S[]): S[] {
-  return secs.map((s) => ({ ...s, items: s.items.filter((i) => pilotItemAllowed(p, i.id)) })).filter((s) => s.items.length);
+export function limitCatalog<S extends { id: string; items: { id: string }[] }>(p: PersonaId, secs: S[], noCare = feature('pilot.noCare')): S[] {
+  return secs.map((s) => ({ ...s, items: s.items.filter((i) => pilotItemAllowed(p, i.id, noCare)) })).filter((s) => s.items.length);
 }
 
 /**

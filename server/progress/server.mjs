@@ -46,7 +46,9 @@ export const FUNNEL = ['open', 'onboarding_done', 'camera_granted', 'card_landed
   // озвучка: реплика без звука или поздно (src/voice/voicePlayer.ts) — причина и мс
   'voice_issue',
   // микрофон: вход сломался (src/voice/mic.ts health) — причина
-  'mic_issue'];
+  'mic_issue',
+  // онборды в сервисы (src/ui/serviceOnboard.ts): шаг онборда — сервис и метка шага
+  'onb_step'];
 const EVENT_PROPS = {
   card_landed: { ms: 'num' }, action: { id: 'id' }, game_start: { id: 'id' }, game_end: { id: 'id' }, cat_switch: { to: 'id' },
   home_enter: { reason: 'id' }, card_lost: { count: 'num' }, sberkids_click: { kind: 'id' }, session_end: { sec: 'num' },
@@ -56,6 +58,7 @@ const EVENT_PROPS = {
   card_found: { ms: 'num' }, cat_awake: { ms: 'num' }, first_action: { ms: 'num', id: 'id' },
   voice_issue: { reason: 'id', ms: 'num', net: 'num', dec: 'num', warm: 'num', ev: 'id', ctx: 'id' },
   mic_issue: { reason: 'id', ctx: 'id', node: 'id', ms: 'num', sr: 'num' },
+  onb_step: { svc: 'id', step: 'id', n: 'num', kind: 'id', at: 'id' },
 };
 /** метка источника из QR (?src=, src/analytics readSrc): латиница и цифры до 32 символов; хранится в props.src (формат строк не меняется) */
 export const SRC_RE = /^[A-Za-z0-9]{1,32}$/;

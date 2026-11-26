@@ -17,8 +17,11 @@ import { ZONES, type ZoneId } from '../home/zones';
 
 // ───────────── что где лежит ─────────────
 
-/** левая колонка «Ласка»: порядок продакта (pilot.ts: погладить, почесать, щекотка, обнять, дай лапу, угостить) */
-export const LEFT_ORDER = ['pet', 'scratch', 'tickle', 'hug', 'paw', 'treat', 'cheek'];
+/**
+ * левая колонка «Ласка» / «Сюрпризы» (pilot.noCare): сначала значки сервисов с «?» (онборды, config/onboards.ts),
+ * потом порядок продакта (pilot.ts: погладить, почесать, щекотка, обнять, дай лапу, угостить)
+ */
+export const LEFT_ORDER = ['svc:samokat', 'svc:kids', 'pet', 'scratch', 'tickle', 'hug', 'paw', 'treat', 'cheek'];
 /** правая колонка «Трюки/Образ»: танец, сальто, фирменные характера, раскраска, «Другой кот»; остальное — после */
 export const RIGHT_ORDER = ['dance', 'flip', 'skate', 'cocoa', 'mirror', 'glass', 'bubbles', 'ui:paint', 'other', 'ui:paint_erase'];
 /** короткие подписи под круглыми кнопками (≤ 10 знаков — в одну строку под кнопкой 56 px) */
@@ -32,6 +35,8 @@ export const SHORT_LABEL: Record<string, string> = {
   'home:dance': 'Танец',
   'home:back': 'На карту',
   'home:go': 'Мой дом',
+  'svc:samokat': 'Самокат',
+  'svc:kids': 'СберKids',
 };
 export const shortLabel = (it: { id: string; label: string }) => SHORT_LABEL[it.id] ?? it.label;
 
@@ -270,7 +275,7 @@ export function tomLayout(o: TomLayoutInput, catIn: CatBox | null): TomPlan {
 
 /** колонки уезжают к краю после 6 с без касаний; во время сцен (пробуждение, раскраска, сон, переход) — сразу */
 export const TOM_IDLE_MS = 6000;
-export type TomBusy = 'awake' | 'paint' | 'sleep' | 'cutscene' | null;
+export type TomBusy = 'awake' | 'paint' | 'sleep' | 'cutscene' | 'onb' | null;
 
 export class TomAutoHide {
   private last = 0;

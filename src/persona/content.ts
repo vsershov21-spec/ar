@@ -77,7 +77,7 @@ export async function loadContent(): Promise<ContentBundle> {
     byName(textMods, 'names.ru.txt'),
   ]);
   return makeBundle({
-    personas,
+    personas: personas.map((p) => noCareLines(p)),
     events: events as RawContent['events'],
     dialogs: editionDialogs(dialogs as DialogsFile),
     intents: intents as RawContent['intents'],
@@ -99,6 +99,24 @@ export function editionDialogs(f: DialogsFile, on = feature('games.new')): Dialo
   const triggers = Object.fromEntries(Object.entries(f.triggers).filter(([, t]) => !off.has(t.split(':')[0])));
   const games = f.games ? Object.fromEntries(Object.entries(f.games).filter(([id]) => !off.has(id))) : f.games;
   return { ...f, dialogs, triggers, ...(games ? { games } : {}) };
+}
+
+/**
+ * «Без ласки» (feature 'pilot.noCare', продакт 26.11): реплики, которые зовут погладить, пощекотать, обнять или
+ * говорят про ласку, — убираются (у события остаются другие варианты; «щекотно!» на тычок в живот — реакция, остаётся).
+ * Событие, у которого не осталось ни одной (meet_skills — «Погладь меня пальцем…»), берёт варианты подсказки help
+ * без этих слов — с их id, то есть с готовой озвучкой («Я умею сальто, танцы и загадки. Нажми кнопку внизу»).
+ */
+export const CARE_RE = /(^|[^а-яё])(по)?глад(ь|ить|ят|ишь|ит)(?![а-яё])|(по)?щекоч|щекотать|щекотк|обним|обнять|обнима|ласк|почеш|почесать/i;
+/** событие без вариантов после фильтра → чьи варианты взять */
+const NO_CARE_FALLBACK: Record<string, string> = { meet_skills: 'help' };
+export function noCareLines(p: Persona, on = feature('pilot.noCare')): Persona {
+  if (!on) return p;
+  const lines: Persona['lines'] = {};
+  for (const [ev, ls] of Object.entries(p.lines)) lines[ev] = ls.filter((l) => !CARE_RE.test(l.text));
+  for (const [ev, from] of Object.entries(NO_CARE_FALLBACK)) if (p.lines[ev]?.length && !lines[ev]?.length) lines[ev] = lines[from] ?? [];
+  for (const ev of Object.keys(lines)) if (!lines[ev].length) delete lines[ev];
+  return { ...p, lines };
 }
 
 /** Подстановка {name}, {answer} и т.п. */

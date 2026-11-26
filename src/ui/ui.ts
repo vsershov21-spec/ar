@@ -490,7 +490,8 @@ ${TOUR ? OB_TOUR : ''}
   coach(v: boolean) {
     const c = this.root.querySelector('.coach') as HTMLElement;
     this.chips.classList.toggle('attn', v);
-    if (!v) {
+    // без «ласки» (pilot.noCare): палец не гладит кота — кнопки покажут подсказки «нажми сюда» (ui/hints.ts)
+    if (!v || feature('pilot.noCare')) {
       c.classList.add('hidden');
       return;
     }

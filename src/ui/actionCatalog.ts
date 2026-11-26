@@ -19,8 +19,8 @@ export interface CatalogItem {
   /** ui — пункт раздела «Ещё» (пересадить на другую карту, режим микрофона): не умение кота, в «открыто N из M» не считается */
   run: { action: ActionId } | { say: string } | { ui: UiRun };
 }
-/** служебные пункты: пересадить, микрофон, дом; unstick — «Сдёрнуть наклейки», zone — комната дома (десктоп-панель, лист) */
-export type UiRun = 'reanchor' | 'micmode' | 'home' | 'unstick' | 'zone' | 'paint' | 'paint_erase';
+/** служебные пункты: пересадить, микрофон, дом; unstick — «Сдёрнуть наклейки», zone — комната дома (десктоп-панель, лист); onb — онборд сервиса (svc:samokat, svc:kids — ui/serviceOnboard.ts) */
+export type UiRun = 'reanchor' | 'micmode' | 'home' | 'unstick' | 'zone' | 'paint' | 'paint_erase' | 'onb';
 export interface CatalogSection { id: SectionId; title: string; icon: string; items: CatalogItem[] }
 
 interface ActionSpec { id: ActionId; label: string; icon: string; /** подпись и иконка по эффекту реакции характера */ byFx?: { event: string; map: Record<string, [string, string]> } }
@@ -145,13 +145,14 @@ export const SIGNATURE_ACTIONS: readonly ActionId[] = ['skate', 'cocoa', 'mirror
  * Срез редакции: signature — фирменные действия (catalog.signature), pilot — набор пилота (pilot.catalog:
  * 8 общих + 2 фирменных, игры, «Другой кот»; «Фразы» и «Эмоции» не показываются — config/pilot.ts).
  */
-export interface CatalogCut { signature: boolean; pilot: boolean }
-export const editionCut = (): CatalogCut => ({ signature: feature('catalog.signature'), pilot: feature('pilot.catalog') });
+/** noCare — пилот без «ласки» (pilot.noCare): без погладить/почесать/щекотки/обнять */
+export interface CatalogCut { signature: boolean; pilot: boolean; noCare?: boolean }
+export const editionCut = (): CatalogCut => ({ signature: feature('catalog.signature'), pilot: feature('pilot.catalog'), noCare: feature('pilot.noCare') });
 
 /** разделы каталога для характера: только работающие действия, пустые разделы — не показываем */
 export function buildCatalog(p: Persona, env: CatalogEnv, cut: CatalogCut = editionCut()): CatalogSection[] {
   const out = buildAll(p, env, cut);
-  return cut.pilot ? limitCatalog(p.id, out) : out;
+  return cut.pilot ? limitCatalog(p.id, out, cut.noCare ?? feature('pilot.noCare')) : out;
 }
 
 function buildAll(p: Persona, env: CatalogEnv, cut: CatalogCut): CatalogSection[] {

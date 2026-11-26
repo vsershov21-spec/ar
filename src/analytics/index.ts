@@ -22,6 +22,8 @@ export const EVENTS = [
   'voice_issue',
   // микрофон (src/voice/mic.ts, engine.ts): вход сломался — причина (ctx / silent / muted / ended / asr_down), без звука и текста
   'mic_issue',
+  // онборды в сервисы (src/ui/serviceOnboard.ts, feature 'onb.services'): шаг онборда — сервис и метка шага, без имени
+  'onb_step',
 ] as const;
 export type EventName = (typeof EVENTS)[number];
 
@@ -53,6 +55,9 @@ export const PROPS: Partial<Record<EventName, Record<string, Kind>>> = {
   paint_start: { color: 'id' },
   voice_issue: { reason: 'id', ms: 'num', net: 'num', dec: 'num', warm: 'num', ev: 'id', ctx: 'id' },
   mic_issue: { reason: 'id', ctx: 'id', node: 'id', ms: 'num', sr: 'num' },
+  // svc — samokat|kids, step — метка шага (open, hello, collect, item, sheet, send, piggy, tour, go, close…),
+  // n — номер (продукт в корзине, шаг экскурса), kind — как ушли (deeplink|web|stub), at — на каком шаге закрыли
+  onb_step: { svc: 'id', step: 'id', n: 'num', kind: 'id', at: 'id' },
 };
 const ID_RE = /^[a-z0-9_:.-]{1,32}$/i;
 

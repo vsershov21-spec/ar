@@ -53,6 +53,7 @@
 | `sleep` / `wake` | — | кота уложили в кровать / разбудили (`home/bedFlow.ts`) |
 | `card_lost` | `count` — какая по счёту потеря | карта пропала из кадра (`tracker.onLost`) |
 | `sberkids_click` | `kind`: `open` (кнопка «В СберKids»), `go` («Открыть СберKids»), `close` («Потом») | `app.ts onKids`, `ui.ts` |
+| `onb_step` | `svc` (`samokat`/`kids`), `step` — метка шага (`open`, `hello`, `collect`, `item`, `sheet`, `send`, `done`, `piggy`, `coin`, `tour`, `go_offer`, `go`, `close`), `n` — номер (продукт, монетка, шаг экскурса), `kind` — как ушли (`stub`/`deeplink`/`web`), `at` — где закрыли | онборды в сервисы (`src/ui/serviceOnboard.ts`, feature `onb.services`, docs/scenario/ONBOARDS.md): каждый шаг; без имени и текстов. Переход в СберKids из онборда — ещё `sberkids_click` `kind` = `web_onb` / `deeplink_onb` |
 | `paint_offer` | — | кот сам предложил раскрасить карту (`src/card/paint.ts offerTick`, раз за сессию) |
 | `paint_start` | `color` — id цвета палитры (`lime`, `pink`, `purple`, `mint`, `peach`, `sky`, `lilac`, `gold`, `turquoise`) | выбран цвет, кот начал рисовать (`CardPaint.start`) |
 | `paint_done` | — | рисунок готов (или дорисован сразу, если карта ушла посреди) |

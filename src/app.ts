@@ -41,6 +41,9 @@ import { prepareFlowMemory, runFlow } from './debug/flows';
 import { feature } from './config/edition';
 import { HintsController } from './ui/hints';
 import { KidsOffer } from './ui/kidsOffer';
+import { ServiceOnboard } from './ui/serviceOnboard';
+import { SVC_ITEMS, type SvcId } from './config/onboards';
+import { readSrc } from './analytics';
 import { FogBoard } from './ui/fogBoard';
 import { CardSearch, SEARCH_LINES } from './ui/cardSearch';
 import type { CardSearchEvent } from './tracker/card/overlay';
@@ -135,6 +138,8 @@ export class App {
   kidsOffer: KidsOffer | null = null;
   /** запотевшее стекло на весь экран (feature 'glass.fogDraw', ui/fogBoard.ts) */
   fogBoard: FogBoard | null = null;
+  /** онборды в сервисы: Самокат, СберKids (feature 'onb.services', ui/serviceOnboard.ts) */
+  onb: ServiceOnboard | null = null;
   /** когда ребёнок последний раз нажимал микрофон (подсказка загрузки распознавания — только после нажатия) */
   private micPressedAt = -1e9;
   /** детский поиск карты (feature 'intro.search', ui/cardSearch.ts) */
@@ -727,11 +732,13 @@ export class App {
       const h = this.home;
       if (h && (h.phase === 'to_home' || h.phase === 'to_ar' || h.moving)) return { id: 'home', interruptible: false };
       if (this.paint?.painting) return { id: 'paint', interruptible: true };
+      if (this.onb?.active) return { id: 'onb', interruptible: true };
       if (h?.bed && (h.bed.state === 'asleep' || h.bed.state === 'tucking')) return { id: 'bed', interruptible: true };
       return null;
     };
     d.orch.interrupt = (sc) => {
       if (sc.id === 'paint') return this.paint?.finishNow('кнопка другого действия'), true;
+      if (sc.id === 'onb') return this.onb?.close('action'), true;
       if (sc.id === 'bed') return !!this.home?.act('home:wake');
       return false;
     };
@@ -833,6 +840,8 @@ export class App {
     if (this.desktopView) out.push({ item: { id: 'ui:unstick', label: 'Сдёрнуть наклейки', icon: 'sticker', run: { ui: 'unstick' } }, section: 'magic' });
     // «Раскрасить карту» / «Стереть рисунок» — вкладка «Образ» (вне карты кот попросит её показать)
     if (this.paint) for (const it of this.paint.catalogItems()) out.push({ item: it, section: 'magic' });
+    // онборды в сервисы — значки «Самокат?» / «СберKids?» в левой колонке меню (ui/catalogGroups.ts groupOf svc:*)
+    if (this.onb) for (const s of SVC_ITEMS) out.push({ item: { id: s.id, label: s.label, icon: s.icon, run: { ui: 'onb' } }, section: 'svc' });
     return out;
   }
   /** для меню «как у Тома» (feature ui.tomLayout): где кот и чем занят */
@@ -846,7 +855,7 @@ export class App {
     const homeOn = () => this.home?.phase === 'home';
     const busy = () => {
       const c = this.uiContext();
-      return !!c.busy || !!d.state.dialog || !!this.fogBoard?.on || !!this.ui.tom?.popOpen || this.ui.sheetOpen || !!this.awake?.active;
+      return !!c.busy || !!d.state.dialog || !!this.fogBoard?.on || !!this.ui.tom?.popOpen || this.ui.sheetOpen || !!this.awake?.active || !!this.onb?.active;
     };
     if (feature('ui.hints'))
       this.hints = new HintsController({
@@ -867,6 +876,50 @@ export class App {
       });
     if (feature('glass.fogDraw')) this.wireFogBoard();
     if (feature('intro.search')) this.wireCardSearch();
+    if (feature('onb.services')) this.wireOnboards();
+  }
+
+  /**
+   * Онборды в сервисы (ui/serviceOnboard.ts, docs/scenario/ONBOARDS.md): кот проводит ребёнка по Самокату и СберKids.
+   * Реплики — пузырём без голоса (director.bubble), кот сдвигается над панелью (как над листом каталога).
+   */
+  private wireOnboards() {
+    const d = this.director;
+    let store: Storage | null = null;
+    try {
+      store = localStorage;
+    } catch {
+      store = null;
+    }
+    this.onb = new ServiceOnboard({
+      root: this.ui.root,
+      persona: () => ({ id: d.persona.id, name: d.persona.name }),
+      say: (t, ms) => void d.bubble(t, ms),
+      clip: (c) => d.character?.play(c as Parameters<Character['play']>[0]),
+      sound: (id) => this.audio.play(id),
+      catPoint: () => {
+        const r = this.ui.catRect();
+        return r ? { x: r.cx, y: r.headY + (r.bottom - r.headY) * 0.45 } : null;
+      },
+      // онборд идёт — ребёнок занят: лестница тишины кота («Ты тут?», дрёма) и подсказка-пузырь ждут
+      activity: () => {
+        this.input.activity();
+        d.ladder.reset(performance.now());
+      },
+      shift: (free) => this.setShiftArea(free),
+      showSheet: (url) => this.ui.showKids(true, url),
+      src: () => readSrc(location.search, store),
+      log: (s) => d.log(s),
+    });
+  }
+  /** значок сервиса в меню: кот занят сценой, которую не прервать (пробуждение, переход домой) — подсказка */
+  private openOnboard(svc: SvcId) {
+    if (!this.onb) return;
+    const ext = this.director.orch.external?.();
+    if (ext && !ext.interruptible) return void this.ui.toast('Подожди чуть-чуть — я сейчас', 1800);
+    if (this.paint?.painting) this.paint.finishNow('онборд сервиса');
+    this.hints?.stop();
+    this.onb.open(svc);
   }
 
   /**
@@ -978,7 +1031,7 @@ export class App {
     const home = this.home, d = this.director;
     const zone = home?.phase === 'home' ? home.zone : null;
     const sleeping = !!d?.dozing || home?.bed?.state === 'asleep';
-    const busy: TomUiCtx['busy'] = this.awake?.active ? 'awake' : this.paint?.painting || this.paint?.sheetOpen ? 'paint'
+    const busy: TomUiCtx['busy'] = this.awake?.active ? 'awake' : this.paint?.painting || this.paint?.sheetOpen ? 'paint' : this.onb?.active ? 'onb'
       : home && (home.phase === 'to_home' || home.phase === 'to_ar' || home.moving) ? 'cutscene' : sleeping ? 'sleep' : null;
     return { home: zone, sleeping, paintBlocked: this.paint ? paintBlocked(this.paint.where()) !== null : true, busy };
   }
@@ -997,6 +1050,7 @@ export class App {
         else if (id === 'zone') this.home.go(item.id.slice(5) as (typeof ZONES)[number]['id']);
         else if (id === 'paint') this.paint?.request('catalog');
         else if (id === 'paint_erase') this.paint?.erase();
+        else if (id === 'onb') this.openOnboard(item.id.slice(4) as SvcId);
         else {
           const m = this.engine.mode === 'auto' ? 'ptt' : 'auto';
           this.engine.setMode(m);

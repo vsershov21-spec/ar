@@ -1,7 +1,7 @@
 /**
  * Меню «как у Говорящего Тома» на экране (feature 'ui.tomLayout', docs/ui/TOM_LAYOUT.md). Раскладка и правила —
  * ui/tomLayout.ts (чистая логика), здесь — только DOM:
- *   · колонки круглых кнопок у левого («Ласка») и правого («Трюки/Образ») края, кот — в центре; колонка, которой
+ *   · колонки круглых кнопок у левого («Ласка»; в пилоте без ласки — «Сюрпризы»: онборды сервисов, угостить, лапа) и правого («Трюки/Образ») края, кот — в центре; колонка, которой
  *     некуда встать мимо кота (catRect), уходит в язычок у края;
  *   · сверху — прогресс «открыто N из M»; снизу — док: звук · «Мой дом»/«На карту» · микрофон · «Игры» · «Ещё»;
  *     дома над доком — ряд действий комнаты, по краям ряда — стрелки комнат (кнопки HomeMode, переставлены CSS);
@@ -13,7 +13,7 @@
  * Выбор пункта — тот же путь, что у листа каталога: UiHandlers.onCatalogPick (app.ts runCatalogItem).
  */
 import type { CatalogItem } from './actionCatalog';
-import type { CatalogGroup } from './catalogGroups';
+import { GROUP_META, type CatalogGroup } from './catalogGroups';
 import type { Chip } from '../scenario/suggest';
 import {
   TOM_IDLE_MS, TomAutoHide, disabledReason, shortLabel, tomLayout, tomModel, type ColMode, type ColumnPlan, type Rect, type TomBusy, type TomCtx, type TomModel, type TomPlan,
@@ -58,6 +58,8 @@ const TIP: Record<string, string> = {
   'ui:paint_erase': 'Сотру рисунок с карты',
   riddle: 'Загадаю загадку',
   echo: 'Буду повторять за тобой',
+  'svc:samokat': 'Что это за значок? Нажми — покажу!',
+  'svc:kids': 'Загадка! Нажми — покажу, что тут',
 };
 
 /** короткая причина под подписью неактивной кнопки (полная — по нажатию, над микрофоном) */
@@ -101,7 +103,7 @@ export class TomMenu {
     el.className = 'tom';
     el.innerHTML = `
       <div class="tom-top"><button type="button" class="tom-prog" data-t="prog" aria-label="Открыто"><span class="tp-ico">${h.icon('trophy')}</span><span class="tp-n">0/0</span></button></div>
-      <div class="tom-col l" role="toolbar" aria-label="Ласка"></div>
+      <div class="tom-col l" role="toolbar" aria-label="${GROUP_META.care.title}"></div>
       <div class="tom-col r" role="toolbar" aria-label="Трюки и образ"></div>
       <button type="button" class="tom-tab l" data-t="tab" aria-label="Показать кнопки">${h.icon('chev_r')}</button>
       <button type="button" class="tom-tab r" data-t="tab" aria-label="Показать кнопки">${h.icon('chev_l')}</button>
@@ -318,7 +320,7 @@ export class TomMenu {
     rs.setProperty('--tom-btn', `${p.btn}px`);
     if (p.room) rs.setProperty('--tom-room-b', `${Math.round(p.h - p.room.y - p.room.h)}px`);
     this.el.classList.toggle('land', p.land);
-    this.renderCol(this.colL, this.tabL, p.left, m.left, 'Ласка');
+    this.renderCol(this.colL, this.tabL, p.left, m.left, GROUP_META.care.title);
     this.renderCol(this.colR, this.tabR, p.right, m.right, 'Трюки');
     this.renderRoom(p, m.room);
     this.h.root.classList.toggle('tom-room-on', !!p.room);

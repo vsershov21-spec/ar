@@ -70,7 +70,8 @@ export function quickEntry(): QuickEntry | null {
 
 /** экраны 2–4 прежнего тура → подписи к подсказкам «нажми сюда» (ui/hints.ts, экскурсия по кнопкам) */
 export const QUICK_HINT_CAPTIONS: { sel: string; text: string }[] = [
-  { sel: '.tom-col.l .tom-btn', text: 'Погладь, накорми, пощекочи' },
+  // без «ласки» (pilot.noCare) слева — сервисы-загадки, угощение и лапа
+  { sel: '.tom-col.l .tom-btn', text: feature('pilot.noCare') ? 'Загадки-сюрпризы и угощение' : 'Погладь, накорми, пощекочи' },
   { sel: '.tom-col.r .tom-btn', text: 'Трюки и образ кота' },
   { sel: '.tom-games', text: 'Игры, раскраска и дом кота' },
   { sel: '.mic', text: 'Скажи коту что-нибудь' },

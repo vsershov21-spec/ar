@@ -181,9 +181,10 @@ export class Suggester {
       if (p.length) return p;
     }
     // кот дремлет — разбудить
-    if (s.dozing) return this.pick([this.chip(s, 'pet', 'Разбуди меня')]);
+    // (без «ласки», pilot.noCare, погладить нет — будит угощение)
+    if (s.dozing) return this.pick([this.chip(s, 'pet', 'Разбуди меня') ?? this.chip(s, 'treat', 'Разбуди меня')]);
     // ребёнку грустно (поддержка) — кот рядом
-    if (s.paused) return this.pick([this.chip(s, 'hug'), this.chip(s, 'pet')]);
+    if (s.paused) return this.pick([this.chip(s, 'hug'), this.chip(s, 'pet'), this.chip(s, 'treat')]);
     // кот обиделся — помириться
     if (s.now < this.upsetUntil) return this.pick([this.chip(s, 'hug'), this.chip(s, 'treat'), this.chip(s, 'pet')]);
     // только что отгадывали — ещё?
@@ -223,7 +224,8 @@ export class Suggester {
     if (s.quietMs < (first ? HINT_FIRST_MS : HINT_LONG_MS)) return null;
     if (this.hintAt < 0) this.hintAt = s.now;
     if (s.now - this.hintAt > HINT_SHOW_MS) return null;
-    return hintText(chips, s.tried('pet'));
+    // погладить нет в каталоге (пилот без «ласки») — подсказка про пальцы не зовёт гладить
+    return hintText(chips, s.tried('pet') || !s.available.has('pet'));
   }
 }
 
