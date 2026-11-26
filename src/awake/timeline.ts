@@ -1,7 +1,9 @@
 /**
  * Хореография «пробуждения» кота из карты — чистые функции времени (без three.js и DOM, тесты — tests/awake.test.ts).
  *
- * Первая встреча (≈5,4 с): карта светится по контуру → из центра открывается портал и поднимается световой столб,
+ * Первая встреча (≈5,7–6 с): карта светится по контуру и «вылупляется», как яйцо покемона (продакт 26.11): дрожит
+ * и подпрыгивает тремя сериями, каждая сильнее (hop: свечение-«крышка» карты подскакивает и трясётся, трещины
+ * раскрываются толчками) → затем из центра открывается портал и поднимается световой столб,
  * летят искры → на карте проступает тень кота → ПУФ: кот выпрыгивает из карты (масштаб от 0,3 с перелётом,
  * снизу из-под поверхности — маска карты прячет то, что ещё «внутри») → приземление со сквошем, салют и фанфары →
  * встряхивается → открывает глаза (сонный → удивлённый → радость) → машет. На повторном визите — та же сцена
@@ -60,6 +62,11 @@ export interface AwakePlan {
   cracks(t: number): { grow: number; k: number };
   /** свечение контура карты 0..1 */
   glow(t: number): number;
+  /**
+   * карта «дрожит и подпрыгивает» до столба света: z — подскок над картой (ширин карты), x/y — дрожь в плоскости,
+   * rot — покачивание вокруг нормали (рад), k — яркость светящейся «крышки» карты 0..1
+   */
+  hop(t: number): { z: number; x: number; y: number; rot: number; k: number };
   /** портал в центре карты 0..~1,4 (вспышка на ПУФ) */
   portal(t: number): number;
   /** столб света: высота 0..1 и яркость 0..1 */
@@ -115,8 +122,16 @@ const STYLE: Record<PersonaId, Style> = {
   glitter: { flight: 0.95, peak: 0.55, depth: 0.75, flips: 0, spins: 2, sway: 0, flightClip: 'jump' },
 };
 
+/** подскоки карты до столба света (первая встреча): [время, с; высота, ширин карты; сила дрожи 0..1] — каждая серия сильнее */
+export const HOPS_FIRST: [number, number, number][] = [[0.32, 0.022, 0.35], [0.7, 0.04, 0.65], [1.05, 0.07, 1]];
+/** короткий визит: один подскок */
+export const HOPS_SHORT: [number, number, number][] = [[0.06, 0.025, 0.6]];
+/** длительность одного подскока, с */
+const HOP_DUR = 0.2;
+/** столб света поднимается после подскоков (первая встреча), с */
+export const PILLAR_FIRST = 1.2;
 /** толчки трещин до ПУФ: [за сколько секунд до ПУФ, раскрытие] (первая встреча) и [доля tPop до ПУФ, раскрытие] (короткая) */
-const CRACK_BEATS_FIRST: [number, number][] = [[1.3, 0.3], [0.8, 0.5], [0.6, 0.7], [0.18, 1]];
+const CRACK_BEATS_FIRST: [number, number][] = [[1.53, 0.35], [1.15, 0.6], [0.8, 0.85], [0.2, 1]];
 const CRACK_BEATS_SHORT: [number, number][] = [[0.85, 0.55], [0.3, 1]];
 
 /** план сцены пробуждения для образа и вида визита */
@@ -124,7 +139,8 @@ export function awakePlan(persona: PersonaId, kind: AwakeKind): AwakePlan {
   const st = STYLE[persona] ?? STYLE.hooligan;
   const first = kind === 'first';
   // короткая версия: всё в ~1,5 с
-  const tPop = first ? 1.55 : 0.32;
+  // первая встреча: подскоки карты (до ~1,25 с) → столб света (PILLAR_FIRST) → ПУФ
+  const tPop = first ? 1.85 : 0.32;
   const flight = first ? st.flight : Math.min(0.62, st.flight * 0.62);
   const tLand = tPop + flight;
   const peak = first ? st.peak : st.peak * 0.6;
@@ -135,8 +151,10 @@ export function awakePlan(persona: PersonaId, kind: AwakeKind): AwakePlan {
 
   const ev: AwakeEvent[] = [];
   const add = (e: AwakeEvent) => ev.push(e);
+  // карта стукается о стол после каждого подскока — всё громче
+  for (const [ht, , k] of first ? HOPS_FIRST : HOPS_SHORT) add({ t: ht + HOP_DUR, type: 'sfx', id: 'land_soft', vol: 0.25 + 0.45 * k });
   if (first) {
-    add({ t: 0, type: 'sound', id: 'rise', vol: 0.8 });
+    add({ t: PILLAR_FIRST - 0.35, type: 'sound', id: 'rise', vol: 0.8 });
     add({ t: tPop - 0.05, type: 'sound', id: `pop_${persona}`, vol: 0.95 });
     add({ t: tPop, type: 'pop' });
     add({ t: tPop, type: 'clip', clip: st.flightClip });
@@ -219,22 +237,38 @@ export function awakePlan(persona: PersonaId, kind: AwakeKind): AwakePlan {
       return { grow, k: grow > 0 ? (0.7 + 0.7 * Math.min(1, hit) + flash) * fade : 0 };
     },
     glow: (t) => (first ? win(t, 0, 0.45, tLand + 0.1, tLand + 0.8) : win(t, 0, 0.18, tLand, tLand + 0.4)),
+    hop: (t) => {
+      const hops = first ? HOPS_FIRST : HOPS_SHORT;
+      let z = 0, shake = 0, k = 0;
+      for (const [ht, hh, kk] of hops) {
+        // подскок — парабола; дрожь — перед подскоком и после приземления, сильнее с каждой серией
+        const u = (t - ht) / HOP_DUR;
+        if (u > 0 && u < 1) z = Math.max(z, hh * 4 * u * (1 - u));
+        shake = Math.max(shake, kk * win(t, ht - 0.22, ht - 0.04, ht + HOP_DUR, ht + HOP_DUR + 0.16));
+        if (t >= ht - 0.25) k = Math.max(k, 0.25 + 0.6 * kk);
+      }
+      // «крышка» гаснет, когда поднялся столб (кот уже выходит)
+      const end = first ? PILLAR_FIRST + 0.15 : tPop;
+      k *= 1 - ramp(t, end, end + 0.45);
+      const f = t * 2 * Math.PI;
+      return { z, x: 0.006 * shake * Math.sin(f * 23), y: 0.004 * shake * Math.sin(f * 31 + 1.3), rot: 0.035 * shake * Math.sin(f * 17), k: t < 0 ? 0 : k };
+    },
     portal: (t) => {
-      const base = first ? win(t, 0.3, 0.8, tPop + 0.05, tLand + 0.2) : win(t, 0.05, 0.2, tPop, tLand);
+      const base = first ? win(t, PILLAR_FIRST - 0.15, PILLAR_FIRST + 0.2, tPop + 0.05, tLand + 0.2) : win(t, 0.05, 0.2, tPop, tLand);
       const flash = 0.45 * Math.exp(-(((t - tPop) / 0.09) ** 2));
       return base + flash;
     },
     pillar: (t) => {
-      if (first) return { h: easeOut((t - 0.6) / 0.7), k: win(t, 0.6, 0.9, tPop + 0.1, tLand + 0.15) * (1 + 0.6 * Math.exp(-(((t - tPop) / 0.12) ** 2))) };
+      if (first) return { h: easeOut((t - PILLAR_FIRST) / 0.5), k: win(t, PILLAR_FIRST, PILLAR_FIRST + 0.25, tPop + 0.1, tLand + 0.15) * (1 + 0.6 * Math.exp(-(((t - tPop) / 0.12) ** 2))) };
       return { h: easeOut((t - 0.05) / 0.3) * 0.75, k: win(t, 0.05, 0.2, tPop + 0.05, tLand) };
     },
-    silhouette: (t) => (first ? win(t, 0.85, 1.45, tPop, tPop + 0.25) * 0.75 : 0),
+    silhouette: (t) => (first ? win(t, PILLAR_FIRST + 0.1, tPop - 0.1, tPop, tPop + 0.25) * 0.75 : 0),
     skate: (t) => {
       if (persona !== 'hooligan' || !first || t < tPop) return 0;
       if (t < tLand + 0.55) return 1;
       return 1 + clamp01((t - tLand - 0.55) / 0.8) + (t > tLand + 1.35 ? 1 : 0);
     },
-    sparks: (t) => (first ? win(t, 0.4, 0.8, tLand - 0.2, tLand + 0.3) : win(t, 0, 0.1, tPop, tLand)),
-    flair: (t) => (first ? win(t, 0.65, 0.95, tLand + 0.5, tLand + 1.6) : win(t, 0.1, 0.2, tLand, tLand + 0.4)),
+    sparks: (t) => (first ? win(t, PILLAR_FIRST - 0.1, PILLAR_FIRST + 0.25, tLand - 0.2, tLand + 0.3) : win(t, 0, 0.1, tPop, tLand)),
+    flair: (t) => (first ? win(t, PILLAR_FIRST + 0.05, PILLAR_FIRST + 0.35, tLand + 0.5, tLand + 1.6) : win(t, 0.1, 0.2, tLand, tLand + 0.4)),
   };
 }

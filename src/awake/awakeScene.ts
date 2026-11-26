@@ -60,6 +60,26 @@ void main() {
   gl_FragColor = vec4(col, clamp(a, 0.0, 1.0));
 }`;
 
+/**
+ * «крышка» карты (подскоки до столба света, timeline hop): светящаяся изнутри поверхность карты — зелёный свет из
+ * центра, яркий край; подскакивает и дрожит вместе с контуром и трещинами — «карта прыгает на столе»
+ */
+const FS_LID = /* glsl */ `
+uniform float uK; uniform float uT; uniform vec3 uA; uniform vec2 uHalf; uniform float uR;
+varying vec2 vUv;
+float sdBox(vec2 p, vec2 b, float r) { vec2 q = abs(p) - b + r; return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r; }
+void main() {
+  vec2 p = (vUv - 0.5) * uHalf * 2.0;
+  float d = sdBox(p, uHalf, uR);
+  if (d > 0.0) discard;
+  float core = exp(-dot(p, p) * 7.0);
+  float rim = exp(d * 60.0);
+  float pulse = 0.85 + 0.15 * sin(uT * 18.0);
+  vec3 col = mix(vec3(0.13, 0.63, 0.22), uA, 0.45);
+  col = mix(col, vec3(0.92, 1.0, 0.75), core * 0.7);
+  float a = uK * (0.22 + core * 0.55 + rim * 0.5) * pulse;
+  gl_FragColor = vec4(col, clamp(a, 0.0, 1.0));
+}`;
 /** портал: закрученные лучи, яркий центр, кольцо по краю */
 const FS_PORTAL = /* glsl */ `
 uniform float uK; uniform float uT; uniform vec3 uA; uniform vec3 uB;
@@ -286,6 +306,9 @@ export class AwakeScene {
   /** маска карты: пишет только глубину — часть кота «под картой» не видна */
   readonly occluder: THREE.Mesh;
   private edge: THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMaterial>;
+  /** карта «прыгает»: крышка, контур и трещины — одна группа (timeline hop) */
+  private cardFx = new THREE.Group();
+  private lid: THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMaterial>;
   private portal: THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMaterial>;
   private pillar: THREE.Mesh<THREE.CylinderGeometry, THREE.ShaderMaterial>;
   private core: THREE.Mesh<THREE.CylinderGeometry, THREE.ShaderMaterial>;
@@ -322,6 +345,17 @@ export class AwakeScene {
     });
     this.edge = add(new THREE.Mesh(new THREE.PlaneGeometry(1 + 2 * m, H + 2 * m), edgeMat), 3);
     this.edge.position.z = 0.002;
+    // светящаяся крышка карты (подскоки): над картой, под трещинами
+    const lidMat = new THREE.ShaderMaterial({
+      vertexShader: VS_UV, fragmentShader: FS_LID, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+      uniforms: { uK: { value: 0 }, uT: this.uT, uA: { value: new THREE.Color() }, uHalf: { value: new THREE.Vector2(0.5, H / 2) }, uR: { value: CORNER } },
+    });
+    this.lid = add(new THREE.Mesh(new THREE.PlaneGeometry(1, H), lidMat), 3);
+    this.lid.position.z = 0.0018;
+    this.lid.visible = false;
+    this.cardFx.name = 'awake-cardfx';
+    this.group.add(this.cardFx);
+    this.cardFx.add(this.lid, this.edge);
     // портал
     const portMat = new THREE.ShaderMaterial({
       vertexShader: VS_UV, fragmentShader: FS_PORTAL, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
@@ -350,6 +384,7 @@ export class AwakeScene {
     this.cracks = add(new THREE.Mesh(new THREE.PlaneGeometry(1, H), crackMat), 3);
     this.cracks.position.z = 0.0022;
     this.cracks.visible = false;
+    this.cardFx.add(this.cracks);
     // тень-силуэт кота
     this.silhouette = add(new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.5), new THREE.MeshBasicMaterial({ map: silhouetteTexture(), transparent: true, depthWrite: false, opacity: 0 })), 2);
     this.silhouette.position.z = 0.0015;
@@ -370,7 +405,10 @@ export class AwakeScene {
   /** все объекты сцены и материалы видимы — для compileAsync/initTexture (прогрев) */
   forWarm(on: boolean) {
     this.group.visible = on;
-    for (const o of this.group.children) o.visible = on;
+    // вложенные группы (cardFx: крышка, контур, трещины) — тоже
+    this.group.traverse((o) => {
+      if (o !== this.group) o.visible = on;
+    });
     this.glowParts.points.visible = on;
     this.softParts.points.visible = on;
   }
@@ -386,6 +424,7 @@ export class AwakeScene {
       (m.uniforms.uA.value as THREE.Color).set(c.a);
       (m.uniforms.uB.value as THREE.Color).set(c.b);
     }
+    (this.lid.material.uniforms.uA.value as THREE.Color).set(c.a);
     (this.edge.material.uniforms.uB.value as THREE.Color).lerp(sber, 0.35);
   }
 
@@ -400,8 +439,14 @@ export class AwakeScene {
   }
 
   /** кадр: значения кривых → uniforms, видимость */
-  apply(s: { t: number; cracks?: { grow: number; k: number }; glow: number; portal: number; pillarH: number; pillarK: number; silhouette: number; splat: number[]; occlude: boolean; catXY: THREE.Vector2; flair: PersonaId | null }) {
+  apply(s: { t: number; cracks?: { grow: number; k: number }; hop?: { z: number; x: number; y: number; rot: number; k: number }; glow: number; portal: number; pillarH: number; pillarK: number; silhouette: number; splat: number[]; occlude: boolean; catXY: THREE.Vector2; flair: PersonaId | null }) {
     this.uT.value = s.t;
+    const hop = s.hop ?? { z: 0, x: 0, y: 0, rot: 0, k: 0 };
+    this.cardFx.visible = true;
+    this.cardFx.position.set(hop.x, hop.y, hop.z);
+    this.cardFx.rotation.z = hop.rot;
+    this.lid.material.uniforms.uK.value = hop.k;
+    this.lid.visible = hop.k > 0.003;
     this.edge.material.uniforms.uK.value = s.glow;
     this.edge.visible = s.glow > 0.003;
     const ck = s.cracks ?? { grow: 0, k: 0 };

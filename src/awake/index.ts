@@ -206,12 +206,13 @@ export class AwakeController {
     const pil = p.pillar(t);
     const splat = [0, 1, 2].map((i) => {
       if (this.persona !== 'hooligan') return 0;
-      const t0 = p.kind === 'first' ? 0.72 + i * 0.22 : 0.1 + i * 0.08;
+      // граффити — вместе со столбом света (после подскоков карты)
+      const t0 = p.kind === 'first' ? p.tPop - 0.83 + i * 0.22 : 0.1 + i * 0.08;
       const fade = p.kind === 'first' ? 1 - clamp01((t - p.tLand - 1.2) / 0.8) : 1 - clamp01((t - p.tLand - 0.1) / 0.45);
       return t < t0 ? 0 : easeOutBack((t - t0) / 0.22, 2.6) * fade;
     });
     this.scene.apply({
-      t, cracks: p.cracks(t), glow: p.glow(t), portal: p.portal(t), pillarH: pil.h, pillarK: pil.k, silhouette: p.silhouette(t), splat,
+      t, cracks: p.cracks(t), hop: p.hop(t), glow: p.glow(t), portal: p.portal(t), pillarH: pil.h, pillarK: pil.k, silhouette: p.silhouette(t), splat,
       occlude: t >= p.tPop - 0.02 && t < p.tLand, catXY: this.catXY, flair: this.persona,
     });
     // скейт под лапами (Хулиган), после приземления укатывается

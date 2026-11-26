@@ -3,10 +3,12 @@
  * без ожидания JS-бандла. Вставляет её сборка (vite.config.ts → quickSplash(), transformIndexHtml) только в редакциях,
  * где функция включена (lab, pilot); MVP-корень не меняется.
  *
- * Загадка (правки продакта 22.11, 23.11): кота до разрешений НЕ показываем — детская карта Сбера «вылупляется», как
- * яйцо: дышит, вздрагивает толчками, по ней расходятся светящиеся трещины, на пике в разломе мелькают ушки и глаза
- * (подробнее — у CARD). Касание карты (это жест) — карта вздрагивает, «тук» синтезом Web Audio, без файлов.
- * «Узнать, кто там» — финальный треск: половинки карты расходятся, вспышка (q-open), звук треска; дальше — камера.
+ * Загадка (правки продакта 22.11, 23.11, 26.11 «как яйцо покемона»): кота до разрешений НЕ показываем — детская карта
+ * Сбера «вылупляется», как яйцо: из щели смотрят глаза, карта качается рывками — 3 серии, каждая сильнее (2 → 3 → 4
+ * рывка, с подскоком), с каждой серией сильнее зелёное свечение изнутри, растут трещины и щель с глазами (подробнее —
+ * у CARD). Касание карты (это жест) — карта вздрагивает, «тук» синтезом Web Audio, без файлов.
+ * «Узнать, кто там» — последняя серия (самая сильная, «тук-тук-ТУК») → вспышка, половинки карты расходятся (q-open),
+ * звук треска; окно камеры появляется сразу в том же жесте — дальше камера.
  * Сам кот — только после разрешений, в катсцене пробуждения из карты (src/awake: те же трещины на настоящей карте).
  *
  * Встроенный скрипт (ES2017, ~4 КБ) работает до бандла: одно нажатие «Узнать, кто там» в ОДНОМ жесте —
@@ -59,10 +61,11 @@ export interface SplashOptions {
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
 /**
- * Детская карта Сбера (как на онбординге) — «яйцо перед вылуплением» (правка продакта 23.11): карта лежит и дышит,
- * толчками вздрагивает и подпрыгивает (тук… тук-тук… ТУК, цикл 5 с), с каждым толчком по ней расходятся светящиеся
- * трещины (свет изнутри, тёплый зелёно-золотой), из разлома бьют лучи и искры; на пике — «почти вылупился»: тряска,
- * в разломе мелькают ушки и глаза — и снова затишье. Кот целиком до разрешений не показывается (тайна).
+ * Детская карта Сбера (как на онбординге) — «яйцо покемона перед вылуплением» (продакт 23.11, 26.11): из тёмной щели
+ * светят и моргают глаза; цикл 6 с — три серии рывков, каждая сильнее: 1) 2 качка ±2,5°; 2) 3 качка ±5° с подскоком
+ * 6 px; 3) 4 качка ±9° с подскоком 18 px. С каждой серией сильнее зелёное свечение изнутри (ореол q-card::before и
+ * свет q-in), раскрываются трещины c1 → c2 → c3, щель с глазами растёт; на третьей — лучи и искры; потом затишье.
+ * Кот целиком до разрешений не показывается (тайна).
  * Карта — две половинки по линии главной трещины (одна разметка лица дважды, clip-path): на «Узнать, кто там»
  * они расходятся, из щели — вспышка (класс q-open). Всё — transform/opacity (60 к/с на iPhone), без картинок.
  */
@@ -90,7 +93,7 @@ const CARD = `
 const SEAM = '58% 0,64% 18%,57% 34%,66% 48%,60% 62%,67% 78%,61% 100%';
 const SEAM_R = '61% 100%,67% 78%,60% 62%,66% 48%,57% 34%,64% 18%,58% 0';
 /** цикл «вылупления», с: все слои идут одной длительностью — толчки, трещины, лучи и искры совпадают */
-const CYCLE = '5s';
+const CYCLE = '6s';
 
 const CSS = `
 #quick{position:fixed;inset:0;z-index:2147482000;display:flex;flex-direction:column;align-items:center;justify-content:space-between;
@@ -111,6 +114,8 @@ const CSS = `
   border-radius:50%;background:radial-gradient(closest-side,rgba(0,0,0,.55),transparent);animation:qShadow ${CYCLE} ease-in-out infinite;pointer-events:none}
 #quick .q-card{position:relative;z-index:1;width:min(74vw,300px);aspect-ratio:1.586;border:0;padding:0;background:none;cursor:pointer;outline:none;
   transform:rotate(-8deg);animation:qHatch ${CYCLE} ease-in-out infinite;will-change:transform}
+#quick .q-card::before{content:"";position:absolute;inset:-28% -18%;border-radius:50%;pointer-events:none;opacity:0;
+  background:radial-gradient(closest-side,rgba(170,255,110,.8),rgba(60,220,100,.35) 55%,rgba(30,160,80,0));animation:qGlow ${CYCLE} ease-out infinite}
 #quick .q-face{position:absolute;inset:0;border-radius:16px;box-shadow:0 18px 40px rgba(0,0,0,.55),0 0 60px rgba(150,255,110,.14)}
 #quick .q-core{position:absolute;inset:6% 22% 6% 40%;border-radius:40%;background:radial-gradient(closest-side,#fffbe0,#f6ff9a 35%,#9cf05a 65%,rgba(80,220,90,0))}
 #quick .q-half{position:absolute;inset:0;border-radius:16px;overflow:hidden;background:linear-gradient(135deg,#2bd36a 0%,#16a34a 42%,#0e7a5a 78%,#0b5c63 100%);
@@ -132,7 +137,7 @@ const CSS = `
 #quick .q-cracks .c3{opacity:0;animation:qC3 ${CYCLE} ease-out infinite}
 #quick .q-hole{position:absolute;left:51%;top:30%;width:30%;height:46%;background:radial-gradient(ellipse at 50% 60%,#000,#04100a 70%,#0a2a17);
   clip-path:polygon(18% 6%,42% 0,62% 10%,86% 4%,100% 40%,90% 70%,98% 96%,62% 100%,38% 90%,8% 100%,0 60%,10% 34%);
-  transform:scale(0);animation:qHole ${CYCLE} ease-in-out infinite;overflow:hidden}
+  transform:scale(.5);animation:qHole ${CYCLE} ease-in-out infinite;overflow:hidden}
 #quick .q-ears{position:absolute;left:22%;right:22%;top:14%;height:30%;display:flex;justify-content:space-between}
 #quick .q-ears i{width:36%;height:100%;background:#1b3a2a;clip-path:polygon(30% 0,100% 100%,0 100%)}
 #quick .q-ears i+i{clip-path:polygon(70% 0,100% 100%,0 100%)}
@@ -154,16 +159,18 @@ const CSS = `
 #quick .q-card.knock .q-in{animation:qTap .6s ease-out}
 #quick .q-flash{position:absolute;inset:0;z-index:3;pointer-events:none;opacity:0;
   background:radial-gradient(60% 45% at 50% 38%,rgba(255,250,210,.95),rgba(214,255,120,.7) 40%,rgba(40,170,80,.35) 75%,rgba(10,40,25,0))}
-#quick.q-open .q-flash{animation:qFlash 1.1s ease-out forwards}
-#quick.q-open .q-card{animation:qOpen .6s ease-in forwards}
+#quick.q-open .q-flash{animation:qFlash 1.1s ease-out .5s forwards}
+#quick.q-open .q-card{animation:qOpen .9s ease-in forwards}
+#quick.q-open .q-card::before{animation:qGlowOpen .9s ease-in forwards}
+#quick.q-open .q-half{transition-delay:.5s}
 #quick.q-open .q-half.a{transform:translate(-16%,-4%) rotate(-9deg)}
 #quick.q-open .q-half.b{transform:translate(16%,5%) rotate(8deg)}
 #quick.q-open .q-cracks .c1,#quick.q-open .q-cracks .c2,#quick.q-open .q-cracks .c3{animation:none;opacity:1}
 #quick.q-open .q-cracks{opacity:0;transition:opacity .3s .18s}
-#quick.q-open .q-in{animation:none;opacity:1;transform:scale(1.6);transition:transform .5s}
-#quick.q-open .q-hole{animation:none;transform:scale(0)}
-#quick.q-open .q-rays{animation:none;opacity:1;transform:scale(1.4) rotate(20deg);transition:transform .8s ease-out,opacity .3s}
-#quick.q-open .q-sparks i{animation:qSpark1 .8s ease-out forwards}
+#quick.q-open .q-in{animation:none;opacity:1;transform:scale(1.6);transition:transform .5s .45s}
+#quick.q-open .q-hole{animation:none;transform:scale(1.1);opacity:0;transition:opacity .2s .5s}
+#quick.q-open .q-rays{animation:none;opacity:1;transform:scale(1.4) rotate(20deg);transition:transform .8s ease-out .45s,opacity .3s .45s}
+#quick.q-open .q-sparks i{animation:qSpark1 .8s ease-out .5s both}
 #quick .q-text{text-align:center;max-width:340px;margin:6px 0 10px}
 #quick h1{font-size:clamp(24px,7.4vw,30px);line-height:1.15;margin:0 0 8px;font-weight:800;letter-spacing:-.01em}
 #quick .q-text p{margin:0;font-size:17px;opacity:.86}
@@ -209,32 +216,33 @@ const CSS = `
 #quick.q-searching{background:transparent;pointer-events:none}
 #quick.q-searching>.q-sky,#quick.q-searching>.q-stage,#quick.q-searching>.q-text,#quick.q-searching>.q-foot{display:none}
 @keyframes qTw{0%,100%{opacity:.15}50%{opacity:.8}}
-@keyframes qHatch{0%,100%{transform:rotate(-8deg)}15%{transform:rotate(-8deg) scale(1.015)}30%{transform:rotate(-8deg)}
-  32%{transform:translateY(-6px) rotate(-6deg)}35%{transform:rotate(-9.5deg)}38%{transform:rotate(-8deg)}
-  50%{transform:translateY(-7px) rotate(-6.5deg)}52.5%{transform:rotate(-9.5deg)}55%{transform:translateY(-8px) rotate(-6deg)}57.5%{transform:rotate(-10deg)}60%,68%{transform:rotate(-8deg)}
-  70%{transform:translateY(-20px) rotate(-4deg) scale(1.05)}73%{transform:translateY(0) rotate(-11deg) scale(1)}
-  75%{transform:translateX(-3px) rotate(-6deg)}77%{transform:translateX(3px) rotate(-10deg)}79%{transform:translateX(-3px) rotate(-6.5deg)}
-  81%{transform:translateX(2px) rotate(-9.5deg)}83%{transform:translateX(-2px) rotate(-7deg)}86%{transform:rotate(-8deg)}}
-@keyframes qShadow{0%,30%,38%,50%,60%,68%,73%,100%{transform:scale(1);opacity:1}32%,55%{transform:scale(.9);opacity:.75}70%{transform:scale(.8);opacity:.55}}
-@keyframes qC1{0%,31%{opacity:.4}32%{opacity:1}44%,86%{opacity:.85}96%,100%{opacity:.4}}
-@keyframes qC2{0%,49%{opacity:0}50%,55%{opacity:1}62%,86%{opacity:.8}96%,100%{opacity:0}}
-@keyframes qC3{0%,69%{opacity:0}70%{opacity:1}84%{opacity:1}96%,100%{opacity:0}}
-@keyframes qIn{0%,31%,40%,49%,60%,69%,92%,100%{opacity:0}32%,50%,55%{opacity:.75}70%,82%{opacity:1}}
-@keyframes qRays{0%,31%,42%,49%,62%,69%,90%,100%{opacity:0;transform:scale(.5) rotate(0)}32%,50%,55%{opacity:.6;transform:scale(.8) rotate(6deg)}70%{opacity:1;transform:scale(1) rotate(10deg)}84%{opacity:.8;transform:scale(1.05) rotate(16deg)}}
-@keyframes qHole{0%,71%,88%,100%{transform:scale(0)}74%,84%{transform:scale(1)}}
-@keyframes qSpark{0%,31%{opacity:0;transform:translate(0,0) scale(.6)}32%{opacity:1;transform:translate(0,0) scale(1)}42%{opacity:0;transform:translate(calc(var(--x)*.6),calc(var(--y)*.6)) scale(.3)}
-  49.9%{opacity:0;transform:translate(0,0)}50%{opacity:1;transform:translate(0,0) scale(1)}60%{opacity:0;transform:translate(calc(var(--x)*.7),calc(var(--y)*.7)) scale(.3)}
-  69.9%{opacity:0;transform:translate(0,0)}70%{opacity:1;transform:translate(0,0) scale(1.3)}84%,100%{opacity:0;transform:translate(var(--x),var(--y)) scale(.3)}}
+@keyframes qHatch{0%,8%{transform:rotate(-8deg)}
+  10%{transform:rotate(-10.5deg)}13%{transform:rotate(-5.5deg)}16%{transform:rotate(-10deg)}19%{transform:rotate(-6deg)}22%,32%{transform:rotate(-8deg)}
+  34%{transform:translateY(-6px) rotate(-13deg)}37%{transform:rotate(-3deg)}40%{transform:translateY(-5px) rotate(-12.5deg)}43%{transform:rotate(-3.5deg)}
+  46%{transform:translateY(-3px) rotate(-11deg)}49%,58%{transform:rotate(-8deg)}
+  60%{transform:translateY(-18px) rotate(-17deg) scale(1.05)}63%{transform:rotate(1deg) scale(1.02)}66%{transform:translateY(-15px) rotate(-17deg) scale(1.05)}
+  69%{transform:rotate(1deg) scale(1.02)}72%{transform:translateY(-11px) rotate(-16deg) scale(1.04)}75%{transform:rotate(0deg)}78%{transform:rotate(-10deg)}81%,100%{transform:rotate(-8deg)}}
+@keyframes qShadow{0%,32%,37%,43%,49%,58%,63%,69%,75%,100%{transform:scale(1);opacity:1}34%,40%{transform:scale(.9);opacity:.75}60%,66%{transform:scale(.78);opacity:.5}72%{transform:scale(.84);opacity:.6}}
+@keyframes qGlow{0%,8%{opacity:0;transform:scale(.8)}11%,19%{opacity:.3;transform:scale(.88)}26%,32%{opacity:.12;transform:scale(.85)}
+  35%,46%{opacity:.6;transform:scale(.96)}52%,58%{opacity:.3;transform:scale(.92)}61%,76%{opacity:1;transform:scale(1.08)}88%,100%{opacity:0;transform:scale(.8)}}
+@keyframes qGlowOpen{0%{opacity:.6;transform:scale(.95)}50%{opacity:1;transform:scale(1.15)}100%{opacity:1;transform:scale(1.6)}}
+@keyframes qC1{0%,9%{opacity:.2}10%{opacity:1}22%,80%{opacity:.85}92%,100%{opacity:.2}}
+@keyframes qC2{0%,33%{opacity:0}34%,46%{opacity:1}52%,80%{opacity:.8}92%,100%{opacity:0}}
+@keyframes qC3{0%,59%{opacity:0}60%,76%{opacity:1}92%,100%{opacity:0}}
+@keyframes qIn{0%,8%,24%,32%,52%,58%,88%,100%{opacity:0}10%,19%{opacity:.3}34%,46%{opacity:.65}60%,76%{opacity:1}}
+@keyframes qRays{0%,33%,48%,59%,82%,100%{opacity:0;transform:scale(.5) rotate(0)}36%,44%{opacity:.35;transform:scale(.7) rotate(5deg)}61%{opacity:1;transform:scale(1) rotate(10deg)}76%{opacity:.8;transform:scale(1.05) rotate(16deg)}}
+@keyframes qHole{0%,8%,88%,100%{transform:scale(.5)}10%,22%{transform:scale(.62)}34%,49%{transform:scale(.8)}60%,78%{transform:scale(1)}}
+@keyframes qSpark{0%,33%{opacity:0;transform:translate(0,0) scale(.6)}34%{opacity:.8;transform:translate(0,0) scale(.8)}44%{opacity:0;transform:translate(calc(var(--x)*.5),calc(var(--y)*.5)) scale(.3)}
+  59.9%{opacity:0;transform:translate(0,0)}60%{opacity:1;transform:translate(0,0) scale(1.3)}76%,100%{opacity:0;transform:translate(var(--x),var(--y)) scale(.3)}}
 @keyframes qSpark1{0%{opacity:1;transform:translate(0,0) scale(1.4)}100%{opacity:0;transform:translate(calc(var(--x)*1.8),calc(var(--y)*1.8)) scale(.3)}}
 @keyframes qKnock{0%,100%{transform:rotate(-8deg)}20%{transform:translateY(-8px) rotate(-5deg) scale(1.03)}45%{transform:rotate(-11deg)}65%{transform:rotate(-6.5deg)}85%{transform:rotate(-9deg)}}
 @keyframes qTap{0%{opacity:1}100%{opacity:.5}}
 @keyframes qFlash{0%{opacity:0}25%{opacity:1}100%{opacity:.25}}
-@keyframes qOpen{0%{transform:rotate(-8deg)}15%{transform:translateX(-4px) rotate(-5deg)}30%{transform:translateX(4px) rotate(-11deg)}45%{transform:translateX(-3px) rotate(-6deg)}
-  100%{transform:translateY(-10px) rotate(-8deg) scale(1.08)}}
+@keyframes qOpen{0%{transform:rotate(-8deg)}10%{transform:translateY(-16px) rotate(-18deg) scale(1.05)}20%{transform:rotate(2deg)}30%{transform:translateY(-20px) rotate(-19deg) scale(1.07)}40%{transform:rotate(3deg)}50%{transform:translateY(-8px) rotate(-8deg) scale(1.1)}100%{transform:translateY(-10px) rotate(-8deg) scale(1.08)}}
 @keyframes qBlink{0%,40%,46%,100%{transform:scaleY(1)}43%{transform:scaleY(.08)}}
 @keyframes qPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.025)}}
 @keyframes qSpin{to{transform:rotate(360deg)}}
-@media (prefers-reduced-motion:reduce){#quick *,#quick .q-card{animation:none!important;transition:none!important}#quick .q-sparks,#quick .q-rays,#quick .q-hole,#quick .q-flash{display:none}
+@media (prefers-reduced-motion:reduce){#quick *,#quick .q-card{animation:none!important;transition:none!important}#quick .q-sparks,#quick .q-rays,#quick .q-flash{display:none}
   #quick .q-cracks .c1,#quick .q-cracks .c2{opacity:.9!important}#quick .q-in{opacity:.45}}
 @media (max-height:640px){#quick .q-card{width:min(60vw,240px)}#quick h1{font-size:23px}#quick .q-text p{font-size:15px}}
 `;
@@ -263,7 +271,7 @@ var card=el.querySelector('.q-card'),knocks=0;
 card.addEventListener('click',function(){if(el.classList.contains('q-open'))return;card.classList.remove('knock');void card.offsetWidth;card.classList.add('knock');
  var c=ctx();if(!c)return;var t=c.currentTime+.02;thump(c,t,knocks++%3===2?120:170)});
 card.addEventListener('animationend',function(e){if(e.animationName==='qKnock')card.classList.remove('knock')});
-function hatch(){el.classList.add('q-open');var c=Q.ctx;if(c){try{var t=c.currentTime+.03;thump(c,t,140);snap(c,t+.02)}catch(e){}}}
+function hatch(){el.classList.add('q-open');var c=Q.ctx;if(c){try{var t=c.currentTime+.03;thump(c,t,130);thump(c,t+.18,160);thump(c,t+.36,200);snap(c,t+.48)}catch(e){}}}
 var own=!(qs.has('tracker')||qs.has('nocard')||qs.has('desktop')||qs.has('debug'));
 function vc(){var hd=qs.get('cam')==='720';return{facingMode:'environment',width:{ideal:hd?1280:960},height:{ideal:hd?720:540},frameRate:{ideal:30}}}
 function ac(){var aec=qs.get('aec')!=='0';return{echoCancellation:aec,noiseSuppression:aec,autoGainControl:false,channelCount:1}}
