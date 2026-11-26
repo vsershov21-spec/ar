@@ -37,8 +37,8 @@ function grade(tag) {
     if (ss !== null && ss < -10) bad(`лёжа в опоре ${ss}`); else if (ss !== null && ss < -2) tol(`лёжа ${ss}`);
     if (o.notes.some((n) => /не вернулся в покой/.test(n)) && !/^(st_|switch|paint|riddle|echo|rest|idleclip_|look_)/.test(o.id)) tol(`висит ${o.endClip}`);
     // предмет в лапах (26.11): проникновение предмета в кисть/пальцы/тело — норма ≤ 2 мм
-    const pp = o.props?.penProp ?? 0;
-    if (pp > 2) bad(`пр.предмета ${pp}`); else if (pp > 1) tol(`пр.предмета ${pp}`);
+    const ppr = o.props?.penProp ?? 0;
+    if (ppr > 2) bad(`пр.предмета ${ppr}`); else if (ppr > 1) tol(`пр.предмета ${ppr}`);
     if (o.bind > 0.5) bad('T-поза');
     (rows[o.id] ||= {})[o.cat] = { v, why, W, o };
   }

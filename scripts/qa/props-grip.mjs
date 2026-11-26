@@ -29,7 +29,7 @@ const CATS = arg('--cats', 'hooligan,kind,glitter').split(',');
 /** предметы в лапах пилота по котам: фирменные, «Угостить» (рыбка), пузыри Добряка (палочка); attr: — предмет появления */
 const ACTS = {
   hooligan: ['attr:skate_show', 'skate', 'treat'],
-  kind: ['attr:cocoa', 'treat', 'bubbles'],
+  kind: ['attr:cocoa_show', 'cocoa', 'treat', 'bubbles'],
   glitter: ['attr:mirror', 'treat'],
 };
 const ONLY = arg('--acts', '') ? arg('--acts').split(',') : null;

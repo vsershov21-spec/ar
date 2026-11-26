@@ -173,11 +173,12 @@ export function laterText(ms: number): string {
 /**
  * Фирменный предмет при появлении кота (feature cat.attrs, director.playAttr): из карты и после выбора листом.
  * Значение — действие персонажа (GlbCharacter.runAct): skate_show — короткий выезд на скейте (без кикфлипа и подброса
- * доски в лапу), cocoa — какао в лапах с глотком, mirror — смотрится в зеркальце. null — кот появляется без предмета
+ * доски в лапу), cocoa_show — какао в лапах у груди (без глотка у рта: лапа ко рту уходит в шарф, аудит 26.11),
+ * mirror — смотрится в зеркальце. null — кот появляется без предмета
  * (так выключают предмет, у которого на стенде нечистый хват: docs/qa/props/GRIP.md, правило «MVP без багов»).
  */
 export const APPEAR_ATTR: Readonly<Record<PersonaId, string | null>> = {
   hooligan: 'skate_show',
-  kind: 'cocoa',
+  kind: 'cocoa_show',
   glitter: 'mirror',
 };

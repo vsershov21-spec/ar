@@ -1136,7 +1136,7 @@ export const TESTS = [
     async fn(t) {
       const P = t.track(await openPhone(t.browser, t.server, { q: `cat=${cat}`, memory: MET(cat) }));
       await toPlay(P);
-      const act = { hooligan: 'skate_show', kind: 'cocoa', glitter: 'mirror' }[cat];
+      const act = { hooligan: 'skate_show', kind: 'cocoa_show', glitter: 'mirror' }[cat];
       await P.must((a) => window.__app.character.actState?.id === a, 20000, `предмет появления ${act}`, act);
       // кадры предмета: положение относительно кости (кисть / стопы на деке), проникновение (character/propPen.ts)
       const fr = [];

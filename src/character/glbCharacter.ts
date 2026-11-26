@@ -29,7 +29,7 @@ import { BodyCollider, CAT_MM, worstPair, type CollidersJson } from './bodyColli
 import { FootPin } from './footPin';
 import { PoseFade } from './poseFade';
 import { curlFingers, lowestPoint, rotWorld as rotW, twoBoneIK, type GroundVolume } from './limbIK';
-import { HOLD_SPECS, holdDuration, holdPose, type HoldFrame, type HoldSpec } from './holdAction';
+import { APPEAR_HOLD_SPECS, HOLD_SPECS, holdDuration, holdPose, type HoldFrame, type HoldSpec } from './holdAction';
 import { PropFx } from './propFx';
 import { BOARD, FEET_ON_DECK, SKATE_SHOW_ORDER, SKATE_SHOW_TOTAL, SKATE_TOTAL, setSkateFit, skatePose, type SkateFrame } from './skateRig';
 import { buildFurShells } from './furShell';
@@ -63,7 +63,8 @@ const ACT_BODY_LOW: Record<string, Partial<Record<string, string>>> = {
 /** доля коррекции BodyCollider для лапы с предметом при теле hold_*_low (иначе — 0: лапа исключена, IK ведёт сам) */
 const HOLD_LOW_PUSH = 0.15;
 /** то же для какао Добряка без клипа (hold_sip_low кланяется над кружкой — морды не видно, кружка у груди) */
-const HOLD_PUSH: Partial<Record<string, number>> = { cocoa: 0.15 };
+// cocoa_show (какао у груди при появлении): лапу из шарфа коллайдер выводит наполовину — кружка идёт за фактической ладонью
+const HOLD_PUSH: Partial<Record<string, number>> = { cocoa: 0.15, cocoa_show: 0.5 };
 /** доля поклона клипа hold_*_low (корпус, шея, голова) — остальное к позе покоя: морда видна с камеры сверху */
 const HOLD_LOW_BOW: Record<string, number> = { treat: 0.35 };
 const HOLD_LOW_BOW_BONES = ['Spine', 'Spine1', 'Spine2', 'Neck', 'Head'] as const;
@@ -665,7 +666,7 @@ export class GlbCharacter implements Character {
       this.clips.play('idle_breathe', { loop: true, force: true });
       return order ? SKATE_SHOW_TOTAL : SKATE_TOTAL;
     }
-    const spec = HOLD_SPECS[id];
+    const spec = HOLD_SPECS[id] ?? APPEAR_HOLD_SPECS[id];
     if (!spec || !this.bones.has(spec.hand + 'Arm')) return 0;
     this.act = { kind: 'hold', id, spec, t: 0 };
     this.props.hold(spec.prop);
@@ -1963,8 +1964,10 @@ export class GlbCharacter implements Character {
       // камера AR — сверху: край чуть выше губ, иначе с телефона кружка «у подбородка» (листы 20.11)
       const rim = M.clone().add(V(0, 0.026 + 0.014 * f.tilt, dims.r * 0.55 - 0.018 * f.tilt));
       near.copy(rim).addScaledVector(Y, -hTop * 0.97);
-      // у груди — чуть дальше вперёд и выше: кружка (её выталкивает из ладони) не задевает живот и бедро на опускании
-      far.set(sx * 0.03, 0.42, 0.31);
+      // у груди — чуть дальше вперёд и выше: кружка (её выталкивает из ладони) не задевает живот и бедро на опускании;
+      // предмет появления (держит у груди, reach < 1) — ещё в сторону своей лапы: предплечье не поперёк хвоста шарфа
+      if ((spec.reach ?? 1) < 1) far.set(sx * 0.11, 0.43, 0.33);
+      else far.set(sx * 0.03, 0.42, 0.31);
     } else if (spec.use === 'look') {
       // зеркальце: стекло вертикально к морде на ширину головы, сбоку-спереди; «чмок» — ближе к рту
       Y.set(sx * 0.08, 1, -0.1).normalize();

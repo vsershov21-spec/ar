@@ -286,7 +286,9 @@ export function measureHand(model: THREE.Object3D, side: 'Left' | 'Right', catSc
   const palmPts = pick(hand, 0.35, 48);
   const palm: SkinPts = palmPts.sort((a, b) => b.idx.length - a.idx.length)[0] ?? { mesh: null as unknown as THREE.SkinnedMesh, idx: [] };
   // остальные меши ладони (подушечки BD_Pads) — тоже: склеиваем в список через отдельные записи пальца «0»
-  for (const f of fingers) f.skin = f.bones.map((b) => pick(b, f.thumb ? -0.2 : 0.1, 14).sort((a, c) => c.idx.length - a.idx.length)[0] ?? { mesh: palm.mesh, idx: [] });
+  // большой палец сгибается поперёк ладони — касается предмета и боком и кончиком: все его точки (кругом), не только
+  // со стороны подушечек (иначе кончик входил в хвост рыбки на 2,2 мм)
+  for (const f of fingers) f.skin = f.bones.map((b) => pick(b, f.thumb ? -2 : 0.1, f.thumb ? 28 : 14).sort((a, c) => c.idx.length - a.idx.length)[0] ?? { mesh: palm.mesh, idx: [] });
   return { hand, palmTo, palmR, fingers, palm: palm.mesh ? palm : { mesh: palm.mesh, idx: [] }, palmExtra: palmPts.filter((p) => p !== palm) } as HandCaps;
 }
 
@@ -442,10 +444,12 @@ export function solveGrip(o: { prop: THREE.Object3D; sdf: PropSDF; caps: HandCap
       let target = 0;
       if (w > 0.01) {
         const hi = lim[j] ?? 1;
+        // разжать можно сильнее большой палец (он отходит в сторону от хвоста рыбки / ручки)
+        const lo = f.thumb ? -0.9 : -0.3;
         if (test(hi) <= 0) target = hi;
-        else if (test(-0.3) > 0) target = -0.3;
+        else if (test(lo) > 0) target = lo;
         else {
-          let a = -0.3, c = hi;
+          let a = lo, c = hi;
           for (let it = 0; it < 7; it++) {
             const m = (a + c) / 2;
             if (test(m) <= 0) a = m;

@@ -537,8 +537,9 @@ export function analyze(r, durs = {}, cuts = null) {
   else if (pop > 10.5) tol(`щелчок ${pop.toFixed(1)} рад/с (${popAt})`);
   if (slideIn > 15) bad(`лапы едут ${slideIn.toFixed(0)} мм`);
   else if (slideIn > 5) tol(`лапы едут ${slideIn.toFixed(0)} мм`);
-  // пробуждение: кот по замыслу поднимается из-под карты (сцена awake) — «провал» лап там не ошибка
-  if (!/^(home_bed|awake)/.test(r.id)) {
+  // пробуждение: кот по замыслу поднимается из-под карты (сцена awake) — «провал» лап там не ошибка; смена кота в пилоте
+  // (pilot.catPick, 26.11) — тоже: новый кот выскакивает из карты коротким пробуждением
+  if (!/^(home_bed|awake|switch|st_switch_mid)/.test(r.id)) {
     if (sink < -5) bad(`провал лап ${sink.toFixed(1)} мм`);
     else if (sink < -2.5) tol(`провал лап ${sink.toFixed(1)} мм`);
     if (floatP > 4) tol(`парит ${floatP.toFixed(1)} мм`);

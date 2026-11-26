@@ -20,6 +20,8 @@ export interface HoldSpec {
   use: HoldUse;
   /** длительности фаз, с */
   t: Record<Exclude<HoldPhase, 'done'>, number>;
+  /** насколько подносит ко рту (0…1, по умолчанию 1); < 1 — держит у груди без глотка/укуса (предмет появления) */
+  reach?: number;
 }
 
 /** действие кнопки → шаблон (id — scenario/actions.ts; у Хулигана «Пузыри» — жвачка) */
@@ -28,6 +30,14 @@ export const HOLD_SPECS: Record<string, HoldSpec> = {
   mirror: { prop: 'hold_mirror', hand: 'Left', use: 'look', t: { take: 0.5, raise: 0.55, use: 3.4, lower: 0.45, away: 0.4 } },
   treat: { prop: 'hold_fish', hand: 'Right', use: 'bite', t: { take: 0.5, raise: 0.5, use: 2.4, lower: 0.45, away: 0.4 } },
   gum: { prop: 'hold_gum', hand: 'Right', use: 'pop', t: { take: 0.4, raise: 0.45, use: 1.7, lower: 0.35, away: 0.25 } },
+};
+/**
+ * Предмет появления (feature cat.attrs, director.playAttr): Добряк выходит из карты с какао в лапах — держит кружку у
+ * груди, смотрит на неё и улыбается, пар идёт; без глотка у рта (лапа ко рту проходит сквозь шарф — 6–7 мм, известный
+ * долг «плечо с предметом», BACKLOG; в «Какао» из каталога глоток остаётся).
+ */
+export const APPEAR_HOLD_SPECS: Record<string, HoldSpec> = {
+  cocoa_show: { prop: 'hold_cocoa', hand: 'Right', use: 'sip', reach: 0.3, t: { take: 0.55, raise: 0.5, use: 2.4, lower: 0.45, away: 0.45 } },
 };
 export const PHASES: Exclude<HoldPhase, 'done'>[] = ['take', 'raise', 'use', 'lower', 'away'];
 export function holdDuration(s: HoldSpec): number {
@@ -216,5 +226,18 @@ function frame(s: HoldSpec, ph: Exclude<HoldPhase, 'done'>, k: number, tt: numbe
       break;
   }
   if (s.use !== 'sip') f.steam = 0;
+  const reach = s.reach ?? 1;
+  if (reach < 1) {
+    // у груди: без глотка/укуса — смотрит на предмет и улыбается
+    f.toMouth *= reach;
+    f.tilt = 0;
+    f.peck = 0;
+    f.eaten = 0;
+    const on = Math.min(1, f.w);
+    f.headPitch = 0.12 * on;
+    f.headYaw = 0.4 * on;
+    f.headRoll = 0.05 * on;
+    f.face = { smile: 0.65 * on, cheek_up: 0.35 * on, eyes_laugh: ph === 'use' ? 0.3 * win(tt, 0.6, U - 0.4, 0.3) : 0 };
+  }
   return f;
 }

@@ -166,7 +166,7 @@ describe('выбор кота: позже в игре («Позвать друг
 
 describe('предмет появления и вид появления', () => {
   it('у каждого кота свой предмет: скейт / какао / зеркальце', () => {
-    expect(APPEAR_ATTR).toEqual({ hooligan: 'skate_show', kind: 'cocoa', glitter: 'mirror' });
+    expect(APPEAR_ATTR).toEqual({ hooligan: 'skate_show', kind: 'cocoa_show', glitter: 'mirror' });
   });
   it('тексты листа — «разные коты», а не «каким мне быть»', () => {
     expect(PICK_TITLE.intro).toBe('Выбери своего кота');
