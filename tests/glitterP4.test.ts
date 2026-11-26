@@ -46,4 +46,36 @@ describe('glitter p4: флаг ?models=p4', () => {
     const col = JSON.parse(fs.readFileSync('public/models/v2/glitter_p4_colliders.json', 'utf8'));
     expect(col.volumes.map((v: { name: string }) => v.name)).toEqual(expect.arrayContaining(['head', 'torso', 'skirt', 'bow']));
   });
+
+  it('доводка лица 26.11: веки в тон меха (extras.lidTone), 4 лепестка ресниц, рот в покое и резцы (extras.mouth)', async () => {
+    const p4: J = read('public/models/v2/glitter_p4.glb');
+    for (const side of ['L', 'R']) {
+      const eye = p4.nodes.find((n) => n.name === `Eye_${side}`)!;
+      expect((eye.extras?.lidTone as number[]).length).toBe(4);
+      const up = p4.nodes.find((n) => n.name === `LidUp_${side}`)!;
+      expect((p4.meshes[up.mesh!].extras as { petals?: number } | undefined)?.petals).toBe(4);
+    }
+    const md = p4.nodes.find((n) => n.name === 'MouthD')!;
+    const mouth = md.extras?.mouth as { rest: Record<string, number>; teeth: number[]; tongue: object; jaw: object };
+    expect(mouth.rest.mouth_A).toBeLessThan(0.46); // рот в покое приоткрыт меньше, чем у p1 (PERSONA_FACE_V2)
+    expect(mouth.teeth[0]).toBe(1); // резцы, не клычки
+    // рантайм: зубки и язык — из extras модели, у остальных — как было
+    const THREE = await import('three');
+    const { MouthRig } = await import('../src/character/mouthRig');
+    const mk = (ex: object) => {
+      const m = new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshStandardMaterial());
+      m.name = 'MouthD';
+      m.userData.mouth = { o: [0, 0, 0], ex: [1, 0, 0], ey: [0, 1, 0], W: 1, nose: 0.3, jaw: {}, ...ex };
+      const g = new THREE.Group(); g.add(m);
+      return MouthRig.find(g)!;
+    };
+    const own = mk({ teeth: mouth.teeth, tongue: mouth.tongue, rest: mouth.rest }), def = mk({});
+    expect(own.uniforms.uME.value.toArray()).toEqual(mouth.teeth);
+    expect(def.uniforms.uME.value.toArray()).toEqual([0, 1, 0.5, 1]);
+    own.setTongue({ size: 0.6, deeper: 0.1, tone: 0.82 });
+    expect(own.uniforms.uMD.value.x).toBeCloseTo((mouth.tongue as { size: number }).size);
+    def.setTongue({ size: 0.6, deeper: 0.1, tone: 0.82 });
+    expect(def.uniforms.uMD.value.x).toBeCloseTo(0.6);
+    expect(own.ex.rest).toEqual(mouth.rest);
+  });
 });

@@ -1359,7 +1359,8 @@ export class GlbCharacter implements Character {
       W.blink_R = Math.max(W.blink_R ?? 0, f.blink);
     }
     // характер в покое (референс): у Блёстки всегда чуть розовые щёчки и мягкая полуулыбка
-    const base = (this.faceMorphs ? PERSONA_FACE_MORPH : modelsV2() ? PERSONA_FACE_V2 : PERSONA_FACE)[this.personaId];
+    // своя модель (Блёстка p4, MouthD extras.mouth.rest — persona_tune.py) — своё лицо в покое
+    const base = (!this.faceMorphs && this.mouthRig?.ex.rest) || (this.faceMorphs ? PERSONA_FACE_MORPH : modelsV2() ? PERSONA_FACE_V2 : PERSONA_FACE)[this.personaId];
     if (base && !this.tripoFace) for (const k in base) W[k] = Math.max(W[k] ?? 0, base[k] * (1 - (W.frown ?? 0)));
     // характер глаз (v2 — по умолчанию; ?models=v1 — без них): у Блёстки по рефу глаза широко открыты — пресеты «самодовольно/сонно/прищур»
     // в idle-клипах (зеркальце, кружение) прикрывают веки слабее

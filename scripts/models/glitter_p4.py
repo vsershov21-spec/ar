@@ -125,6 +125,35 @@ def stitch(head, part):
     print(f"  вшита {part['name']} ({part['role']}): край {len(lb)}, дыра головы {len(hole)}, полоса {len(T)} треуг.")
 
 
+def close_slits(head, max_w=0.004):
+    """щель Tripo по середине подбородка: две колонки вершин в 1.6–2.5 мм друг от друга не сшиты (отдельная тонкая дыра
+    головы) — сквозь неё видна изнанка, на лице тёмная вертикальная черта (и в рендере Tripo). Тонкие дыры у центра морды
+    ниже рта (по x ≤ max_w, вдоль — длиннее) сшиваем: вершины левого края — в ближайшие вершины правого (все копии
+    позиции), нормали — средние"""
+    V, N = head['V'], head['N']
+    key = np.round(V * 1e5).astype(np.int64)
+    _, w = np.unique(key, axis=0, return_inverse=True); w = w.ravel()
+    done = 0
+    for loop in boundary_loops(V, head['F']):
+        P = V[loop]; c = P.mean(0)
+        if not (abs(c[0]) < 0.01 and c[2] > 0.05 and 0.5 < c[1] < 0.62):
+            continue
+        across = P[:, 0] - np.median(P[:, 0])
+        if np.ptp(across) > max_w or np.ptp(P[:, 1]) < 4 * max_w:
+            continue
+        left = [i for i, a in zip(loop, across) if a < 0]; right = [i for i, a in zip(loop, across) if a >= 0]
+        Pr = V[right]
+        for i in left:
+            k = right[int(np.argmin(np.linalg.norm(Pr - V[i], axis=1)))]
+            n = N[i] + N[k]; n /= np.linalg.norm(n)
+            for ids in (w == w[i], w == w[k]):
+                V[ids] = V[k]; N[ids] = n
+        done += 1
+        print(f"  щель головы у подбородка сшита: {len(left)}+{len(right)} вершин, ширина {np.ptp(across) * 1000:.1f} мм, "
+              f"y {P[:, 1].min():.3f}…{P[:, 1].max():.3f}")
+    return done
+
+
 def cap_grid(V, loop, bulge, step=0.0016):
     """заплатка рта: ровная сетка рядами вдоль x (линия рта горизонтальна) — разрез губ face_rig.py идёт по рёбрам без
     зигзагов (у веерной заплатки путь уходил с линии, и губы не разделялись). Высота z — квадрика по краю дыры +
@@ -234,6 +263,7 @@ def main():
     head = next(p for p in parts if p['role'] == 'head')
     drop = {'junk'} if a.keep_face else {'junk', 'eye', 'mouth'}
     caps = []
+    close_slits(head)
     if not a.keep_face:
         for p in parts:
             if p['role'] in ZIP:

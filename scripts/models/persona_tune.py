@@ -35,8 +35,25 @@ TUNE = {
                 'bow_star': {'k': 1.2, 'r0': 0.035, 'r1': 0.062},
                 'stars': {'R': 0.011, 'lift': 0.008, 'at': [(60, 0.79, 0.012), (55, 0.818, 0.01)]}},
 }
-# Блёстка p4 (glitter_p4.py): веки и ресницы как у Блёстки p1, бант и звёзды — сетка Tripo (свои не добавляем)
-TUNE['glitter_p4'] = {k: v for k, v in TUNE['glitter'].items() if k not in ('bow_star', 'stars')}
+# Блёстка p4: рот в покое (MouthD, extras.mouth → mouthRig.ts / glbCharacter.ts) по развороту продакта
+# design/refs/glitter_turnaround_1123.png — улыбка приоткрыта меньше (у p1 smile 0.6 + mouth_A 0.46: челюсть тела
+# опускалась, рот «настежь» с клычками), два маленьких резца сверху ближе к середине, язык глубже
+MOUTH_P4 = {'rest': {'smile': 0.75, 'mouth_A': 0.34}, 'teeth': [1, 1.0, 0.3, 0.92],
+            'tongue': {'size': 0.62, 'deeper': 0.0, 'tone': 0.9}}
+# Блёстка p4 (glitter_p4.py): бант и звёзды — сетка Tripo (свои не добавляем). Веки (мягкие, подводку и ресницы по кромке
+# рисует шейдер eyeRig) — мех морды в тон: цвет — текстура тела кольцом вокруг глаза (lid_fur; у p1 — медиана у самого
+# разреза, у текстуры Tripo там тень ресниц — закрытое веко выходило тёмно-серым диском), без тёмных рядов persona_tune
+# (up/lo — нули); lid_tone → extras.lidTone узлов Eye_* (яркость, подсветка, насыщенность, сила прядей шума в шейдере
+# века — у плюша Tripo мех короткий, серое «зерно» шума читалось заплаткой). Ресницы — 4 загнутых лепестка у внешнего
+# уголка верхнего века (petals: доля дуги к уголку, длина, угол от вертикали наружу в корне, загиб к вертикали к кончику,
+# ширина у корня; единицы глаза), как у Tripo/рефа design/refs/glitter_turnaround_1123.png
+TUNE['glitter_p4'] = {**{k: v for k, v in TUNE['glitter'].items() if k not in ('bow_star', 'stars', 'lash')},
+                      'up': [0, 0, 0, 0, 0], 'lo': [0, 0, 0, 0, 0],
+                      'lid_fur': {'r': (1.1, 1.4), 'lo': 0.0},
+                      'lid_tone': [1.0, 0.08, 1.25, 0.6],
+                      'petals': [(0.40, 0.30, 30, 14, 0.05), (0.58, 0.40, 46, 22, 0.055),
+                                 (0.74, 0.48, 62, 30, 0.06), (0.88, 0.50, 78, 38, 0.06)],
+                      'mouth': MOUTH_P4}
 LASH_SEG = 12  # вершин в лепестке ресницы (face_detail: 6 сечений × 2)
 
 
@@ -50,6 +67,16 @@ def main():
         if n.get('name') in ('Eye_L', 'Eye_R') and 'restUp' in n.get('extras', {}):
             print(f"{cat}: {n['name']} restUp {n['extras']['restUp']} → {t['restUp']}")
             n['extras']['restUp'] = t['restUp']
+            if t.get('lid_tone'):
+                n['extras']['lidTone'] = list(t['lid_tone'])
+    if t.get('petals'):
+        petals(g, t['petals'])
+    if t.get('mouth'):
+        for n in j['nodes']:
+            if 'mouth' in n.get('extras', {}):
+                n['extras']['mouth'].update(t['mouth'])
+                print(f"{cat}: рот {n['name']} — {t['mouth']}")
+    ring = lid_fur(g, t['lid_fur']) if t.get('lid_fur') else {}
     for n in j['nodes']:
         nm = n.get('name', '')
         if not (nm.startswith('LidUp_') or nm.startswith('LidLo_')) or 'mesh' not in n:
@@ -58,8 +85,12 @@ def main():
         ai = pr['attributes']['COLOR_0']
         c = g.acc(ai).astype(np.float64)
         nv = len(c)
-        # ряды века — первые ROWS·nu вершин; у Блёстки после них — лепестки ресниц (по LASH_SEG вершин)
-        nu = next((nv // ROWS - k for k in range(0, 4) if (nv - (nv // ROWS - k) * ROWS) % LASH_SEG == 0 and nv // ROWS - k > 0), None)
+        # ряды века — первые ROWS·nu вершин; у Блёстки после них — лепестки ресниц (по LASH_SEG вершин); nu — по нижнему
+        # веку того же глаза (у него лепестков нет), иначе подбором
+        lo = next((m for m in j['nodes'] if m.get('name') == 'LidLo_' + nm[-1] and 'mesh' in m), None)
+        nlo = j['accessors'][j['meshes'][lo['mesh']]['primitives'][0]['attributes']['POSITION']]['count'] if lo else 0
+        nu = nlo // ROWS if nlo and nlo % ROWS == 0 else \
+            next((nv // ROWS - k for k in range(0, 4) if (nv - (nv // ROWS - k) * ROWS) % LASH_SEG == 0 and nv // ROWS - k > 0), None)
         if nu is None or (nv - nu * ROWS) % LASH_SEG:
             print(f'{cat}: {nm} — {nv} вершин: ряды не найдены, пропуск'); continue
         extra = nv - nu * ROWS
@@ -78,6 +109,8 @@ def main():
             j['meshes'][n['mesh']].setdefault('extras', {})['lashScale'] = list(t['lash'])
             c[nu * ROWS:, :3] = LASH
             print(f'{cat}: {nm} ресницы ×{t["lash"]} ({extra // LASH_SEG} лепестка)')
+        if nm in ring:
+            c[:nu * ROWS, :3] = ring[nm]
         fur = c[5 * nu:6 * nu, :3].copy()  # ряд 5 — чистый мех (подводка не доходит)
         ks = t['up'] if nm.startswith('LidUp_') else t['lo']
         for r in range(5):
@@ -101,6 +134,132 @@ def main():
 
 
 LIMIT = 4.5 * 1024 * 1024
+
+
+def node_world(j):
+    """мировые матрицы узлов в позе покоя (TRS / matrix узлов glTF)"""
+    from scipy.spatial.transform import Rotation
+    par = {c: i for i, n in enumerate(j['nodes']) for c in n.get('children', [])}
+    loc = []
+    for n in j['nodes']:
+        if 'matrix' in n:
+            loc.append(np.array(n['matrix'], np.float64).reshape(4, 4).T); continue
+        M = np.eye(4)
+        M[:3, :3] = Rotation.from_quat(n.get('rotation', [0, 0, 0, 1])).as_matrix() * np.array(n.get('scale', [1, 1, 1]))
+        M[:3, 3] = n.get('translation', [0, 0, 0])
+        loc.append(M)
+    out = {}
+    def w(i):
+        if i not in out:
+            out[i] = (w(par[i]) if i in par else np.eye(4)) @ loc[i]
+        return out[i]
+    return [w(i) for i in range(len(j['nodes']))]
+
+
+def lid_fur(g, cfg):
+    """цвет меха век (линейный) по текстуре тела: кольцо r0…r1 вокруг глаза (единицы глаза EyeS_*, вид спереди) — над
+    глазом для верхнего века, под глазом для нижнего; медиана светлой половины (без теней и подводки Tripo)"""
+    j = g.j
+    W = node_world(j)
+    bi, b = g.main_mesh()
+    P = g.acc(b['attributes']['POSITION']).astype(np.float64)
+    UV = g.acc(b['attributes']['TEXCOORD_0']).astype(np.float64)
+    mat = j['materials'][b['material']]
+    img = np.asarray(g.image(j['textures'][mat['pbrMetallicRoughness']['baseColorTexture']['index']]['source']).convert('RGB')).astype(np.float64)
+    h, w = img.shape[:2]
+    # сетка тела в мир (поза связывания = покой): кость головы · обратная матрица связывания
+    sk = j['skins'][0]
+    hi = next(k for k, ji in enumerate(sk['joints']) if j['nodes'][ji]['name'].replace('mixamorig:', '') == 'Head')
+    ibm = g.acc(sk['inverseBindMatrices'])[hi].reshape(4, 4).T
+    M = W[sk['joints'][hi]] @ ibm
+    Pw = np.c_[P, np.ones(len(P))] @ M.T
+    out = {}
+    r0, r1 = cfg['r']
+    for side in 'LR':
+        es = next(i for i, n in enumerate(j['nodes']) if n.get('name') == f'EyeS_{side}')
+        Q = (Pw @ np.linalg.inv(W[es]).T)[:, :3]
+        r = np.hypot(Q[:, 0], Q[:, 1])
+        m = (r > r0) & (r < r1) & (Q[:, 2] > -1.0) & (np.abs(Q[:, 2]) < 3)
+        for nm, mm in ((f'LidUp_{side}', m & (Q[:, 1] > 0.3 * r)), (f'LidLo_{side}', m & (Q[:, 1] < -0.3 * r))):
+            uv = UV[mm]
+            col = img[np.clip((uv[:, 1] % 1 * h).astype(int), 0, h - 1), np.clip((uv[:, 0] % 1 * w).astype(int), 0, w - 1)]
+            lum = col.mean(1)
+            c = np.median(col[lum >= np.percentile(lum, 50)], 0)
+            out[nm] = c
+        # нижнее веко: мех под глазом светлее (щека) — у смеха поднятое нижнее веко закрывает весь глаз светлым диском;
+        # берём ближе к верхнему (доля щеки lo)
+        lo = cfg.get('lo', 1.0)
+        out[f'LidLo_{side}'] = out[f'LidUp_{side}'] * (1 - lo) + out[f'LidLo_{side}'] * lo
+        for nm in (f'LidUp_{side}', f'LidLo_{side}'):
+            print(f'веко {nm}: мех кольцом вокруг глаза {np.round(out[nm]).astype(int).tolist()}')
+            out[nm] = (out[nm] / 255) ** 2.2
+    return out
+
+
+def petals(g, cfg):
+    """ресницы-лепестки верхних век заново (вместо трёх прямых face_detail.py): у внешнего уголка, по дуге кромки века
+    (ряд 0 сетки), каждый — из корня чуть над кромкой наружу-вверх и с загибом к вертикали; 6 сечений × 2 вершины
+    (LASH_SEG — как у face_detail, persona_tune и eyeRig узнают их по числу вершин). Единицы глаза (узел EyeS_*)."""
+    import math
+    j = g.j
+    for n in j['nodes']:
+        nm = n.get('name', '')
+        if not nm.startswith('LidUp_') or 'mesh' not in n:
+            continue
+        side = nm[-1]
+        outer = 1 if side == 'L' else -1  # face_detail.build_eyes: внешний уголок левого глаза — +x
+        lo = next(m for m in j['nodes'] if m.get('name') == f'LidLo_{side}')
+        nu = j['accessors'][j['meshes'][lo['mesh']]['primitives'][0]['attributes']['POSITION']]['count'] // ROWS
+        pr = j['meshes'][n['mesh']]['primitives'][0]
+        A = pr['attributes']
+        P = g.acc(A['POSITION']).astype(np.float64)[:nu * ROWS]
+        Nn = g.acc(A['NORMAL']).astype(np.float64)[:nu * ROWS]
+        C = g.acc(A['COLOR_0']).astype(np.float64)[:nu * ROWS]
+        I = g.acc(pr['indices']).reshape(-1, 3).astype(np.int64)
+        I = I[(I < nu * ROWS).all(1)]
+        e0 = P[:nu]  # кромка (ряд 0)
+        a = np.arcsin(np.clip(e0[:, 0] / np.linalg.norm(e0, axis=1), -1, 1))
+        # открытая часть разреза — где кромка верхнего века выше нижнего (уголки сошлись)
+        Plo = g.acc(j['meshes'][lo['mesh']]['primitives'][0]['attributes']['POSITION']).astype(np.float64)[:nu]
+        op = np.where(e0[:, 1] - Plo[:, 1] > 0.02)[0]
+        amax = np.abs(a[op]).max()
+        V2, N2, C2, F2 = [], [], [], []
+        lash = np.r_[LASH, 1.0][:C.shape[1]]
+        for f, ln, ang0, curl, w0 in cfg:
+            i = int(np.argmin(np.abs(a - outer * f * amax)))
+            root = e0[i] * 1.035
+            root[1] += 0.03
+            # плоскость лепестка: наружу (x) и U — вверх с наклоном к камере (40° от оси глаза): и у открытого, и у
+            # закрытого века (поворот ≈ 80° вокруг x) лепесток виден спереди (вверх-наружу / вниз-наружу), не ребром
+            U = np.array([0, math.sin(math.radians(40)), math.cos(math.radians(40))])
+            X = np.array([outer, 0.0, 0.0])
+            root = root + U * 0.02
+            pts = [root]
+            dirs = []
+            for s in range(1, 6):
+                aa = math.radians(ang0 - curl * (s - 0.5) / 5)
+                dirs.append((aa, X * math.sin(aa) + U * math.cos(aa)))
+                pts.append(pts[-1] + dirs[-1][1] * ln / 5)
+            pts = np.array(pts)
+            base = nu * ROWS + len(V2)
+            for si, p in enumerate(pts):
+                aa = dirs[min(si, 4)][0]
+                sv = -X * math.cos(aa) + U * math.sin(aa)  # поперёк лепестка в его плоскости
+                wd = w0 * (1 - si / 5) ** 0.8 + 0.006
+                V2 += [p - sv * wd, p + sv * wd]
+                nn = np.cross(X, U) * outer; N2 += [nn / np.linalg.norm(nn)] * 2
+                C2 += [lash, lash]
+            for si in range(5):
+                a0 = base + si * 2
+                F2 += [(a0, a0 + 1, a0 + 3), (a0, a0 + 3, a0 + 2)]
+        P = np.r_[P, V2]; Nn = np.r_[Nn, N2]; C = np.r_[C, C2]; I = np.r_[I, np.array(F2)]
+        was = (j['accessors'][A['POSITION']]['count'] - nu * ROWS) // LASH_SEG
+        A['POSITION'] = g.add_acc(P.astype(np.float32), 5126, 'VEC3', 34962)
+        A['NORMAL'] = g.add_acc(Nn.astype(np.float32), 5126, 'VEC3', 34962)
+        A['COLOR_0'] = g.add_acc(C.astype(np.float32), 5126, 'VEC4' if C.shape[1] == 4 else 'VEC3', 34962)
+        pr['indices'] = g.add_acc(I.ravel().astype(np.uint16), 5123, 'SCALAR', 34963)
+        j['meshes'][n['mesh']].setdefault('extras', {})['petals'] = len(cfg)
+        print(f'{nm}: ресницы — {len(cfg)} загнутых лепестка у внешнего уголка (было {was})')
 
 
 def bow_star(g, cat, cfg):

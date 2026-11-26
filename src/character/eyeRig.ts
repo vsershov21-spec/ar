@@ -23,6 +23,11 @@ export interface EyeExtras {
   pupil: number;
   /** верхнее веко в покое (доля закрытия) */
   restUp?: number;
+  /**
+   * тон мягкого века своей модели (persona_tune.py, Блёстка p4): яркость, подсветка, насыщенность, сила прядей шума;
+   * без него — LID_FUR по характеру и 0.9 / 1 (как было)
+   */
+  lidTone?: [number, number, number, number];
 }
 
 export interface LidPose {
@@ -138,12 +143,12 @@ export function patchLid(m: THREE.MeshStandardMaterial, soft = false, lidN?: { v
     }` : ''}
     // мех по всей оболочке (вершинный цвет у кромки — тоже мех), тон — под мех вокруг: чуть светлее и теплее
     float lidL0 = dot(diffuseColor.rgb, vec3(0.299, 0.587, 0.114));
-    diffuseColor.rgb = mix(vec3(lidL0), diffuseColor.rgb, 0.9) * ${cut ? 'vec3(1.0)' : 'vec3(1.1, 1.0, 0.96)'};
+    diffuseColor.rgb = mix(vec3(lidL0), diffuseColor.rgb, ${cut ? 'uLidTone.z' : '0.9'}) * ${cut ? 'vec3(1.0)' : 'vec3(1.1, 1.0, 0.96)'};
     vec3 q1 = vLidP * vec3(140.0, 22.0, 140.0);
     vec3 q2 = vLidP * vec3(60.0, 10.0, 60.0) + 7.0;
     float n1 = fract(sin(dot(floor(q1), vec3(12.9898, 78.233, 37.719))) * 43758.5453);
     float n2 = fract(sin(dot(floor(q2), vec3(39.346, 11.135, 83.155))) * 43758.5453);
-    diffuseColor.rgb *= ${cut ? 'uLidTone.x' : '1.34'} + 0.08 * (n1 - 0.5) + 0.1 * (n2 - 0.5);
+    diffuseColor.rgb *= ${cut ? 'uLidTone.x + uLidTone.w * (0.08 * (n1 - 0.5) + 0.1 * (n2 - 0.5))' : '1.34 + 0.08 * (n1 - 0.5) + 0.1 * (n2 - 0.5)'};
     ${cut ? `// закрытое веко — мягкий купол (реф: светлее к середине), к краю разреза — тон кожи вокруг
     diffuseColor.rgb *= 1.0 + 0.07 * smoothstep(0.0, -0.45, lidCutD);` : ''}
     // подводка: тонкая линия у края (≈ 0.02 рад) + ресницы (по столбцам вдоль кромки — разной длины), мягко в мех
@@ -174,7 +179,7 @@ export function patchLid(m: THREE.MeshStandardMaterial, soft = false, lidN?: { v
     lidFur = fur;
   }`;
     sh.fragmentShader = 'varying vec3 vLidP;\nfloat lidFur = 0.0;\nfloat lidCutD = -1.0;\n' + (soft ? 'varying vec2 vLid;\n' : '') +
-      (cut ? 'uniform sampler2D uLidCut;\nuniform vec2 uLidBand;\nuniform vec2 uLidTone;\nuniform mat4 projectionMatrix;\nvarying vec3 vLidE;\n' : '') + sh.fragmentShader.replace(
+      (cut ? 'uniform sampler2D uLidCut;\nuniform vec2 uLidBand;\nuniform vec4 uLidTone;\nuniform mat4 projectionMatrix;\nvarying vec3 vLidE;\n' : '') + sh.fragmentShader.replace(
       '#include <color_fragment>',
       `#include <color_fragment>
   ${furCode}`,
@@ -248,8 +253,8 @@ export interface LidCut {
   rot: { value: THREE.Matrix3 };
   /** x — закрытие века 0..1, y — сдвиг к камере у кромки глазницы (мир); обновляется в update */
   band: { value: THREE.Vector2 };
-  /** яркость меха века (x) и подсветка (y) — под мех оболочек вокруг (у века оболочек нет) */
-  tone: THREE.Vector2;
+  /** яркость меха века (x), подсветка (y) — под мех оболочек вокруг (у века оболочек нет), насыщенность (z) и сила прядей шума (w) */
+  tone: THREE.Vector4;
 }
 /** поле разреза: квадрат ±CUT_SPAN единиц глаза, расстояние ±CUT_RANGE (> 0 — снаружи разреза) */
 const CUT_SPAN = 1.3;
@@ -392,6 +397,9 @@ export class EyeRig {
     };
     const persona = (rig.eyes[0].pivot.userData as { persona?: string }).persona ?? '';
     const tone = LID_TONE[persona] ?? 1;
+    // тон века: своей модели (extras.lidTone, Блёстка p4) или по характеру
+    const lt = rig.eyes[0].ex.lidTone;
+    const lidTone = lt?.length === 4 ? lt : [...(LID_FUR[persona] ?? LID_FUR.kind), 0.9, 1];
     const lids = rig.eyes.map((e) => {
       const lo = meshOf(e.lo), up = meshOf(e.up);
       const nu = lo ? lo.geometry.attributes.position.count / LID_ROWS.length : 0;
@@ -404,7 +412,7 @@ export class EyeRig {
         const l = lids[i];
         // контур — до правки цвета/атрибутов (позиции те же); одна текстура на глаз, поворот — свой у каждого века
         const tex = lidCutTexture(lidCutPolygon(l.up!.geometry, l.lo!.geometry, l.nu));
-        for (const lid of [e.up, e.lo]) cuts.set(lid, { tex, rot: { value: new THREE.Matrix3() }, band: { value: new THREE.Vector2() }, tone: new THREE.Vector2(...(LID_FUR[persona] ?? LID_FUR.kind)) });
+        for (const lid of [e.up, e.lo]) cuts.set(lid, { tex, rot: { value: new THREE.Matrix3() }, band: { value: new THREE.Vector2() }, tone: new THREE.Vector4(...lidTone) });
         softLidGeometry(l.lo!.geometry, l.nu, 0.35, tone);
         softLidGeometry(l.up!.geometry, l.nu, LID_LASH[persona] ?? 1, tone);
       });

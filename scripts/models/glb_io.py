@@ -88,6 +88,15 @@ class Glb:
         v = self.j['bufferViews'][a['bufferView']]
         n = NC[a['type']]
         dt = np.dtype(CT[a['componentType']])
+        if a['bufferView'] in self.extra:
+            # добавленный add_acc (данные ещё не в self.bin): переписать его байты — иначе запись легла бы в начало
+            # общего буфера (позиции тела) поверх чужих данных
+            arr = np.ascontiguousarray(np.asarray(arr, dtype=dt).reshape(a['count'], n))
+            self.extra[a['bufferView']] = arr.tobytes()
+            if 'min' in a:
+                a['min'] = arr.min(0).tolist()
+                a['max'] = arr.max(0).tolist()
+            return
         stride = v.get('byteStride', dt.itemsize * n)
         if not isinstance(self.bin, bytearray):
             self.bin = bytearray(self.bin)

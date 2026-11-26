@@ -19,6 +19,14 @@ export interface MouthExtras {
   nose: number;
   jaw: Record<string, number>;
   persona?: string;
+  /**
+   * своя модель (persona_tune.py, Блёстка p4): лицо в покое вместо базового характера (glbCharacter PERSONA_FACE_*),
+   * зубки [форма 0 — клычок, 1 — резец со скруглённым краем; размер; место — доля полуширины рта; ширина рта],
+   * язык (как setTongue)
+   */
+  rest?: Record<string, number>;
+  teeth?: [number, number, number, number];
+  tongue?: { size?: number; deeper?: number; tone?: number };
 }
 
 const clamp = (v: number, a: number, b: number) => (v < a ? a : v > b ? b : v);
@@ -48,6 +56,7 @@ uniform vec4 uMA; // drop, round, wide, press
 uniform vec4 uMB; // smile, smirk, frown, tongue
 uniform vec4 uMC; // gum, nose y, style, -
 uniform vec4 uMD; // язык: размер, глубже на долю раскрытия, яркость; -
+uniform vec4 uME; // зубки: форма (0 — клычок, 1 — резец), размер, место (доля полуширины), ширина рта
 varying vec2 vMp;
 float mwl(float x, float hw) {
   // линия «ω»: две дуги вниз от середины к уголкам, уголки вверх при улыбке, вниз при обиде
@@ -69,7 +78,7 @@ const FRAG_BODY = `
     float aa = max(fwidth(p.y), fwidth(p.x)) * 1.2 + 1e-4;
     float D = uMA.x * 0.95, r = uMA.y, e = uMA.z, pr = uMA.w;
     float sm = uMB.x, fr = uMB.z, tg = uMB.w, gum = uMC.x;
-    float hw = 0.5 * (1.0 + 0.14 * sm + 0.12 * e - 0.38 * fr - 0.3 * gum);
+    float hw = 0.5 * uME.w * (1.0 + 0.14 * sm + 0.12 * e - 0.38 * fr - 0.3 * gum);
     float wl = mwl(p.x, hw);
     // открытый рот
     float hwo = hw * (0.92 - 0.3 * r) * (1.0 - 0.15 * fr);
@@ -88,14 +97,14 @@ const FRAG_BODY = `
     float tongueIn = (1.0 - smoothstep(1.0 - aa / tyr, 1.0 + aa / tyr, tE)) * cav;
     float tongueOut = tg > 0.01 ? (1.0 - smoothstep(1.0 - aa / tyr, 1.0 + aa / tyr, tE)) * step(p.y, Lo + 0.02) * smoothstep(0.0, 0.3, tg) : 0.0;
     float tongue = max(tongueIn, tongueOut);
-    // клычки сверху
+    // клычки сверху (или резцы — uME.x)
     float fang = 0.0;
-    float fl = min(0.11, D * 0.5);
+    float fl = min(0.11, D * 0.5) * uME.y;
     for (int i = 0; i < 2; i++) {
-      float fx = (i == 0 ? -1.0 : 1.0) * hwo * 0.5;
+      float fx = (i == 0 ? -1.0 : 1.0) * hwo * uME.z;
       float top = mwl(fx, hw) + r * D * 0.34 * sqrt(max(1.0 - pow(fx / hwo, 2.0), 0.0)) + 0.012;
       float tt = clamp((top - p.y) / max(fl, 1e-3), 0.0, 1.0);
-      float half_ = 0.032 * (1.0 - tt);
+      float half_ = mix(0.032 * (1.0 - tt), 0.034 * sqrt(max(1.0 - pow(tt, 4.0), 0.0)), uME.x) * uME.y;
       float inF = (1.0 - smoothstep(half_ - aa, half_ + aa, abs(p.x - fx))) * step(p.y, top) * step(top - fl, p.y);
       fang = max(fang, inF);
     }
@@ -130,6 +139,7 @@ export class MouthRig {
     uMB: { value: new THREE.Vector4() },
     uMC: { value: new THREE.Vector4() },
     uMD: { value: new THREE.Vector4(1, 0, 1, 0) },
+    uME: { value: new THREE.Vector4(0, 1, 0.5, 1) },
     uMO: { value: new THREE.Vector3() },
     uMX: { value: new THREE.Vector3() },
     uMY: { value: new THREE.Vector3() },
@@ -154,6 +164,7 @@ export class MouthRig {
     rig.uniforms.uMY.value.fromArray(ex.ey);
     rig.uniforms.uMW.value = ex.W;
     rig.uniforms.uMC.value.y = ex.nose;
+    if (ex.teeth?.length === 4) rig.uniforms.uME.value.fromArray(ex.teeth);
     rig.patch(m.material as THREE.MeshStandardMaterial);
     m.renderOrder = 2;
     return rig;
@@ -193,6 +204,7 @@ export class MouthRig {
    * раскрытия, tone — яркость. Без аргумента — как у всех (v1). Высунутый язык (tongue_out) — без изменений.
    */
   setTongue(t?: { size?: number; deeper?: number; tone?: number }) {
+    t = this.ex.tongue ?? t;
     this.uniforms.uMD.value.set(t?.size ?? 1, t?.deeper ?? 0, t?.tone ?? 1, 0);
   }
 
