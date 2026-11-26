@@ -382,7 +382,10 @@ export class GlbCharacter implements Character {
       loader.setDRACOLoader(new DRACOLoader());
     }
     const gltf = await loader.parseAsync(raw, asset(url).replace(/[^/]*$/, ''));
-    this.tripoFace = (gltf.parser.json as { asset?: { extras?: { glitterP3?: { face?: string } } } }).asset?.extras?.glitterP3?.face === 'tripo';
+    const assetEx = (gltf.parser.json as { asset?: { extras?: { glitterP3?: { face?: string }; glitterP4?: unknown } } }).asset?.extras;
+    this.tripoFace = assetEx?.glitterP3?.face === 'tripo';
+    // Блёстка p4 (scripts/models/build_glitter_p4.sh): тон меха своей текстуры Tripo, без краски одежды/бровей/носа (furTone.ts)
+    this.furTone.setP4(!!assetEx?.glitterP4);
     const model = gltf.scene;
     this.model = model;
     model.updateMatrixWorld(true);

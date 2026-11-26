@@ -58,3 +58,7 @@ python3 scripts/models/glb_textures.py /tmp/<n>_full.glb public/models/<n>_v1.gl
 Сравнить «как было»: `?anim=raw`. Замеры: `node tools/anim-diag.mjs <tag> [persona] ['&anim=raw']` (сервер `npx vite --port 4191` или `vite preview`) → `docs/look/anim_<tag>.json`: pop (пик скорости в первые 0,35 с после смены клипа), bind, высота лап. Аудит кривых без браузера: `node tools/anim-audit.mjs public/models/anims_v1.glb`.
 
 Поворот к зрителю (stage.ts): пружина с ограничением скорости (к зрителю 2,6 рад/с, в ходьбе 5), гистерезис ~7° против дрожания трекинга, не зависит от частоты кадров; шаг начинается, когда кот почти развернулся.
+
+Блёстка p4 (модель Tripo «по частям»): уши и хвост — отдельные части, `scripts/models/blender/p4_parts.py` берёт их
+целиком вместо `find_parts.py`; `dump.py` читает цвет по материалу полигона (сетка из нескольких частей). Вся сборка —
+`scripts/models/build_glitter_p4.sh` (docs/models/README.md).

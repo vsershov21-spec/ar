@@ -56,6 +56,19 @@ export const FUR_TONE: Record<string, FurToneParams> = {
  * плотнее карточки, при тех же значениях кот темнее и «грязнее» v1). Хулиган и Добряк — по рефам персонажей
  * design/cut/<кот> (модели models/v2/<кот>_p1.glb на основе v1 и models/v2/<кот>_v2.glb при ?models=v2h).
  */
+/**
+ * Блёстка p4 (models/v2/glitter_p4.glb, текстура Tripo 26.11): мех головы у Tripo ≈ 128,138,185 — в свете приложения
+ * насыщенно-синий; реф (design/refs/glitter_turnaround_1123.png) — светлее и серее. Морда у текстуры своя светлая
+ * (маска лица слабая), брови и нос — сетка Tripo (без тона), худи — пастельнее (как на рефе) (лист docs/qa/glitter/glitter_p4_sheet.jpg).
+ */
+export const FUR_TONE_P4: Record<string, FurToneParams> = {
+  glitter: {
+    src: S(128, 138, 185), dst: S(150, 158, 194), contrast: 0.75, desat: 0.12, white: S(214, 216, 236), face: 0.25, brow: 0,
+    // худи Tripo ≈ 185,162,206 в свете приложения — насыщенный фиолет; реф — пастельный лиловый
+    cloth: { src: S(185, 162, 206), r: 0.2, dst: S(206, 190, 236), k: 0.6 },
+  },
+};
+
 export const FUR_TONE_V2: Record<string, FurToneParams> = {
   // Блёстка (20.11, по design/cut/glitter): мех лавандово-голубой, морда чуть светлее, брови едва; нос розовый;
   // худи — пастельная лаванда (не насыщенный фиолет), бант, звёзды и окантовка — яркое золото
@@ -116,8 +129,21 @@ export class FurTone {
   };
   private done = new WeakSet<THREE.Material>();
 
+  /**
+   * Блёстка p4 (asset.extras.glitterP4): 4K-текстура Tripo по развороту продакта уже в цветах рефа (морда, нос, брови,
+   * худи) — только мех чуть светлее и серее, как на рефе (FUR_TONE_P4), без краски одежды, бровей и носа. Ставит
+   * GlbCharacter по модели (до и после setPersona).
+   */
+  private p4 = false;
+  private personaId = 'kind';
+  setP4(on: boolean) {
+    this.p4 = on;
+    this.setPersona(this.personaId);
+  }
+
   setPersona(id: string) {
-    const T = modelsV2() ? FUR_TONE_V2 : FUR_TONE;
+    this.personaId = id;
+    const T = this.p4 && FUR_TONE_P4[id] ? FUR_TONE_P4 : modelsV2() ? FUR_TONE_V2 : FUR_TONE;
     const p = T[id] ?? T.kind;
     this.uniforms.uFtSrc.value.set(...p.src);
     this.uniforms.uFtDst.value.set(...p.dst);

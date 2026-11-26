@@ -17,7 +17,7 @@
   • Старая накладка EyeLids (веки поверх нарисованных глаз) убирается; нарисованные глаза закрашиваются мехом/тенью
     глазницы (цвет — из кольца вокруг, поэтому повторная закраска даёт тот же результат).
 
-Usage: python3 scripts/models/face_detail.py <persona> in.glb out.glb [--bake /tmp/bake/<n>]  (bake — scripts/models/blender/bake_head.py)
+Usage: python3 scripts/models/face_detail.py <persona> in.glb out.glb [--bake /tmp/bake/<n>] [--land face_landmarks/<x>.json]  (bake — scripts/models/blender/bake_head.py)
 Ориентиры лица — scripts/models/face_landmarks/<persona>.json (координаты Blender: x, глубина y (−y — вперёд), z вверх).
 """
 import io, json, math, os, sys
@@ -1132,6 +1132,9 @@ def paint_eyes(g, persona, F, eyes, P, N, UV, I, fr):
     lum = ring_c.mean(1)
     okr = lum > np.percentile(lum, 25)
     ring_c, ring_p = ring_c[okr], ring_p[okr]
+    if len(ring_p) > 4000:  # крупная морда в атласе (Блёстка p4: лицо Tripo 2048 → ~1200 px) — кольцо прореживается
+        sel = np.linspace(0, len(ring_p) - 1, 4000).round().astype(int)
+        ring_c, ring_p = ring_c[sel], ring_p[sel]
     yy, xx = np.where(region > 0)
     q = np.stack([px[yy, xx], py[yy, xx]], 1)
     fill = np.zeros((len(q), 3))
@@ -1266,10 +1269,15 @@ def paint_mouth(g, persona, F, P, N, UV, I, fr):
     rc = base[yy[ring], xx[ring]]; rp = np.stack([X[ring], Y[ring]], 1)
     ok = rc[:, 2] > rc[:, 0] + 6  # только мех (голубоватый), без розовых губ вокруг
     rc, rp = rc[ok], rp[ok]
+    if len(rp) > 3000:  # крупная морда в атласе (Блёстка p4) — кольцо прореживается, заливка кусками
+        sel = np.linspace(0, len(rp) - 1, 3000).round().astype(int)
+        rc, rp = rc[sel], rp[sel]
     q = np.stack([X[inside], Y[inside]], 1)
-    d2 = ((q[:, None, :] - rp[None]) ** 2).sum(-1)
-    w = 1 / (d2 + 1e-6) ** 1.5
-    fill = (w[..., None] * rc[None]).sum(1) / w.sum(1, keepdims=True)
+    fill = np.zeros((len(q), 3))
+    for s0 in range(0, len(q), 2048):
+        d2 = ((q[s0:s0 + 2048, None, :] - rp[None]) ** 2).sum(-1)
+        w = 1 / (d2 + 1e-6) ** 1.5
+        fill[s0:s0 + 2048] = (w[..., None] * rc[None]).sum(1) / w.sum(1, keepdims=True)
     k = (1 - smooth(-0.001, 0.002, dout[inside]))[:, None]
     yi, xi = yy[inside], xx[inside]
     col = base[yi, xi] * (1 - k) + fill * k
@@ -1425,7 +1433,9 @@ def build_mouth(g, persona, F, fr, P, head_node, IBM):
 def main():
     persona, src, dst = sys.argv[1:4]
     bake = sys.argv[sys.argv.index('--bake') + 1] if '--bake' in sys.argv else None
-    F = json.load(open(os.path.join(HERE, 'face_landmarks', f'{persona}.json')))
+    # --land <json> — свои ориентиры (Блёстка p4: scripts/models/face_landmarks/glitter_p4.json, glitter_p4_land.py)
+    land = sys.argv[sys.argv.index('--land') + 1] if '--land' in sys.argv else os.path.join(HERE, 'face_landmarks', f'{persona}.json')
+    F = json.load(open(land))
     g = G2(src)
     n0 = strip_stage(g)
     if n0:

@@ -21,7 +21,13 @@ import { feature } from '../config/edition';
  * model.glitterP3 (lab — вкл., MVP и пилот — выкл., решит продакт по листу docs/qa/glitter/glitter_p3_sheet.jpg);
  * ?models=v2 — явный p1 там, где p3 по умолчанию.
  */
-export type ModelsVariant = 'v1' | 'v2' | 'v2h' | 'p3';
+/**
+ * p4 — Блёстка из модели продакта Tripo (4 вида, по частям, Auto Rig Mixamo) тем же конвейером, что Хулиган и Добряк
+ * (scripts/models/build_glitter_p4.sh: уши/хвост rig_cat, глаза и веки eyeRig, брови, MouthD — face_detail.py,
+ * мех-оболочки, прокси) → models/v2/glitter_p4.glb (лицо шейдером, как p1 в пилоте; при faceMode 'morph' — тоже он:
+ * риг лица p2 для этой сетки пока не собирается) + glitter_p4_colliders.json. Только ?models=p4 (lab; MVP и пилот — со страницы /test), по умолчанию нигде.
+ */
+export type ModelsVariant = 'v1' | 'v2' | 'v2h' | 'p3' | 'p4';
 
 /**
  * Лицо котов v2 (основа p1): 'morph' — риг лица p2 (scripts/models/face_rig.py: рот геометрией, полость, клычки,
@@ -46,12 +52,12 @@ export const V2_BASE: Record<string, 'v2' | 'p1'> = { glitter: 'p1', hooligan: '
 export const P1_OWN_COLLIDERS = new Set(['glitter', 'hooligan', 'kind']);
 
 /**
- * ?models=v1 → 'v1', ?models=v2h → 'v2h', ?models=p3 → 'p3', ?models=v2 → 'v2'; без параметра — 'p3', если включена
+ * ?models=v1 → 'v1', ?models=v2h → 'v2h', ?models=p3 → 'p3', ?models=p4 → 'p4', ?models=v2 → 'v2'; без параметра — 'p3', если включена
  * функция model.glitterP3 (lab), иначе 'v2' (адрес уже прошёл guardUrl: в MVP/пилоте без /test параметра нет)
  */
 export function modelsVariant(search = typeof location !== 'undefined' ? location.search : '', p3 = feature('model.glitterP3')): ModelsVariant {
   const m = new URLSearchParams(search).get('models');
-  return m === 'v1' ? 'v1' : m === 'v2h' ? 'v2h' : m === 'p3' ? 'p3' : m === 'v2' ? 'v2' : p3 ? 'p3' : 'v2';
+  return m === 'v1' ? 'v1' : m === 'v2h' ? 'v2h' : m === 'p3' ? 'p3' : m === 'p4' ? 'p4' : m === 'v2' ? 'v2' : p3 ? 'p3' : 'v2';
 }
 
 export const modelsV2 = (search?: string) => modelsVariant(search) !== 'v1';
@@ -65,6 +71,8 @@ export function variantGlb(p: string, variant: ModelsVariant = modelsVariant(), 
   const m = p.match(/^(.*?)models\/(hooligan|kind|glitter)_v1\.glb$/);
   if (!m) return p;
   if (variant === 'p3' && m[2] === 'glitter') return `${m[1]}models/v2/glitter_p3.glb`;
+  // p4: лицо шейдером при любом faceMode — риг лица p2 (p4m) у этой сетки пока не собирается (build_glitter_p4.sh)
+  if (variant === 'p4' && m[2] === 'glitter') return `${m[1]}models/v2/glitter_p4.glb`;
   let base: string = variant === 'v2h' ? 'v2' : V2_BASE[m[2]] ?? 'v2';
   if (base === 'p1' && face === 'morph') base = 'p2';
   return `${m[1]}models/v2/${m[2]}_${base}.glb`;
@@ -82,6 +90,9 @@ export function collidersUrl(glb: string): string | null {
   if (m1) return `${m1[1] ?? ''}${m1[2]}_v1_colliders.json`;
   const p3 = glb.match(/^(.*\/)?v2\/glitter_p3\.glb$/);
   if (p3) return `${p3[1] ?? ''}v2/glitter_p3_colliders.json`;
+  // p4m (риг лица) — та же геометрия тела, что у p4
+  const p4 = glb.match(/^(.*\/)?v2\/glitter_p4m?\.glb$/);
+  if (p4) return `${p4[1] ?? ''}v2/glitter_p4_colliders.json`;
   // p2 (риг лица) — та же геометрия тела, что у p1: прокси те же
   const p1 = glb.match(/^(.*\/)?v2\/(hooligan|kind|glitter)_p[12]\.glb$/);
   if (!p1) return null;

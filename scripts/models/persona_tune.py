@@ -35,6 +35,8 @@ TUNE = {
                 'bow_star': {'k': 1.2, 'r0': 0.035, 'r1': 0.062},
                 'stars': {'R': 0.011, 'lift': 0.008, 'at': [(60, 0.79, 0.012), (55, 0.818, 0.01)]}},
 }
+# Блёстка p4 (glitter_p4.py): веки и ресницы как у Блёстки p1, бант и звёзды — сетка Tripo (свои не добавляем)
+TUNE['glitter_p4'] = {k: v for k, v in TUNE['glitter'].items() if k not in ('bow_star', 'stars')}
 LASH_SEG = 12  # вершин в лепестке ресницы (face_detail: 6 сечений × 2)
 
 
