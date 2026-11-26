@@ -49,6 +49,11 @@ PERSONA = {
     'glitter': {'gap': 0.014, 'depth': 0.42, 'fang': (0.075, 0.19), 'tongue': (0.18, 0.18), 'jaw': 0.24},
 }
 
+# подбор без правки файла (база котов, build_base.sh): FR_OVR='{"glitter": {"jaw": 0.34}}' — поверх PERSONA
+if os.environ.get('FR_OVR'):
+    for _k, _v in json.loads(os.environ['FR_OVR']).items():
+        PERSONA[_k] = {**PERSONA.get(_k, {}), **{a: tuple(b) if isinstance(b, list) else b for a, b in _v.items()}}
+
 # ключи прошлых стадий, которые переезжают на FaceSkin как есть (интерполируются при подразбиении)
 W_REF = 0.1458  # ширина рта Хулигана (масштаб глубины рамки)
 REST_FANG = 0.003  # длина клычка в покое (W): не виден в щели губ
@@ -653,12 +658,14 @@ def profile_fix(fr, T, P, side, pairs):
         h = comp.get('open')
         if not h:
             continue
+        # база котов (FR_OVR): проём шире (open_k) и профиль «D» площе (prof_p; 0.7 — купол, как было)
+        h = h * fr.cfg.get('open_k', 1.0)
         d = T[k]
         ylo = np.interp(u, pu_, d[lo_i, 1])  # текущее смещение края нижней губы над этой u
         yup = np.interp(u, pu_, d[up_i, 1])
         c = int(np.argmin(np.abs(pu_)))
         drop = min(0.0, float(d[lo_i[c], 1] - d[up_i[c], 1]))  # раскрытие в середине (< 0)
-        prof = sm(h * 1.15, 0.0, np.abs(u)) ** 0.7  # купол без излома на краю — мягкие уголки
+        prof = sm(h * 1.15, 0.0, np.abs(u)) ** fr.cfg.get('prof_p', 0.7)  # купол без излома на краю — мягкие уголки
         # цель: край нижней губы = верхняя губа + раскрытие·профиль; за проёмом — сомкнуто (щель покоя тоже)
         close = 0.5 * gap * qrest * W * (1 - prof)
         tgt_lo = yup + drop * prof + close
@@ -1131,7 +1138,8 @@ def tongue(fr, rig, S, cav, ang_d, body=None):
     targets = {}
     for key, comp in MOUTH.items():
         ang = comp.get('jaw', 0) * ang_d
-        d = (rig.jaw(V, -np.ones(len(V)), ang) + rig.bow(V, -np.ones(len(V)), comp.get('jaw', 0))) if ang else np.zeros_like(V)  # за челюстью, как кожа под ним
+        tj = fr.cfg.get('tongue_jaw', 1.0)  # база котов: язык за челюстью слабее (у плоской морды кончик выходил сквозь подбородок)
+        d = (rig.jaw(V, -np.ones(len(V)), ang * tj) + rig.bow(V, -np.ones(len(V)), comp.get('jaw', 0) * tj)) if ang else np.zeros_like(V)  # за челюстью, как кожа под ним
         if comp.get('tongue_out'):
             k = comp['tongue_out']
             fwd = (0.24 * (0.45 + 0.55 * tip_k)) * W
@@ -1268,6 +1276,31 @@ def main():
     srcE = np.sort(S['src'][E], 1)
     uq, cnt = np.unique(srcE, axis=0, return_counts=True)
     bnd_bm = np.unique(uq[cnt == 1])
+    # трещины подразбиения (Т-стыки на краю зоны SUBDIV: ребро с одной стороны целое, с другой — пополам) — не граница:
+    # малые связные куски граничных рёбер (база котов: у мелкой сетки мордочки трещины под губой гасили челюсть)
+    be = uq[cnt == 1]
+    if len(be):
+        par = {}
+        def _f(x):
+            while par.get(x, x) != x:
+                par[x] = par.get(par[x], par[x]); x = par[x]
+            return x
+        for a_, b_ in be:
+            ra, rb = _f(int(a_)), _f(int(b_))
+            if ra != rb:
+                par[ra] = rb
+        comp = {}
+        for v_ in bnd_bm:
+            comp.setdefault(_f(int(v_)), []).append(int(v_))
+        small = [v_ for c_ in comp.values() if len(c_) < 40 for v_ in c_]
+        if os.environ.get('FACE_DEBUG'):
+            for c_ in sorted(comp.values(), key=len):
+                gi_ = np.where(np.isin(S['src'], c_))[0]
+                uu_, vv_, ww_ = fr.uvw(Ps[gi_])
+                print('   bcomp', len(c_), 'u %.2f..%.2f v %.2f..%.2f' % (uu_.min(), uu_.max(), vv_.min(), vv_.max()))
+        if small:
+            print(f'  граница: {len(small)} вершин трещин подразбиения не считаются краем морды')
+            bnd_bm = np.array([b for b in bnd_bm if b not in set(small)])
     # разрез тоже граница (по bmesh) — исключить вершины разреза
     cut_bm = {p[3] for p in S['pairs']} | {p[4] for p in S['pairs']} | {c[2] for c in S['corners']}
     bnd_bm = np.array([b for b in bnd_bm if b not in cut_bm])
@@ -1381,6 +1414,22 @@ def main():
                  **{'T_' + k: v for k, v in C['targets'].items()})
     Tf = fangs(fr, rig, S, C, T, ang_d, body=(P, Ib[keep_b]))
     Tg = tongue(fr, rig, S, C, ang_d, body=(P, Ib[keep_b]))
+    # язык в каждом ключе — над кожей подбородка и за ней (база котов: у плоской морды кончик выходил сквозь подбородок
+    # при «а»): по смещённой коже ключа — лучи вниз и вперёд-вниз, точка ближе margin — назад/вверх
+    if fr.cfg.get('tongue_guard'):
+        import bpy  # noqa: F401
+        from mathutils.bvhtree import BVHTree
+        fixed = 0
+        for key, d in list(Tg['targets'].items()):
+            if key not in T:
+                continue
+            Q = S['P'] + T[key]
+            bvh = BVHTree.FromPolygons([tuple(p) for p in Q], [tuple(int(x) for x in f) for f in S['F']])
+            q0 = Tg['V'] + d
+            q1 = keep_inside(q0, bvh, fr.cfg['tongue_guard'] * W, [(0, -1, 0), (0, -0.7071, 0.7071), (0, -0.3, 0.954)])
+            fixed += int((np.abs(q1 - q0).max(1) > 1e-7).sum())
+            Tg['targets'][key] = q1 - Tg['V']
+        print(f'  язык: {fixed} вершин по ключам — над подбородком')
 
     # ── запись в GLB
     def skin_of(src_idx, n):

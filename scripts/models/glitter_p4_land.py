@@ -11,6 +11,9 @@ from scipy import ndimage as nd
 src, land, out = sys.argv[1:4]
 # v3 (наложение на реф): рот шире (у рефа 0.44 межглазья) и ближе к носу (короткий фильтрум)
 MOUTH_W, MOUTH_UP = 1.75, 0.004
+# база котов (build_base.sh): рот шире — рот геометрией (риг лица p2), у рефа design/sheets/mouths.jpg ширина ≈ 0.68 межглазья
+import os
+MOUTH_W = float(os.environ.get('P4_MOUTH_W', MOUTH_W)); MOUTH_UP = float(os.environ.get('P4_MOUTH_UP', MOUTH_UP))
 d = np.load(src)
 C, L, xs, zs, step = d['C'], d['L'], d['xs'], d['zs'], float(d['step'])
 F = json.load(open(land))
@@ -93,6 +96,13 @@ drop = 0.45 * float(line[:, 1].mean() - low.mean()) - MOUTH_UP
 # ширина — как у части-рта Tripo с губами (верхний край открытого рта уже: уголки губ дальше), ×1.35 от центра
 cx_ = float(line[:, 0].mean()); line[:, 0] = cx_ + (line[:, 0] - cx_) * MOUTH_W
 left = line[np.argmax(line[:, 0])].copy(); right = line[np.argmin(line[:, 0])].copy()
+# база котов (build_base.sh): разрез губ рига p2 по «ω» с острым пиком под носом не отделял губы у середины (кожа под
+# пиком шла с верхней губой — «зуб» в открытом рте) — линия ближе к гладкой дуге (P4_MOUTH_SMOOTH — доля дуги)
+sm_k = float(os.environ.get('P4_MOUTH_SMOOTH', 0))
+if sm_k > 0:
+    cf = np.polyfit(line[:, 0] - cx_, line[:, 1], 2)
+    line[:, 1] = (1 - sm_k) * line[:, 1] + sm_k * np.polyval(cf, line[:, 0] - cx_)
+    cusp = np.array([cx_, float(np.polyval(cf, 0.0)) * sm_k + (1 - sm_k) * cusp[1]])
 line[:, 1] -= drop; left = left - [0, drop]; right = right - [0, drop]; cusp = cusp - [0, drop]; center[1] -= drop
 F['mouth'] = {'line': line.round(6).tolist(), 'left': left.round(6).tolist(), 'right': right.round(6).tolist(),
               'center': center, 'cusp': cusp.round(6).tolist(), 'strength': float(m.sum() * step * step * 1e4),

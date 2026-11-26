@@ -6,7 +6,9 @@
 set -e
 cd "$(dirname "$0")"
 W=${1:-/tmp/p4}; BPY=${BPY:-/tmp/bpyenv/bin/python}
-OUT=../../public/models/v2
+OUT=${OUT:-../../public/models/v2}
+# LAND — файл ориентиров лица (база котов build_base.sh кладёт свой: cat_base.json)
+LAND=${LAND:-face_landmarks/glitter_p4.json}
 mkdir -p "$W"
 q() { grep -v "INFO\|^$\|Draco\|MeshOptimizer\|Deprecation\|use_nodes\|WARNING" || true; }
 if [ -z "$FROM4" ]; then  # FROM4=1 — с шага 4 (ригнутая сетка и ориентиры уже есть)
@@ -18,19 +20,19 @@ python3 glitter_p4_sculpt.py "$W/joined0.glb" "$W/joined.glb" | tail -1
 $BPY blender/dump.py -- "$W/joined.glb" /tmp/glitter4.npz 2>&1 | q
 python3 blender/p4_parts.py glitter4
 $BPY blender/rig_cat.py -- "$W/joined.glb" /tmp/glitter4_parts.npz "$W/rigged.glb" 2>&1 | q
-# 3. ориентиры лица по снимку спереди (лицо Tripo на месте) → face_landmarks/glitter_p4.json
+# 3. ориентиры лица по снимку спереди (лицо Tripo на месте) → $LAND
 python3 glitter_p4.py "$W/rigged.glb" "$W/base_face.glb" --keep-face | tail -1
 $BPY blender/face_photo.py -- "$W/base_face.glb" "$W/photo.npz" 2>&1 | q
 python3 blender/face_detect.py "$W/photo.npz" "$W/land.json" "$W/land_viz.png"
-python3 glitter_p4_land.py "$W/photo.npz" "$W/land.json" face_landmarks/glitter_p4.json
+python3 glitter_p4_land.py "$W/photo.npz" "$W/land.json" $LAND
 fi
 # 4. одна сетка с атласом: глаза и рот Tripo → заплатки, нос/морда/брови вшиты в голову
 python3 glitter_p4.py "$W/rigged.glb" "$W/base.glb" > "$W/base.log"; grep -v "^tripo_part" "$W/base.log"
 # 5. лицо как у Хулигана/Добряка: ключи рта (Blender), глаза/веки eyeRig, брови, усы, MouthD, закраска
-$BPY blender/face_rig.py -- "$W/base.glb" face_landmarks/glitter_p4.json "$W/fr.glb" 2>&1 | q
+$BPY blender/face_rig.py -- "$W/base.glb" $LAND "$W/fr.glb" 2>&1 | q
 # глаза: разрез — по белку Tripo (glitter_p4_land.py); v3 — крупнее (наложение на реф: белок и радужка больше на ~20 %)
 EYE_OVR='{"EYE_SCALE": {"glitter": [1.25, 1.22]}, "ROUND": {"glitter": 0.35}, "IRIS_K": {"glitter": 1.18}}' \
-python3 face_detail.py glitter "$W/fr.glb" "$W/fd.glb" --land face_landmarks/glitter_p4.json | tail -3
+python3 face_detail.py glitter "$W/fr.glb" "$W/fd.glb" --land $LAND | tail -3
 python3 persona_tune.py glitter_p4 "$W/fd.glb" "$W/pt.glb" | tail -2
 # 6. мех-оболочки, пачка и золото своими мешами → p4 (рот шейдером), прокси, риг лица p2 → p4m
 python3 glitter_p4_finish.py "$W/pt.glb" $OUT/glitter_p4.glb --parts "$W/base_parts.json"
