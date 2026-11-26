@@ -248,7 +248,8 @@ export const TESTS = [
       await P.page.keyboard.type('Ксюша');
       await P.tap('.namebox [data-a="name"]');
       await P.must(() => ['play', 'free'].includes(window.__app.director.state.phase), 60000, 'игра после имени');
-      await P.must(() => (window.__qaRec ?? []).some((r) => r.kind === 'speak' && /meet_skills/.test(r.id ?? '')), 60000, 'кот договорил знакомство (meet_skills)');
+      // пилот без «ласки» (pilot.noCare): meet_skills звучит озвученным вариантом help («Я умею сальто, танцы…») — с его id
+      await P.must(() => (window.__qaRec ?? []).some((r) => r.kind === 'speak' && /meet_skills|\.help\./.test(r.id ?? '')), 60000, 'кот договорил знакомство (meet_skills)');
       await P.must(() => !window.__app.voice.speaking, 20000, 'реплика знакомства кончилась');
       const said = (await P.rec('speak')).map((r) => r.id);
       t.note(`знакомство: ${said.join(', ')}`);

@@ -58,6 +58,8 @@ describe('пилот без «ласки»: реплики', () => {
     // знакомство: «что я умею» — озвученные варианты help без ласки (с их id — та же запись)
     expect(q.lines.meet_skills?.length).toBeGreaterThan(0);
     for (const l of q.lines.meet_skills) expect(l.id).toMatch(new RegExp(`^${pid}\\.help\\.`));
+    // та же фраза не звучит дважды подряд: в help её больше нет
+    for (const l of q.lines.meet_skills) expect((q.lines.help ?? []).map((x) => x.id)).not.toContain(l.id);
     // поддержка («мне грустно») остаётся
     expect(q.lines.sad?.length).toBeGreaterThan(0);
     // «щекотно!» на тычок в живот — реакция, не приглашение: остаётся

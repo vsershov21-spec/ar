@@ -104,8 +104,8 @@ export function editionDialogs(f: DialogsFile, on = feature('games.new')): Dialo
 /**
  * «Без ласки» (feature 'pilot.noCare', продакт 26.11): реплики, которые зовут погладить, пощекотать, обнять или
  * говорят про ласку, — убираются (у события остаются другие варианты; «щекотно!» на тычок в живот — реакция, остаётся).
- * Событие, у которого не осталось ни одной (meet_skills — «Погладь меня пальцем…»), берёт варианты подсказки help
- * без этих слов — с их id, то есть с готовой озвучкой («Я умею сальто, танцы и загадки. Нажми кнопку внизу»).
+ * Событие, у которого не осталось ни одной (meet_skills — «Погладь меня пальцем…»), берёт первый вариант подсказки help
+ * без этих слов — с его id, то есть с готовой озвучкой («Я умею сальто, танцы и загадки. Нажми кнопку внизу»).
  */
 export const CARE_RE = /(^|[^а-яё])(по)?глад(ь|ить|ят|ишь|ит)(?![а-яё])|(по)?щекоч|щекотать|щекотк|обним|обнять|обнима|ласк|почеш|почесать/i;
 /** событие без вариантов после фильтра → чьи варианты взять */
@@ -114,7 +114,13 @@ export function noCareLines(p: Persona, on = feature('pilot.noCare')): Persona {
   if (!on) return p;
   const lines: Persona['lines'] = {};
   for (const [ev, ls] of Object.entries(p.lines)) lines[ev] = ls.filter((l) => !CARE_RE.test(l.text));
-  for (const [ev, from] of Object.entries(NO_CARE_FALLBACK)) if (p.lines[ev]?.length && !lines[ev]?.length) lines[ev] = lines[from] ?? [];
+  // событие без вариантов берёт первый вариант «донора»; у донора он убирается — иначе кот скажет ту же фразу дважды
+  // подряд (знакомство «Я умею сальто…» и через 8 с подсказка help — e2e 26.11). Донор без вариантов — подсказка пальцем
+  for (const [ev, from] of Object.entries(NO_CARE_FALLBACK))
+    if (p.lines[ev]?.length && !lines[ev]?.length && lines[from]?.length) {
+      lines[ev] = lines[from].slice(0, 1);
+      lines[from] = lines[from].slice(1);
+    }
   for (const ev of Object.keys(lines)) if (!lines[ev].length) delete lines[ev];
   return { ...p, lines };
 }
