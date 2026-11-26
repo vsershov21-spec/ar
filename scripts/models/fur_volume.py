@@ -105,6 +105,9 @@ def main():
 
     # точки лица (стадия face_detail)
     marks = next((n.get('extras', {}).get('marks') for n in j['nodes'] if n.get('name') == 'Brows'), None)
+    # Блёстка v5 (лицо Tripo без накладок face_detail): точки лица — asset.extras.glitterV5.marks
+    if marks is None:
+        marks = (j['asset'].get('extras') or {}).get('glitterV5', {}).get('marks')
     Pw = to_w(P[:, 0]), to_w(P[:, 1]), to_w(P[:, 2])
     Pw = np.stack(Pw, 1)
     Nw = np.stack([to_w(N[:, k]) for k in range(3)], 1)
@@ -149,7 +152,8 @@ def main():
         # ниже подбородка (наушники, воротник) — не мех головы
         chinY = (ml[1] + mr[1]) / 2 - 0.5 * eyeD
         k *= smoothstep(chinY - 0.05 * eyeD, chinY + 0.05 * eyeD, Pw[:, 1])
-        R.update(lo=lo, lat=lat, low=low, front=front, ytop=ytop, eyeD=eyeD, nose=nose, mouth=(ml + mr) / 2, k=k.copy())
+        R.update(lo=lo, lat=lat, low=low, front=front, ytop=ytop, eyeD=eyeD, nose=nose, mouth=(ml + mr) / 2, k=k.copy(),
+                 v5=bool((j['asset'].get('extras') or {}).get('glitterV5')))
     L = HEAD_LEN[persona] * lo * k
     Lv = L[weld]
     hv = to_w(headw)[weld]
@@ -227,6 +231,8 @@ def cards(g, persona, bi, body, si, P, N, UV, J, Wt, I, weld, nW, Pw, Nw, fur, h
     chin = (Pw[:, 1] < R['mouth'][1] - 0.32 * eyeD) * (Nw[:, 2] > 0.1) * (np.abs(Pw[:, 0] - nose[0]) < 0.55 * eyeD)
     # v2: короче и шире, гуще на щеках-«баках», макушке и подбородке — мягкий объём, а не бахрома
     base = {'hooligan': 0.0165, 'kind': 0.0175, 'glitter': 0.0155}[persona]
+    if R.get('v5'):  # v5: пучков реже (бюджет) — длиннее, силуэт щёк и затылка как у Хулигана
+        base = 0.019
     for w in np.where(headfur & (front < 0.3) & (R['k'] > 0.7) & (R['lo'] > 0.85))[0]:
         n = Nw[w]
         if cheek[w] > 0.25:
@@ -257,7 +263,11 @@ def cards(g, persona, bi, body, si, P, N, UV, J, Wt, I, weld, nW, Pw, Nw, fur, h
     for w in np.where((tw > 0.5) & (furw | (persona == 'glitter')))[0]:
         k_ = min(1, tipw[w])
         ax_ = Pw[w] - tr; ax_ /= max(np.linalg.norm(ax_), 1e-9)
-        if persona == 'glitter':  # пушистый длинный хвост (на рефе — пышный, с блёстками): кончик — вдоль оси
+        if R.get('v5'):  # Блёстка v5: хвост-«булава» Tripo — пушок как у Хулигана, без длинного пышного кончика
+            if k_ < 0.25:
+                continue  # у корня (светлая кайма у пояса пачки) — только оболочки
+            cand.append((w, base * (0.8 + 0.5 * k_), Nw[w] * 0.85 + ax_ * 0.35 * k_ + down * 0.1, 'tail'))
+        elif persona == 'glitter':  # пушистый длинный хвост (на рефе — пышный, с блёстками): кончик — вдоль оси
             cand.append((w, base * (1.2 + 1.6 * k_), Nw[w] * (0.9 - 0.4 * k_) + ax_ * (0.3 + 0.9 * k_), 'tail'))
         else:
             cand.append((w, base * (1.0 + 0.8 * k_), Nw[w] * 0.8 + ax_ * 0.4 * k_ + down * 0.2, 'tail'))
@@ -270,7 +280,7 @@ def cards(g, persona, bi, body, si, P, N, UV, J, Wt, I, weld, nW, Pw, Nw, fur, h
     grid = {}
     for o in order:
         w, L, d, kd = cand[o]
-        sp = SP[kd] * L
+        sp = SP[kd] * L * (1.7 if R.get('v5') else 1.0)  # v5: мех на всей голове (нет кепки) — пучков реже, бюджет кадра как у Добряка
         cell = tuple((Pw[w] / 0.01).astype(int))
         ok = True
         for dx in (-2, -1, 0, 1, 2):
@@ -299,6 +309,10 @@ def cards(g, persona, bi, body, si, P, N, UV, J, Wt, I, weld, nW, Pw, Nw, fur, h
         nb_ = nb_[okc[nb_]] if okc[nb_].any() else nb_
         tgt = np.percentile(lum[nb_], 70)
         UVc[w] = UVw[nb_[np.argmin(np.abs(lum[nb_] - tgt))]]
+    if R.get('v5'):  # v5: хвост — цвет текселя у корня (сиреневые блёстки Tripo, без светлой каймы у пояса пачки)
+        for w in roots:
+            if tw[w] > 0.5:
+                UVc[w] = UVw[w]
     # пучкование: каждый ~5-й пучок — «центр пряди», остальные клонятся кончиком к ближайшему центру
     clump = {}
     kp = np.array([cand[o][0] for o in keep])

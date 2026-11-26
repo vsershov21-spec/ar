@@ -1,0 +1,23 @@
+<!doctype html><html><head><meta charset="utf-8"><title>fur perf</title></head><body style="margin:0"><script type="module">
+// Время кадра кота (как на телефоне: 585×1266, кот ~ на пол-экрана, ?fur=6 — PHONE_SHELLS_V2) — сравнение котов между
+// собой в одном окружении (SwiftShader — относительные числа, не мс iPhone). ?p=glitter&models=v5&n=40
+// node tools/fur-perf.mjs → таблица (tools/fur-perf.mjs)
+import * as THREE from 'three';
+let seed = 12345; Math.random = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+const { GlbCharacter } = await import('../src/character/glbCharacter.ts');
+const { variantGlb } = await import('../src/character/modelVariant.ts');
+const q = new URLSearchParams(location.search);
+const p = q.get('p') || 'glitter';
+const W = 585, H = 1266, N = +(q.get('n') || 40);
+const r = new THREE.WebGLRenderer({ antialias: true }); r.setPixelRatio(1); r.setSize(W, H); document.body.appendChild(r.domElement);
+(await import('../src/core/glRenderer.ts')).setGlRenderer(r);
+const sc = new THREE.Scene(); sc.add(new THREE.HemisphereLight(0xffffff, 0x8899aa, 2.2));
+const ch = new GlbCharacter(variantGlb(`/models/${p}_v1.glb`), '/models/anims_v1.glb'); await ch.load(); ch.setPersona?.({ id: p }); ch.clips.setIdles(['idle'], p); sc.add(ch.object); ch.play('idle');
+const cam = new THREE.PerspectiveCamera(40, W / H, 0.01, 50); cam.position.set(0, 0.9, 2.0); cam.lookAt(0, 0.5, 0);
+const gl = r.getContext(); const px = new Uint8Array(4);
+for (let k = 0; k < 10; k++) { ch.update(1 / 30, cam); r.render(sc, cam); }
+gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
+const t0 = performance.now();
+for (let k = 0; k < N; k++) { ch.update(1 / 30, cam); r.render(sc, cam); gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px); }
+window.__ms = (performance.now() - t0) / N; window.__calls = r.info.render.calls; window.__tris = r.info.render.triangles; window.__ready = true;
+</script></body></html>

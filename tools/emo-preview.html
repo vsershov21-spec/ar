@@ -5,7 +5,7 @@
 // мех-оболочки) и свет приложения (src/app.ts: полусфера 2.2 + направленный 1.6, без тонмаппинга).
 // ?p=glitter&m=/models/glitter_v1.glb&s=neutral,happy,laugh,talk:A&cols=4&tile=360&yaw=0&pitch=0&zoom=1&t=1.2
 // Состояние: id пресета (setEmotion), «talk:A|O|E|U|M|F» — рот липсинка, «vis:A…H|X» — визема Rhubarb (риг p2),
-// «emo>emo2@0.2» — кадр перехода через 0.2 с. ?face=morph|shader — лицо рига p2 или шейдером (modelVariant.ts faceMode).
+// «emo>emo2@0.2» — кадр перехода через 0.2 с; «w:frown=1;mouth_M=1» — веса напрямую (отладка ключей). ?face=morph|shader — лицо рига p2 или шейдером (modelVariant.ts faceMode).
 import * as THREE from 'three';
 // детерминированный Math.random (моргание, саккады, микромимика)
 let seed = 12345; Math.random = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
@@ -42,6 +42,8 @@ if (q.get('hide')) ch.object.traverse((o) => { if (new RegExp(q.get('hide')).tes
 if (q.get('wire')) ch.object.traverse((o) => { if (o.isMesh && new RegExp(q.get('wire')).test(o.name)) { o.material = o.material.clone(); o.material.wireframe = true; } });
 ch.faceMix.nextBlink = 1e9;
 ch.life.nextMicro = 1e9;
+// Блёстка v5: своя живость лица (моргания, саккады головой) — в кадрах выключена (&life=1 — включить)
+if (ch.v5Life && !q.get('life')) ch.v5Life.off = true;
 const bone = (n) => { let b = null; ch.object.traverse((o) => { if (!b && o.name.replace(/^mixamorig:?/, '') === n) b = o; }); return b; };
 const cam = new THREE.PerspectiveCamera(22 / zoom, 1, 0.01, 50);
 const camAt = () => {
@@ -94,7 +96,12 @@ states.forEach((st, i) => {
     run(+st.slice(6));
   } else {
   ch.clearEmotion(); ch.setMouth('X', 0, { open: 0, wide: 0, round: 0 }); run(0.8);
-  if (st.startsWith('vis:')) {
+  if (st.startsWith('w:')) {
+    // веса напрямую (отладка ключей): «w:frown=1;mouth_M=1» — эмоция из этих весов без пресета
+    const weights = Object.fromEntries(st.slice(2).split(';').map((kv) => { const [k, v] = kv.split('='); return [k, +v]; }));
+    ch.emo = { p: { id: 'custom', weights, ears: 0, pupils: 1 }, w: 1, t: 0, dur: 0, from: 0, inS: 0.01 };
+    run(hold);
+  } else if (st.startsWith('vis:')) {
     // визема Rhubarb напрямую (риг p2: драйвер морфов faceMorphs.ts, кроссфейд 75 мс)
     const v = st.slice(4);
     ch.setMouth(v, 1, { open: 0.5, wide: 0, round: 0 }, v);

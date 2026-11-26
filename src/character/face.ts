@@ -44,6 +44,8 @@ export class FaceMixer {
   private blinkT = 0;
   private nextBlink = 3;
   private setAt = -Infinity;
+  /** моргать по расписанию (Блёстка v5 — false: моргает своя живость V5Life; blink() работает всегда) */
+  autoBlink = true;
   /** сколько секунд назад поставлен текущий пресет */
   get age() {
     return this.time - this.setAt;
@@ -125,7 +127,7 @@ export class FaceMixer {
       if (this.blinkT > 0) {
         this.blinkT += dt;
         if (this.blinkT > 0.15) this.blinkT = 0;
-      } else if (this.time >= this.nextBlink) {
+      } else if (this.autoBlink && this.time >= this.nextBlink) {
         this.blinkT = 0.001;
         this.nextBlink = this.time + 3 + this.rnd() * 2;
       }

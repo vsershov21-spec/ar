@@ -39,7 +39,7 @@ import { attachTulle, tulleMotion, tulleOf, type TulleMotion } from './tulleFx';
 import { alivePose } from './aliveIdle';
 import { attachTailSparkle } from './tailSparkle';
 import { FaceMixer, EMOTE_FACE, MORPH_TARGETS, facePreset, type FacePreset } from './face';
-import { applyV5Lids, type V5Lids } from './v5Face';
+import { applyV5Lids, attachV5Blush, v5Emote, V5Life, type V5Lids } from './v5Face';
 import { EyeRig } from './eyeRig';
 import { FaceWrinkles } from './faceWrinkles';
 import { FurTone } from './furTone';
@@ -267,6 +267,9 @@ export function disposeObject(root: THREE.Object3D) {
 /** кости слоя «предмет в лапе» (applyHold) и предел скорости его поправки, рад/с */
 const HOLD_SLEW = ['Spine1', 'Spine2', 'Neck', 'Head', 'LeftShoulder', 'RightShoulder', 'LeftArm', 'RightArm', 'LeftForeArm', 'RightForeArm', 'LeftHand', 'RightHand'] as const;
 const SLEW_RATE = 12;
+/** v5: пресеты, при которых лицо «дышит» (улыбка, щёки, брови) — V5Life calm */
+const V5_CALM = new Set(['neutral', 'listen', 'think', 'caring', 'happy', 'proud']);
+
 /** кости живого покоя (applyAlive): корпус, голова, лапы, ноги */
 const ALIVE_SLEW = ['Hips', 'Spine1', 'Spine2', 'Head', 'LeftArm', 'RightArm', 'LeftForeArm', 'RightForeArm', 'LeftHand', 'RightHand', 'LeftUpLeg', 'RightUpLeg', 'LeftLeg', 'RightLeg'] as const;
 /** кости слоя скейта (applySkate): стопы на деке, лапы для баланса, лапа с доской, корпус */
@@ -369,6 +372,12 @@ export class GlbCharacter implements Character {
    * лицо Tripo с веками Lids_V5 (v5Face.ts) и ключами рта тела
    */
   private v5Lids: V5Lids | null = null;
+  /** v5: живое лицо (моргания, саккады головой, дыхание улыбки, брови и щёки в речи) — v5Face.ts V5Life; null у других */
+  v5Life: V5Life | null = null;
+  /** v5: сила румянца шейдером щёк (W.blush кадра) */
+  private v5Blush: { value: number } | null = null;
+  /** ширина рта липсинка 0..1 (v5: щёки в речи) */
+  private lipWide = 0;
 
   constructor(private url = 'models/character.glb', private animsUrl?: string) {
     this.object.name = 'character-glb';
@@ -490,6 +499,10 @@ export class GlbCharacter implements Character {
     if (v5) {
       const lids = model.getObjectByName('Lids_V5') as THREE.Mesh | undefined;
       this.v5Lids = lids?.morphTargetDictionary ? { mesh: lids } : null;
+      this.v5Life = new V5Life();
+      // моргает V5Life (свой ритм, двойные); ручное моргание faceMix.blink() — как у всех
+      this.faceMix.autoBlink = false;
+      this.v5Blush = attachV5Blush(model, (assetEx?.glitterV5 as { marks?: Parameters<typeof attachV5Blush>[1] } | undefined)?.marks);
     }
     // фатин Блёстки с разметкой (models/v2/glitter_p1.glb): сетка, золотые блёстки и полоса по подолу
     // …и хвост с искрой к кончику (только эта модель — tailSparkle.ts)
@@ -1376,6 +1389,7 @@ export class GlbCharacter implements Character {
    */
   setMouth(v: Viseme, w: number, shape: MouthShape, raw?: Viseme) {
     this.mouth = clamp(shape.open, 0, 1);
+    this.lipWide = clamp(shape.wide, 0, 1);
     this.visemeW = FaceLife.mouthWeights(v, w, shape);
     // драйвер морфов: визема без сглаживания (кроссфейд — свой, 75 мс); нет виземы — амплитудный фолбэк по open
     this.lipRaw = raw ?? (w > 0 && v ? v : null);
@@ -1462,6 +1476,14 @@ export class GlbCharacter implements Character {
     for (const k in W) W[k] = 0;
     for (const k in f.weights) W[k] = f.weights[k];
     for (const k in lw) W[k] = Math.max(W[k] ?? 0, lw[k]);
+    // v5: живое нарисованное лицо (поверх микромимики; эмоция ниже перекрывает его как обычно)
+    const v5l = this.v5Life;
+    const v5NoBlink = emo && ee > 0.4 ? !!emo.p.noBlink : false;
+    if (v5l) {
+      const calm = V5_CALM.has(facePresetId) && ee < 0.4;
+      const vw = v5l.update(dt, this.mouth, this.lipWide, this.life.talk, calm, v5NoBlink || this.faceMix.preset === 'sleep');
+      for (const k in vw) if (vw[k]) W[k] = Math.max(W[k] ?? 0, vw[k]);
+    }
     let pupils = f.pupils, ears = f.ears;
     if (ee > 0) {
       const ew = L.w;
@@ -1474,6 +1496,10 @@ export class GlbCharacter implements Character {
     if (!noBlink) {
       W.blink_L = Math.max(W.blink_L ?? 0, f.blink);
       W.blink_R = Math.max(W.blink_R ?? 0, f.blink);
+      if (v5l) {
+        W.blink_L = Math.max(W.blink_L, v5l.blink);
+        W.blink_R = Math.max(W.blink_R, v5l.blink);
+      }
     }
     // характер в покое (референс): у Блёстки всегда чуть розовые щёчки и мягкая полуулыбка
     // своя модель (Блёстка p4, MouthD extras.mouth.rest — persona_tune.py) — своё лицо в покое
@@ -1482,7 +1508,8 @@ export class GlbCharacter implements Character {
     // характер глаз (v2 — по умолчанию; ?models=v1 — без них): у Блёстки по рефу глаза широко открыты — пресеты «самодовольно/сонно/прищур»
     // в idle-клипах (зеркальце, кружение) прикрывают веки слабее
     const eyeK = modelsV2() ? PERSONA_EYES_V2[this.personaId] : undefined;
-    if (eyeK) for (const k in eyeK) if (W[k]) W[k] *= eyeK[k];
+    // v5: румянец — шейдером щёк (у прежней Блёстки blush ×0: накладка Blush не по рефу)
+    if (eyeK) for (const k in eyeK) if (W[k] && !(v5l && k === 'blush')) W[k] *= eyeK[k];
     // складки и мягкость: щёки поднимаются при улыбке, морщинка у носа при хмурых бровях
     W.cheek_up = Math.max(W.cheek_up ?? 0, 0.5 * (W.smile ?? 0), 0.3 * (W.smirk ?? 0));
     W.nose_wrinkle = Math.max(W.nose_wrinkle ?? 0, 0.35 * (W.brow_down ?? 0));
@@ -1495,6 +1522,8 @@ export class GlbCharacter implements Character {
       W.brow_down = (W.brow_down ?? 0) * 0.15;
       W.frown = (W.frown ?? 0) * 0.15;
     }
+    // v5: эмоции сильнее на нарисованном лице Tripo (брови, закрытый рот при хмуром, веки) — v5Face.ts
+    if (v5l) v5Emote(W);
     this.wrinkles?.update(W);
     this.mouthRig?.setTongue(modelsV2() ? PERSONA_TONGUE_V2[this.personaId] : undefined);
     this.mouthRig?.update(W);
@@ -1513,6 +1542,7 @@ export class GlbCharacter implements Character {
       }
     }
     if (this.v5Lids) applyV5Lids(this.v5Lids, W);
+    if (this.v5Blush) this.v5Blush.value = clamp(W.blush ?? 0, 0, 1);
     this.applyTailEars(dt, ears, facePresetId);
     this.bones.get('LeftEye')?.scale.setScalar(pupils);
     this.bones.get('RightEye')?.scale.setScalar(pupils);
@@ -1538,8 +1568,10 @@ export class GlbCharacter implements Character {
         this.rotWorld(neck, up, yaw * 0.25 + h.yaw * 0.4);
         this.rotWorld(neck, side, -(pitch * 0.15 + h.pitch * 0.4));
       }
-      this.rotWorld(head, up, yaw * 0.4 + h.yaw * 0.6);
-      this.rotWorld(head, side, -(pitch * 0.35 + h.pitch * 0.6));
+      // v5: «взгляд» микроповоротами головы (глаза нарисованы) — V5Life.head
+      const vh = this.v5Life?.head;
+      this.rotWorld(head, up, yaw * 0.4 + h.yaw * 0.6 + (vh?.yaw ?? 0));
+      this.rotWorld(head, side, -(pitch * 0.35 + h.pitch * 0.6 + (vh?.pitch ?? 0)));
       this.rotWorld(head, fwd, h.roll);
       const chest = this.bones.get('Spine2');
       if (chest) this.rotWorld(chest, side, h.breath);

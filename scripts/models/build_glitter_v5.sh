@@ -20,8 +20,14 @@ python3 v5/v5_parts.py glitter5 "$W/parts.png"
 $BPY blender/rig_cat.py -- "$W/joined.glb" /tmp/glitter5_parts.npz "$W/rig0.glb" 2>&1 | q
 # 3. концевые кости Mixamo (в скине Tripo их нет): HeadTop_End, *Toe_End, пальцы *4 — 71 кость, как у Хулигана
 $BPY v5/v5_endbones.py -- "$W/rig0.glb" "$W/rigged.glb" 2>&1 | q
-# 4. мимика поверх лица Tripo: веки Lids_V5, ключи рта/бровей/щёк (места концевых костей — как у исходника Tripo)
-python3 v5/v5_face.py "$W/rigged.glb" "$W/face.glb" --src $SRC --viz "$W/viz"
-# 5. текстуры 4K → 2048² (сборка — KTX2 1024²), без меха (мех — только для сравнения: v5_finish.py … --fur)
-python3 v5/v5_finish.py "$W/face.glb" $OUT/glitter_v5.glb
+# 4. мимика поверх лица Tripo: сетка гуще у уголков рта (v5_dense — без граней на «грусти»), веки Lids_V5 (закрытое
+#    накрывает и контур глаза Tripo), ключи рта/бровей/щёк (места концевых костей — как у исходника Tripo)
+python3 v5/v5_dense.py "$W/rigged.glb" "$W/dense.glb"
+python3 v5/v5_face.py "$W/dense.glb" "$W/face.glb" --src $SRC --viz "$W/viz"
+# 5. мех как у Хулигана/Добряка: оболочки тела (v5_fur), голова, щёки и пряди силуэта — общий fur_volume.py
+#    (точки лица — asset.extras.glitterV5.marks); кончики — цвет текстуры Tripo, без тона меха
+python3 v5/v5_fur.py "$W/face.glb" "$W/fur0.glb"
+python3 fur_volume.py glitter "$W/fur0.glb" "$W/fur.glb"
+# 6. текстуры 4K → 2048² (сборка — KTX2 1024²)
+python3 v5/v5_finish.py "$W/fur.glb" $OUT/glitter_v5.glb
 python3 colliders.py glitter $OUT/glitter_v5.glb $OUT/glitter_v5_colliders.json

@@ -1,0 +1,54 @@
+<!doctype html><html><head><meta charset="utf-8"><title>face anim</title><style>html,body{margin:0;background:#e6e6ea}canvas{display:block}</style></head>
+<body><script type="module">
+// Живое лицо кадрами (GIF/webm): НАСТОЯЩИЙ рантайм GlbCharacter — моргания, микромимика, живость v5 (V5Life), липсинк
+// реплики (?text=…, как emo-preview seq:) — со своим временем; кадры снимает tools/face-anim.mjs (window.__frame()).
+// ?p=glitter&models=v5&fps=12&idle=4&text=Привет!…&tile=360&dist=8&dy=-0.1
+import * as THREE from 'three';
+let seed = 777; Math.random = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+const { GlbCharacter } = await import('../src/character/glbCharacter.ts');
+const { variantGlb } = await import('../src/character/modelVariant.ts');
+const { LipSync } = await import('../src/lipsync/lipsync.ts');
+const { cuesFromText, estimateSpeechSec } = await import('../src/lipsync/visemes.ts');
+const q = new URLSearchParams(location.search);
+const persona = q.get('p') || 'glitter';
+const T = +(q.get('tile') || 360), fps = +(q.get('fps') || 12);
+const r = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+(await import('../src/core/glRenderer.ts')).setGlRenderer(r);
+r.setPixelRatio(1); r.setSize(T, T); r.outputColorSpace = THREE.SRGBColorSpace; document.body.appendChild(r.domElement);
+const sc = new THREE.Scene(); sc.background = new THREE.Color(0xe6e6ea);
+sc.add(new THREE.HemisphereLight(0xffffff, 0x8899aa, 2.2));
+const dl = new THREE.DirectionalLight(0xffffff, 1.6); dl.position.set(0.5, 1, 1); sc.add(dl);
+const ch = new GlbCharacter(variantGlb(`/models/${persona}_v1.glb`), '/models/anims_v1.glb');
+await ch.load(); ch.setPersona?.({ id: persona }); ch.clips.setIdles(['idle'], persona); sc.add(ch.object); ch.play('idle');
+const bone = (n) => { let b = null; ch.object.traverse((o) => { if (!b && o.name.replace(/^mixamorig:?/, '') === n) b = o; }); return b; };
+const cam = new THREE.PerspectiveCamera(22, 1, 0.01, 50);
+// камера неподвижна (по позе покоя): движения головы видны
+for (let k = 0; k < 20; k++) ch.update(1 / 30, cam);
+ch.object.updateMatrixWorld(true);
+const hp = bone('Head').getWorldPosition(new THREE.Vector3()), tp = bone('HeadTop_End').getWorldPosition(new THREE.Vector3());
+const c = hp.clone().lerp(tp, 0.62 + +(q.get('dy') || 0)); const d = hp.distanceTo(tp) * +(q.get('dist') || 8);
+cam.position.set(c.x, c.y, c.z + d); cam.lookAt(c);
+ch.lookAt(new THREE.Vector3(c.x, c.y, c.z + 3));
+const lip = new LipSync();
+const text = q.get('text') || '';
+const idle = +(q.get('idle') || 4);
+const cues = text ? cuesFromText(text, estimateSpeechSec(text)) : [];
+const speech = text ? estimateSpeechSec(text) + 0.6 : 0;
+let t = 0, started = false;
+window.__total = Math.round((idle + speech) * fps);
+window.__frame = (i) => {
+  const until = (i + 1) / fps;
+  while (t < until - 1e-6) {
+    const dt = 1 / 60; t += dt;
+    if (t > idle && text) {
+      if (!started) { started = true; const t0 = t; lip.playCues(cues, () => t - t0); }
+      lip.update(dt);
+      ch.setMouth(lip.dominant, lip.weights[lip.dominant], lip.shape, lip.target);
+    }
+    ch.update(dt, cam);
+  }
+  r.render(sc, cam);
+  return { t, talk: t > idle && !!text };
+};
+window.__ready = true;
+</script></body></html>

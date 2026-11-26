@@ -171,6 +171,7 @@ print('шарнир челюсти', hinge.round(3), 'вершин полост�
 NC, NR = 30, 12
 DT, DM = 0.0005, 0.0018  # отступ века от поверхности: у верха (покой) и к кромке (м); радужка Tripo выпуклее белка
 TW, TH = 256, 64  # текстура века одного глаза
+LID_X, LID_Y = 13.0, 11.0  # запас закрытого века за разрез: по бокам и снизу (px снимка, 0.4 мм)
 lid_img = np.zeros((TH, TW * 2, 3), np.uint8)
 LV, LUV, LF, LN = [], [], [], []
 keys = {}  # имя → смещения (позиции) и нормалей
@@ -188,11 +189,12 @@ def fur_col(x, ys_):
 
 for ei, side in enumerate(('L', 'R')):
     e = eyes[side]
-    # на 6 px шире разреза: закрытое веко накрывает и тёмный контур в уголках
-    xs_e = np.linspace(e['x'][0] - 6, e['x'][-1] + 6, NC)
+    # на LID_X px шире разреза: закрытое веко накрывает и тёмный контур глаза Tripo в уголках (27.11: при 6 px контур
+    # читался тёмной обводкой вокруг закрытого века)
+    xs_e = np.linspace(e['x'][0] - LID_X, e['x'][-1] + LID_X, NC)
     t = np.interp(xs_e, e['x'], e['top']); bt = np.interp(xs_e, e['x'], e['bot']); lt_ = np.interp(xs_e, e['x'], e['lt'])
     yT = t - 3.0  # верх века — на 3 px под нижним краем полосы ресниц (дуга Tripo остаётся; без щели белка над веком)
-    yE = np.maximum(bt + 5.0, yT + 3.0)  # кромка закрытого века — чуть ниже нижнего контура глаза
+    yE = np.maximum(bt + LID_Y, yT + 3.0)  # кромка закрытого века — ниже нижнего контура глаза (и его тёмной обводки)
     Lg = yE - yT
     band = np.clip(t - lt_, 3, 40)
     # ── текстура века: мех сверху (над полосой ресниц) → мех снизу (под глазом), у кромки — тонкая тёмная линия ──
@@ -337,12 +339,13 @@ def jaw(ang, squeeze=0.0, fwd=0.0, wide=0.0, up=0.0):
     return Q - P
 
 
-def corners(dy, dxo=0.0, dz=0.0, sides=('L', 'R')):
+def corners(dy, dxo=0.0, dz=0.0, sides=('L', 'R'), soft=1.0):
+    """уголки рта: гауссиана вокруг уголка; soft > 1 — шире (хмурый рот: щека тянется плавно, без складки)"""
     D = np.zeros_like(P)
     for sd, c in (('L', cL3), ('R', cR3)):
         if sd not in sides:
             continue
-        r2 = ((P[:, 0] - c[0]) / (Wm * 0.3)) ** 2 + ((P[:, 1] - c[1]) / (Wm * 0.25)) ** 2
+        r2 = ((P[:, 0] - c[0]) / (Wm * 0.3 * soft)) ** 2 + ((P[:, 1] - c[1]) / (Wm * 0.25 * soft)) ** 2
         w = np.exp(-r2 * 1.6) * (P[:, 2] > hinge[2] - 0.004)
         D[:, 1] += dy * w; D[:, 0] += np.sign(c[0] - cx) * dxo * w; D[:, 2] += dz * w
     return D
@@ -403,16 +406,43 @@ def cheeks(dy):
     return D
 
 
+# сварка и рёбра — сглаживание ключей уголков (без граней на «грусти»: сдвиг соседей плавный, сетка у уголков гуще —
+# v5_dense.py)
+_key = np.round(P * 1e5).astype(np.int64)
+_, WL = np.unique(_key, axis=0, return_inverse=True); WL = WL.ravel(); nWL = WL.max() + 1
+EW = WL[np.r_[I[:, [0, 1]], I[:, [1, 2]], I[:, [2, 0]]]]
+
+
+def smooth_key(D, it=6, mask=None):
+    """лапласиан сдвига по сваренным соседям — кожа и край полости рта вместе (по отдельности край полости отставал
+    от кожи: зазубрина в уголке)"""
+    Dw = np.zeros((nWL, 3)); kw = np.zeros(nWL)
+    np.add.at(Dw, WL, D); np.add.at(kw, WL, 1); Dw /= np.maximum(kw, 1)[:, None]
+    for _ in range(it):
+        S_ = np.zeros((nWL, 3)); k_ = np.zeros(nWL)
+        np.add.at(S_, EW[:, 0], Dw[EW[:, 1]]); np.add.at(k_, EW[:, 0], 1)
+        np.add.at(S_, EW[:, 1], Dw[EW[:, 0]]); np.add.at(k_, EW[:, 1], 1)
+        Dn = 0.5 * Dw + 0.5 * S_ / np.maximum(k_, 1)[:, None]
+        Dw = Dn
+    return Dw[WL] if mask is None else D * (1 - mask[:, None]) + Dw[WL] * mask[:, None]
+
+
+# челюсть у уголков: вершины уголка (полный поворот) и щеки рядом (меньше) расходились складкой — сбоку от середины рта
+# сдвиг челюсти сглажен (между губами в середине рта — как есть, рот раскрывается)
+LAT = ss(0.3 * Wm, 0.46 * Wm, np.abs(P[:, 0] - cx))
+
+
 Hs = Hm
 BODY_KEYS = {
-    'mouth_A': jaw(0.21, squeeze=0.04),
-    'mouth_E': jaw(0.07, wide=0.07, up=0.002),
-    'mouth_O': jaw(0.15, squeeze=0.22, fwd=0.004),
-    'mouth_U': jaw(0.05, squeeze=0.32, fwd=0.006),
-    'mouth_M': jaw(-0.11, squeeze=0.02),
-    'smile': onto_surface(corners(0.32 * Hs, 0.05 * Wm) + cheeks(0.0025)),
-    'frown': onto_surface(corners(-0.18 * Hs, -0.015 * Wm)),
-    'smirk': onto_surface(corners(0.36 * Hs, 0.04 * Wm, sides=('L',))),
+    'mouth_A': smooth_key(jaw(0.21, squeeze=0.04), 5, LAT),
+    'mouth_E': smooth_key(jaw(0.07, wide=0.07, up=0.002), 5, LAT),
+    'mouth_O': smooth_key(jaw(0.15, squeeze=0.22, fwd=0.004), 5, LAT),
+    'mouth_U': smooth_key(jaw(0.05, squeeze=0.32, fwd=0.006), 5, LAT),
+    # M: у уголков — вполовину (уголок нижней губы, поднятый целиком, открывал тёмную стенку полости — зазубрина)
+    'mouth_M': smooth_key(jaw(-0.11, squeeze=0.02) * (1 - 0.55 * LAT)[:, None], 10, LAT),
+    'smile': onto_surface(smooth_key(corners(0.32 * Hs, 0.05 * Wm)) + cheeks(0.0025)),
+    'frown': onto_surface(smooth_key(corners(-0.2 * Hs, -0.015 * Wm, soft=1.7))),
+    'smirk': onto_surface(smooth_key(corners(0.36 * Hs, 0.04 * Wm, sides=('L',)))),
     'cheek_up': onto_surface(cheeks(0.004)),
     'brow_up': onto_surface(brow(0.006, 0.005)),
     'brow_down': onto_surface(brow(-0.005, 0.0015, dx_in=0.002)),

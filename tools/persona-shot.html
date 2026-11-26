@@ -38,6 +38,8 @@ const clip = q.get('ct') ? clipQ : actQ ? 'act' : null, ct = +(q.get('ct') || 0.
 ch.play?.(clip ? 'idle' : clipQ || 'idle');
 if (clipQ && !clip) for (let k = 0, n = Math.round(+(q.get('t') || 1) * 30); k < n; k++) ch.update(1 / 30);
 if (ch.faceMix) ch.faceMix.nextBlink = 1e9;
+// Блёстка v5: своя живость лица (моргания, саккады головой) — в кадрах выключена (&life=1 — включить)
+if (ch.v5Life && !q.get('life')) ch.v5Life.off = true;
 if (ch.life) ch.life.nextMicro = 1e9;
 // без взглядов в сторону и микросаккад: глаза ровно на камеру
 if (ch.eyes) { ch.eyes.awayT = 1e9; ch.eyes.sacT = 1e9; }

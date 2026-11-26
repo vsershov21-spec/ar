@@ -30,9 +30,11 @@ export interface FurParams {
   layers: number;
   density: number;
   tip: [number, number, number];
+  /** подсветка кончиков по контуру (доля цвета пряди; у Блёстки v5 — слабее: кончики = цвет текстуры, без светлой бахромы) */
+  rim: number;
 }
 
-const DEF: FurParams = { layers: 4, density: 150, tip: [1.06, 1.06, 1.08] };
+const DEF: FurParams = { layers: 4, density: 150, tip: [1.06, 1.06, 1.08], rim: 0.35 };
 /** оболочек на уровень ?fur=0..3 */
 export const FUR_LEVELS = [0, 4, 8, 12];
 /** телефон, модели v2: 6 оболочек + пряди ≈ 1.4× кадра без меха (SwiftShader, 585×1266; 8 — уже 1.5×) */
@@ -196,6 +198,7 @@ const SHELL_COMMON = `
 uniform float uShell;
 uniform float uDensity;
 uniform vec3 uTip;
+uniform float uRim;
 varying vec3 vRest;
 varying vec3 vRestN;
 varying float vFur;
@@ -260,6 +263,7 @@ export function buildFurShells(model: THREE.Object3D, body?: THREE.MeshStandardM
       sh.uniforms.uShell = uShell;
       sh.uniforms.uDensity = { value: p.density };
       sh.uniforms.uTip = { value: tip };
+      sh.uniforms.uRim = { value: p.rim };
       sh.uniforms.uFurTime = G.time;
       sh.vertexShader = sh.vertexShader
         .replace('#include <common>', '#include <common>\nattribute float _furlen;\nuniform float uShell;\nuniform float uFurTime;\nvarying vec3 vRest;\nvarying vec3 vRestN;\nvarying float vFur;')
@@ -302,7 +306,7 @@ export function buildFurShells(model: THREE.Object3D, body?: THREE.MeshStandardM
     // корень темнее (самозатенение), кончик светлее; на контуре — мягкая подсветка кончиков
     float ao = mix(0.86, 1.0, smoothstep(0.0, 0.8, h));
     diffuseColor.rgb *= ao * mix(vec3(1.0), uTip, h);
-    diffuseColor.rgb += diffuseColor.rgb * 0.35 * h * pow(1.0 - facing, 2.0);
+    diffuseColor.rgb += diffuseColor.rgb * uRim * h * pow(1.0 - facing, 2.0);
   }`,
         );
     };
