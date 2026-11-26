@@ -247,6 +247,36 @@
       ],
       "maxCredits": 240,
       "note": "зов листа выбора кота pick_intro/pick_play × 3 кота: 6 заданий, 222 симв."
+    },
+    {
+      "id": "release-setup-2611",
+      "kind": "script",
+      "ref": "16c5b0fdd90ec295fbf9e33078a682c1ccaf87a4",
+      "path": "scripts/deploy/release-setup.sh",
+      "timeoutMin": 90,
+      "note": "ветка release → /mvp: новый ar-update.sh (бэкап, проверка меток, откат)"
+    },
+    {
+      "id": "voice-onb-pick-check-2611",
+      "kind": "script",
+      "ref": "16c5b0fdd90ec295fbf9e33078a682c1ccaf87a4",
+      "path": "scripts/deploy/voice-headers.sh",
+      "args": [
+        "events=onb_,pick_:45"
+      ],
+      "timeoutMin": 40,
+      "note": "45 новых реплик onb_/pick_ в манифесте сайта, mp3 отдаются"
+    },
+    {
+      "id": "release-check-2611",
+      "kind": "script",
+      "ref": "16c5b0fdd90ec295fbf9e33078a682c1ccaf87a4",
+      "path": "scripts/deploy/release-check.sh",
+      "args": [
+        "release=71f75a9"
+      ],
+      "timeoutMin": 40,
+      "note": "/mvp из release 71f75a9, /lab и корень из main"
     }
   ]
 }
