@@ -4,9 +4,30 @@ import { earlyModelScript, modelOpt } from './scripts/build/vite-model-opt.mjs';
 import { ASSETS } from './src/config';
 import { variantGlb } from './src/character/modelVariant';
 import { existsSync, readdirSync } from 'node:fs';
+import { execSync } from 'node:child_process';
 import { featureIn, parseEdition } from './src/config/edition';
 import { quickSplash } from './src/quick/splash';
 import { PRIVACY_POLICY_URL, parseConsentMode } from './src/config/consent';
+
+/**
+ * Метка сборки в HTML каждой редакции: <meta name="ar-build" content="<коммит> <редакция>"> — по ней видно, из какого
+ * коммита собран /mvp (ветка release) и /lab, корень (main): docs/RELEASE.md. Коммит — AR_BUILD_SHA или git HEAD.
+ */
+function buildSha(): string {
+  if (process.env.AR_BUILD_SHA) return process.env.AR_BUILD_SHA.slice(0, 12);
+  try {
+    return execSync('git rev-parse --short HEAD', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
+  } catch {
+    return 'unknown';
+  }
+}
+function buildMarkPlugin() {
+  const mark = `${buildSha()} ${parseEdition(process.env.VITE_EDITION)}`.replace(/[^A-Za-z0-9 ._-]/g, '');
+  return {
+    name: 'ar-build-mark',
+    transformIndexHtml: (html: string) => html.replace(/(<meta charset[^>]*>)/i, `$1\n    <meta name="ar-build" content="${mark}">`),
+  };
+}
 
 /**
  * Быстрый вход (feature 'intro.quick', src/quick/splash.ts): заставка — прямо в index.html редакции (lab, pilot; dev = lab),
@@ -67,7 +88,7 @@ const LAB_DIR = !!SUB;
 export default defineConfig({
   base: LAB_DIR ? (process.env.SUB_BASE ?? process.env.LAB_BASE ?? `/${SUB}/`) : (process.env.BASE_PATH ?? './'),
   publicDir: LAB_DIR ? false : 'public',
-  plugins: [modelOpt({ emit: !LAB_DIR }), quickSplashPlugin()],
+  plugins: [modelOpt({ emit: !LAB_DIR }), quickSplashPlugin(), buildMarkPlugin()],
   build: {
     target: 'es2020',
     chunkSizeWarningLimit: 6000,

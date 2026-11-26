@@ -1,11 +1,13 @@
 # Деплой
 
-**push в `main` → примерно через 2 минуты изменения на https://ar.vershov.com**
+**push в `main` → примерно через 2 минуты изменения на https://ar.vershov.com (корень, /lab, /test)**
+**/mvp (пилот с детьми) — только из ветки `release`**: выпуск `npm run release:promote` — [RELEASE.md](RELEASE.md)
 
 ## Как это устроено
 
 - Сервер **swe** (Caddy, статика). Раз в 2 минуты сервер сам забирает ветку `main` из GitHub,
-  выполняет `npm ci && npm run build` (Node 22) и публикует содержимое `dist/` в корень сайта.
+  выполняет `npm ci && npm run build` (Node 22) и публикует содержимое `dist/` в корень сайта; `dist/mvp/` (pilot) —
+  из сборки ветки `release` (`/usr/local/bin/ar-update.sh` ← `server/ar-update/ar-update.sh`, docs/RELEASE.md).
 - Сборка обязана проходить из **чистого клона** одной командой, без дополнительных шагов и без сетевых обращений,
   кроме npm. Поэтому все рантайм-ассеты лежат в репозитории в `public/`.
 - `vite base = '/'` (сайт в корне домена; переопределяется `BASE_PATH`, если понадобится подпапка).
@@ -88,13 +90,15 @@ Meshy / Tripo / ElevenLabs запускаются на swe по очереди `
 ## Логи и откат
 
 - Лог сборок на сервере: `/srv/ar/update.log`.
-- Релизы: `/srv/ar/releases/<…>`, текущий — симлинк `/srv/ar/current`.
+- Релизы: `/srv/ar/releases/<main>-r<release>` (без ветки release — `<main>`), текущий — симлинк `/srv/ar/current`;
+  кэш сборок release — `/srv/ar/release-dist/<sha>`, рабочая копия — `/srv/ar/repo-release`.
 - **Откат** — переключить симлинк на прошлый релиз:
   ```bash
   ls -1t /srv/ar/releases | head                # найти прошлый
   ln -sfn /srv/ar/releases/<прошлый> /srv/ar/current
   ```
-  (Сервер при следующем опросе снова соберёт `main` — для отката надолго сделайте `git revert` в `main`.)
+  (Сервер при следующем опросе снова соберёт `main` — для отката надолго сделайте `git revert` в `main`; откат /mvp —
+  `git revert` в main и `npm run release:promote`, docs/RELEASE.md.)
 
 ## CI
 
