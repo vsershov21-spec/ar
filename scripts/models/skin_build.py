@@ -36,7 +36,7 @@ P1 = os.path.join(HERE, '../../public/models/v2/{}_p1.glb')
 # худи Хулигана и Добряка — не из p1 (у p1 худи с дырами под наушниками/шерстью груди), а худи Tripo базы (как у
 # Блёстки: та же форма, сидит на торсе без подгонки) перекрашенное и длиннее (template_hoodie)
 P1_PARTS = {
-    'hooligan': {1: 'Cap_Hooligan', 7: 'Shoes_Hooligan'},
+    'hooligan': {1: 'Cap_Hooligan'},
     'kind': {4: 'Scarf_Kind', 7: 'Boots_Kind'},
 }
 P1_DETAILS = {'hooligan': ('BD_Cloth',), 'kind': ()}
@@ -55,9 +55,9 @@ MARGIN = {'Hoodie': 0.004, 'Cap': 0.003, 'Headphones': 0.004, 'Shoes': 0.004, 'B
 # скрытые меши базы, эффекты; см. design/cut/<кот>, design/sheets/*_turnaround.jpg
 FEET = ['LeftFoot', 'RightFoot', 'LeftToeBase', 'RightToeBase', 'LeftToe_End', 'RightToe_End']
 LOOK = {
-    'glitter': {'rest': {'smile': 0.6, 'mouth_A': 0.2}, 'eyes': {'eyes_smug': 0.15, 'eyes_sleepy': 0.2, 'eyes_squint': 0.45, 'blush': 0},
+    'glitter': {'rest': {'smile': 0.7, 'mouth_A': 0.32}, 'eyes': {'eyes_smug': 0.15, 'eyes_sleepy': 0.2, 'eyes_squint': 0.45, 'blush': 0},
                 'petals': 1, 'lash': 2.3, 'fx': ['tailSparkle'], 'hide': ['BodyTorso'], 'brow': None},
-    'hooligan': {'rest': {'smirk': 0.55, 'smile': 0.2}, 'eyes': {'eyes_smug': 1.0, 'blush': 0}, 'restUp': 0.22,
+    'hooligan': {'rest': {'smirk': 0.55, 'smile': 0.2, 'eyes_smug': 0.3}, 'eyes': {'eyes_smug': 1.0, 'blush': 0}, 'restUp': 0.3,
                  'petals': 0, 'lash': 1.4, 'fx': [], 'hide': ['BodyTorso'], 'brow': [0.42, 0.44, 0.55], 'furOff': FEET},
     'kind': {'rest': {'smile': 0.45}, 'eyes': {'eyes_smug': 0.3, 'blush': 0}, 'restUp': 0.1,
              'petals': 0, 'lash': 1.5, 'fx': [], 'hide': ['BodyTorso'], 'brow': [0.46, 0.48, 0.6], 'furOff': FEET},
@@ -475,9 +475,50 @@ def v2_extras(cat, base_g, body):
         Vn = fit[k:k + n_]; k += n_
         Vn, _ = push_out(Vn, o['F'], body, 0.003, smooth=12)
         res.append({'name': o['name'], 'V': Vn, 'N': vnormals(Vn, o['F']), 'UV': None, 'J': o['J'], 'W': o['W'], 'F': o['F'], 'img': None, 'nimg': None,
-                    'mat': o['mat'], 'extras': {'headphones': 1}, 'rects': [], 'own_tex': False})
+                    'mat': o['mat'], 'extras': {'part': 'headphones'}, 'rects': [], 'own_tex': False})
         print(f"{o['name']}: {n_} вершин (v2, перенос)")
     return res
+
+
+# кеды Хулигана — по стопе базы (у кед p1 рваный край и мех стопы насквозь): оболочка стопы наружу, цвет вершин —
+# чёрный верх, белая подошва и шнурки (design/cut/hooligan/turn)
+SNEAKER = {'h': 0.066, 'off': 0.0045, 'sole': 0.017, 'flare': 0.003, 'upper': (24, 24, 28), 'white': (238, 238, 236)}
+
+
+def sneakers(base_g, body):
+    g = base_g; j = g.j
+    names, B = skel(g)
+    n = next(n for n in j['nodes'] if n.get('name') == 'tripo_mesh_glitter_p4')
+    p = j['meshes'][n['mesh']]['primitives'][0]
+    V = g.acc(p['attributes']['POSITION']).astype(np.float64)
+    J = g.acc(p['attributes']['JOINTS_0']).astype(np.int64); W = g.acc(p['attributes']['WEIGHTS_0']).astype(np.float64)
+    F = g.acc(p['indices']).reshape(-1, 3).astype(np.int64)
+    feet = [i for i, nm in enumerate(names) if 'Foot' in nm or 'Toe' in nm]
+    fw = (np.isin(J, feet) * W).sum(1)
+    tri = (V[F][:, :, 1].max(1) < SNEAKER['h']) & (fw[F].mean(1) > 0.3)
+    sv, inv = np.unique(F[tri].ravel(), return_inverse=True)
+    Fs = inv.reshape(-1, 3); Vs = V[sv]
+    s_, nrm = body.depth(Vs)
+    Vo = Vs + nrm * SNEAKER['off']
+    sole = Vo[:, 1] < SNEAKER['sole']
+    Vo[sole] += np.c_[nrm[sole, 0], 0 * nrm[sole, 1], nrm[sole, 2]] * SNEAKER['flare']
+    Vo[:, 1] = np.maximum(Vo[:, 1], 0.0)
+    col = np.tile(np.array(SNEAKER['upper'], np.float64) / 255, (len(Vo), 1))
+    col[sole] = np.array(SNEAKER['white']) / 255
+    # шнурки: верх подъёма спереди — белые поперечные полоски
+    for side in (1, -1):
+        m = (np.sign(Vo[:, 0]) == side)
+        if not m.any():
+            continue
+        cx = np.median(Vo[m, 0]); zf = np.percentile(Vo[m, 2], 70)
+        top = m & (Vo[:, 1] > 0.03) & (np.abs(Vo[:, 0] - cx) < 0.018) & (Vo[:, 2] > zf - 0.03) & (nrm[:, 1] > 0.35)
+        stripe = (np.sin(Vo[:, 2] / 0.0085 * np.pi) > 0.2)
+        col[top & stripe] = np.array(SNEAKER['white']) / 255
+    col = np.c_[col ** 2.2, np.ones(len(col))].astype(np.float32)  # COLOR_0 в glTF — линейный
+    mat = {'name': 'Shoes_Hooligan_mat', 'doubleSided': True, 'pbrMetallicRoughness': {'metallicFactor': 0.0, 'roughnessFactor': 0.6}}
+    print(f'Shoes_Hooligan: кеды по стопе базы — {len(Vo)} вершин, {len(Fs)} треуг.')
+    return {'name': 'Shoes_Hooligan', 'V': Vo, 'N': vnormals(Vo, Fs), 'UV': None, 'J': J[sv], 'W': W[sv], 'F': Fs, 'img': None, 'nimg': None,
+            'mat': mat, 'extras': {'part': 'shoes'}, 'rects': [], 'own_tex': False, 'color': col}
 
 
 def p1_garments(cat, base_g, body):
@@ -640,6 +681,9 @@ def write_skin(base_path, garments, cat, dst, atlas, natlas):
              'JOINTS_0': g.add_acc(G['J'].astype(np.uint16), 5123, 'VEC4', 34962),
              'WEIGHTS_0': g.add_acc(G['W'].astype(np.float32), 5126, 'VEC4', 34962)}
         m = json.loads(json.dumps(G['mat']))
+        if G.get('UV') is None or not G.get('own_tex', True):
+            # без текстуры: нулевые UV (merged_body/colliders.py ждут TEXCOORD_0 у каждой части)
+            A['TEXCOORD_0'] = g.add_acc(np.zeros((len(G['V']), 2), np.float32), 5126, 'VEC2', 34962)
         if G.get('UV') is not None and (G.get('own_tex', True)):
             A['TEXCOORD_0'] = g.add_acc(G['UV'].astype(np.float32), 5126, 'VEC2', 34962)
             m.setdefault('pbrMetallicRoughness', {})['baseColorTexture'] = {'index': ti}
@@ -722,6 +766,8 @@ def main():
     else:
         body = Body(base_g)
         garments = [template_hoodie(a.cat, a.p4m, parts, body)] + p1_garments(a.cat, base_g, body) + v2_extras(a.cat, base_g, body)
+        if a.cat == 'hooligan':
+            garments.append(sneakers(base_g, body))
     tex = [G for G in garments if G.get('rects')]
     atlas, natlas = build_atlas(tex)
     atlas = bake_cloth(atlas, CLOTH.get(a.cat, []))

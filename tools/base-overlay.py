@@ -143,16 +143,20 @@ def main():
         rows.append([lab(tile(ref), f'реф {nm}'), lab(tile(mod), title), lab(tile(ov), f'50 %  IoU {iou:.3f}')])
     ref = load_ref(REFS[cat][0][1])
     ra = np.asarray(ref)
-    er = eyes(ra[150:520])
+    # глаза — в полосе под кепкой/бантом (зелёная кепка Хулигана — тоже «зелёное пятно»)
+    er = eyes(ra[240:480])
     if er:
-        er = [p + (0, 150) for p in er]
+        er = [p + (0, 240) for p in er]
         io = er[1][0] - er[0][0]
         c = (er[0] + er[1]) / 2
         box = (int(c[0] - 1.9 * io), int(c[1] - 2.0 * io), int(c[0] + 1.9 * io), int(c[1] + 1.5 * io))
-        refc = ref.crop(box).resize((800, int(800 * (box[3] - box[1]) / (box[2] - box[0]))), Image.LANCZOS)
+        pad = Image.new('RGB', (box[2] - box[0], box[3] - box[1]), (255, 255, 255)); pad.paste(ref, (-box[0], -box[1]))
+        refc = pad.resize((800, int(800 * (box[3] - box[1]) / (box[2] - box[0]))), Image.LANCZOS)
         k = 800 / (box[2] - box[0])
         er = [(p - box[:2]) * k for p in er]; io *= k; c = (er[0] + er[1]) / 2
-        em = eyes(np.asarray(shots[4]))
+        fa = np.asarray(shots[4]); h0, h1 = int(fa.shape[0] * 0.15), int(fa.shape[0] * 0.45)
+        em = eyes(fa[h0:h1])
+        em = [p + (0, h0) for p in em] if em else em
         if em:
             s = (er[1][0] - er[0][0]) / (em[1][0] - em[0][0])
             cm = (em[0] + em[1]) / 2

@@ -77,6 +77,19 @@ def main():
     if Wt.max() > 1.5:
         Wt /= 255
     lab = label_parts(cat, g, b, P, I)
+    # база котов + скин (skin_build.py compose): у одежды свой атлас — метки частей по имени меша, не по цвету
+    if (j.get('asset', {}).get('extras') or {}).get('catSkin'):
+        by = [('Cap_', CAP), ('Hoodie_', HOODIE), ('Headphones_', PHONES), ('Scarf_', SCARF), ('Bow_', BOW), ('Skirt_', SKIRT),
+              ('Shoes_', SHOES), ('Boots_', SHOES)]
+        bi_, bm_ = g.main_mesh()
+        off = j['accessors'][bm_['attributes']['POSITION']]['count']
+        lab[:off] = BODY
+        for n in j['nodes']:
+            if 'mesh' in n and n.get('extras', {}).get('part'):
+                pr_ = j['meshes'][n['mesh']]['primitives'][0]
+                cnt = j['accessors'][pr_['attributes']['POSITION']]['count']
+                lab[off:off + cnt] = next((v for k, v in by if n['name'].startswith(k)), BODY)
+                off += cnt
     sk = j['skins'][0]
     names = [j['nodes'][k]['name'].replace('mixamorig:', '') for k in sk['joints']]
     meshes = {n.get('name') for n in j['nodes'] if 'mesh' in n}

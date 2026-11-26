@@ -84,6 +84,47 @@ def boundary_loops(F):
 
 
 HEAD_C = [None]
+# золотые части Блёстки, врезанные в голову (звёзды у висков, края банта) — коробки сглаживания (запас, ед. модели)
+GOLD_ON_HEAD = ('tripo_part_24', 'tripo_part_26', 'tripo_part_27', 'tripo_part_15', 'tripo_part_20')
+GOLD_PAD = 0.008
+
+
+def fs_F(g, pr):
+    return g.acc(pr['indices']).reshape(-1, 3).astype(np.int64)
+
+
+def gold_boxes(g, parts):
+    j = g.j
+    n = next((n for n in j['nodes'] if n.get('name') == 'Bow_Glitter'), None)
+    if n is None:
+        return []
+    p = j['meshes'][n['mesh']]['primitives'][0]
+    P = g.acc(p['attributes']['POSITION']).astype(np.float64); UV = g.acc(p['attributes']['TEXCOORD_0'])
+    out = []
+    for pn in GOLD_ON_HEAD:
+        if pn not in parts:
+            continue
+        x0, y0, x1, y1 = parts[pn]['uv']
+        m = (UV[:, 0] >= x0) & (UV[:, 0] <= x1) & (UV[:, 1] >= y0) & (UV[:, 1] <= y1)
+        if m.sum() > 10:
+            out.append((P[m].min(0) - GOLD_PAD, P[m].max(0) + GOLD_PAD))
+    return out
+
+
+def smooth_boxes(U, F, boxes, it=30):
+    """U (n,3) на месте: вершины внутри коробок — лапласово сглаживание (сварка по позиции, край коробок закреплён)"""
+    if not boxes:
+        return 0
+    wm = weld_map(U, 1e-4); nW = wm.max() + 1
+    Pw = np.zeros((nW, 3)); c = np.zeros(nW)
+    np.add.at(Pw, wm, U); np.add.at(c, wm, 1); Pw /= c[:, None]
+    inside = np.zeros(nW, bool)
+    for a, b in boxes:
+        inside |= ((Pw >= a) & (Pw <= b)).all(1)
+    E = wm[edges_of(F)]
+    Ps = smooth_field(Pw, E, nW, it, k=0.6, fixed=~inside)
+    U[:] = Ps[wm]
+    return int(inside.sum())
 
 
 def dent_fix(V, sel, c):
@@ -182,9 +223,12 @@ def main():
     sel = np.r_[head, np.ones(len(Pf), bool)] & (U[:, 1] > UPPER_Y)
     for ec in eyes_c:
         sel &= np.linalg.norm(U - ec, axis=1) > 0.085
-    # (выключено: радиус от центра у неровной головы Tripo «надувал» и здоровые места; звезда у виска — в части уха)
+    # (радиус от центра у неровной головы Tripo «надувал» и здоровые места — вместо него) отпечатки звёзд и банта Tripo на
+    # голове (звёзды у висков врезаны в голову): сглаживание Лапласа только в коробках золотых частей, край коробки — на месте
+    # (сглаживание Лапласа в коробках золотых частей пробовали: отпечаток звезды — дыры по контуру, а не вмятина, и
+    # сглаживание стягивало край — открывалась щель у морды; выключено, smooth_boxes оставлен для доработки)
     mv = 0
-    V = U[:len(V)]
+    V = U[:len(V)].copy()
     g.set_acc(fpr['attributes']['POSITION'], U[len(V):].astype(np.float32))
     print(f'голова: вмятины — {mv} вершин наружу')
     V, F, N, UV, Jt, Wt, pv, role = fix_head(V, F, N, UV, Jt, Wt, pv, role)
@@ -334,6 +378,7 @@ def main():
         if fp['attributes'].get('POSITION') != old_attr['POSITION']:
             continue
         L = g.acc(fp['attributes']['_FURLEN']).astype(np.float32)
+        L = np.r_[L, np.zeros(max(0, len(V) - len(L)), np.float32)]  # вершины закрытых дыр головы — без меха
         Ff = g.acc(fp['indices']).reshape(-1, 3).astype(np.int64)
         Ff = old2new[Ff]
         Ff = Ff[(Ff >= 0).all(1)]

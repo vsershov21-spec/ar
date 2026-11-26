@@ -16,6 +16,8 @@ export P4_MOUTH_W=${P4_MOUTH_W:-2.6}
 export P4_MUZZLE=${P4_MUZZLE:-'{"step": 0.0026}'}
 export P4_MOUTH_SMOOTH=${P4_MOUTH_SMOOTH:-0.8}
 export FR_OVR=${FR_OVR:-'{"glitter": {"jaw": 0.22, "open_k": 1.5, "prof_p": 0.4, "tongue_jaw": 0.8}}'}
+# «о» и «у» у узкой челюсти базы — шире и круглее (реф design/cut/base/mouth O, U)
+export MOUTH_OVR=${MOUTH_OVR:-'{"vis_E": {"jaw": 0.6, "open": 0.3}, "vis_F": {"jaw": 0.35, "open": 0.18}, "surprise": {"jaw": 0.6, "open": 0.28}}'}
 if [ -z "$SKINS_ONLY" ]; then
 # 1. форма и лицо — конвейер Блёстки p4 v3 (build_glitter_p4.sh) в рабочую папку, свои ориентиры лица
 OUT="$W/p4" LAND=face_landmarks/cat_base.json sh build_glitter_p4.sh "$W/p4"

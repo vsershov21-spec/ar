@@ -43,6 +43,16 @@ const bone = (n) => { let b = null; ch.object.traverse((o) => { if (!b && o.name
 const cam = new THREE.PerspectiveCamera(22, W / H, 0.01, 50);
 for (let k = 0; k < 20; k++) ch.update(1 / 30, cam);
 if (clip) { ch.play(clip, { loop: true }); for (let k = 0; k < Math.round(ct * 30); k++) ch.update(1 / 30, cam); }
+// ?act=cocoa&at=1.6 — действие с предметом (runAct: какао, зеркальце, угощение, жвачка, скейт), кадр через at с;
+// поза заморожена на все виды (база котов: листы «предметы в лапах», tools/base-sheet.py)
+const actQ = q.get('act');
+if (actQ) {
+  const dur = ch.runAct(actQ);
+  if (!dur) console.error('act: не умеет', actQ);
+  // предмет грузится асинхронно (PropRig) — подождать, пока появится
+  await new Promise((r) => setTimeout(r, +(q.get('wait') || 4000)));
+  for (let k = 0; k < Math.round(+(q.get('at') || 1.6) * 30); k++) ch.update(1 / 30, cam);
+}
 ch.object.updateMatrixWorld(true);
 const box = new THREE.Box3();
 ch.object.traverse((o) => { if (o.isSkinnedMesh && o.visible && !/^BD_Fur/.test(o.name)) box.expandByObject(o, true); });
@@ -54,7 +64,8 @@ function look(target, yawDeg, pitchDeg, dist, fov = 22) {
   cam.position.set(target.x + Math.sin(y) * Math.cos(p) * dist, target.y + Math.sin(p) * dist, target.z + Math.cos(y) * Math.cos(p) * dist);
   cam.lookAt(target);
 }
-const fullD = (fov) => (size.y * 1.12) / 2 / Math.tan((fov * Math.PI) / 360);
+// лёжа (кровать) кот ниже, чем длиннее — кадр по большему из габаритов
+const fullD = (fov) => (Math.max(size.y, 0.9 * Math.max(size.x, size.z)) * 1.12) / 2 / Math.tan((fov * Math.PI) / 360);
 function setView(v) {
   const fc = hp.clone().lerp(tp, 0.45);
   if (v === 'pilot') look(ctr, 0, 30, fullD(40) * 1.05, 40);
@@ -75,7 +86,7 @@ views.forEach((v, i) => {
   setView(v);
   // взгляд на камеру, но из дальней точки по тому же лучу: в упор (лицо крупно) глаза не сводит к носу
   tgt.copy(cam.position).sub(fc0()).setLength(3).add(fc0());
-  if (!clip) {
+  if (!clip && !actQ) {
     ch.lookAt(tgt.clone());
     for (let k = 0; k < 45; k++) { ch.update(1 / 30, cam); setView(v); }
   }

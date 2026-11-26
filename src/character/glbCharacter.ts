@@ -1483,7 +1483,9 @@ export class GlbCharacter implements Character {
     // своя модель (Блёстка p4, MouthD extras.mouth.rest — persona_tune.py) — своё лицо в покое
     // база + скин: лицо в покое и множители век — из скина (catSkin.ts), один набор настроек мимики на всех
     const base = this.skinLook ? this.skinLook.rest : (!this.faceMorphs && this.mouthRig?.ex.rest) || (this.faceMorphs ? PERSONA_FACE_MORPH : modelsV2() ? PERSONA_FACE_V2 : PERSONA_FACE)[this.personaId];
-    if (base && !this.tripoFace) for (const k in base) W[k] = Math.max(W[k] ?? 0, base[k] * (1 - (W.frown ?? 0)));
+    // база + скин: лицо покоя уступает эмоции (у «грусти», «обиды» рот свой, а не открытая улыбка покоя)
+    const restK = this.skinLook ? 1 - 0.85 * Math.min(1, this.emoL.s) : 1;
+    if (base && !this.tripoFace) for (const k in base) W[k] = Math.max(W[k] ?? 0, base[k] * (1 - (W.frown ?? 0)) * restK);
     // характер глаз (v2 — по умолчанию; ?models=v1 — без них): у Блёстки по рефу глаза широко открыты — пресеты «самодовольно/сонно/прищур»
     // в idle-клипах (зеркальце, кружение) прикрывают веки слабее
     const eyeK = this.skinLook ? this.skinLook.eyes : modelsV2() ? PERSONA_EYES_V2[this.personaId] : undefined;

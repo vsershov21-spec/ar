@@ -95,6 +95,11 @@ MOUTH = {
     'tongue_out': {'jaw': 0.34, 'open': 0.3, 'tongue_out': 1.0, 'arch': 0.1},
 }
 
+# база котов (build_base.sh): ключи рта поверх MOUTH — MOUTH_OVR='{"vis_E": {"jaw": 0.55}}' (слияние по ключу)
+if os.environ.get('MOUTH_OVR'):
+    for _k, _v in json.loads(os.environ['MOUTH_OVR']).items():
+        MOUTH[_k] = {**MOUTH.get(_k, {}), **_v}
+
 
 def sm(e0, e1, x):
     t = np.clip((np.asarray(x, np.float64) - e0) / (e1 - e0), 0, 1)
