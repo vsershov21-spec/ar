@@ -227,6 +227,26 @@
         "pick_"
       ],
       "timeoutMin": 20
+    },
+    {
+      "id": "el-onb-2611",
+      "kind": "eleven",
+      "args": [
+        "--only",
+        "onb_"
+      ],
+      "maxCredits": 1850,
+      "note": "13 реплик онбордов Самоката и СберKids × 3 кота: 39 заданий, 1837 симв. (план el-plan-onb-2611)"
+    },
+    {
+      "id": "el-pick-2611",
+      "kind": "eleven",
+      "args": [
+        "--only",
+        "pick_"
+      ],
+      "maxCredits": 240,
+      "note": "зов листа выбора кота pick_intro/pick_play × 3 кота: 6 заданий, 222 симв."
     }
   ]
 }
