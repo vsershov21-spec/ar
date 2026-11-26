@@ -16,15 +16,21 @@
  */
 import './onboard.css';
 import { track } from '../analytics';
-import { FROM_CAT, KIDS_TOUR, ONB_LINES, ONB_MS, PIGGY, SAMOKAT_DEEPLINK, SNACKS, isPlaceholderUrl, withMark, type SvcId } from '../config/onboards';
+import { FROM_CAT, KIDS_TOUR, ONB_EVENTS, ONB_LINES, ONB_MS, PIGGY, SAMOKAT_DEEPLINK, SNACKS, isPlaceholderUrl, withMark, type SvcId } from '../config/onboards';
 import type { PersonaId } from '../persona/types';
 import { goKids, openTab } from './kidsOffer';
 
 export interface OnbHost {
   root: HTMLElement;
   persona(): { id: PersonaId; name: string };
-  /** реплика кота пузырём (без голоса), ms — сколько держать */
-  say(text: string, ms?: number): void;
+  /**
+   * реплика кота: event — событие content (голос ElevenLabs, у каждого кота свой текст; нет записи — пузырь текстом кота),
+   * text — запасной текст пузыря, ms — сколько его держать; cut — ребёнок нажал кнопку: прежняя реплика онборда
+   * обрывается (иначе новая ждёт, пока та договорит)
+   */
+  say(text: string, ms?: number, event?: string, cut?: boolean): void;
+  /** онборд закрыт не своей кнопкой — недоговорённые реплики онборда снять */
+  hush?(): void;
   /** клип кота (point_button, celebrate…) */
   clip(name: string): void;
   sound(id: string): void;
@@ -149,6 +155,8 @@ export class ServiceOnboard {
     this.fly.innerHTML = '';
     this.h.root.classList.remove('onb-on');
     this.h.shift(null);
+    // «Не сейчас» / «Готово» / «Войти» — прощальная реплика договаривает; закрыли иначе (команда коту, ×) — тишина
+    if (reason !== 'later' && reason !== 'done') this.h.hush?.();
     this.h.log?.(`онборд ${svc}: закрыт (${reason})`);
   }
 
@@ -159,17 +167,17 @@ export class ServiceOnboard {
 
   // ───────────── Самокат ─────────────
   private samokat() {
-    const L = ONB_LINES.samokat;
+    const L = ONB_LINES.samokat, E = ONB_EVENTS.samokat;
     this.setStage('store', `
       <div class="onb-head">${SAMOKAT_LOGO}<b>Самокат</b><button type="button" class="onb-x" data-k="close" aria-label="Закрыть">×</button></div>
       <div class="onb-cart"><span class="onb-cart-ico">${CART_SVG}<em class="onb-count">0</em></span>
         <span class="onb-slots">${SNACKS.map((s) => `<i data-s="${s.id}" aria-label="${s.label}"></i>`).join('')}</span></div>
       <p class="onb-cap">Кот собирает перекус…</p>`);
-    this.say(L.hello, ONB_MS.hello + 400);
+    this.say(L.hello, ONB_MS.hello + 400, E.hello);
     this.h.clip('surprised');
     this.step('hello');
     this.later(ONB_MS.hello, () => {
-      this.say(L.collect, SNACKS.length * ONB_MS.snack + ONB_MS.fly + 900);
+      this.say(L.collect, SNACKS.length * ONB_MS.snack + ONB_MS.fly + 900, E.collect);
       this.h.clip('point_button');
       this.step('collect');
       SNACKS.forEach((s, i) => this.later(i * ONB_MS.snack, () => this.throwSnack(s.id, i)));
@@ -195,7 +203,7 @@ export class ServiceOnboard {
   }
 
   private samokatSheet() {
-    const L = ONB_LINES.samokat;
+    const L = ONB_LINES.samokat, E = ONB_EVENTS.samokat;
     const p = this.h.persona();
     this.setStage('sheet', `
       <div class="onb-head">${SAMOKAT_LOGO}<b>Перекус от ${FROM_CAT[p.id] ?? 'кота'}</b><button type="button" class="onb-x" data-k="close" aria-label="Закрыть">×</button></div>
@@ -203,14 +211,14 @@ export class ServiceOnboard {
       <p class="onb-cap">${this.count} ${plural(this.count, 'вкусняшка', 'вкусняшки', 'вкусняшек')} после школы</p>
       <button type="button" class="onb-btn" data-k="send">Отправить маме на оплату</button>
       <button type="button" class="onb-btn ghost" data-k="later">Не сейчас</button>`);
-    this.say(L.sheet, 5000);
+    this.say(L.sheet, 5000, E.sheet);
     this.h.clip('celebrate');
     this.h.sound('chime_soft');
     this.step('sheet', { n: this.count });
   }
 
   private samokatSend() {
-    const L = ONB_LINES.samokat;
+    const L = ONB_LINES.samokat, E = ONB_EVENTS.samokat;
     const url = isPlaceholderUrl(SAMOKAT_DEEPLINK) ? null : withMark(SAMOKAT_DEEPLINK, 'onb', this.h.src());
     let kind: 'deeplink' | 'stub' = 'stub';
     if (url) {
@@ -226,28 +234,28 @@ export class ServiceOnboard {
       <ul class="onb-list sm">${SNACKS.map((s) => `<li>${SNACK_SVG[s.id] ?? ''}</li>`).join('')}</ul>
       <p class="onb-note">${kind === 'stub' ? 'Покажи этот экран маме или папе — они закажут перекус в Самокате.' : 'Отправили! Мама увидит перекус в Самокате.'}</p>
       <button type="button" class="onb-btn" data-k="done">Готово</button>`);
-    this.say(kind === 'stub' ? L.stub : L.sent, 4200);
+    this.say(kind === 'stub' ? L.stub : L.sent, 4200, kind === 'stub' ? E.stub : E.sent);
     this.h.clip('celebrate');
     this.h.sound('confetti');
   }
 
   // ───────────── СберKids ─────────────
   private kids() {
-    const L = ONB_LINES.kids;
+    const L = ONB_LINES.kids, E = ONB_EVENTS.kids;
     this.setStage('piggy', `
       <div class="onb-head">${KIDS_LOGO}<b>СберKids</b><button type="button" class="onb-x" data-k="close" aria-label="Закрыть">×</button></div>
       <div class="onb-piggy"><span class="onb-pig">${TOUR_SVG.piggy}</span>
         <span class="onb-goal"><b>Копилка на мечту</b><span class="onb-bar"><i style="width:${PIGGY.from}%"></i></span><em class="onb-pct">${PIGGY.from}%</em></span></div>
       <p class="onb-cap">Монетки летят в копилку…</p>`);
     this.piggyPct = PIGGY.from;
-    this.say(L.hello, ONB_MS.hello + 400);
+    this.say(L.hello, ONB_MS.hello + 400, E.hello);
     this.h.clip('point_button');
     this.step('hello');
     this.later(ONB_MS.hello * 0.6, () => {
       this.step('piggy');
       this.coins = 0;
       for (let i = 0; i < PIGGY.coins; i++) this.later(i * ONB_MS.coin, () => this.throwCoin(i));
-      this.later(ONB_MS.hello * 0.4 + 200, () => this.say(L.piggy, 2600));
+      this.later(ONB_MS.hello * 0.4 + 200, () => this.say(L.piggy, 2600, E.piggy));
     });
   }
 
@@ -280,7 +288,7 @@ export class ServiceOnboard {
       <div class="onb-tour" data-t="${t.id}"><span class="onb-tico">${TOUR_SVG[t.icon] ?? ''}</span><span><b>${t.title}</b><small>${t.text}</small></span></div>
       <div class="onb-dots">${KIDS_TOUR.map((_, i) => `<i class="${i === k ? 'on' : ''}"></i>`).join('')}</div>
       <button type="button" class="onb-btn" data-k="next">${k === KIDS_TOUR.length - 1 ? 'Понятно!' : 'Дальше'}</button>`);
-    this.say(ONB_LINES.kids.tour[k] ?? '', ONB_MS.tourAuto);
+    this.say(ONB_LINES.kids.tour[k] ?? '', ONB_MS.tourAuto, ONB_EVENTS.kids.tour[k]);
     this.h.clip(k === 1 ? 'proud' : 'point_button');
     this.step('tour', { n: k + 1 });
     // ребёнок не нажал «Дальше» — листаем сами
@@ -293,20 +301,30 @@ export class ServiceOnboard {
       <div class="onb-piggy sm"><span class="onb-pig">${TOUR_SVG.piggy}</span><span class="onb-goal"><b>Копилка на мечту</b><span class="onb-bar"><i style="width:${this.piggyPct}%"></i></span><em class="onb-pct">${this.piggyPct}%</em></span></div>
       <button type="button" class="onb-btn kids" data-k="kids_go">${KIDS_LOGO}<span>Войти в СберKids</span></button>
       <button type="button" class="onb-btn ghost" data-k="later">Потом</button>`);
-    this.say(ONB_LINES.kids.go, 6000);
+    this.say(ONB_LINES.kids.go, 6000, ONB_EVENTS.kids.go);
     this.h.clip('wave');
     this.h.sound('chime_soft');
     this.step('go_offer');
   }
 
   // ───────────── кнопки ─────────────
+  /** идёт обработка нажатия ребёнка: реплика шага обрывает прежнюю (say → cut) */
+  private pressing = false;
   private press(k: string) {
+    this.pressing = true;
+    try {
+      this.pressNow(k);
+    } finally {
+      this.pressing = false;
+    }
+  }
+  private pressNow(k: string) {
     this.h.activity();
     const svc = this.svcNow;
     if (!svc) return;
     if (k === 'close') return this.close('close');
     if (k === 'later') {
-      this.say(svc === 'samokat' ? ONB_LINES.samokat.later : ONB_LINES.kids.later, 2600);
+      this.say(svc === 'samokat' ? ONB_LINES.samokat.later : ONB_LINES.kids.later, 2600, svc === 'samokat' ? ONB_EVENTS.samokat.later : ONB_EVENTS.kids.later);
       return this.close('later');
     }
     if (k === 'send') return this.samokatSend();
@@ -334,8 +352,8 @@ export class ServiceOnboard {
     this.h.log?.(`онборд ${svc}: ${step}${extra.n ? ' ' + extra.n : ''}${extra.kind ? ' ' + extra.kind : ''}`);
   }
 
-  private say(text: string, ms: number) {
-    if (text) this.h.say(text, ms);
+  private say(text: string, ms: number, event?: string) {
+    if (text) this.h.say(text, ms, event, this.pressing);
   }
 
   private setStage(stage: OnbStage, html: string) {

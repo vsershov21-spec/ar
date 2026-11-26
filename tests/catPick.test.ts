@@ -174,6 +174,17 @@ describe('предмет появления и вид появления', () =>
     expect(PICK_LINE.intro).toBe('Выбери, кто будет с тобой!');
     for (const t of [...Object.values(PICK_TITLE), ...Object.values(PICK_LINE)]) expect(t).not.toMatch(/быть|бываю|образ|переоде/i);
   });
+  it('зов к листу — голосом кота: события pick_intro / pick_play, у каждого кота одна реплика того же смысла', async () => {
+    expect(eventIds.has('pick_intro') && eventIds.has('pick_play')).toBe(true);
+    for (const pid of ['hooligan', 'kind', 'glitter']) {
+      const p = (await import(`../content/personas/${pid}.json`)).default as { lines: Record<string, { text: string }[]> };
+      expect(p.lines.pick_intro).toHaveLength(1);
+      expect(p.lines.pick_play).toHaveLength(1);
+      expect(p.lines.pick_intro[0].text).toMatch(/[Вв]ыб.+кто будет с тобой!$/);
+      expect(p.lines.pick_play[0].text).toMatch(/Кого позовём\? Выбирай!$/);
+      for (const t of [p.lines.pick_intro[0].text, p.lines.pick_play[0].text]) expect(t).not.toMatch(/быть|бываю|образ|переоде/i);
+    }
+  });
   it('выезд на скейте: доска всё время на колёсах под котом (без кикфлипа, олли и подброса в лапу), стопы на деке на проезде', () => {
     expect(SKATE_SHOW_ORDER).toEqual(['rise', 'push', 'ride', 'roll', 'hopoff', 'fade']);
     expect(SHOW_RIDE_TO).toBeGreaterThan(SHOW_RIDE_FROM);

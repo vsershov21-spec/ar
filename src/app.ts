@@ -883,7 +883,8 @@ export class App {
 
   /**
    * Онборды в сервисы (ui/serviceOnboard.ts, docs/scenario/ONBOARDS.md): кот проводит ребёнка по Самокату и СберKids.
-   * Реплики — пузырём без голоса (director.bubble), кот сдвигается над панелью (как над листом каталога).
+   * Реплики — голосом кота (события onb_*, director.serviceLine; нет записи — пузырём), кот сдвигается над панелью
+   * (как над листом каталога).
    */
   private wireOnboards() {
     const d = this.director;
@@ -896,7 +897,8 @@ export class App {
     this.onb = new ServiceOnboard({
       root: this.ui.root,
       persona: () => ({ id: d.persona.id, name: d.persona.name }),
-      say: (t, ms) => void d.bubble(t, ms),
+      say: (t, ms, ev, cut) => void (ev ? d.serviceLine(ev, t, ms, { cut }) : d.bubble(t, ms)),
+      hush: () => void d.hushLines('onb_'),
       clip: (c) => d.character?.play(c as Parameters<Character['play']>[0]),
       sound: (id) => this.audio.play(id),
       catPoint: () => {

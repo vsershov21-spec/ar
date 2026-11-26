@@ -797,3 +797,51 @@ happy: Это я пока не умею. Давай лучше какао поп
 
 ## pilot_switch_later | clip=none
 happy: Чуть позже! Давай ещё немного поиграем со мной.
+
+# Онборды в сервисы (onb.services, docs/scenario/ONBOARDS.md) и лист выбора кота (pilot.catPick) — озвучка 26.11.
+# Клипы ведёт сцена онборда / листа (clip=none); по одному варианту — шаги онборда не повторяются.
+
+## onb_samokat_hello | clip=none
+happy: Ой! Это Самокат — у них столько вкусняшек!
+
+## onb_samokat_collect | clip=none
+caring: Смотри, собираю нам перекус после школы.
+
+## onb_samokat_sheet | clip=none
+caring: Готово! Отправим маме — пусть оплатит?
+
+## onb_samokat_sent | clip=none
+happy: Ура! Мама посмотрит и оплатит.
+
+## onb_samokat_stub | clip=none
+caring: Покажи этот экран маме — она закажет.
+
+## onb_samokat_later | clip=none
+neutral: Хорошо, перекус подождёт.
+
+## onb_kids_hello | clip=none
+happy: А это СберKids. Тут живут твои деньги и копилка!
+
+## onb_kids_piggy | clip=none
+happy: Дзынь-дзынь! Копим на мечту.
+
+## onb_kids_tour_1 | clip=none
+caring: В копилке СберKids копят на мечту — по монетке.
+
+## onb_kids_tour_2 | clip=none
+happy: А ещё там задания — и награды за них!
+
+## onb_kids_tour_3 | clip=none
+caring: И твоя детская карта — всё видно в телефоне.
+
+## onb_kids_go | clip=none
+happy: Заходи в СберKids — я и там с тобой!
+
+## onb_kids_later | clip=none
+caring: Хорошо, заглянем в СберKids потом.
+
+## pick_intro | clip=none
+caring: Выбери, кто будет с тобой!
+
+## pick_play | clip=none
+happy: Кого позовём? Выбирай!

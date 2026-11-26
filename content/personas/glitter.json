@@ -667,6 +667,51 @@
     "pilot_switch_later": {
       "clip": "none"
     },
+    "onb_samokat_hello": {
+      "clip": "none"
+    },
+    "onb_samokat_collect": {
+      "clip": "none"
+    },
+    "onb_samokat_sheet": {
+      "clip": "none"
+    },
+    "onb_samokat_sent": {
+      "clip": "none"
+    },
+    "onb_samokat_stub": {
+      "clip": "none"
+    },
+    "onb_samokat_later": {
+      "clip": "none"
+    },
+    "onb_kids_hello": {
+      "clip": "none"
+    },
+    "onb_kids_piggy": {
+      "clip": "none"
+    },
+    "onb_kids_tour_1": {
+      "clip": "none"
+    },
+    "onb_kids_tour_2": {
+      "clip": "none"
+    },
+    "onb_kids_tour_3": {
+      "clip": "none"
+    },
+    "onb_kids_go": {
+      "clip": "none"
+    },
+    "onb_kids_later": {
+      "clip": "none"
+    },
+    "pick_intro": {
+      "clip": "none"
+    },
+    "pick_play": {
+      "clip": "none"
+    },
     "home_ball": {
       "clip": "jump"
     },
@@ -3535,6 +3580,126 @@
         "text": "Чуть позже! Давай ещё немного поиграем со мной.",
         "emotion": "happy",
         "face": "happy"
+      }
+    ],
+    "onb_samokat_hello": [
+      {
+        "id": "glitter.onb_samokat_hello.01",
+        "text": "Ой! Это Самокат — у них столько вкусняшек!",
+        "emotion": "excited",
+        "face": "excited"
+      }
+    ],
+    "onb_samokat_collect": [
+      {
+        "id": "glitter.onb_samokat_collect.01",
+        "text": "Смотри, собираю нам перекус после школы!",
+        "emotion": "happy",
+        "face": "happy"
+      }
+    ],
+    "onb_samokat_sheet": [
+      {
+        "id": "glitter.onb_samokat_sheet.01",
+        "text": "Готово! Отправим маме — пусть оплатит?",
+        "emotion": "happy",
+        "face": "happy"
+      }
+    ],
+    "onb_samokat_sent": [
+      {
+        "id": "glitter.onb_samokat_sent.01",
+        "text": "Ура-ура! Мама посмотрит и оплатит.",
+        "emotion": "excited",
+        "face": "excited"
+      }
+    ],
+    "onb_samokat_stub": [
+      {
+        "id": "glitter.onb_samokat_stub.01",
+        "text": "Покажи этот экран маме — она закажет!",
+        "emotion": "happy",
+        "face": "happy"
+      }
+    ],
+    "onb_samokat_later": [
+      {
+        "id": "glitter.onb_samokat_later.01",
+        "text": "Ладно, перекус подождёт.",
+        "emotion": "neutral",
+        "face": "neutral"
+      }
+    ],
+    "onb_kids_hello": [
+      {
+        "id": "glitter.onb_kids_hello.01",
+        "text": "А это СберKids! Тут живут твои деньги и копилка!",
+        "emotion": "excited",
+        "face": "excited"
+      }
+    ],
+    "onb_kids_piggy": [
+      {
+        "id": "glitter.onb_kids_piggy.01",
+        "text": "Дзынь-дзынь! Копим на мечту!",
+        "emotion": "excited",
+        "face": "excited"
+      }
+    ],
+    "onb_kids_tour_1": [
+      {
+        "id": "glitter.onb_kids_tour_1.01",
+        "text": "В копилке СберKids копят на мечту — по монетке.",
+        "emotion": "happy",
+        "face": "happy"
+      }
+    ],
+    "onb_kids_tour_2": [
+      {
+        "id": "glitter.onb_kids_tour_2.01",
+        "text": "А ещё там задания — и награды за них!",
+        "emotion": "excited",
+        "face": "excited"
+      }
+    ],
+    "onb_kids_tour_3": [
+      {
+        "id": "glitter.onb_kids_tour_3.01",
+        "text": "И твоя детская карта — всё видно в телефоне.",
+        "emotion": "happy",
+        "face": "happy"
+      }
+    ],
+    "onb_kids_go": [
+      {
+        "id": "glitter.onb_kids_go.01",
+        "text": "Заходи в СберKids — я и там с тобой!",
+        "emotion": "excited",
+        "face": "excited"
+      }
+    ],
+    "onb_kids_later": [
+      {
+        "id": "glitter.onb_kids_later.01",
+        "text": "Хорошо, заглянем в СберKids потом.",
+        "emotion": "neutral",
+        "face": "neutral"
+      }
+    ],
+    "pick_intro": [
+      {
+        "id": "glitter.pick_intro.01",
+        "text": "Выбери, кто будет с тобой!",
+        "emotion": "excited",
+        "face": "excited"
+      }
+    ],
+    "pick_play": [
+      {
+        "id": "glitter.pick_play.01",
+        "text": "Кого позовём? Выбирай!",
+        "emotion": "excited",
+        "face": "excited"
       }
     ],
     "home_ball": [

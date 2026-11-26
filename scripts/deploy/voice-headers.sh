@@ -5,6 +5,8 @@
 #   ALL=1 bash scripts/deploy/voice-headers.sh                                   # + HEAD на каждый mp3 манифеста
 #   bash scripts/deploy/voice-headers.sh names=227      # имена: ждать (до 25 мин), пока в манифесте сайта у каждого кота
 #                                                       # ≥227 слотов имени, затем HEAD на все mp3 имён + 2–3 образца целиком
+#   bash scripts/deploy/voice-headers.sh events=onb_,pick_:45   # реплики событий с этими префиксами: ждать (до 25 мин),
+#                                                       # пока в манифесте их ≥45 (у трёх котов), HEAD на все + образец целиком
 # Что проверяет (iPhone 22.11: «звук зависал и не грузился»):
 #   манифест voice/el/manifest.json — 200, JSON, Cache-Control no-cache (после пересборки хэши файлов новые);
 #   mp3 — 200, audio/mpeg, БЕЗ Content-Encoding (mp3 не жмётся повторно), Content-Length = скачанному, начало файла —
@@ -24,6 +26,32 @@ T=$(mktemp -d); trap 'rm -rf "$T"' EXIT
 echo "=== озвучка $H (кот $P) ==="
 # режим names=<N> (аргумент — так его можно задать задачей ar-auto, где env ограничен)
 NAMES_N=""; for a in "$@"; do case "$a" in names=[0-9]*) NAMES_N=${a#names=} ;; esac; done
+# режим events=<префикс,префикс>:<N> — новые реплики событий (онборды onb_*, лист выбора pick_*, 26.11)
+EV_ARG=""; for a in "$@"; do case "$a" in events=*:[0-9]*) EV_ARG=${a#events=} ;; esac; done
+if [ -n "$EV_ARG" ]; then
+  EV_N=${EV_ARG##*:}; EV_RE=$(printf '%s' "${EV_ARG%:*}" | tr -cd 'a-z0-9_,' | sed 's/,/|/g')
+  [ -n "$EV_RE" ] || { echo "events=: пустой список префиксов"; exit 1; }
+  for i in $(seq 1 25); do
+    curl -s -o "$T/man.json" -H "$AE" -H "$UA" --compressed "$H/voice/el/manifest.json"
+    FILES=$(grep -oE "\"f\":\"el/[a-z]+/[a-z]+\.($EV_RE)[a-z0-9_]*\.[0-9]+\.[0-9a-f]+\.mp3\"" "$T/man.json" | cut -d'"' -f4 | sort -u)
+    c=$(printf '%s\n' $FILES | grep -c . || true)
+    per=""; for p in hooligan kind glitter; do per="$per $p=$(printf '%s\n' $FILES | grep -c "^el/$p/" || true)"; done
+    echo "попытка $i: реплик ($EV_RE) в манифесте: $c ($per) — ждём ≥ $EV_N"
+    [ "$c" -ge "$EV_N" ] && break
+    [ "$i" = 25 ] && { echo "ИТОГ: ПЛОХО (реплики не попали в манифест сайта — пересборка не прошла?)"; exit 1; }
+    sleep 60
+  done
+  printf '%s\n' $FILES | sed 's/^/  /'
+  miss=$(printf '%s\n' $FILES | xargs -P 8 -I{} bash -c 'c=$(curl -s -o /dev/null -I -w "%{http_code}" "$0/voice/{}"); [ "$c" = 200 ] || echo "$c {}"' "$H")
+  [ -z "$miss" ] && echo "HEAD: все 200" || { echo "ПЛОХО: не отвечают:"; printf '%s\n' "$miss" | head -10; bad=1; }
+  for f in $(printf '%s\n' $FILES | grep -E '/(kind|hooligan|glitter)\.(onb_samokat_hello|pick_intro)\.' | head -6); do
+    code=$(curl -s -o "$T/a.mp3" -D "$T/a.h" -H "$UA" -w '%{http_code}' "$H/voice/$f")
+    echo "$f: $code $(hdr content-type < "$T/a.h") $(wc -c < "$T/a.mp3") б magic=$(head -c 3 "$T/a.mp3" | od -An -tx1 | tr -d ' \n')"
+    [ "$code" = 200 ] || bad=1
+  done
+  [ "$bad" = 1 ] && { echo "ИТОГ: ПЛОХО"; exit 1; }
+  echo "ИТОГ: OK (реплики в манифесте и отдаются)"; exit 0
+fi
 if [ -n "$NAMES_N" ]; then
   # кириллица в пути — percent-encoding, как шлёт браузер
   urlenc() { local LC_ALL=C s="$1" o="" c i; for ((i = 0; i < ${#s}; i++)); do c=${s:i:1}; case "$c" in [A-Za-z0-9./_~-]) o+=$c ;; *) o+=$(printf '%%%02X' "'$c") ;; esac; done; printf '%s' "$o"; }

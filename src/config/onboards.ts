@@ -8,8 +8,9 @@
  *   «Отправить маме на оплату» ничего не открывает — лист честно просит показать экран маме (заглушка).
  * СберKids — существующий переход src/config/sberkids.ts (kidsTargets) с меткой точки (kidsLink).
  *
- * Новые реплики пока без записи ElevenLabs — пузырём без голоса (director.bubble). Список для озвучки —
- * ONB_VOICE_LINES (тест сверяет, что каждая реплика онборда в нём есть).
+ * Реплики — голосом ElevenLabs (26.11): события onb_* в content/src/<кот>.lines.txt (у каждого кота свой текст в его
+ * характере), ONB_EVENTS — какое событие у какого шага; director.serviceLine играет запись, а нет записи — пузырь
+ * текстом кота. ONB_LINES — запасной текст (у события нет реплик) и список ONB_VOICE_LINES для сверки в тестах.
  */
 import type { PersonaId } from '../persona/types';
 
@@ -36,7 +37,7 @@ export const SNACKS: { id: string; label: string }[] = [
 /** «Перекус от Хулигана / Добряка / Блёстки» */
 export const FROM_CAT: Record<PersonaId, string> = { hooligan: 'Хулигана', kind: 'Добряка', glitter: 'Блёстки' };
 
-/** реплики кота (пузырём; запись ElevenLabs — потом, по списку ONB_VOICE_LINES) */
+/** реплики кота — запасной текст пузыря (основной — событие ONB_EVENTS у кота в content) */
 export const ONB_LINES = {
   samokat: {
     hello: 'Ой! Это Самокат, у них столько вкусняшек!',
@@ -58,6 +59,31 @@ export const ONB_LINES = {
     later: 'Хорошо, заглянем в СберKids потом.',
   },
 } as const;
+
+/** события content (content/events.json, content/src/<кот>.lines.txt) для шагов онборда — те же ключи, что ONB_LINES */
+export const ONB_EVENTS = {
+  samokat: {
+    hello: 'onb_samokat_hello',
+    collect: 'onb_samokat_collect',
+    sheet: 'onb_samokat_sheet',
+    sent: 'onb_samokat_sent',
+    stub: 'onb_samokat_stub',
+    later: 'onb_samokat_later',
+  },
+  kids: {
+    hello: 'onb_kids_hello',
+    piggy: 'onb_kids_piggy',
+    tour: ['onb_kids_tour_1', 'onb_kids_tour_2', 'onb_kids_tour_3'],
+    go: 'onb_kids_go',
+    later: 'onb_kids_later',
+  },
+} as const;
+
+/** все события онборда (13) — тест сверяет, что у каждого кота на каждое есть реплика */
+export const ONB_VOICE_EVENTS: string[] = [
+  ...Object.values(ONB_EVENTS.samokat),
+  ONB_EVENTS.kids.hello, ONB_EVENTS.kids.piggy, ...ONB_EVENTS.kids.tour, ONB_EVENTS.kids.go, ONB_EVENTS.kids.later,
+];
 
 /** экскурс СберKids: 3 шага (что можно в СберKids) — иконка и подпись карточки */
 export const KIDS_TOUR: { id: string; icon: string; title: string; text: string }[] = [
@@ -83,7 +109,7 @@ export const ONB_MS = {
   tourAuto: 5200,
 } as const;
 
-/** все новые реплики онбордов — для озвучки (ElevenLabs не тратим, пока продакт не скажет «да») */
+/** все реплики онбордов (запасной текст) — смысл тот же, что у озвученных реплик котов (13 шт.) */
 export const ONB_VOICE_LINES: string[] = [
   ...Object.values(ONB_LINES.samokat),
   ONB_LINES.kids.hello, ONB_LINES.kids.piggy, ...ONB_LINES.kids.tour, ONB_LINES.kids.go, ONB_LINES.kids.later,

@@ -11,7 +11,9 @@ const sent: { name: string; props: Record<string, unknown> }[] = [];
 vi.mock('../src/analytics', () => ({ track: (name: string, props: Record<string, unknown> = {}) => void sent.push({ name, props }) }));
 
 import { ServiceOnboard, type OnbHost } from '../src/ui/serviceOnboard';
-import { KIDS_TOUR, ONB_LINES, ONB_MS, ONB_VOICE_LINES, PIGGY, SNACKS, SVC_ITEMS, withMark } from '../src/config/onboards';
+import { KIDS_TOUR, ONB_EVENTS, ONB_LINES, ONB_MS, ONB_VOICE_EVENTS, ONB_VOICE_LINES, PIGGY, SNACKS, SVC_ITEMS, withMark } from '../src/config/onboards';
+import fs from 'node:fs';
+import path from 'node:path';
 
 function host(over: Partial<OnbHost> = {}) {
   const root = document.createElement('div');
@@ -147,6 +149,45 @@ describe('онборды: конфиг и аналитика без персон
     for (const t of [...Object.values(ONB_LINES.samokat), ONB_LINES.kids.hello, ONB_LINES.kids.piggy, ...ONB_LINES.kids.tour, ONB_LINES.kids.go, ONB_LINES.kids.later]) expect(ONB_VOICE_LINES).toContain(t);
     // ни одна реплика не зовёт «погладить» (pilot.noCare)
     for (const t of ONB_VOICE_LINES) expect(t).not.toMatch(/глад|щекоч|обним|ласк/i);
+  });
+  it('озвучка: у каждого шага — событие onb_*, у каждого кота на него одна реплика без слов ласки (длина ±20 % от запасной)', () => {
+    expect(ONB_VOICE_EVENTS).toHaveLength(13);
+    expect(new Set(ONB_VOICE_EVENTS).size).toBe(13);
+    const ev = JSON.parse(fs.readFileSync(path.resolve('content/events.json'), 'utf8')).events as { id: string }[];
+    const fallback = new Map<string, string>([
+      ...Object.entries(ONB_EVENTS.samokat).map(([k, e]) => [e, ONB_LINES.samokat[k as keyof typeof ONB_LINES.samokat]] as [string, string]),
+      [ONB_EVENTS.kids.hello, ONB_LINES.kids.hello], [ONB_EVENTS.kids.piggy, ONB_LINES.kids.piggy], [ONB_EVENTS.kids.go, ONB_LINES.kids.go],
+      [ONB_EVENTS.kids.later, ONB_LINES.kids.later], ...ONB_EVENTS.kids.tour.map((e, i) => [e, ONB_LINES.kids.tour[i]] as [string, string]),
+    ]);
+    for (const e of ONB_VOICE_EVENTS) {
+      expect(ev.some((x) => x.id === e)).toBe(true);
+      for (const pid of ['hooligan', 'kind', 'glitter']) {
+        const p = JSON.parse(fs.readFileSync(path.resolve(`content/personas/${pid}.json`), 'utf8'));
+        const ls = p.lines[e] as { text: string }[];
+        expect(ls, `${pid}.${e}`).toHaveLength(1);
+        expect(ls[0].text).not.toMatch(/глад|щекоч|обним|ласк/i);
+        const base = fallback.get(e)!.length;
+        expect(Math.abs(ls[0].text.length - base) / base, `${pid}.${e}: «${ls[0].text}»`).toBeLessThanOrEqual(0.2);
+      }
+    }
+  });
+  it('реплика шага уходит с событием; нажатие кнопки обрывает прежнюю (cut), закрытие крестиком — снимает недоговорённое', () => {
+    vi.useFakeTimers();
+    const calls: [string, string | undefined, boolean | undefined][] = [];
+    let hushed = 0;
+    const { h, root } = host({ say: (t, _ms, e, cut) => void calls.push([t, e, cut]), hush: () => void hushed++ });
+    const o = new ServiceOnboard(h);
+    o.open('kids');
+    expect(calls[0]).toEqual([ONB_LINES.kids.hello, 'onb_kids_hello', false]);
+    vi.advanceTimersByTime(ONB_MS.hello + PIGGY.coins * ONB_MS.coin + ONB_MS.fly + ONB_MS.toSheet + 200);
+    expect(o.stage).toBe('tour');
+    expect(calls.at(-1)).toEqual([ONB_LINES.kids.tour[0], 'onb_kids_tour_1', false]);
+    tap(root, 'next');
+    expect(calls.at(-1)).toEqual([ONB_LINES.kids.tour[1], 'onb_kids_tour_2', true]);
+    tap(root, 'close');
+    expect(hushed).toBe(1);
+    o.dispose();
+    vi.useRealTimers();
   });
   it('onb_step: только сервис, метка шага, номер, способ; текст/имя выбрасываются', async () => {
     const { sanitize } = await vi.importActual<typeof import('../src/analytics')>('../src/analytics');

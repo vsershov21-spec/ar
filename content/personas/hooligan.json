@@ -696,6 +696,51 @@
     "pilot_switch_later": {
       "clip": "none"
     },
+    "onb_samokat_hello": {
+      "clip": "none"
+    },
+    "onb_samokat_collect": {
+      "clip": "none"
+    },
+    "onb_samokat_sheet": {
+      "clip": "none"
+    },
+    "onb_samokat_sent": {
+      "clip": "none"
+    },
+    "onb_samokat_stub": {
+      "clip": "none"
+    },
+    "onb_samokat_later": {
+      "clip": "none"
+    },
+    "onb_kids_hello": {
+      "clip": "none"
+    },
+    "onb_kids_piggy": {
+      "clip": "none"
+    },
+    "onb_kids_tour_1": {
+      "clip": "none"
+    },
+    "onb_kids_tour_2": {
+      "clip": "none"
+    },
+    "onb_kids_tour_3": {
+      "clip": "none"
+    },
+    "onb_kids_go": {
+      "clip": "none"
+    },
+    "onb_kids_later": {
+      "clip": "none"
+    },
+    "pick_intro": {
+      "clip": "none"
+    },
+    "pick_play": {
+      "clip": "none"
+    },
     "home_ball": {
       "clip": "jump"
     },
@@ -3586,6 +3631,126 @@
       {
         "id": "hooligan.pilot_switch_later.01",
         "text": "Чуть позже! Давай ещё немного поиграем со мной.",
+        "emotion": "cheeky",
+        "face": "smirk"
+      }
+    ],
+    "onb_samokat_hello": [
+      {
+        "id": "hooligan.onb_samokat_hello.01",
+        "text": "Йо! Это Самокат — у них куча вкусняшек!",
+        "emotion": "cheeky",
+        "face": "smirk"
+      }
+    ],
+    "onb_samokat_collect": [
+      {
+        "id": "hooligan.onb_samokat_collect.01",
+        "text": "Смотри, ща соберу нам перекус после школы!",
+        "emotion": "excited",
+        "face": "excited"
+      }
+    ],
+    "onb_samokat_sheet": [
+      {
+        "id": "hooligan.onb_samokat_sheet.01",
+        "text": "Готово! Отправим маме — пусть оплатит?",
+        "emotion": "cheeky",
+        "face": "smirk"
+      }
+    ],
+    "onb_samokat_sent": [
+      {
+        "id": "hooligan.onb_samokat_sent.01",
+        "text": "Ура! Мама глянет и оплатит.",
+        "emotion": "happy",
+        "face": "happy"
+      }
+    ],
+    "onb_samokat_stub": [
+      {
+        "id": "hooligan.onb_samokat_stub.01",
+        "text": "Покажи этот экран маме — она закажет!",
+        "emotion": "neutral",
+        "face": "neutral"
+      }
+    ],
+    "onb_samokat_later": [
+      {
+        "id": "hooligan.onb_samokat_later.01",
+        "text": "Окей, перекус подождёт.",
+        "emotion": "neutral",
+        "face": "neutral"
+      }
+    ],
+    "onb_kids_hello": [
+      {
+        "id": "hooligan.onb_kids_hello.01",
+        "text": "А это СберKids. Тут живут твои деньги и копилка!",
+        "emotion": "cheeky",
+        "face": "smirk"
+      }
+    ],
+    "onb_kids_piggy": [
+      {
+        "id": "hooligan.onb_kids_piggy.01",
+        "text": "Дзынь-дзынь! Копим на мечту!",
+        "emotion": "excited",
+        "face": "excited"
+      }
+    ],
+    "onb_kids_tour_1": [
+      {
+        "id": "hooligan.onb_kids_tour_1.01",
+        "text": "В копилке СберKids копят на мечту — по монетке.",
+        "emotion": "neutral",
+        "face": "neutral"
+      }
+    ],
+    "onb_kids_tour_2": [
+      {
+        "id": "hooligan.onb_kids_tour_2.01",
+        "text": "А ещё там задания — и награды за них. Чётко!",
+        "emotion": "cheeky",
+        "face": "smirk"
+      }
+    ],
+    "onb_kids_tour_3": [
+      {
+        "id": "hooligan.onb_kids_tour_3.01",
+        "text": "И твоя детская карта — всё видно в телефоне.",
+        "emotion": "neutral",
+        "face": "neutral"
+      }
+    ],
+    "onb_kids_go": [
+      {
+        "id": "hooligan.onb_kids_go.01",
+        "text": "Залетай в СберKids — я и там с тобой!",
+        "emotion": "excited",
+        "face": "excited"
+      }
+    ],
+    "onb_kids_later": [
+      {
+        "id": "hooligan.onb_kids_later.01",
+        "text": "Окей, заглянем в СберKids потом.",
+        "emotion": "neutral",
+        "face": "neutral"
+      }
+    ],
+    "pick_intro": [
+      {
+        "id": "hooligan.pick_intro.01",
+        "text": "Ну? Выбери, кто будет с тобой!",
+        "emotion": "cheeky",
+        "face": "smirk"
+      }
+    ],
+    "pick_play": [
+      {
+        "id": "hooligan.pick_play.01",
+        "text": "Кого позовём? Выбирай!",
         "emotion": "cheeky",
         "face": "smirk"
       }

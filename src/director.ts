@@ -93,6 +93,7 @@ const EXTRA_EMOTION: Record<string, [string, number, number]> = {
 /** взрывы блёсток/конфетти по кнопке — у лап кота, а не у морды */
 /** лист выбора кота (cfg.pickCat): заголовок и пузырь кота — это три разных кота, а не «каким мне быть» */
 export const PICK_TITLE = { intro: 'Выбери своего кота', play: 'Позвать другого кота' } as const;
+/** запасной текст листа выбора (основной — события pick_intro / pick_play у кота в content, голосом) */
 export const PICK_LINE = { intro: 'Выбери, кто будет с тобой!', play: 'Кого позовём? Выбирай!' } as const;
 
 const BURST_FX = new Set(['glitter_burst', 'confetti', 'skate_sparks']);
@@ -1170,8 +1171,8 @@ export class Director extends Emitter<DirectorEvents> {
   }
 
   /**
-   * Лист выбора кота (cfg.pickCat): знакомство — «Выбери своего кота», все трое (кот, вышедший из карты, зовёт:
-   * «Выбери, кто будет с тобой!» — пузырём, записи нет); игра — «Позвать другого кота», двое других. Касание карточки —
+   * Лист выбора кота (cfg.pickCat): знакомство — «Выбери своего кота», все трое (кот, вышедший из карты, зовёт своим
+   * голосом: событие pick_intro — «Выбери, кто будет с тобой!»; нет записи — пузырём); игра — pick_play; игра — «Позвать другого кота», двое других. Касание карточки —
    * событие choose (машина: swap_persona).
    */
   private async offerPick(where: 'intro' | 'play') {
@@ -1190,7 +1191,7 @@ export class Director extends Emitter<DirectorEvents> {
     d.ui.showChoice(opts, (id) => {
       if (open() && isPersonaId(id)) this.dispatch({ type: 'choose', persona: id });
     }, where === 'intro' ? { title: PICK_TITLE.intro } : { title: PICK_TITLE.play, close: 'Не сейчас', onClose: () => this.dispatch({ type: 'intent', intent: { type: 'no', text: '' } }) });
-    this.bubble(where === 'intro' ? PICK_LINE.intro : PICK_LINE.play, where === 'intro' ? 6000 : 4000);
+    this.serviceLine(where === 'intro' ? 'pick_intro' : 'pick_play', PICK_LINE[where], where === 'intro' ? 6000 : 4000);
     this.log(`🐾 лист выбора кота (${where}): ${ids.join(', ')}`);
   }
 
@@ -1375,6 +1376,28 @@ export class Director extends Emitter<DirectorEvents> {
     this.d.ui.say(pk.text, p.name, p.id);
     this.emotion(event);
     return true;
+  }
+
+  /**
+   * Реплика сцены вне режиссёра (онборды сервисов, лист выбора кота): есть запись у текущего кота — голосом через
+   * очередь, без клипа реакции (тело ведёт сцена); записи нет — пузырём текстом кота (fallback — если у события нет
+   * реплик). Реплики той же группы (префикс события) не копятся: ждущая снимается, а cut — обрывает и звучащую
+   * (ребёнок нажал «Дальше»). false — ничего не показано.
+   */
+  serviceLine(event: string, fallback: string, ms = 3500, o: { cut?: boolean; group?: string } = {}): boolean {
+    const group = o.group ?? `${event.split('_')[0]}_`;
+    const cur = this.queue.current?.id;
+    this.queue.drop((it) => it.event.startsWith(group) && (o.cut || it.id !== cur));
+    if (this.hasVoiced(event)) return this.speakEvent(event, { visuals: false });
+    const pk = this.personas.line(event, { name: this.state.name, strict: false });
+    const text = pk?.text ?? fallback;
+    if (!text) return false;
+    this.emotion(event);
+    return this.bubble(text, ms);
+  }
+  /** снять недоговорённые реплики группы (префикс события): онборд закрыли командой коту или крестиком */
+  hushLines(group: string): boolean {
+    return this.queue.drop((it) => it.event.startsWith(group));
   }
 
   /** есть ли у события хоть одна реплика, которая прозвучит живым голосом */
