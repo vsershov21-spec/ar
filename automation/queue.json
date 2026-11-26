@@ -203,6 +203,30 @@
       "path": "scripts/deploy/caddy-static.sh",
       "timeoutMin": 15,
       "note": "PERF-02: статика терминальная, 404 без immutable, HTML no-cache; проверки curl -I"
+    },
+    {
+      "id": "el-plan-onb-2611",
+      "kind": "script",
+      "ref": "71f75a9b04371fe644c897cf1b46d7391f88b104",
+      "path": "scripts/voice/el-run.sh",
+      "args": [
+        "--plan",
+        "--only",
+        "onb_"
+      ],
+      "timeoutMin": 20
+    },
+    {
+      "id": "el-plan-pick-2611",
+      "kind": "script",
+      "ref": "71f75a9b04371fe644c897cf1b46d7391f88b104",
+      "path": "scripts/voice/el-run.sh",
+      "args": [
+        "--plan",
+        "--only",
+        "pick_"
+      ],
+      "timeoutMin": 20
     }
   ]
 }
