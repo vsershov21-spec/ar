@@ -57,8 +57,11 @@ describe('glitter p4: флаг ?models=p4', () => {
     }
     const md = p4.nodes.find((n) => n.name === 'MouthD')!;
     const mouth = md.extras?.mouth as { rest: Record<string, number>; teeth: number[]; tongue: object; jaw: object };
-    expect(mouth.rest.mouth_A).toBeLessThan(0.46); // рот в покое приоткрыт меньше, чем у p1 (PERSONA_FACE_V2)
-    expect(mouth.teeth[0]).toBe(1); // резцы, не клычки
+    expect(mouth.rest.mouth_A).toBeLessThan(0.46); // челюсть тела в покое — меньше, чем у p1 (PERSONA_FACE_V2)
+    // v3 (продакт: «больше на зайца»): клычки у уголков (форма 0), а не два резца по центру; рот открыт рисунком
+    expect(mouth.teeth[0]).toBe(0);
+    expect(mouth.teeth[2]).toBeGreaterThan(0.6);
+    expect(mouth.rest.mouth_open).toBeGreaterThan(mouth.rest.mouth_A);
     // рантайм: зубки и язык — из extras модели, у остальных — как было
     const THREE = await import('three');
     const { MouthRig } = await import('../src/character/mouthRig');
@@ -77,5 +80,32 @@ describe('glitter p4: флаг ?models=p4', () => {
     def.setTongue({ size: 0.6, deeper: 0.1, tone: 0.82 });
     expect(def.uniforms.uMD.value.x).toBeCloseTo(0.6);
     expect(own.ex.rest).toEqual(mouth.rest);
+  });
+
+  it('v3: голова и мордочка по наложению на реф — своя морда, нос розовый, один блик, подводка толще', async () => {
+    const p4: J = read('public/models/v2/glitter_p4.glb');
+    const parts = (p4.asset.extras?.glitterP4 as { parts: Record<string, { role: string }> }).parts;
+    const roles = Object.values(parts).map((q) => q.role);
+    expect(Object.keys(parts)).toContain('cap_muzzle_v3'); // морда Tripo (вытянутый блок, раздвоенная губа) — своей заплаткой
+    expect(roles).not.toContain('muzzle');
+    expect(roles).not.toContain('brow'); // брови — мягкие заплатки мехом
+    expect(roles).toContain('browcap');
+    const eye = p4.nodes.find((n) => n.name === 'Eye_L')!;
+    const hi = eye.extras?.hi as number[];
+    expect(hi.length).toBe(5);
+    expect(hi[3]).toBe(0); // второй блик выключен
+    expect(eye.extras?.lash as number).toBeGreaterThan(1.6);
+    // рантайм: mouth_open раскрывает рисунок рта без челюсти тела; у других котов ключа нет — как было
+    const { mouthParams } = await import('../src/character/mouthRig');
+    expect(mouthParams({ mouth_open: 0.7 }, { mouth_A: 0.4 }).drop).toBeCloseTo(0.28);
+    expect(mouthParams({ mouth_A: 0.5 }, { mouth_A: 0.4 }).drop).toBeCloseTo(0.2);
+    expect(mouthParams({ mouth_A: 0.9, mouth_open: 0.1 }, { mouth_A: 0.4 }).drop).toBeCloseTo(0.36);
+    // блики: без extras.hi — прежние значения шейдера
+    const THREE = await import('three');
+    const { EyeRig } = await import('../src/character/eyeRig');
+    const r = new EyeRig();
+    expect(r.uniforms.uHiP.value.toArray()).toEqual([-0.42, 0.5, 1, 1]);
+    expect(r.uniforms.uHiK.value).toBe(0);
+    void THREE;
   });
 });

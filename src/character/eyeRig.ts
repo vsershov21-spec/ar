@@ -28,6 +28,13 @@ export interface EyeExtras {
    * без него — LID_FUR по характеру и 0.9 / 1 (как было)
    */
   lidTone?: [number, number, number, number];
+  /**
+   * блики своей модели (persona_tune.py, Блёстка p4 v3 — один аккуратный блик, как на рефе): направление первого
+   * (x, y в пространстве камеры), сила первого и второго, размер первого (сдвиг порога); без него — как было
+   */
+  hi?: [number, number, number, number, number];
+  /** сила подводки и ресниц верхнего века своей модели (Блёстка p4 v3 — толще, как на рефе); без него — LID_LASH */
+  lash?: number;
 }
 
 export interface LidPose {
@@ -340,6 +347,9 @@ export class EyeRig {
     uIris: { value: new THREE.Vector2(0.2, 0.2) },
     uPr0: { value: 0.5 },
     uHi: { value: 1 },
+    /** блики: направление первого (x, y), сила первого и второго; uHiK — размер первого (сдвиг порога, > 0 — меньше) */
+    uHiP: { value: new THREE.Vector4(-0.42, 0.5, 1, 1) },
+    uHiK: { value: 0 },
   };
   private t = 0;
   private sacT = 0.6;
@@ -387,6 +397,10 @@ export class EyeRig {
     const ex = rig.eyes[0].ex;
     rig.uniforms.uIris.value.set(ex.irisUV?.[0] ?? 0.2, ex.irisUV?.[1] ?? 0.2);
     rig.uniforms.uPr0.value = ex.pupil ?? 0.5;
+    if (ex.hi?.length === 5) {
+      rig.uniforms.uHiP.value.set(ex.hi[0], ex.hi[1], ex.hi[2], ex.hi[3]);
+      rig.uniforms.uHiK.value = ex.hi[4];
+    }
     const done = new Set<THREE.Material>();
     // веки: мех, а не серые «заслонки» (продакт 23.11: плоские серые оболочки с резким светлым краем над глазом);
     // мягкая кромка (подводка и ресницы шейдером) — если сетки век узнаются (softLidGeometry)
@@ -414,7 +428,7 @@ export class EyeRig {
         const tex = lidCutTexture(lidCutPolygon(l.up!.geometry, l.lo!.geometry, l.nu));
         for (const lid of [e.up, e.lo]) cuts.set(lid, { tex, rot: { value: new THREE.Matrix3() }, band: { value: new THREE.Vector2() }, tone: new THREE.Vector4(...lidTone) });
         softLidGeometry(l.lo!.geometry, l.nu, 0.35, tone);
-        softLidGeometry(l.up!.geometry, l.nu, LID_LASH[persona] ?? 1, tone);
+        softLidGeometry(l.up!.geometry, l.nu, rig.eyes[0].ex.lash ?? LID_LASH[persona] ?? 1, tone);
       });
     for (const e of rig.eyes)
       for (const lid of [e.up, e.lo])
@@ -503,7 +517,7 @@ export class EyeRig {
     m.onBeforeCompile = (sh) => {
       Object.assign(sh.uniforms, U);
       sh.fragmentShader =
-        'uniform float uPupil;\nuniform float uSpiral;\nuniform float uTime;\nuniform vec2 uIris;\nuniform float uPr0;\nuniform float uHi;\n' +
+        'uniform float uPupil;\nuniform float uSpiral;\nuniform float uTime;\nuniform vec2 uIris;\nuniform float uPr0;\nuniform float uHi;\nuniform vec4 uHiP;\nuniform float uHiK;\n' +
         sh.fragmentShader
           .replace(
             '#include <map_fragment>',
@@ -527,11 +541,11 @@ export class EyeRig {
             '#include <emissivemap_fragment>',
             `#include <emissivemap_fragment>
   {
-    vec3 eyH1 = normalize(vec3(-0.42, 0.5, 0.76));
+    vec3 eyH1 = normalize(vec3(uHiP.xy, 0.76));
     vec3 eyH2 = normalize(vec3(0.32, -0.3, 0.9));
-    float eyS1 = smoothstep(0.968, 0.978, dot(normal, eyH1));
+    float eyS1 = smoothstep(0.968 + uHiK, 0.978 + uHiK * 0.7, dot(normal, eyH1));
     float eyS2 = smoothstep(0.9925, 0.9965, dot(normal, eyH2));
-    totalEmissiveRadiance += vec3(1.0) * (eyS1 * 1.2 + eyS2 * 0.9) * uHi * (1.0 - 0.6 * uSpiral);
+    totalEmissiveRadiance += vec3(1.0) * (eyS1 * 1.2 * uHiP.z + eyS2 * 0.9 * uHiP.w) * uHi * (1.0 - 0.6 * uSpiral);
   }`,
           );
     };

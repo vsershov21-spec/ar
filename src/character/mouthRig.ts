@@ -36,7 +36,10 @@ export function mouthParams(W: Record<string, number>, jaw: Record<string, numbe
   const g = (k: string) => W[k] ?? 0;
   const A = Math.max(0, g('mouth_A')), E = Math.max(0, g('mouth_E')), O = Math.max(0, g('mouth_O')), U = Math.max(0, g('mouth_U'));
   // насколько опустилась челюсть (в долях ширины рта) — как у тела
-  const drop = A * (jaw.mouth_A ?? 0.4) + E * (jaw.mouth_E ?? 0.2) + O * (jaw.mouth_O ?? 0.32) + U * (jaw.mouth_U ?? 0.15) + g('tongue_out') * (jaw.tongue_out ?? 0.1);
+  const drop0 = A * (jaw.mouth_A ?? 0.4) + E * (jaw.mouth_E ?? 0.2) + O * (jaw.mouth_O ?? 0.32) + U * (jaw.mouth_U ?? 0.15) + g('tongue_out') * (jaw.tongue_out ?? 0.1);
+  // mouth_open — рот открыт только рисунком (без челюсти тела): покой своей модели (Блёстка p4 v3, extras.mouth.rest);
+  // у остальных котов ключа нет — как было
+  const drop = Math.max(drop0, g('mouth_open') * (jaw.mouth_A ?? 0.4));
   const sum = A + E + O + U + 1e-3;
   return {
     drop,

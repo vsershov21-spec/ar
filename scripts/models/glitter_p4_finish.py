@@ -19,8 +19,36 @@ sys.path.insert(0, HERE)
 from face_detail import G2, gc  # noqa: E402
 from glitter_p3 import add_skinned_node, weld_map, edges_of, smooth_field  # noqa: E402
 
-FUR_ROLES = {'head', 'fur', 'tail', 'muzzle'}
+FUR_ROLES = {'head', 'fur', 'tail', 'muzzle', 'browcap'}
 VERSION = 1
+# v3: ключи рта тела (face_rig.py) у этой сетки двигают морду только по y — при «а»/улыбке полоса подбородка
+# выезжала вперёд светлой плашкой («резцы» под ртом). Тело и MouthD — слабее (рот рисует шейдер: раскрытие — по
+# extras.mouth.jaw MouthD, оно прежнее)
+KEY_K = {'mouth_A': 0.45, 'mouth_E': 0.5, 'mouth_O': 0.45, 'mouth_U': 0.5, 'tongue_out': 0.6, 'smile': 0.3, 'cheeks_gum': 0.2}
+# второй ярус пачки (v3): высота к поясу ×0.72, шире у подола на 8 %
+TIER = (0.72, 0.08)
+
+
+def scale_acc(g, ai, k):
+    """ключ ×k на месте: у разреженного accessor — его значения (файл не пухнет плотными ключами), иначе — данные"""
+    a = g.j['accessors'][ai]
+    if 'sparse' not in a:
+        g.set_acc(ai, g.acc(ai).astype(np.float32) * k)
+        return
+    vi = a['sparse']['values']['bufferView']
+    off = a['sparse']['values'].get('byteOffset', 0)
+    n = a['sparse']['count'] * 3
+    raw = bytearray(g.view(vi))
+    v = np.frombuffer(bytes(raw[off:off + n * 4]), np.float32) * k
+    raw[off:off + n * 4] = v.astype(np.float32).tobytes()
+    if vi in g.extra:
+        g.extra[vi] = bytes(raw)
+    else:
+        bv = g.j['bufferViews'][vi]
+        if not isinstance(g.bin, bytearray):
+            g.bin = bytearray(g.bin)
+        o = bv.get('byteOffset', 0)
+        g.bin[o:o + len(raw)] = raw
 
 
 def roles_by_uv(UV, parts):
@@ -40,6 +68,15 @@ def main():
     if '--parts' in sys.argv:  # роли частей от glitter_p4.py (Blender-стадии теряют asset.extras)
         ex['glitterP4'] = json.load(open(sys.argv[sys.argv.index('--parts') + 1]))
     info = ex['glitterP4']
+    for m_ in j['meshes']:
+        tn = m_.get('extras', {}).get('targetNames') or []
+        if m_.get('name') not in ('MouthD',) and not m_.get('name', '').startswith('tripo_mesh'):
+            continue
+        for p_ in m_['primitives']:
+            for k_, t_ in zip(tn, p_.get('targets', [])):
+                if k_ in KEY_K:
+                    scale_acc(g, t_['POSITION'], KEY_K[k_])
+        print(f"ключи рта {m_['name']}: ×{KEY_K}")
     mi, pr = g.main_mesh()
     mesh = j['meshes'][mi]
     A = pr['attributes']
@@ -86,7 +123,9 @@ def main():
         k *= near(ec, 0.052, 0.07)
     for key in ('nose', 'mouth'):
         if key in marks:
-            k *= near(marks[key], 0.03 if key == 'nose' else 0.045, 0.055 if key == 'nose' else 0.07)
+            # v3: у рта без меха — уже (0.03…0.045 вместо 0.045…0.07): подбородок и край морды под мехом (шов Tripo по
+            # середине подбородка и край заплатки морды не читаются)
+            k *= near(marks[key], 0.026 if key == 'nose' else 0.03, 0.045 if key == 'nose' else 0.045)
     L *= k * (role != 'muzzle') * (role != 'brow') * (role != 'nose')
     L[~np.isin(role, list(FUR_ROLES))] = 0
     L = L.astype(np.float32)
@@ -115,19 +154,36 @@ def main():
     bct = mat['pbrMetallicRoughness']['baseColorTexture']['index']
     nrt = mat['normalTexture']['index']
 
-    def sub_mesh(name, tris, m, extras):
+    def sub_mesh(name, tris, m, extras, tier=None):
         sv, inv = np.unique(F[tris].ravel(), return_inverse=True)
-        sa = {'POSITION': g.add_acc(V[sv].astype(np.float32), 5126, 'VEC3', 34962), 'NORMAL': g.add_acc(N[sv], 5126, 'VEC3', 34962),
-              'TEXCOORD_0': g.add_acc(UV[sv].astype(np.float32), 5126, 'VEC2', 34962),
-              'JOINTS_0': g.add_acc(Jt[sv].astype(np.uint16), 5123, 'VEC4', 34962), 'WEIGHTS_0': g.add_acc(Wt[sv].astype(np.float32), 5126, 'VEC4', 34962)}
+        Vs, Ns, UVs, Js, Ws, inv = V[sv], N[sv], UV[sv], Jt[sv], Wt[sv], inv.reshape(-1, 3)
+        if tier:
+            # v3: второй ярус пачки (реф — пышная многослойная): та же сетка короче (к поясу ×k) и шире, поверх
+            k, wide = tier
+            yt = np.percentile(Vs[:, 1], 99)
+            top = Vs[Vs[:, 1] > yt - 0.01]
+            c = np.array([top[:, 0].mean(), 0, top[:, 2].mean()])
+            V2 = Vs.copy(); V2[:, 1] = yt - (yt - Vs[:, 1]) * k
+            d = V2 - c; d[:, 1] = 0
+            tt = np.clip((yt - Vs[:, 1]) / (yt - Vs[:, 1].min()), 0, 1)
+            V2 += d * (wide * tt)[:, None] + d / (np.linalg.norm(d, axis=1, keepdims=True) + 1e-9) * 0.003 * tt[:, None]
+            n0 = len(Vs)
+            Vs = np.r_[Vs, V2]; Ns = np.r_[Ns, Ns]; UVs = np.r_[UVs, UVs]; Js = np.r_[Js, Js]; Ws = np.r_[Ws, Ws]
+            inv = np.r_[inv, inv + n0]
+            print(f'{name}: второй ярус ×{k} по высоте, шире ×{1 + wide:.2f} у подола')
+        sv = np.arange(len(Vs))
+        inv = inv.ravel()
+        sa = {'POSITION': g.add_acc(Vs.astype(np.float32), 5126, 'VEC3', 34962), 'NORMAL': g.add_acc(Ns.astype(np.float32), 5126, 'VEC3', 34962),
+              'TEXCOORD_0': g.add_acc(UVs.astype(np.float32), 5126, 'VEC2', 34962),
+              'JOINTS_0': g.add_acc(Js.astype(np.uint16), 5123, 'VEC4', 34962), 'WEIGHTS_0': g.add_acc(Ws.astype(np.float32), 5126, 'VEC4', 34962)}
         j['materials'].append(m)
         sp = {'attributes': sa, 'indices': g.add_acc(inv.astype(np.uint16), 5123, 'SCALAR', 34963), 'material': len(j['materials']) - 1}
         j['meshes'].append({'name': name, 'primitives': [sp]})
         add_skinned_node(j, name, len(j['meshes']) - 1, extras)
-        print(f'{name}: {len(sv)} вершин, {int(tris.sum())} треуг.')
+        print(f'{name}: {len(sv)} вершин, {len(inv) // 3} треуг.')
     sub_mesh('Skirt_P4', sk_tri, {'name': 'Skirt_P4_mat', 'alphaMode': 'BLEND', 'doubleSided': True,
              'pbrMetallicRoughness': {'baseColorTexture': {'index': bct}, 'baseColorFactor': [1, 1, 1, 0.8], 'metallicFactor': 0.0, 'roughnessFactor': 0.55},
-             'normalTexture': {'index': nrt}}, {'skirtP4': 1, 'tulle': 1})
+             'normalTexture': {'index': nrt}}, {'skirtP4': 1, 'tulle': 1}, tier=TIER)
     sub_mesh('Bow_Glitter', gold_tri, {'name': 'Gold_P4_mat', 'pbrMetallicRoughness': {'baseColorTexture': {'index': bct},
              'metallicFactor': 0.55, 'roughnessFactor': 0.32}, 'normalTexture': {'index': nrt}, 'emissiveFactor': [0.10, 0.08, 0.03]},
              {'part': 'bow', 'goldP4': 1})

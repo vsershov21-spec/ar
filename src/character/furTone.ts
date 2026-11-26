@@ -63,7 +63,8 @@ export const FUR_TONE: Record<string, FurToneParams> = {
  */
 export const FUR_TONE_P4: Record<string, FurToneParams> = {
   glitter: {
-    src: S(128, 138, 185), dst: S(150, 158, 194), contrast: 0.75, desat: 0.12, white: S(214, 216, 236), face: 0.25, brow: 0,
+    // v3 (наложение на разворот): реф спереди ≈ 161,171,191, сзади ≈ 144,156,184 — мех светлее и серее, рисунок мягче
+    src: S(128, 138, 185), dst: S(160, 169, 196), contrast: 0.68, desat: 0.2, white: S(216, 219, 236), face: 0.25, brow: 0,
     // худи Tripo ≈ 185,162,206 в свете приложения — насыщенный фиолет; реф — пастельный лиловый
     cloth: { src: S(185, 162, 206), r: 0.2, dst: S(206, 190, 236), k: 0.6 },
   },

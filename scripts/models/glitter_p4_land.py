@@ -9,6 +9,8 @@ import numpy as np
 from scipy import ndimage as nd
 
 src, land, out = sys.argv[1:4]
+# v3 (наложение на реф): рот шире (у рефа 0.44 межглазья) и ближе к носу (короткий фильтрум)
+MOUTH_W, MOUTH_UP = 1.75, 0.004
 d = np.load(src)
 C, L, xs, zs, step = d['C'], d['L'], d['xs'], d['zs'], float(d['step'])
 F = json.load(open(land))
@@ -87,9 +89,9 @@ if np.isnan(c3[0]):
 low = np.array([zr[np.where(m[:, c])[0].max()] for c in cols])
 # линия рта — посередине бывшего открытого рта (по заплатке glitter_p4.py): верхний край — шов заплатки с головой,
 # разрез губ face_rig.py по шву протекал (вершины края и полосы вшивки)
-drop = 0.45 * float(line[:, 1].mean() - low.mean())
+drop = 0.45 * float(line[:, 1].mean() - low.mean()) - MOUTH_UP
 # ширина — как у части-рта Tripo с губами (верхний край открытого рта уже: уголки губ дальше), ×1.35 от центра
-cx_ = float(line[:, 0].mean()); line[:, 0] = cx_ + (line[:, 0] - cx_) * 1.35
+cx_ = float(line[:, 0].mean()); line[:, 0] = cx_ + (line[:, 0] - cx_) * MOUTH_W
 left = line[np.argmax(line[:, 0])].copy(); right = line[np.argmin(line[:, 0])].copy()
 line[:, 1] -= drop; left = left - [0, drop]; right = right - [0, drop]; cusp = cusp - [0, drop]; center[1] -= drop
 F['mouth'] = {'line': line.round(6).tolist(), 'left': left.round(6).tolist(), 'right': right.round(6).tolist(),
