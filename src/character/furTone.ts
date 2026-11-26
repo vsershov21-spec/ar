@@ -142,10 +142,18 @@ export class FurTone {
     this.setPersona(this.personaId);
   }
 
+  /** база котов + скин (?models=base): тон меха один на всех котов */
+  private baseCat = false;
+  setBase(on: boolean) {
+    this.baseCat = on;
+    this.setPersona(this.personaId);
+  }
+
   setPersona(id: string) {
     this.personaId = id;
     const T = this.p4 && FUR_TONE_P4[id] ? FUR_TONE_P4 : modelsV2() ? FUR_TONE_V2 : FUR_TONE;
-    const p = T[id] ?? T.kind;
+    // база котов (catSkin.ts): одна модель и один мех на всех — тон Блёстки p4 у любого скина
+    const p = this.baseCat ? FUR_TONE_P4.glitter : (T[id] ?? T.kind);
     this.uniforms.uFtSrc.value.set(...p.src);
     this.uniforms.uFtDst.value.set(...p.dst);
     this.uniforms.uFtK.value.set(p.contrast, p.desat);
@@ -175,7 +183,8 @@ export class FurTone {
     }
     model.traverse((o) => {
       const m = o as THREE.Mesh;
-      if (!m.isMesh || !FurTone.isFur(m.name)) return;
+      // одежда скина (база котов, catSkin.ts): цвета уже в атласе скина — не мех
+      if (!m.isMesh || !FurTone.isFur(m.name) || m.userData.skinPart) return;
       const spatial = FurTone.isSpatial(m);
       for (const mat of Array.isArray(m.material) ? m.material : [m.material]) this.patch(mat as THREE.MeshStandardMaterial, spatial);
     });

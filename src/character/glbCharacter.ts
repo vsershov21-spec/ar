@@ -43,6 +43,7 @@ import { EyeRig } from './eyeRig';
 import { FaceWrinkles } from './faceWrinkles';
 import { FurTone } from './furTone';
 import { collidersUrl, modelsV2 } from './modelVariant';
+import { applySkinLook, graftSkin, skinBaseUrl, type CatSkinLook } from './catSkin';
 import { MouthRig } from './mouthRig';
 import { FaceMorphs } from './faceMorphs';
 import { personaMeta } from './personaMeta';
@@ -363,6 +364,8 @@ export class GlbCharacter implements Character {
    * её ключи mouth_A/smile у этой сетки открывали бы рот в покое
    */
   private tripoFace = false;
+  /** вид скина (база котов, ?models=base — catSkin.ts); null — модель целиком */
+  skinLook: CatSkinLook | null = null;
 
   constructor(private url = 'models/character.glb', private animsUrl?: string) {
     this.object.name = 'character-glb';
@@ -384,11 +387,24 @@ export class GlbCharacter implements Character {
       const { DRACOLoader } = await import('three/examples/jsm/loaders/DRACOLoader.js');
       loader.setDRACOLoader(new DRACOLoader());
     }
-    const gltf = await loader.parseAsync(raw, asset(url).replace(/[^/]*$/, ''));
+    let gltf = await loader.parseAsync(raw, asset(url).replace(/[^/]*$/, ''));
+    // скин на базе котов (?models=base, catSkin.ts): база грузится отдельно (у всех котов один файл), меши скина — к её костям
+    const skinLook = (gltf.parser.json as { asset?: { extras?: { catSkin?: CatSkinLook } } }).asset?.extras?.catSkin;
+    this.skinLook = skinLook ?? null;
+    if (skinLook) {
+      const baseP = skinBaseUrl(this.url, skinLook);
+      const baseU = modelUrl(baseP);
+      const baseGltf = await makeGltfLoader().parseAsync(await fetchModel(baseP), asset(baseU).replace(/[^/]*$/, ''));
+      const n = graftSkin(baseGltf.scene, gltf.scene);
+      applySkinLook(baseGltf.scene, skinLook);
+      console.info('[glb] база + скин', skinLook.persona, n, 'мешей');
+      gltf = baseGltf;
+    }
     const assetEx = (gltf.parser.json as { asset?: { extras?: { glitterP3?: { face?: string }; glitterP4?: unknown } } }).asset?.extras;
     this.tripoFace = assetEx?.glitterP3?.face === 'tripo';
     // Блёстка p4 (scripts/models/build_glitter_p4.sh): тон меха своей текстуры Tripo, без краски одежды/бровей/носа (furTone.ts)
     this.furTone.setP4(!!assetEx?.glitterP4);
+    this.furTone.setBase(!!this.skinLook);
     const model = gltf.scene;
     this.model = model;
     model.updateMatrixWorld(true);
@@ -481,7 +497,7 @@ export class GlbCharacter implements Character {
     this.furTone.attach(model);
     // фатин Блёстки с разметкой (models/v2/glitter_p1.glb): сетка, золотые блёстки и полоса по подолу
     // …и хвост с искрой к кончику (только эта модель — tailSparkle.ts)
-    if (attachTulle(model)) attachTailSparkle(model);
+    if (attachTulle(model) || this.skinLook?.fx?.includes('tailSparkle')) attachTailSparkle(model);
     this.mouthRig = MouthRig.find(model);
     // риг лица p2: морфы рта/лица ведёт драйвер; шейдерная линия рта (если вдруг есть) — выключена
     this.faceMorphs = FaceMorphs.find(this.morphMeshes);
@@ -1465,11 +1481,12 @@ export class GlbCharacter implements Character {
     }
     // характер в покое (референс): у Блёстки всегда чуть розовые щёчки и мягкая полуулыбка
     // своя модель (Блёстка p4, MouthD extras.mouth.rest — persona_tune.py) — своё лицо в покое
-    const base = (!this.faceMorphs && this.mouthRig?.ex.rest) || (this.faceMorphs ? PERSONA_FACE_MORPH : modelsV2() ? PERSONA_FACE_V2 : PERSONA_FACE)[this.personaId];
+    // база + скин: лицо в покое и множители век — из скина (catSkin.ts), один набор настроек мимики на всех
+    const base = this.skinLook ? this.skinLook.rest : (!this.faceMorphs && this.mouthRig?.ex.rest) || (this.faceMorphs ? PERSONA_FACE_MORPH : modelsV2() ? PERSONA_FACE_V2 : PERSONA_FACE)[this.personaId];
     if (base && !this.tripoFace) for (const k in base) W[k] = Math.max(W[k] ?? 0, base[k] * (1 - (W.frown ?? 0)));
     // характер глаз (v2 — по умолчанию; ?models=v1 — без них): у Блёстки по рефу глаза широко открыты — пресеты «самодовольно/сонно/прищур»
     // в idle-клипах (зеркальце, кружение) прикрывают веки слабее
-    const eyeK = modelsV2() ? PERSONA_EYES_V2[this.personaId] : undefined;
+    const eyeK = this.skinLook ? this.skinLook.eyes : modelsV2() ? PERSONA_EYES_V2[this.personaId] : undefined;
     if (eyeK) for (const k in eyeK) if (W[k]) W[k] *= eyeK[k];
     // складки и мягкость: щёки поднимаются при улыбке, морщинка у носа при хмурых бровях
     W.cheek_up = Math.max(W.cheek_up ?? 0, 0.5 * (W.smile ?? 0), 0.3 * (W.smirk ?? 0));

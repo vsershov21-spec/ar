@@ -9,7 +9,7 @@ import { ANIM_PIPELINE, packAnims } from './anim-pack.mjs';
 import { startClipNames } from '../../src/character/animPacks';
 
 /** какие модели сжимаем: персонажи и реквизит (библиотека движений — отдельно, пакетами: ANIM_LIBS) */
-const PICK = (rel) => /^models\/(props\/|v2\/)?[\w.-]+\.glb$/.test(rel) && !/^models\/(anims_|character\.glb)/.test(rel);
+const PICK = (rel) => /^models\/(props\/|v2\/|base\/)?[\w.-]+\.glb$/.test(rel) && !/^models\/(anims_|character\.glb)/.test(rel);
 
 /** библиотеки движений → стартовый пакет + «остальное» (scripts/build/anim-pack.mjs, src/character/animPacks.ts) */
 const ANIM_LIBS = ['models/anims_v1.glb'];

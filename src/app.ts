@@ -31,6 +31,7 @@ import { CardMonitor, LumaSampler, cardScreenFrac, type CardEvent } from './trac
 import { perf, AdaptiveQuality, type QualityLevel } from './core/perf';
 import { prefetchModel, prefetchSettled, warmModel } from './core/modelUrl';
 import { variantGlb } from './character/modelVariant';
+import { baseOfSkinUrl } from './character/catSkin';
 import { loadMemory } from './scenario/memory';
 import { progressReady } from './progress';
 import { PERSONA_IDS } from './persona/types';
@@ -379,7 +380,12 @@ export class App {
     if (this.params.character !== 'glb' || new URLSearchParams(location.search).get('glb')) return;
     const sp = new URLSearchParams(location.search), qc = sp.get('cat') ?? sp.get('char');
     const own = (ASSETS.glbByPersona as Record<string, string>)[(isPersonaId(qc) ? qc : loadMemory().persona) ?? PERSONA_IDS[0]];
-    if (own) prefetchModel(variantGlb(own), priority);
+    if (own) {
+      prefetchModel(variantGlb(own), priority);
+      // база котов (?models=base): скин без базы не соберётся — база в той же очереди (catSkin.ts)
+      const baseOf = baseOfSkinUrl(variantGlb(own));
+      if (baseOf) prefetchModel(baseOf, priority);
+    }
     prefetchModel(ASSETS.glbAnims, priority);
     void import('./character/glbCharacter').catch(() => undefined);
     // транскодер текстур KTX2 — параллельно с моделью (иначе он ждёт конца её загрузки)

@@ -27,7 +27,12 @@ import { feature } from '../config/edition';
  * мех-оболочки, прокси) → models/v2/glitter_p4.glb (лицо шейдером, как p1 в пилоте; при faceMode 'morph' — тоже он:
  * риг лица p2 для этой сетки пока не собирается) + glitter_p4_colliders.json. Только ?models=p4 (lab; MVP и пилот — со страницы /test), по умолчанию нигде.
  */
-export type ModelsVariant = 'v1' | 'v2' | 'v2h' | 'p3' | 'p4';
+/**
+ * base — база котов + скины (docs/models/BASE.md, catSkin.ts): одна модель кота models/base/cat_base.glb (из формы Блёстки
+ * p4 v3, риг лица на морфах) и скин персонажа models/base/skin_<кот>.glb (одежда на тот же скелет, вид). Все три кота.
+ * Только ?models=base (lab; MVP и пилот — со страницы /test, ?from=test), по умолчанию нигде.
+ */
+export type ModelsVariant = 'v1' | 'v2' | 'v2h' | 'p3' | 'p4' | 'base';
 
 /**
  * Лицо котов v2 (основа p1): 'morph' — риг лица p2 (scripts/models/face_rig.py: рот геометрией, полость, клычки,
@@ -57,7 +62,7 @@ export const P1_OWN_COLLIDERS = new Set(['glitter', 'hooligan', 'kind']);
  */
 export function modelsVariant(search = typeof location !== 'undefined' ? location.search : '', p3 = feature('model.glitterP3')): ModelsVariant {
   const m = new URLSearchParams(search).get('models');
-  return m === 'v1' ? 'v1' : m === 'v2h' ? 'v2h' : m === 'p3' ? 'p3' : m === 'p4' ? 'p4' : m === 'v2' ? 'v2' : p3 ? 'p3' : 'v2';
+  return m === 'v1' ? 'v1' : m === 'v2h' ? 'v2h' : m === 'p3' ? 'p3' : m === 'p4' ? 'p4' : m === 'base' ? 'base' : m === 'v2' ? 'v2' : p3 ? 'p3' : 'v2';
 }
 
 export const modelsV2 = (search?: string) => modelsVariant(search) !== 'v1';
@@ -70,6 +75,7 @@ export function variantGlb(p: string, variant: ModelsVariant = modelsVariant(), 
   if (variant === 'v1') return p;
   const m = p.match(/^(.*?)models\/(hooligan|kind|glitter)_v1\.glb$/);
   if (!m) return p;
+  if (variant === 'base') return `${m[1]}models/base/skin_${m[2]}.glb`;
   if (variant === 'p3' && m[2] === 'glitter') return `${m[1]}models/v2/glitter_p3.glb`;
   // p4: лицо шейдером при любом faceMode — риг лица p2 (p4m) у этой сетки пока не собирается (build_glitter_p4.sh)
   if (variant === 'p4' && m[2] === 'glitter') return `${m[1]}models/v2/glitter_p4.glb`;
@@ -88,6 +94,9 @@ export function collidersUrl(glb: string): string | null {
   if (m && /(^|\/)v2\/$/.test(m[1] ?? '')) return `${m[1]}${m[2]}_colliders.json`;
   const m1 = glb.match(/^(.*\/)?(hooligan|kind|glitter)_v1\.glb$/);
   if (m1) return `${m1[1] ?? ''}${m1[2]}_v1_colliders.json`;
+  // база + скин: прокси по собранной модели (scripts/models/build_base.sh → colliders.py)
+  const sk = glb.match(/^(.*\/)?base\/skin_([a-z]+)\.glb$/);
+  if (sk) return `${sk[1] ?? ''}base/skin_${sk[2]}_colliders.json`;
   const p3 = glb.match(/^(.*\/)?v2\/glitter_p3\.glb$/);
   if (p3) return `${p3[1] ?? ''}v2/glitter_p3_colliders.json`;
   // p4m (риг лица) — та же геометрия тела, что у p4
