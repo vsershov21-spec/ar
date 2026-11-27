@@ -1,4 +1,5 @@
-"""Блёстка v5, стадия «мимика поверх лица Tripo» (без Blender): лицо, текстура и форма в покое — как у Tripo 1:1.
+"""Блёстка v5, стадия «мимика поверх лица Tripo» (v5d: у кромки верхнего века — полоса ресниц Tripo, lidStrip; ключ
+cheeks_puff — надутые щёки обиды) (без Blender): лицо, текстура и форма в покое — как у Tripo 1:1.
 
     python3 scripts/models/v5/v5_face.py rigged.glb out.glb [--src tripo.glb] [--viz dir]
 
@@ -167,15 +168,34 @@ marks = {
 }
 print('шарнир челюсти', hinge.round(3), 'вершин полости', int(cav.sum()))
 
+# v5d: снимок 0.1 мм у глаз — полоса ресниц Tripo для века (на 0.4 мм тонкие лепестки ресниц размываются в мех)
+PXH = 0.0001
+_xa = BOX[0] + (min(eyes['R']['x'][0], eyes['L']['x'][0]) - 60) * PX; _xb = BOX[0] + (max(eyes['R']['x'][-1], eyes['L']['x'][-1]) + 60) * PX
+_ya = BOX[3] - (max(eyes['R']['bot'].max(), eyes['L']['bot'].max()) + 10) * PX
+_yb = BOX[3] - (min(eyes['R']['lt'].min(), eyes['L']['lt'].min()) - 70) * PX
+BOXH = (_xa, _xb, _ya, _yb)
+trih, baryh, _ = raster_front(P, I, BOXH, PXH)
+imgh = sample(tex, interp(UV, I, trih, baryh)).astype(float)
+
+
+def hires(x, y):
+    """цвет снимка 0.1 мм в точке снимка 0.4 мм (билинейно)"""
+    X = ((BOX[0] + x * PX) - BOXH[0]) / PXH - 0.5; Y = (BOXH[3] - (BOX[3] - y * PX)) / PXH - 0.5
+    return np.stack([nd.map_coordinates(imgh[..., q], [np.atleast_1d(Y), np.atleast_1d(X)], order=1, mode='nearest') for q in range(3)], -1)
+
+
 # ════════════════ веки ════════════════
-NC, NR = 30, 12
-DT, DM = 0.0005, 0.0018  # отступ века от поверхности: у верха (покой) и к кромке (м); радужка Tripo выпуклее белка
-TW, TH = 256, 64  # текстура века одного глаза
+NC, NR = 30, 16
+NF, VS, PET = 6, 0.3, 30.0  # v5d: рядов меха над полосой ресниц, доля текстуры меха, запас над полосой ресниц (px)
+DT, DM = 0.0008, 0.0024  # отступ века от поверхности: у верха (покой) и к кромке (м); радужка Tripo выпуклее белка
+TW, TH = 384, 96  # текстура века одного глаза (v5d: крупнее — ресницы на веке; < 1024 px — model-opt не жмёт в KTX2)
 LID_X, LID_Y = 13.0, 11.0  # запас закрытого века за разрез: по бокам и снизу (px снимка, 0.4 мм)
 lid_img = np.zeros((2 * TH, TW * 2, 3), np.uint8)  # верх — верхние веки, низ — нижние (v5c)
+lid_a = np.full((2 * TH, TW * 2), 255, np.uint8)  # v5d: альфа — верх века (мех над ресницами) растворяется в мех тела
 NRL = 8  # рядов нижнего века
 DLO = 0.0010  # отступ нижнего века (под верхним: у кромки верхнего 1.8 мм)
 lid_base = {}
+lid_strip = {}  # v5d: полоса ресниц в покое по столбцам века (x, верх, низ — px снимка)
 skin_pos = []  # положение для скина (закрытое веко / поднятое нижнее)
 LV, LUV, LF, LN = [], [], [], []
 keys = {}  # имя → смещения (позиции) и нормалей
@@ -197,7 +217,9 @@ for ei, side in enumerate(('L', 'R')):
     # читался тёмной обводкой вокруг закрытого века)
     xs_e = np.linspace(e['x'][0] - LID_X, e['x'][-1] + LID_X, NC)
     t = np.interp(xs_e, e['x'], e['top']); bt = np.interp(xs_e, e['x'], e['bot']); lt_ = np.interp(xs_e, e['x'], e['lt'])
-    yT = t - 3.0  # верх века — на 3 px под нижним краем полосы ресниц (дуга Tripo остаётся; без щели белка над веком)
+    # v5d: в покое веко — полоса ресниц Tripo на своём месте (копия; на теле ресницы закрашены мехом — v5_eyes.py), кромка —
+    # у верха глаза; закрываясь, полоса едет с кромкой, над ней тянется мех века
+    yT = t - 1.5
     yE = np.maximum(bt + LID_Y, yT + 3.0)  # кромка закрытого века — ниже нижнего контура глаза (и его тёмной обводки)
     Lg = yE - yT
     band = np.clip(t - lt_, 3, 40)
@@ -229,26 +251,31 @@ for ei, side in enumerate(('L', 'R')):
     LC = np.array(LC)
     LC = np.stack([nd.uniform_filter1d(LC[:, q], 5, mode='nearest') for q in range(3)], -1)
     FB = fur_row(yE, 4, 16)
+    # v5d: текстура верхнего века — мех (верх растворяется альфой в мех тела) и полоса ресниц Tripo (копия снимка от PET
+    # px над полосой до верха глаза; альфа — ресницы, мех между ними прозрачен в покое, шейдер делает его непрозрачным,
+    # когда веко закрывается)
     for i in range(TW):
         x = xs_e[0] + (i + 0.5) / TW * (xs_e[-1] - xs_e[0])
         k = np.interp(x, xs_e, np.arange(NC))
-        tt, ee, bb = (np.interp(k, np.arange(NC), a) for a in (yT, yE, band))
         ftop = np.array([np.interp(k, np.arange(NC), FT[:, q]) for q in range(3)])
-        fbot = np.array([np.interp(k, np.arange(NC), FB[:, q]) for q in range(3)])
-        Lgx = max(ee - tt, 1e-3)
-        line_px = min(max(2.5, 0.42 * bb), 0.3 * Lgx)  # толщина линии у кромки (px снимка) — тоньше полосы ресниц
-        xi = int(np.clip(round(x), 0, W_ - 1))
+        l0 = np.interp(k, np.arange(NC), lt_) - PET; l1 = np.interp(k, np.arange(NC), yT)
+        ltk = np.interp(k, np.arange(NC), lt_)
         for jj in range(TH):
-            s = (jj + 0.5) / TH
-            c = ftop + (fbot - ftop) * (s ** 1.6)
-            dpx = (1 - s) * Lgx  # от кромки, px снимка
-            if dpx < line_px + 1.2:
-                # тёмная линия цвета ресниц Tripo
-                lc = np.array([np.interp(k, np.arange(NC), LC[:, q]) for q in range(3)])
-                a = np.clip((line_px + 1.2 - dpx) / 1.2, 0, 1)
-                c = c * (1 - a) + lc * a
+            v = (jj + 0.5) / TH
+            if v < VS:
+                c = ftop; a = np.clip(v / (VS / NF), 0, 1) ** 1.5
+            else:
+                f = (v - VS) / (1 - VS)
+                yy = l0 + (l1 - l0) * f
+                c = hires(x, yy)[0]
+                # ресница — тёмное; полоса (ниже верха полосы ресниц) — целиком
+                a = 1.0 if yy >= ltk - 1 else float(np.clip((150 - c.mean()) / 50, 0, 1))
+                # мех между ресницами — к меху века (виден, когда веко закрыто)
+                c = ftop + (c - ftop) * a
             lid_img[jj, ei * TW + i] = np.clip(c, 0, 255)
+            lid_a[jj, ei * TW + i] = int(round(255 * a))
         # нижнее веко (v5c): мех под глазом, к верхней кромке — чуть темнее и мягкая линия (нижние ресницы)
+        fbot = np.array([np.interp(k, np.arange(NC), FB[:, q]) for q in range(3)])
         lc = np.array([np.interp(k, np.arange(NC), LC[:, q]) for q in range(3)])
         for jj in range(TH):
             s = (jj + 0.5) / TH  # 0 — низ, 1 — кромка
@@ -262,21 +289,39 @@ for ei, side in enumerate(('L', 'R')):
     base = len(LV)
     S = np.linspace(0, 1, NR + 1)
 
+    yTop0 = lt_ - PET  # верх века (неподвижен): верх полосы ресниц в покое
+    HS = yT - yTop0  # высота полосы ресниц, px снимка
+    lid_strip[side] = (xs_e.copy(), yTop0.copy(), yT.copy())
+
     def pos_at(c, shape=None):
-        """позиции и нормали века при закрытии c (shape — своё c по столбцам: наклоны)"""
+        """позиции и нормали века при закрытии c (shape — своё c по столбцам: наклоны, «^»)"""
         cc = np.full(NC, c) if shape is None else shape
+        yE_ = yT + cc * Lg
+        yS = yE_ - HS
+        Y = np.zeros((NR + 1, NC))
+        hf = yS - yTop0  # высота меха века над полосой ресниц
+        for r in range(NR + 1):
+            if r == 0:
+                Y[r] = yTop0
+            elif r <= NF:
+                # первый ряд — тонкая кайма (≤ 6 px), где верх века растворяется альфой в мех тела
+                y1_ = yTop0 + np.minimum(6.0, 0.5 * hf)
+                Y[r] = y1_ + (yS - y1_) * ((r - 1) / (NF - 1))
+            else:
+                Y[r] = yS + (yE_ - yS) * ((r - NF) / (NR - NF))
         X = np.repeat(xs_e[None, :], NR + 1, 0)
-        Y = yT[None, :] + (cc[None, :] * Lg[None, :]) * S[:, None]
         p, n_ = surf(X, Y)
-        dlt = DT + (DM - DT) * np.sqrt(S)[:, None] * np.clip(4 * cc, 0, 1)[None, :]
+        fr = np.clip((Y - yTop0[None, :]) / np.maximum(yE_ - yTop0, 1e-6)[None, :], 0, 1)
+        dlt = DT + (DM - DT) * np.sqrt(fr) * np.clip(4 * cc, 0, 1)[None, :]
         return (p + n_ * dlt[..., None]).reshape(-1, 3), n_.reshape(-1, 3)
 
     p0, n0 = pos_at(0.0)
     rest_pos.append(p0); rest_n.append(n0)
     U = ei * 0.5 + (0.5 / TW) + np.linspace(0, 1, NC) * (0.5 - 1.0 / TW)
     for r in range(NR + 1):
+        vr = (VS / NF if r == 1 else VS * r / NF) if r <= NF else VS + (1 - VS) * (r - NF) / (NR - NF)
         for c_ in range(NC):
-            LUV.append((U[c_], 0.5 * (0.5 / TH + S[r] * (1 - 1.0 / TH))))
+            LUV.append((U[c_], 0.5 * (0.5 / TH + vr * (1 - 1.0 / TH))))
             side_of.append(side)
     LV.extend(p0)
     for r in range(NR):
@@ -298,7 +343,7 @@ for ei, side in enumerate(('L', 'R')):
     arc = tmin + Hh * (0.66 - 0.36 * np.sin(np.pi * u))  # «^» смеха: дуга вверх
     EDGES = {
         # грусть: внешний край века ниже (опущенные уголки), внутренний — почти открыт
-        'sad': t + Hh * (0.06 + 0.40 * uin ** 1.3),
+        'sad': t + Hh * (0.04 + 0.28 * uin ** 1.3),
         # недовольство/обида: тяжёлое веко, ниже у переносицы
         'mad': np.maximum(t, tmin + Hh * (0.50 - 0.28 * uin)),
         'laugh': arc,
@@ -345,12 +390,20 @@ for ei, side in enumerate(('L', 'R')):
 LV = np.array(LV, np.float32); LUV = np.array(LUV, np.float32); LF = np.array(LF, np.uint32)
 LN = np.concatenate(rest_n).astype(np.float32)
 nL = len(LV)
-# скин век — как у ближайшей вершины тела в закрытом положении
+# скин век — у всех рядов столбца один (ближайшая вершина тела к середине пути века по столбцу): в покое ряды стянуты в
+# линию и остаются линией при любом повороте головы относительно шеи (v5d: при разных весах рядов — шея/голова — линия
+# покоя расходилась полосой меха между ресницами и глазом)
 from scipy.spatial import cKDTree  # noqa: E402
 closed = np.concatenate(skin_pos)  # верхние — закрытые, нижние — поднятые до «^»
 assert len(closed) == nL
 kd = cKDTree(P)
-_, nn = kd.query(closed)
+anchor = np.zeros_like(closed)
+o_ = 0
+for blk in (NR + 1, NRL + 1, NR + 1, NRL + 1):  # верх L, низ L, верх R, низ R — ряды × NC
+    seg = closed[o_:o_ + blk * NC].reshape(blk, NC, 3)
+    anchor[o_:o_ + blk * NC] = np.repeat(seg[blk // 2][None], blk, 0).reshape(-1, 3)
+    o_ += blk * NC
+_, nn = kd.query(anchor)
 LJ = B['J'][nn]; LW = B['W'][nn]
 
 # ════════════════ ключи тела ════════════════
@@ -542,6 +595,24 @@ def eye_scale_D(Q, k=0.12, front_m=None):
 
 
 BODY_KEYS['eyes_wide'] = onto_surface(eye_scale_D(P, front_m=front.astype(float)))
+
+
+# v5d: надутые щёки (обида): щёки под глазами и сбоку от рта — наружу по нормали и в стороны, у рта и глаз — ноль
+def cheeks_puff(amt=0.0075):
+    D = np.zeros_like(P)
+    for sd, c3 in (('L', cL3), ('R', cR3)):
+        e = eyes[sd]
+        cxk = 0.5 * c3[0] + 0.5 * ((e['x'][0] + e['x'][-1]) / 2 * PX + BOX[0])
+        cyk = 0.55 * c3[1] + 0.45 * (BOX[3] - e['bot'].max() * PX)
+        r2 = ((P[:, 0] - cxk) / (D_eye * 0.55)) ** 2 + ((P[:, 1] - cyk) / (D_eye * 0.42)) ** 2
+        w = np.exp(-r2 * 1.4) * (P[:, 2] > hinge[2] - 0.02)
+        w *= 1 - np.exp(-(((P[:, 0] - cx) / (Wm * 0.35)) ** 2 + ((P[:, 1] - my) / (Hm * 1.2)) ** 2))  # губы не раздувать
+        D += Nn * (amt * w)[:, None]
+        D[:, 0] += np.sign(cxk - cx) * amt * 0.5 * w
+    return smooth_key(D, 4)
+
+
+BODY_KEYS['cheeks_puff'] = cheeks_puff()
 # веки едут вместе с растянутым глазом (иначе линия покоя века осталась бы на белке)
 for sd in 'LR':
     b0 = lid_base[sd]; nU = (NR + 1) * NC; nLo = (NRL + 1) * NC
@@ -613,9 +684,9 @@ for n_ in j['nodes']:
 eye_uv = img_uv[(tri >= 0) & ~blob & ~dark & (np.arange(H_)[:, None] > 330) & (np.arange(H_)[:, None] < 620)]
 mrv = sample(mrtex, eye_uv[::50]).astype(float) / 255
 rough = float(np.median(mrv[:, 1])); metal = float(np.median(mrv[:, 2]))
-li = g.add_image(Image.fromarray(lid_img), 'glitter_v5_lids')
+li = g.add_image(Image.fromarray(np.dstack([(lid_img // 4) * 4 + 2, lid_a]), 'RGBA'), 'glitter_v5_lids')  # 6 бит — размер
 lt_i = g.add_texture(li, 0)
-j['materials'].append({'name': 'Lids_V5', 'pbrMetallicRoughness': {'baseColorTexture': {'index': lt_i}, 'metallicFactor': round(metal, 3), 'roughnessFactor': round(rough, 3)}})
+j['materials'].append({'name': 'Lids_V5', 'alphaMode': 'BLEND', 'pbrMetallicRoughness': {'baseColorTexture': {'index': lt_i}, 'metallicFactor': round(metal, 3), 'roughnessFactor': round(rough, 3)}})
 lm = len(j['materials']) - 1
 lid_names = sorted(keys.keys(), key=lambda s: (s[3], s))  # lidL_1..4, lidL_laugh, lidL_lo, …
 ltargets = []
@@ -638,6 +709,9 @@ arm = next(i for i, n_ in enumerate(j['nodes']) if n_.get('name') == 'Armature')
 j['nodes'][arm].setdefault('children', []).append(len(j['nodes']) - 1)
 j['asset'].setdefault('extras', {})['glitterV5'] = {
     'face': 'tripo', 'lids': 'Lids_V5', 'marks': marks,
+    # v5d: полоса ресниц Tripo, перенесённая на веко (на теле её закрашивает мехом v5_eyes.py): x, верх, низ (м модели)
+    'lidStrip': {sd: [[round(float(BOX[0] + x * PX), 5), round(float(BOX[3] - a * PX), 5), round(float(BOX[3] - b * PX), 5)]
+                      for x, a, b in zip(*lid_strip[sd])] for sd in lid_strip},
     'source': 'design/models/glitter_v5_rigged.glb (Tripo 4 вида, H3.1, Ultra, 4K PBR, одна сетка; Auto Rig Mixamo)',
 }
 size = g.save(dst)

@@ -50,8 +50,15 @@ const camAt = () => {
   ch.object.updateMatrixWorld(true);
   const o = ch.object.getWorldPosition(new THREE.Vector3());
   const hp = bone('Head').getWorldPosition(new THREE.Vector3()), tp = bone('HeadTop_End').getWorldPosition(new THREE.Vector3());
-  const c = hp.clone().lerp(tp, 0.62 + +(q.get('dy') || 0));
-  const d = hp.distanceTo(tp) * (+(q.get("dist") || 10.5));
+  let c = hp.clone().lerp(tp, 0.62 + +(q.get('dy') || 0));
+  let d = hp.distanceTo(tp) * (+(q.get("dist") || 10.5));
+  // крупно глаза Блёстки v5d: &eyes=<ширин накладки глаз до камеры> (центр — накладка Eyes_V5 со скином), &ey — сдвиг вверх
+  const em = q.get('eyes') && ch.object.getObjectByName('Eyes_V5');
+  if (em) {
+    const bx = new THREE.Box3().setFromObject(em, true);
+    c = bx.getCenter(new THREE.Vector3()); c.y += bx.getSize(new THREE.Vector3()).x * +(q.get('ey') || 0);
+    d = bx.getSize(new THREE.Vector3()).x * +q.get('eyes');
+  }
   cam.position.set(c.x + Math.sin(yaw) * Math.cos(pitch) * d, c.y + Math.sin(pitch) * d, c.z + Math.cos(yaw) * Math.cos(pitch) * d);
   cam.lookAt(c);
 };
@@ -74,6 +81,7 @@ window.__cues = seqCues;
 const run = (sec) => { for (let k = 0; k < Math.round(sec * 30); k++) ch.update(1 / 30, cam); };
 window.__seq = [];
 states.forEach((st, i) => {
+  if (ch.v5Face?.gaze) { ch.v5Face.gaze.force = null; ch.v5Face.gaze.still = false; }
   if (st.startsWith('seq:')) {
     if (seqT < 0) {
       ch.clearEmotion(); ch.setMouth('X', 0, { open: 0, wide: 0, round: 0 }); run(0.8);
@@ -89,6 +97,13 @@ states.forEach((st, i) => {
       ch.update(dt, cam);
     }
     window.__seq.push({ t: T, cue: lip.target, vis: ch.faceMorphs ? { ...ch.faceMorphs.vis } : null });
+  } else if (st.startsWith('look:')) {
+    // v5d: взгляд нарисованных глаз Блёстки (Eyes_V5): look:L|R|U|D|C — влево/вправо (от зрителя)/вверх/вниз/на камеру
+    ch.clearEmotion(); ch.setMouth('X', 0, { open: 0, wide: 0, round: 0 }); run(0.8);
+    const LOOK = { L: [-0.45, 0], R: [0.45, 0], U: [0, 0.3], D: [0, -0.38], C: null };
+    const gz = ch.v5Face?.gaze;
+    if (gz) { gz.still = true; gz.force = LOOK[st.slice(5)] ?? null; }
+    run(0.6);
   } else if (st.startsWith('blink:')) {
     // моргание: кадр через t с после начала (моргание 150 мс)
     ch.clearEmotion(); ch.setMouth('X', 0, { open: 0, wide: 0, round: 0 }); run(0.8);
@@ -127,5 +142,5 @@ states.forEach((st, i) => {
   const x = (i % cols) * T, y = (rows - 1 - Math.floor(i / cols)) * T;
   r.setViewport(x, y, T, T); r.setScissor(x, y, T, T); r.render(sc, cam);
 });
-window.__labels = states; window.__morphs = { W: { ...ch.W }, u: ch.mouthRig && ch.mouthRig.uniforms.uMA.value.toArray() }; window.__ready = true;
+window.__ch = ch; window.__labels = states; window.__morphs = { W: { ...ch.W }, u: ch.mouthRig && ch.mouthRig.uniforms.uMA.value.toArray(), gaze: ch.v5Face?.eyes ? { yaw: [...ch.v5Face.gaze.yaw], pitch: [...ch.v5Face.gaze.pitch], aim: ch.v5Face.aimer?.out } : null, lids: (() => { const l = ch.object.getObjectByName('Lids_V5'); if (!l?.morphTargetDictionary) return null; const o = {}; for (const k in l.morphTargetDictionary) { const v = l.morphTargetInfluences[l.morphTargetDictionary[k]]; o[k] = +v.toFixed(4); } return o; })() }; window.__ready = true;
 </script></body></html>

@@ -269,7 +269,10 @@ class Glb:
             q = self.j['images'][ii].get('extras', {}).get('requant', self.jpeg_q)
             self.images[ii].convert('RGB').save(buf, 'JPEG', quality=q, optimize=True)
             return buf.getvalue()
-        self.images[ii].convert('RGB').save(buf, 'PNG')
+        im = self.images[ii]
+        # накладки Блёстки v5 (маска рта, разрез глаз, веко — имя glitter_v5_*) — PNG с альфой; остальные — RGB, как было
+        keep = im.mode == 'RGBA' and str(self.j['images'][ii].get('name', '')).startswith('glitter_v5_')
+        (im if keep else im.convert('RGB')).save(buf, 'PNG')
         self.j['images'][ii]['mimeType'] = 'image/png'
         return buf.getvalue()
 

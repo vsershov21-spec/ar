@@ -18,7 +18,7 @@ r.setPixelRatio(1); r.setSize(T, T); r.outputColorSpace = THREE.SRGBColorSpace; 
 const sc = new THREE.Scene(); sc.background = new THREE.Color(0xe6e6ea);
 sc.add(new THREE.HemisphereLight(0xffffff, 0x8899aa, 2.2));
 const dl = new THREE.DirectionalLight(0xffffff, 1.6); dl.position.set(0.5, 1, 1); sc.add(dl);
-const ch = new GlbCharacter(variantGlb(`/models/${persona}_v1.glb`), '/models/anims_v1.glb');
+const ch = new GlbCharacter(q.get('m') || variantGlb(`/models/${persona}_v1.glb`), '/models/anims_v1.glb');
 await ch.load(); ch.setPersona?.({ id: persona }); ch.clips.setIdles(['idle'], persona); sc.add(ch.object); ch.play('idle');
 const bone = (n) => { let b = null; ch.object.traverse((o) => { if (!b && o.name.replace(/^mixamorig:?/, '') === n) b = o; }); return b; };
 const cam = new THREE.PerspectiveCamera(22, 1, 0.01, 50);
@@ -35,11 +35,21 @@ const idle = +(q.get('idle') || 4);
 const cues = text ? cuesFromText(text, estimateSpeechSec(text)) : [];
 const speech = text ? estimateSpeechSec(text) + 0.6 : 0;
 let t = 0, started = false;
-window.__total = Math.round((idle + speech) * fps);
+// смена эмоций по времени: &emos=happy@3.5,surprised@5,offended@6.5,laugh@8,neutral@9.5 (neutral — снять); &look=x,y — точка
+// взгляда (палец) смещается по кругу
+const emos = (q.get('emos') || '').split(',').filter(Boolean).map((e) => { const [n, at] = e.split('@'); return { n, at: +at, done: false }; });
+const RU = { happy: 'радость', excited: 'радость', surprised: 'удивление', offended: 'обида', laugh: 'смех', sad: 'грусть', annoyed: 'недовольство', wink_r: 'подмигнуть', shy: 'смущение' };
+let curEmo = '';
+const emoEnd = emos.length ? Math.max(...emos.map((e) => e.at)) + 1.5 : 0;
+window.__total = Math.round(Math.max(idle + speech, emoEnd) * fps);
+const lookR = +(q.get('look') || 0);
 window.__frame = (i) => {
   const until = (i + 1) / fps;
   while (t < until - 1e-6) {
     const dt = 1 / 60; t += dt;
+    for (const e of emos) if (!e.done && t >= e.at) { e.done = true; if (e.n === 'neutral') { ch.clearEmotion(); curEmo = ''; } else { ch.setEmotion(e.n, 1, 0); curEmo = RU[e.n] ?? e.n; } }
+    // палец перед котом (точка взгляда) медленно ходит по кругу — глаза следят
+    if (lookR) ch.lookAt(new THREE.Vector3(c.x + lookR * Math.sin(t * 0.9), c.y + 0.5 * lookR * Math.cos(t * 1.3), c.z + 1.2));
     if (t > idle && text) {
       if (!started) { started = true; const t0 = t; lip.playCues(cues, () => t - t0); }
       lip.update(dt);
@@ -48,7 +58,8 @@ window.__frame = (i) => {
     ch.update(dt, cam);
   }
   r.render(sc, cam);
-  return { t, talk: t > idle && !!text };
+  const talk = t > idle && !!text && t < idle + speech;
+  return { t, talk, label: talk ? 'реплика' : curEmo || (lookR ? 'покой: взгляд за пальцем' : 'покой') };
 };
 window.__ready = true;
 </script></body></html>

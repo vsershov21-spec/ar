@@ -26,7 +26,11 @@ $BPY v5/v5_endbones.py -- "$W/rig0.glb" "$W/rigged.glb" 2>&1 | q
 python3 v5/v5_dense.py "$W/rigged.glb" "$W/dense.glb"
 python3 v5/v5_face.py "$W/dense.glb" "$W/face0.glb" --src $SRC --viz "$W/viz"
 # 4b. v5c: накладка рта Mouth_V5 (кожа морды без рта + формы рта шейдером — src/character/v5Face.ts)
-python3 v5/v5_mouth.py "$W/face0.glb" "$W/face.glb" --viz "$W/viz"
+python3 v5/v5_mouth.py "$W/face0.glb" "$W/face1.glb" --viz "$W/viz"
+# 4c. v5d: настоящие глаза поверх нарисованных — накладка Eyes_V5 (белок Tripo, радужка двигается шейдером, зрачок, блики);
+#     в текстуре тела разрез глаза закрашен белком, ресницы в полосе века — мехом (их несёт веко Lids_V5); до меха —
+#     цвет оболочек и прядей берётся с уже закрашенной текстуры
+python3 v5/v5_eyes.py "$W/face1.glb" "$W/face.glb" --viz "$W/viz"
 # 5. мех как у Хулигана/Добряка: оболочки тела (v5_fur), голова, щёки и пряди силуэта — общий fur_volume.py
 #    (точки лица — asset.extras.glitterV5.marks); кончики — цвет текстуры Tripo, без тона меха
 python3 v5/v5_fur.py "$W/face.glb" "$W/fur0.glb"

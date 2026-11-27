@@ -210,4 +210,84 @@ describe('glitter v5: флаг ?models=v5', () => {
     expect(life.blink).toBe(0);
     expect(life.head.yaw).toBe(0);
   });
+
+  it('v5d: настоящие глаза — накладка Eyes_V5 (белок, радужка, альфа PNG < 1024 px), веко с полосой ресниц, ключ надутых щёк', () => {
+    const v5: J & { images: { name?: string; mimeType?: string }[] } = read('public/models/v2/glitter_v5.glb');
+    const names = v5.nodes.map((n) => n.name);
+    expect(names).toContain('Eyes_V5');
+    const ex = v5.asset.extras!.glitterV5 as { eyes: Record<string, unknown> & { L: { plate: number[]; c: number[]; ai: number[]; iris: number[]; pupil: number } }; lidStrip: Record<string, number[][]> };
+    for (const s of ['L', 'R']) {
+      const e = (ex.eyes as Record<string, { plate: number[]; ai: number[]; iris: number[]; pupil: number }>)[s];
+      expect(e.plate).toHaveLength(3);
+      expect(e.ai).toHaveLength(4);
+      expect(e.pupil).toBeGreaterThan(0.3);
+      expect(e.pupil).toBeLessThan(0.8);
+      expect(ex.lidStrip[s].length).toBe(30);
+    }
+    const mats = v5.materials as { name: string; alphaMode?: string }[];
+    expect(mats.find((m) => m.name === 'Eyes_V5')?.alphaMode).toBe('BLEND');
+    expect(mats.find((m) => m.name === 'Lids_V5')?.alphaMode).toBe('BLEND');
+    const body = v5.meshes.find((m) => m.name === 'Body_Glitter_V5')!;
+    expect(body.extras!.targetNames).toContain('cheeks_puff');
+    const eyes = v5.meshes.find((m) => m.name === 'Eyes_V5')!;
+    expect(eyes.extras!.targetNames).toContain('eyes_wide');
+  });
+
+  it('v5d: взгляд — радужка к цели, саккады, смещение пресета, зрачок шире на удивлении; веко следует за взглядом вниз', async () => {
+    const { V5Gaze, V5_GAZE_LIM, v5LidWeights, v5State } = await import('../src/character/v5Face');
+    let seed = 7;
+    const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+    const g = new V5Gaze(rnd);
+    const inp = { aim: [0.3, 0.1, 0.3, 0.1] as [number, number, number, number], pupils: 1, idle: false, bias: null, wide: 0, spiral: 0 };
+    for (let i = 0; i < 60; i++) g.update(1 / 60, inp);
+    expect(g.yaw[0]).toBeGreaterThan(0.2);
+    expect(g.pitch[0]).toBeGreaterThan(0.03);
+    // пределы
+    for (let i = 0; i < 60; i++) g.update(1 / 60, { ...inp, aim: [3, -3, 3, -3] });
+    expect(g.yaw[0]).toBeLessThanOrEqual(V5_GAZE_LIM.yaw + 1e-6);
+    expect(g.pitch[0]).toBeGreaterThanOrEqual(-V5_GAZE_LIM.down - 1e-6);
+    // смещение пресета (обида — вбок) без цели
+    const b = new V5Gaze(rnd);
+    b.still = true;
+    for (let i = 0; i < 90; i++) b.update(1 / 60, { ...inp, aim: null, bias: [-0.2, 0.02] });
+    expect(b.yaw[0]).toBeLessThan(-0.2);
+    // зрачок: удивление шире покоя
+    const p = new V5Gaze(rnd);
+    for (let i = 0; i < 60; i++) p.update(1 / 60, { ...inp, wide: 1, pupils: 0.85 });
+    expect(p.pupil).toBeGreaterThan(1.15);
+    // взгляд вниз опускает верхнее веко немного, вверх — нет
+    const st = v5State();
+    st.look = -0.45;
+    const down = v5LidWeights({}, st);
+    st.look = 0.3;
+    const up = v5LidWeights({}, st);
+    expect(down.lidL_1).toBeGreaterThan(0.3);
+    expect(up.lidL_1).toBe(0);
+  });
+
+  it('v5d: мимика — радость открытой улыбкой с клычками, подмигнуть «ω», обида надутая с румянцем, недовольство без румянца', async () => {
+    const { v5Emote, v5State, v5MouthParams, v5BodyWeights, v5LidCover } = await import('../src/character/v5Face');
+    const face = JSON.parse(fs.readFileSync('content/face.json', 'utf8')) as { presets: { id: string; weights: Record<string, number> }[] };
+    const pre = (id: string) => ({ ...face.presets.find((p) => p.id === id)!.weights });
+    const run = (id: string) => { const st = v5State(); const w = v5Emote(pre(id), st); return { st, w, mp: v5MouthParams(st), bw: v5BodyWeights(w, st) }; };
+    const happy = run('happy');
+    expect(happy.st.mHappy).toBeGreaterThan(0.5);
+    expect(happy.mp.open2[2]).toBeGreaterThan(0.5); // клычки
+    const wink = run('wink_r');
+    expect(wink.st.mOmega).toBeGreaterThan(0.9);
+    expect(wink.mp.line2[3]).toBeGreaterThan(0.9); // «ω»
+    const off = run('offended'), ann = run('annoyed');
+    expect(off.bw.cheeks_puff).toBeGreaterThan(0.8);
+    expect(off.w.blush).toBeGreaterThan(0.4);
+    expect(ann.bw.cheeks_puff).toBe(0);
+    expect(ann.w.blush ?? 0).toBe(0);
+    // покой: дыхание улыбки V5Life (до 0.38) — рот Tripo, без накладки
+    const calm = v5State();
+    v5Emote({ smile: 0.38, cheek_up: 0.18 }, calm);
+    expect(calm.cover).toBe(0);
+    // полоса ресниц века: в покое мех между ресницами прозрачен, закрытое веко — непрозрачно
+    expect(v5LidCover({}, 'L')).toBe(0);
+    expect(v5LidCover({ lidL_1: 1, lidL_2: 1, lidL_3: 1, lidL_4: 1 }, 'L')).toBe(1);
+  });
 });
+

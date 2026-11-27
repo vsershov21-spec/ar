@@ -1522,7 +1522,11 @@ export class GlbCharacter implements Character {
       W.frown = (W.frown ?? 0) * 0.15;
     }
     // v5: эмоции сильнее на нарисованном лице Tripo (брови, закрытый рот при хмуром, веки) — v5Face.ts
-    if (v5l) v5Emote(W, this.v5Face?.st);
+    if (v5l) {
+      // v5d: брови заметны в любой эмоции (сила эмоции кадра)
+      if (this.v5Face) this.v5Face.st.emo = ee;
+      v5Emote(W, this.v5Face?.st);
+    }
     this.wrinkles?.update(W);
     this.mouthRig?.setTongue(modelsV2() ? PERSONA_TONGUE_V2[this.personaId] : undefined);
     this.mouthRig?.update(W);
@@ -1629,6 +1633,12 @@ export class GlbCharacter implements Character {
       const tgt = this.actLook ?? this.look ?? camera.getWorldPosition(this.gazeV);
       const gz = (emo && ee > 0.4 ? emo.p.gaze : facePreset(this.faceMix.preset)?.gaze) ?? null;
       this.eyes.update(dt, { weights: W, pupils, target: tgt, idle: cs.idleMode && this.life.talk < 0.1, bias: gz });
+    }
+    // v5d: нарисованные глаза Блёстки смотрят (Eyes_V5: радужка, зрачок, блики) — после головы
+    if (this.v5Face?.eyes) {
+      const tgt = this.actLook ?? this.look ?? camera.getWorldPosition(this.gazeV);
+      const gz = (emo && ee > 0.4 ? emo.p.gaze : facePreset(this.faceMix.preset)?.gaze) ?? null;
+      this.v5Face.updateEyes(dt, tgt, W, pupils, cs.idleMode && this.life.talk < 0.1, gz);
     }
   }
 

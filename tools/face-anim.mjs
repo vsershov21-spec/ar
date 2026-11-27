@@ -19,7 +19,7 @@ for (let i = 0; i < n; i++) {
   const m = await page.evaluate((k) => window.__frame(k), i);
   const url = await page.evaluate(() => document.querySelector('canvas').toDataURL('image/png'));
   fs.writeFileSync(`${dir}/f${String(i).padStart(4, '0')}.png`, Buffer.from(url.split(',')[1], 'base64'));
-  meta.push(m.talk ? 'реплика' : 'покой');
+  meta.push(m.label ?? (m.talk ? 'реплика' : 'покой'));
 }
 await browser.close();
 fs.writeFileSync(`${dir}/meta.json`, JSON.stringify(meta));
@@ -33,7 +33,7 @@ F = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', 1
 fr = []
 for f, m in zip(sorted(glob.glob(d + '/f*.png')), meta):
     im = Image.open(f).convert('RGB'); dr = ImageDraw.Draw(im)
-    dr.rectangle((0, 0, 110, 28), fill=(255, 255, 255)); dr.text((6, 4), m, fill=(20, 20, 30), font=F)
+    dr.rectangle((0, 0, 12 + 11 * len(m), 28), fill=(255, 255, 255)); dr.text((6, 4), m, fill=(20, 20, 30), font=F)
     fr.append(im)
 pal = fr[len(fr) // 2].quantize(colors=255, method=Image.Quantize.MEDIANCUT)
 q = [im.quantize(palette=pal, dither=Image.Dither.NONE) for im in fr]
