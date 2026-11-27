@@ -1,4 +1,4 @@
-"""Блёстка v5: сетка гуще у уголков рта (до ключей мимики) — на «грусти» уголки вниз давали грани: у Tripo там
+"""Блёстка v5: сетка гуще на лице и у уголков рта (до ключей мимики) — на «грусти» уголки вниз давали грани: у Tripo там
 крупные треугольники, ключ сгибал их по одному ребру. Делим треугольники вокруг каждого уголка (красно-зелёное
 деление: 3 ребра — на 4, 1 ребро — пополам, без Т-стыков; швы UV — по сваренным рёбрам, обе стороны шва делятся
 вместе). Новые вершины — середины рёбер (позиция, нормаль, UV, веса), форма и вид в покое не меняются.
@@ -10,7 +10,10 @@ import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from v5_common import Glb, body, sample  # noqa: E402
 
-LEVELS = [(0.022, 'уголки рта ±22 мм'), (0.012, 'уголки рта ±12 мм')]
+# v5c: сначала всё лицо спереди (глаза, брови, щёки, рот, подбородок) — деформации ключей гладкие, без граней и тёмных
+# треугольников под подбородком на «а»; затем ещё раз — веки/брови (эллипсы вокруг глаз) и рот с подбородком;
+# затем уголки рта (как в v5b). Точки — по рту Tripo (уголки) и глазам (зелёная радужка).
+LEVELS = [('fine', 'глаза, брови, рот, подбородок'), (0.022, 'уголки рта ±22 мм')]  # ±12 мм (v5b) — лишнее при общем уплотнении (размер ≲ 2 МБ)
 
 src, dst = sys.argv[1:3]
 g = Glb(src); j = g.j
@@ -29,6 +32,21 @@ red = (C[:, 0] > C[:, 1] + 35) & (lum < 175) & (P[:, 2] > 0.1) & (P[:, 1] > 0.55
 R = P[red]
 corners = [R[np.argmax(R[:, 0])], R[np.argmin(R[:, 0])]]
 print('уголки рта:', np.round(corners, 4).tolist())
+mc = (corners[0] + corners[1]) / 2
+green = (C[:, 1] > C[:, 0] + 20) & (C[:, 1] > C[:, 2] - 15) & (P[:, 2] > 0.08) & (P[:, 1] > 0.66) & (P[:, 1] < 0.8)
+eyesC = [P[green & (P[:, 0] > 0)].mean(0), P[green & (P[:, 0] < 0)].mean(0)]
+print('глаза:', np.round(eyesC, 4).tolist())
+
+
+def select(kind, cen, nrm):
+    if kind == 'face':
+        return (np.abs(cen[:, 0] - mc[0]) < 0.165) & (cen[:, 1] > mc[1] - 0.085) & (cen[:, 1] < eyesC[0][1] + 0.1) \
+            & (nrm[:, 2] > 0.15) & (cen[:, 2] > 0.04)
+    sel = (np.abs(cen[:, 0] - mc[0]) < 0.075) & (cen[:, 1] > mc[1] - 0.06) & (cen[:, 1] < mc[1] + 0.035) & (nrm[:, 2] > 0.1)
+    for e in eyesC:
+        q = cen - e
+        sel |= ((q[:, 0] / 0.07) ** 2 + (q[:, 1] / np.where(q[:, 1] > 0, 0.085, 0.05)) ** 2 < 1) & (nrm[:, 2] > 0.1)
+    return sel
 
 
 def merge_w(ja, wa, jb, wb):
@@ -51,9 +69,13 @@ for rad, what in LEVELS:
     key = np.round(P * 1e5).astype(np.int64)
     _, wl = np.unique(key, axis=0, return_inverse=True); wl = wl.ravel()
     cen = P[I].mean(1)
-    sel = np.zeros(len(I), bool)
-    for c in corners:
-        sel |= np.linalg.norm(cen - c, axis=1) < rad
+    nrm = np.cross(P[I[:, 1]] - P[I[:, 0]], P[I[:, 2]] - P[I[:, 0]]); nrm /= np.maximum(np.linalg.norm(nrm, axis=1, keepdims=True), 1e-12)
+    if isinstance(rad, str):
+        sel = select(rad, cen, nrm)
+    else:
+        sel = np.zeros(len(I), bool)
+        for c in corners:
+            sel |= np.linalg.norm(cen - c, axis=1) < rad
     # рёбра по сваренным вершинам
     def ekey(a, b):
         a, b = wl[a], wl[b]

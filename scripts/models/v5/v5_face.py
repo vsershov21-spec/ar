@@ -172,7 +172,11 @@ NC, NR = 30, 12
 DT, DM = 0.0005, 0.0018  # отступ века от поверхности: у верха (покой) и к кромке (м); радужка Tripo выпуклее белка
 TW, TH = 256, 64  # текстура века одного глаза
 LID_X, LID_Y = 13.0, 11.0  # запас закрытого века за разрез: по бокам и снизу (px снимка, 0.4 мм)
-lid_img = np.zeros((TH, TW * 2, 3), np.uint8)
+lid_img = np.zeros((2 * TH, TW * 2, 3), np.uint8)  # верх — верхние веки, низ — нижние (v5c)
+NRL = 8  # рядов нижнего века
+DLO = 0.0010  # отступ нижнего века (под верхним: у кромки верхнего 1.8 мм)
+lid_base = {}
+skin_pos = []  # положение для скина (закрытое веко / поднятое нижнее)
 LV, LUV, LF, LN = [], [], [], []
 keys = {}  # имя → смещения (позиции) и нормалей
 rest_pos, rest_n = [], []
@@ -244,6 +248,16 @@ for ei, side in enumerate(('L', 'R')):
                 a = np.clip((line_px + 1.2 - dpx) / 1.2, 0, 1)
                 c = c * (1 - a) + lc * a
             lid_img[jj, ei * TW + i] = np.clip(c, 0, 255)
+        # нижнее веко (v5c): мех под глазом, к верхней кромке — чуть темнее и мягкая линия (нижние ресницы)
+        lc = np.array([np.interp(k, np.arange(NC), LC[:, q]) for q in range(3)])
+        for jj in range(TH):
+            s = (jj + 0.5) / TH  # 0 — низ, 1 — кромка
+            c = fbot * (1 - 0.1 * s ** 3)
+            dpx = (1 - s) * 40
+            if dpx < 3.2:
+                a = 0.55 * np.clip((3.2 - dpx) / 1.6, 0, 1)
+                c = c * (1 - a) + lc * a
+            lid_img[TH + jj, ei * TW + i] = np.clip(c, 0, 255)
     # ── сетка века: ряды по s (кромка — s=1), ключи пути закрытия c = k/4 ──
     base = len(LV)
     S = np.linspace(0, 1, NR + 1)
@@ -262,7 +276,7 @@ for ei, side in enumerate(('L', 'R')):
     U = ei * 0.5 + (0.5 / TW) + np.linspace(0, 1, NC) * (0.5 - 1.0 / TW)
     for r in range(NR + 1):
         for c_ in range(NC):
-            LUV.append((U[c_], 0.5 / TH + S[r] * (1 - 1.0 / TH)))
+            LUV.append((U[c_], 0.5 * (0.5 / TH + S[r] * (1 - 1.0 / TH))))
             side_of.append(side)
     LV.extend(p0)
     for r in range(NR):
@@ -274,6 +288,58 @@ for ei, side in enumerate(('L', 'R')):
         pk, nk = pos_at(k / 4)
         keys.setdefault(f'lid{side}_{k}', []).append((base, pk - prev[0], nk - prev[1]))
         prev = (pk, nk)
+    skin_pos.append(pk)
+    lid_base[side] = base
+    # ── v5c: косое веко и смех — своя форма кромки по столбцам (ключ от покоя; веко-оболочка по куполу глаза) ──
+    Hh = float(e['bot'].max() - e['top'].min())
+    u = np.clip((xs_e - e['x'][0]) / (e['x'][-1] - e['x'][0]), 0, 1)
+    uin = u if side == 'L' else 1 - u  # 0 — внутренний уголок (у переносицы), 1 — внешний
+    tmin = float(e['top'].min())
+    arc = tmin + Hh * (0.66 - 0.36 * np.sin(np.pi * u))  # «^» смеха: дуга вверх
+    EDGES = {
+        # грусть: внешний край века ниже (опущенные уголки), внутренний — почти открыт
+        'sad': t + Hh * (0.06 + 0.40 * uin ** 1.3),
+        # недовольство/обида: тяжёлое веко, ниже у переносицы
+        'mad': np.maximum(t, tmin + Hh * (0.50 - 0.28 * uin)),
+        'laugh': arc,
+    }
+    for nm, ye in EDGES.items():
+        cc = np.clip((ye - yT) / Lg, 0, 1)
+        pk, nk = pos_at(0.0, shape=cc)
+        keys.setdefault(f'lid{side}_{nm}', []).append((base, pk - p0, nk - n0))
+    # ── v5c: нижнее веко — ряды от линии под глазом (покой: стянуты в линию) вверх ──
+    baseL = base + (NR + 1) * NC
+    yB = yE.copy()
+    SL = np.linspace(0, 1, NRL + 1)
+
+    def pos_lo(ytop):
+        ytop = np.minimum(ytop, yB)
+        X = np.repeat(xs_e[None, :], NRL + 1, 0)
+        Y = yB[None, :] - SL[:, None] * (yB - ytop)[None, :]
+        p, n_ = surf(X, Y)
+        dlt = DT + (DLO - DT) * np.clip(SL * 3, 0, 1)[:, None] * np.ones(NC)[None, :]
+        return (p + n_ * dlt[..., None]).reshape(-1, 3), n_.reshape(-1, 3)
+    q0, m0 = pos_lo(yB)
+    rest_n.append(m0)
+    for r in range(NRL + 1):
+        for c_ in range(NC):
+            LUV.append((U[c_], 0.5 + 0.5 * (0.5 / TH + SL[r] * (1 - 1.0 / TH))))
+            side_of.append(side)
+    LV.extend(q0)
+    for r in range(NRL):
+        for c_ in range(NC - 1):
+            a = baseL + r * NC + c_; b = a + 1; cup = a + NC; d = cup + 1
+            LF.extend([(a, b, cup), (b, d, cup)])
+    LOS = {
+        # прищур снизу (радость): щёки поднимают нижнее веко, кромка — мягкая дуга
+        'lo': bt - Hh * 0.30 * (0.65 + 0.35 * np.sin(np.pi * u)),
+        # смех: до дуги «^» (под кромкой верхнего века)
+        'lolaugh': arc - 2.0,
+    }
+    for nm, ye in LOS.items():
+        pk, nk = pos_lo(ye)
+        keys.setdefault(f'lid{side}_{nm}', []).append((baseL, pk - q0, nk - m0))
+    skin_pos.append(pos_lo(LOS['lolaugh'])[0])
     print(f'веко {side}: {NC}×{NR + 1} вершин, ход кромки {Lg.max() * PX * 1000:.0f} мм, полоса ресниц {np.median(band):.0f} px')
 
 LV = np.array(LV, np.float32); LUV = np.array(LUV, np.float32); LF = np.array(LF, np.uint32)
@@ -281,11 +347,8 @@ LN = np.concatenate(rest_n).astype(np.float32)
 nL = len(LV)
 # скин век — как у ближайшей вершины тела в закрытом положении
 from scipy.spatial import cKDTree  # noqa: E402
-closed = LV.copy()
-for nm, lst in keys.items():
-    if nm.endswith(('_1', '_2', '_3', '_4')):
-        for base, dp, _ in lst:
-            closed[base:base + len(dp)] += dp
+closed = np.concatenate(skin_pos)  # верхние — закрытые, нижние — поднятые до «^»
+assert len(closed) == nL
 kd = cKDTree(P)
 _, nn = kd.query(closed)
 LJ = B['J'][nn]; LW = B['W'][nn]
@@ -300,7 +363,9 @@ ss = lambda a, b, x: np.clip((x - a) / (b - a), 0, 1) ** 2 * (3 - 2 * np.clip((x
 
 # низ морды (челюсть): кожа ниже середины рта и дно полости (нормаль вверх), спереди от шарнира
 dx = np.abs(P[:, 0] - cx)
-face_zone = (P[:, 2] > hinge[2] - 0.004) & (P[:, 1] > my - 0.2) & (P[:, 1] < my + 0.03)
+# v5c: по глубине — плавно (раньше резкая граница z > шарнир: под подбородком на «а» тянулись тёмные треугольники)
+face_zone = (P[:, 2] > hinge[2] - 0.03) & (P[:, 1] > my - 0.2) & (P[:, 1] < my + 0.03)
+zf = ss(hinge[2] - 0.03, hinge[2] + 0.004, P[:, 2])
 mU_y = BOX[3] - np.interp(P[:, 0], mcols * PX + BOX[0], np.nan_to_num(mU, nan=np.nanmin(mU))) * PX
 mD_y = BOX[3] - np.interp(P[:, 0], mcols * PX + BOX[0], np.nan_to_num(mD, nan=np.nanmax(mD))) * PX
 mid_y = (mU_y + mD_y) / 2
@@ -312,6 +377,7 @@ jaw_w = (lower & face_zone).astype(float) * wx * wy
 # у самого шва губ сверху (уголки) — плавно: вершины чуть выше середины рта, но у уголков — половина
 jaw_w = np.where(front & (P[:, 1] >= mid_y) & (P[:, 1] < mid_y + 0.006) & face_zone, 0.5 * wx * wy * (1 - (P[:, 1] - mid_y) / 0.006), jaw_w)
 jaw_w[~face_zone] = 0
+jaw_w *= zf
 print(f'челюсть: вершин {int((jaw_w > 0.01).sum())} (полная — {int((jaw_w > 0.99).sum())})')
 
 
@@ -373,12 +439,16 @@ for sd in 'LR':
     e = eyes[sd]
     xc = (e['x'][0] + e['x'][-1]) / 2
     brow_c[sd] = np.array([xc * PX + BOX[0], BOX[3] - (e['lt'].min() - 0.55 * (e['bot'].max() - e['top'].min())) * PX])
+for sd in 'LR':  # v5c: дуга брови для шейдера (src/character/v5Face.ts — тёмная мягкая дуга меха): центр и полуширина
+    e = eyes[sd]
+    marks['brow' + sd] = [round(float(brow_c[sd][0]), 5), round(float(brow_c[sd][1]), 5),
+                          round(float((e['x'][-1] - e['x'][0]) / 2 * PX), 5)]
 lash_top_y = {sd: BOX[3] - np.interp(P[:, 0], eyes[sd]['x'] * PX + BOX[0], eyes[sd]['lt'], left=np.nan, right=np.nan) * PX for sd in 'LR'}
 
 
-def brow(dy_in, dy_out, dx_in=0.0):
+def brow(dy_in, dy_out, dx_in=0.0, sides='LR'):
     D = np.zeros_like(P)
-    for sd in 'LR':
+    for sd in sides:
         e = eyes[sd]
         c = brow_c[sd]
         r2 = ((P[:, 0] - c[0]) / (D_eye * 0.62)) ** 2 + ((P[:, 1] - c[1]) / (D_eye * 0.42)) ** 2
@@ -444,10 +514,40 @@ BODY_KEYS = {
     'frown': onto_surface(smooth_key(corners(-0.2 * Hs, -0.015 * Wm, soft=1.7))),
     'smirk': onto_surface(smooth_key(corners(0.36 * Hs, 0.04 * Wm, sides=('L',)))),
     'cheek_up': onto_surface(cheeks(0.004)),
-    'brow_up': onto_surface(brow(0.006, 0.005)),
-    'brow_down': onto_surface(brow(-0.005, 0.0015, dx_in=0.002)),
-    'brow_sad': onto_surface(brow(0.006, -0.0015)),
 }
+# v5c: брови по сторонам (асимметрия: недовольство, подмигнуть) — ведёт v5Face.ts (v5BodyWeights), не цикл MORPH_TARGETS
+for sd in 'LR':
+    BODY_KEYS[f'brow_up_{sd}'] = onto_surface(brow(0.006, 0.005, sides=sd))
+    BODY_KEYS[f'brow_down_{sd}'] = onto_surface(brow(-0.0055, 0.002, dx_in=0.0025, sides=sd))
+    BODY_KEYS[f'brow_sad_{sd}'] = onto_surface(brow(0.0065, -0.002, dx_in=0.001, sides=sd))
+
+
+# v5c: широко раскрытые глаза (удивление) — область нарисованного глаза с ресницами растягивается от центра
+# (круг радужки остаётся кругом), к краю области — плавно в ноль
+def eye_scale_D(Q, k=0.12, front_m=None):
+    D = np.zeros_like(Q)
+    for sd in 'LR':
+        e = eyes[sd]
+        cxp = (e['x'][0] + e['x'][-1]) / 2; cyp = (e['top'].min() + e['bot'].max()) / 2
+        c = np.array([cxp * PX + BOX[0], BOX[3] - cyp * PX])
+        rx = (e['x'][-1] - e['x'][0]) / 2 * PX
+        ry_up = (cyp - e['lt'].min()) * PX; ry_dn = (e['bot'].max() - cyp) * PX
+        q = Q[:, :2] - c
+        r = np.sqrt((q[:, 0] / rx) ** 2 + (q[:, 1] / np.where(q[:, 1] > 0, ry_up, ry_dn)) ** 2)
+        w = 1 - ss(1.12, 1.9, r)
+        if front_m is not None:
+            w = w * front_m
+        D[:, :2] += q * (k * w)[:, None]
+    return D
+
+
+BODY_KEYS['eyes_wide'] = onto_surface(eye_scale_D(P, front_m=front.astype(float)))
+# веки едут вместе с растянутым глазом (иначе линия покоя века осталась бы на белке)
+for sd in 'LR':
+    b0 = lid_base[sd]; nU = (NR + 1) * NC; nLo = (NRL + 1) * NC
+    seg = LV[b0:b0 + nU + nLo].astype(np.float64)
+    Dl = eye_scale_D(seg)
+    keys[f'lid{sd}_wide'] = [(b0, Dl.astype(np.float32), np.zeros_like(Dl, np.float32))]
 
 
 def vnormals(V, F):
@@ -466,13 +566,14 @@ def vnormals(V, F):
 n_base = vnormals(P, I)
 body_targets = []
 for nm, D in BODY_KEYS.items():
-    D[np.abs(D).max(1) < 5e-5] = 0  # < 0.05 мм — ноль (ключ разреженный)
+    # < 0.12 мм — ноль (ключ разреженный; v5c: сетка лица вдвое гуще, хвосты лапласиана — не в файл)
+    D[np.abs(D).max(1) < 1.2e-4] = 0
     moved = np.abs(D).max(1) > 1e-7
     dn = np.zeros_like(P)
     if moved.any():
         dn = vnormals(P + D, I) - n_base
         # нормали меняются и у соседей сдвинутых вершин — остальное ноль (шум округления)
-        dn[np.abs(dn).max(1) < 1e-4] = 0
+        dn[np.abs(dn).max(1) < 4e-3] = 0
     body_targets.append((nm, D.astype(np.float32), dn.astype(np.float32)))
     print(f'ключ {nm}: вершин {int(moved.sum())}, макс. сдвиг {np.abs(D).max() * 1000:.1f} мм')
 
@@ -516,13 +617,13 @@ li = g.add_image(Image.fromarray(lid_img), 'glitter_v5_lids')
 lt_i = g.add_texture(li, 0)
 j['materials'].append({'name': 'Lids_V5', 'pbrMetallicRoughness': {'baseColorTexture': {'index': lt_i}, 'metallicFactor': round(metal, 3), 'roughnessFactor': round(rough, 3)}})
 lm = len(j['materials']) - 1
-lid_names = sorted(keys.keys(), key=lambda s: (s[3], s))
+lid_names = sorted(keys.keys(), key=lambda s: (s[3], s))  # lidL_1..4, lidL_laugh, lidL_lo, …
 ltargets = []
 for nm in lid_names:
     dp = np.zeros((nL, 3), np.float32); dn = np.zeros((nL, 3), np.float32)
     for base, a, b in keys[nm]:
         dp[base:base + len(a)] = a; dn[base:base + len(b)] = b
-    ltargets.append({'POSITION': g.add_acc(dp, 5126, 'VEC3', 34962), 'NORMAL': g.add_acc(dn, 5126, 'VEC3', 34962)})
+    ltargets.append({'POSITION': add_sparse(dp), 'NORMAL': add_sparse(dn)})
 Wn = LW.astype(np.float32)
 if Wn.dtype != np.float32 or Wn.max() > 1.5:
     Wn = Wn / 255.0
@@ -543,7 +644,7 @@ size = g.save(dst)
 print(f'→ {dst} ({size / 1e6:.2f} МБ): ключей тела {len(body_targets)}, век {len(lid_names)}, вершин век {nL}')
 
 if VIZ:
-    Image.fromarray(lid_img).resize((TW * 4, TH * 4), Image.NEAREST).save(f'{VIZ}/lid_tex.png')
+    Image.fromarray(lid_img).resize((TW * 4, TH * 8), Image.NEAREST).save(f'{VIZ}/lid_tex.png')
     v = Image.fromarray(img.astype(np.uint8)).convert('RGB'); dr = ImageDraw.Draw(v)
     for sd in 'LR':
         e = eyes[sd]

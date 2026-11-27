@@ -54,9 +54,17 @@ describe('glitter v5: флаг ?models=v5', () => {
     expect(fur.rim).toBeLessThan(0.35);
     expect(v5.asset.extras?.glitterV5).toBeTruthy();
     const body = v5.meshes.find((m) => m.name === 'Body_Glitter_V5')!;
-    expect(body.extras!.targetNames).toEqual(expect.arrayContaining(['mouth_A', 'mouth_E', 'mouth_O', 'mouth_U', 'mouth_M', 'smile', 'frown', 'brow_up', 'brow_sad']));
+    expect(body.extras!.targetNames).toEqual(expect.arrayContaining(['mouth_A', 'mouth_E', 'mouth_O', 'mouth_U', 'mouth_M', 'smile', 'frown', 'eyes_wide',
+      'brow_up_L', 'brow_up_R', 'brow_down_L', 'brow_down_R', 'brow_sad_L', 'brow_sad_R']));
     const lids = v5.meshes.find((m) => m.name === 'Lids_V5')!;
-    expect(lids.extras!.targetNames).toEqual(['lidL_1', 'lidL_2', 'lidL_3', 'lidL_4', 'lidR_1', 'lidR_2', 'lidR_3', 'lidR_4']);
+    for (const s of ['L', 'R']) {
+      expect(lids.extras!.targetNames).toEqual(expect.arrayContaining([1, 2, 3, 4, 'sad', 'mad', 'laugh', 'lo', 'lolaugh', 'wide'].map((k) => `lid${s}_${k}`)));
+    }
+    // v5c: накладка рта (формы рта шейдером), плоскость рта в мм
+    expect(names).toContain('Mouth_V5');
+    const mouth = (v5.asset.extras!.glitterV5 as { mouth: { uv0: number[]; mm: number[] } }).mouth;
+    expect(mouth.mm[0]).toBeGreaterThan(80);
+    expect(mouth.uv0[0]).toBeCloseTo(0.5, 1);
     const col = JSON.parse(fs.readFileSync('public/models/v2/glitter_v5_colliders.json', 'utf8'));
     expect(col.volumes.map((v: { name: string }) => v.name)).toEqual(expect.arrayContaining(['head', 'torso', 'skirt', 'bow']));
   });
@@ -76,8 +84,11 @@ describe('glitter v5: флаг ?models=v5', () => {
     const sq = v5LidWeights({ eyes_squint: 1 });
     expect(sum(sq, 'L')).toBeGreaterThan(0.5);
     expect(sum(sq, 'L')).toBeLessThan(4);
+    // подмигнуть и смех — кромкой «^» (верхнее и нижнее веко), а не путём закрытия
     const wk = v5LidWeights({ wink_R: 1 });
-    expect(sum(wk, 'R')).toBe(4);
+    expect(wk.lidR_laugh).toBe(1);
+    expect(wk.lidR_lolaugh).toBe(1);
+    expect(wk.lidL_laugh).toBe(0);
     expect(sum(wk, 'L')).toBe(0);
     // ключ не больше 1 (сумма моргания и прищура не уводит веко за кромку)
     for (const v of Object.values(v5LidWeights({ blink_L: 1, eyes_squint: 1, eyes_laugh: 1 }))) expect(v).toBeLessThanOrEqual(1);
@@ -118,18 +129,38 @@ describe('glitter v5: флаг ?models=v5', () => {
     expect(j.accessors[cards.indices].count / 3).toBeLessThan(5500);
   });
 
-  it('эмоции v5: брови сильнее, хмурый рот закрывает улыбку Tripo, грусть — веки ниже, обида — румянец', async () => {
-    const { v5Emote, V5_EMO } = await import('../src/character/v5Face');
-    const sad = v5Emote({ brow_sad: 1, frown: 0.65 });
+  it('эмоции v5c: брови сильнее, формы рта накладки по эмоции, рот Tripo под накладкой закрыт, веки своей формы', async () => {
+    const { v5Emote, V5_EMO, v5State, v5MouthParams, v5LidWeights, v5BodyWeights, v5BrowInk } = await import('../src/character/v5Face');
+    const st = v5State();
+    const sad = v5Emote({ brow_sad: 1, frown: 0.65, tear: 1 }, st);
     expect(sad.brow_sad).toBeCloseTo(V5_EMO.browSad);
-    expect(sad.mouth_M).toBeGreaterThan(0.5);
-    expect(sad.frown).toBeGreaterThan(0.65);
-    expect(sad.eyes_sleepy).toBeGreaterThan(0.3);
-    // открытый рот (удивление) хмурый рот не закрывает
-    expect(v5Emote({ frown: 1, mouth_O: 1 }).mouth_M).toBe(0);
-    expect(v5Emote({ frown: 0.9, cheeks_gum: 0.6, brow_down: 0.75 }).blush).toBeGreaterThan(0.3);
-    // нейтральное — без изменений
-    expect(v5Emote({})).toEqual({});
+    expect(st.mSad).toBeGreaterThan(0.9);
+    expect(st.cover).toBe(1);
+    expect(st.tear).toBe(1);
+    const mp = v5MouthParams(st);
+    expect(mp.line2[1]).toBe(1); // линия закрытого рта
+    expect(mp.line[2]).toBeGreaterThan(5); // «︿» — уголки вниз
+    expect(mp.open2[0]).toBe(0);
+    expect(v5LidWeights(sad, st).lidL_sad).toBeGreaterThan(0.9);
+    const bw = v5BodyWeights(sad, st);
+    expect(bw.brow_sad_L).toBeGreaterThan(1);
+    expect(v5BrowInk(bw, 'L')).toBeGreaterThan(0.8);
+    // смех: открытый рот с клычками и язычком, рот Tripo закрыт
+    const l = v5Emote({ smile: 1, mouth_A: 0.85, eyes_laugh: 1, cheek_up: 1 }, st);
+    expect(st.mLaugh).toBe(1);
+    expect(l.mouth_A).toBe(0);
+    const lp = v5MouthParams(st);
+    expect(lp.open2[0]).toBe(1);
+    expect(lp.open2[2]).toBe(1);
+    // удивление — «о»; недовольство — кривая линия (наклон), обида — румянец
+    v5Emote({ eyes_wide: 1, brow_up: 1, mouth_O: 1.3 }, st);
+    expect(st.mO).toBe(1);
+    v5Emote({ brow_down: 0.8, eyes_squint: 0.45, mouth_M: 0.3, frown: 0.4 }, st);
+    expect(Math.abs(v5MouthParams(st).line[3])).toBeGreaterThan(3);
+    expect(v5Emote({ frown: 0.9, cheeks_gum: 0.6, brow_down: 0.75 }, st).blush).toBeGreaterThan(0.3);
+    // нейтральное — без изменений, рот Tripo
+    expect(v5Emote({}, st)).toEqual({});
+    expect(st.cover).toBe(0);
   });
 
   it('румянец: центры щёк под глазами, симметрично', async () => {

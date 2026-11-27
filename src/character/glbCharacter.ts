@@ -39,7 +39,7 @@ import { attachTulle, tulleMotion, tulleOf, type TulleMotion } from './tulleFx';
 import { alivePose } from './aliveIdle';
 import { attachTailSparkle } from './tailSparkle';
 import { FaceMixer, EMOTE_FACE, MORPH_TARGETS, facePreset, type FacePreset } from './face';
-import { applyV5Lids, attachV5Blush, v5Emote, V5Life, type V5Lids } from './v5Face';
+import { attachV5Face, v5Emote, V5Life, type V5FaceRig } from './v5Face';
 import { EyeRig } from './eyeRig';
 import { FaceWrinkles } from './faceWrinkles';
 import { FurTone } from './furTone';
@@ -371,11 +371,11 @@ export class GlbCharacter implements Character {
    * Блёстка v5 (asset.extras.glitterV5, scripts/models/build_glitter_v5.sh): вид Tripo 1:1 — без тона меха (FurTone),
    * лицо Tripo с веками Lids_V5 (v5Face.ts) и ключами рта тела
    */
-  private v5Lids: V5Lids | null = null;
   /** v5: живое лицо (моргания, саккады головой, дыхание улыбки, брови и щёки в речи) — v5Face.ts V5Life; null у других */
   v5Life: V5Life | null = null;
   /** v5: сила румянца шейдером щёк (W.blush кадра) */
-  private v5Blush: { value: number } | null = null;
+  /** v5c: лицо (веки, брови, накладка рта, шейдер лица) — v5Face.ts; null у других */
+  v5Face: V5FaceRig | null = null;
   /** ширина рта липсинка 0..1 (v5: щёки в речи) */
   private lipWide = 0;
 
@@ -497,12 +497,11 @@ export class GlbCharacter implements Character {
     // v5 — цвета текстуры Tripo как есть (без тона меха)
     if (!v5) this.furTone.attach(model);
     if (v5) {
-      const lids = model.getObjectByName('Lids_V5') as THREE.Mesh | undefined;
-      this.v5Lids = lids?.morphTargetDictionary ? { mesh: lids } : null;
       this.v5Life = new V5Life();
       // моргает V5Life (свой ритм, двойные); ручное моргание faceMix.blink() — как у всех
       this.faceMix.autoBlink = false;
-      this.v5Blush = attachV5Blush(model, (assetEx?.glitterV5 as { marks?: Parameters<typeof attachV5Blush>[1] } | undefined)?.marks);
+      // веки, брови по сторонам, накладка рта, румянец/брови/слёзы шейдером (v5c) — v5Face.ts
+      this.v5Face = attachV5Face(model, assetEx?.glitterV5 as Parameters<typeof attachV5Face>[1], this.morphMeshes);
     }
     // фатин Блёстки с разметкой (models/v2/glitter_p1.glb): сетка, золотые блёстки и полоса по подолу
     // …и хвост с искрой к кончику (только эта модель — tailSparkle.ts)
@@ -1523,7 +1522,7 @@ export class GlbCharacter implements Character {
       W.frown = (W.frown ?? 0) * 0.15;
     }
     // v5: эмоции сильнее на нарисованном лице Tripo (брови, закрытый рот при хмуром, веки) — v5Face.ts
-    if (v5l) v5Emote(W);
+    if (v5l) v5Emote(W, this.v5Face?.st);
     this.wrinkles?.update(W);
     this.mouthRig?.setTongue(modelsV2() ? PERSONA_TONGUE_V2[this.personaId] : undefined);
     this.mouthRig?.update(W);
@@ -1541,8 +1540,7 @@ export class GlbCharacter implements Character {
         inf[i] = W[key] ?? 0;
       }
     }
-    if (this.v5Lids) applyV5Lids(this.v5Lids, W);
-    if (this.v5Blush) this.v5Blush.value = clamp(W.blush ?? 0, 0, 1);
+    this.v5Face?.apply(W);
     this.applyTailEars(dt, ears, facePresetId);
     this.bones.get('LeftEye')?.scale.setScalar(pupils);
     this.bones.get('RightEye')?.scale.setScalar(pupils);

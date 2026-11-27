@@ -20,10 +20,13 @@ python3 v5/v5_parts.py glitter5 "$W/parts.png"
 $BPY blender/rig_cat.py -- "$W/joined.glb" /tmp/glitter5_parts.npz "$W/rig0.glb" 2>&1 | q
 # 3. концевые кости Mixamo (в скине Tripo их нет): HeadTop_End, *Toe_End, пальцы *4 — 71 кость, как у Хулигана
 $BPY v5/v5_endbones.py -- "$W/rig0.glb" "$W/rigged.glb" 2>&1 | q
-# 4. мимика поверх лица Tripo: сетка гуще у уголков рта (v5_dense — без граней на «грусти»), веки Lids_V5 (закрытое
-#    накрывает и контур глаза Tripo), ключи рта/бровей/щёк (места концевых костей — как у исходника Tripo)
+# 4. мимика поверх лица Tripo: сетка гуще на лице и у уголков рта (v5_dense — гладкие деформации), веки Lids_V5 (закрытое
+#    накрывает и контур глаза Tripo; v5c — косые, «^», нижние), ключи рта/бровей по сторонам/щёк/глаз (места концевых
+#    костей — как у исходника Tripo)
 python3 v5/v5_dense.py "$W/rigged.glb" "$W/dense.glb"
-python3 v5/v5_face.py "$W/dense.glb" "$W/face.glb" --src $SRC --viz "$W/viz"
+python3 v5/v5_face.py "$W/dense.glb" "$W/face0.glb" --src $SRC --viz "$W/viz"
+# 4b. v5c: накладка рта Mouth_V5 (кожа морды без рта + формы рта шейдером — src/character/v5Face.ts)
+python3 v5/v5_mouth.py "$W/face0.glb" "$W/face.glb" --viz "$W/viz"
 # 5. мех как у Хулигана/Добряка: оболочки тела (v5_fur), голова, щёки и пряди силуэта — общий fur_volume.py
 #    (точки лица — asset.extras.glitterV5.marks); кончики — цвет текстуры Tripo, без тона меха
 python3 v5/v5_fur.py "$W/face.glb" "$W/fur0.glb"
