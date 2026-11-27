@@ -76,6 +76,88 @@ export function v5LidWeights(w: Record<string, number>, st?: V5State): Record<st
   return out;
 }
 
+// ───────────────────────── v5e: поза лица по эмоции (брови шейдером, голова, взгляд, веса пресета) ─────────────────────────
+/**
+ * Эмоция на рефе (design/cut/glitter/face) — сочетание формы века, бровей, наклона головы и рта; одних весов content/face.json
+ * (общие с Хулиганом/Добряком) для нарисованного лица Tripo мало. Только для Блёстки v5:
+ *  • brow — сдвиг бровей шейдером, мм (вверх +): [L внутр., L внешн., R внутр., R внешн.]; browIn — внутренние концы к
+ *    переносице (мм, сведённые брови); bend — дуга сильнее (+) / прямее (−), мм;
+ *  • head — голова, рад: рысканье (> 0 — к +X модели, влево у кота), тангаж (> 0 — вверх/назад), крен;
+ *  • gaze — взгляд глаз относительно цели (рад: рысканье к +X, тангаж вверх); null — прямо на зрителя (без «взгляда в сторону»);
+ *  • w — веса лица вместо пресета content/face.json (ключи век, рта, щёк).
+ * Все каналы сглажены одной постоянной (V5_POSE_TAU): смена эмоции — плавное смешивание за ~0,2 с.
+ */
+export interface V5Pose {
+  brow: [number, number, number, number];
+  browIn: number;
+  bend: number;
+  head: [number, number, number];
+  gaze: [number, number] | null;
+  w?: Record<string, number>;
+}
+const WINK_BOTH: Record<string, number> = { wink_L: 1, wink_R: 1, smile: 0.7, cheek_up: 0.6, brow_up: 0.25 };
+export const V5_POSES: Record<string, V5Pose> = {
+  happy: { brow: [7, 5, 7, 5], browIn: 0, bend: 2, head: [0, 0.04, 0.05], gaze: null },
+  excited: {
+    brow: [11, 8, 11, 8], browIn: 0, bend: 3, head: [0, 0.07, 0.08], gaze: null,
+    w: { smile: 0.95, cheek_up: 0.75, eyes_wide: 0.55, brow_up: 0.5, mouth_A: 0.45 },
+  },
+  laugh: {
+    brow: [12, 9, 12, 9], browIn: 0, bend: 3, head: [0, 0.22, 0.07], gaze: null,
+    w: { smile: 1, mouth_A: 0.85, eyes_laugh: 1, cheek_up: 1, brow_up: 0.5 },
+  },
+  surprised: {
+    brow: [22, 19, 22, 19], browIn: 0, bend: 5, head: [0, 0.1, -0.17], gaze: null,
+    w: { eyes_wide: 1, brow_up: 1, mouth_O: 1.3 },
+  },
+  sad: {
+    brow: [16, -7, 16, -7], browIn: 3, bend: -3, head: [0, -0.17, 0.07], gaze: [0, 0.3],
+    w: { brow_sad: 1, frown: 0.7, tear: 1 },
+  },
+  offended: {
+    brow: [-11, 3, -11, 3], browIn: 5, bend: -4, head: [0.3, 0.06, -0.06], gaze: [-0.62, 0.02],
+    w: { brow_down: 0.8, frown: 0.9, cheeks_gum: 0.75, blush: 0.95 },
+  },
+  annoyed: {
+    brow: [-10, 0, -6, 4], browIn: 4, bend: -3, head: [0.2, -0.05, 0.05], gaze: [-0.42, -0.02],
+    w: { brow_down: 0.85, eyes_squint: 0.55, frown: 0.45 },
+  },
+  shy: {
+    brow: [9, -3, 9, -3], browIn: 1, bend: -1, head: [-0.2, -0.17, 0.15], gaze: [0.4, -0.34],
+    w: { blush: 1, brow_sad: 0.55, eyes_sleepy: 0.25, frown: 0.15, smile: 0.2, cheek_up: 0.3 },
+  },
+  wink: { brow: [7, 5, 7, 5], browIn: 0, bend: 2, head: [0, 0.05, 0.11], gaze: null, w: WINK_BOTH },
+  wink_r: { brow: [7, 5, 7, 5], browIn: 0, bend: 2, head: [0, 0.05, 0.11], gaze: null, w: WINK_BOTH },
+  wink_l: { brow: [7, 5, 7, 5], browIn: 0, bend: 2, head: [0, 0.05, -0.11], gaze: null, w: WINK_BOTH },
+};
+/** постоянная сглаживания позы (с): 90 % за ~0,2 с */
+export const V5_POSE_TAU = 0.085;
+
+/** сглаженная поза кадра (без аллокаций): brow, browIn, bend (мм), head (рад), gaze (рад), focus — 0..1 «смотрит на зрителя» */
+export class V5PoseMix {
+  readonly brow = [0, 0, 0, 0];
+  browIn = 0;
+  bend = 0;
+  readonly head = [0, 0, 0];
+  readonly gaze = [0, 0];
+  /** доля эмоции с «прямо на зрителя» (без взгляда в сторону) и доля эмоции вообще */
+  focus = 0;
+  emo = 0;
+  /** id — пресет эмоции, s — её сила 0..1 (0 — покой) */
+  update(dt: number, id: string | null, s: number) {
+    const p = id ? V5_POSES[id] : undefined;
+    const k = 1 - Math.exp(-dt / V5_POSE_TAU);
+    const w = p ? c01(s) : 0;
+    for (let i = 0; i < 4; i++) this.brow[i] += ((p ? p.brow[i] * w : 0) - this.brow[i]) * k;
+    this.browIn += ((p ? p.browIn * w : 0) - this.browIn) * k;
+    this.bend += ((p ? p.bend * w : 0) - this.bend) * k;
+    for (let i = 0; i < 3; i++) this.head[i] += ((p ? p.head[i] * w : 0) - this.head[i]) * k;
+    for (let i = 0; i < 2; i++) this.gaze[i] += ((p?.gaze ? p.gaze[i] * w : 0) - this.gaze[i]) * k;
+    this.focus += ((p ? w : 0) - this.focus) * k;
+    this.emo += (w - this.emo) * k;
+  }
+}
+
 // ───────────────────────── эмоции v5: сильнее и ближе к design/cut/glitter/face ─────────────────────────
 /**
  * Пресеты content/face.json рассчитаны на 3D-глаза и рот-накладку других котов; на нарисованном лице Tripo те же веса
@@ -85,7 +167,8 @@ export function v5LidWeights(w: Record<string, number>, st?: V5State): Record<st
  *  • румянец (blush) рисует шейдер щёк — отдельного ключа нет; обида — тоже с румянцем.
  * Меняет w на месте; st — исходные веса и формы рта (без аллокаций в кадре).
  */
-export const V5_EMO = { browSad: 2.0, browDown: 2.2, browUp: 1.6, frown: 1.4 };
+// v5e: брови рисует шейдер с позой V5_POSES — ключи кожи (мех у бровей) без усиления
+export const V5_EMO = { browSad: 1.0, browDown: 1.0, browUp: 1.0, frown: 1.4 };
 
 const _st = v5State();
 
@@ -168,19 +251,21 @@ export interface V5MouthParams {
   open2: [number, number, number, number];
 }
 
+// v5e: грусть — маленький надутый «︿» уголками вниз (реф sad), обида — поджатый, смущение — крошечный
 const LINE = {
-  sad: [28, 14, 12, 0, 4.6, 1, 0],
-  off: [12, 17, 6, 0, 4.6, 1, 0],
-  ann: [25, 17, -4, 8, 4.4, 0, 0],
-  shy: [18, 19, 5, 0, 4.0, 0.6, 0],
+  sad: [17, 13, 9, 0, 4.6, 1, 0],
+  off: [11, 17, 5, 0, 4.6, 1, 0],
+  ann: [24, 17, -4, 9, 4.4, 0, 0],
+  shy: [10, 18, 3, 0, 4.0, 0.7, 0],
   // v5d: «ω» подмигивания — уголки вверх, посередине две дужки
   omega: [26, 22, -9, 0, 4.4, 0, 1],
 } as const;
 const OPEN = {
-  laugh: [47, 19, 3, 34, 1, 1, 1],
-  o: [20, 8, 18, 25, 0, 1, 0.7],
-  // v5d: радость — открытая улыбка поменьше смеха, плоский верх, клычки, язычок
-  happy: [36, 18, 2.5, 22, 1, 1, 0.8],
+  laugh: [52, 19, 3, 40, 1, 1, 1],
+  // v5e: удивление — маленькое круглое «о» с тёмной полостью (реф surprised)
+  o: [14, 7, 9, 12, 0, 0, 0.35],
+  // v5d: радость — открытая улыбка поменьше смеха, плоский верх, клычки, язычок (v5e: шире и глубже — реф joy)
+  happy: [42, 18, 3, 30, 1, 1, 0.9],
 } as const;
 
 export function v5MouthParams(st: V5State, out?: V5MouthParams): V5MouthParams {
@@ -201,10 +286,13 @@ export function v5MouthParams(st: V5State, out?: V5MouthParams): V5MouthParams {
   } else {
     o.line[0] = 20; o.line[1] = 18;
   }
-  // речь под закрытой формой: линия гаснет, рот приоткрывается маленьким «о»
-  o.line2[1] = c01(sl / Math.max(st.cover, 1e-4)) * (1 - st.talk);
   const ow = [st.mLaugh, st.mO, st.mHappy ?? 0];
   const so = ow[0] + ow[1] + ow[2];
+  // v5e: смена закрытой формы на открытую (обида → смех) — короткая перекрёстная смена по доле, без 2–3 кадров двух ртов
+  const fo = so + sl > 1e-4 ? so / (so + sl) : 0;
+  const ko = fo <= 0.35 ? 0 : fo >= 0.65 ? 1 : ((fo - 0.35) / 0.3) ** 2 * (3 - 2 * (fo - 0.35) / 0.3);
+  // речь под закрытой формой: линия гаснет, рот приоткрывается маленьким «о»
+  o.line2[1] = c01((sl + so) / Math.max(st.cover, 1e-4)) * (1 - st.talk) * (1 - ko);
   const talkW = st.talk * c01(sl);
   const tot = so + talkW;
   for (let k = 0; k < 4; k++) o.open[k] = 0;
@@ -222,7 +310,7 @@ export function v5MouthParams(st: V5State, out?: V5MouthParams): V5MouthParams {
   } else {
     o.open[0] = 10; o.open[1] = 15; o.open[2] = 1; o.open[3] = 1;
   }
-  o.open2[0] = c01(tot / Math.max(st.cover, 1e-4));
+  o.open2[0] = c01((tot + (so > 0 ? sl : 0)) / Math.max(st.cover, 1e-4)) * (tot > 1e-4 ? Math.max(ko, talkW / tot) : 1);
   return o;
 }
 
@@ -250,22 +338,51 @@ export function v5LidCover(lw: Record<string, number>, s: 'L' | 'R'): number {
   return k * k * (3 - 2 * k);
 }
 
+/** v5e: глаз закрыт (моргание, сон, «^» смеха и подмигивания) 0..1 — полоса ресниц века становится мехом с тонкой кромкой */
+export function v5LidClosed(lw: Record<string, number>, s: 'L' | 'R'): number {
+  const g = (k: string) => lw[`lid${s}_${k}`] ?? 0;
+  const c = (g('1') + g('2') + g('3') + g('4')) / V5_LID_KEYS;
+  const k = c01(Math.max((c - 0.55) / 0.4, g('laugh')));
+  return k * k * (3 - 2 * k);
+}
+
 /** v5d: шейдер века — в полосе ресниц (верхнее веко, v > VS) альфа не меньше «закрытости» своего глаза */
 export const V5_LID_VS = 0.3;
-function patchLid(m: THREE.Material, cover: { value: THREE.Vector2 }) {
+/** v5e: тон меха века к меху тела (веко гладкое, тело — с оболочками меха: без поправки веко светлее «заплаткой») */
+export const V5_LID_TONE: [number, number, number] = [0.87, 0.88, 0.91];
+function patchLid(m: THREE.Material, cover: { value: THREE.Vector2 }, closed: { value: THREE.Vector2 }) {
   const prev = m.onBeforeCompile;
   m.onBeforeCompile = (sh, r) => {
     prev.call(m, sh, r);
     sh.uniforms.uLidCover = cover;
+    sh.uniforms.uLidClosed = closed;
+    sh.uniforms.uLidTone = { value: new THREE.Vector3(...V5_LID_TONE) };
     sh.fragmentShader = sh.fragmentShader
-      .replace('#include <common>', '#include <common>\nuniform vec2 uLidCover;')
+      .replace('#include <common>', '#include <common>\nuniform vec2 uLidCover;\nuniform vec2 uLidClosed;\nuniform vec3 uLidTone;')
       .replace('#include <map_fragment>', `#include <map_fragment>
   {
     float lv = vMapUv.y * 2.0;
-    if (lv < 1.0 && lv > ${V5_LID_VS.toFixed(3)}) diffuseColor.a = max(diffuseColor.a, vMapUv.x < 0.5 ? uLidCover.x : uLidCover.y);
+    bool eL = vMapUv.x < 0.5;
+    float sc = clamp((vMapUv.x - (eL ? 0.0 : 0.5)) * 2.0, 0.0, 1.0);  // столбец века 0..1 (+X модели)
+    if (lv < 1.0) {
+      float VS = ${V5_LID_VS.toFixed(3)};
+      if (lv > VS) diffuseColor.a = max(diffuseColor.a, eL ? uLidCover.x : uLidCover.y);
+      // закрытый глаз: полоса ресниц — мех века, у кромки — тонкая тёмная линия (без «кучки» ресниц и полоски белка)
+      float cl = eL ? uLidClosed.x : uLidClosed.y;
+      if (cl > 0.001 && lv > VS) {
+        float f = (lv - VS) / (1.0 - VS);
+        vec4 fur = texture2D(map, vec2(vMapUv.x, VS * 0.42));
+        float edge = smoothstep(0.86, 0.94, f);
+        vec3 tgt = mix(fur.rgb, vec3(0.11, 0.12, 0.22), edge);
+        diffuseColor.rgb = mix(diffuseColor.rgb, diffuse * tgt, cl);
+      }
+      // мех века — в тон меху тела; бока века — мягко (без вертикальной кромки за уголком глаза)
+      diffuseColor.rgb *= uLidTone;
+      diffuseColor.a *= smoothstep(0.0, 0.04, sc) * smoothstep(1.0, 0.96, sc);
+    }
   }`);
   };
-  m.customProgramCacheKey = () => 'v5-lid-1';
+  m.customProgramCacheKey = () => 'v5-lid-2';
   m.needsUpdate = true;
 }
 
@@ -289,7 +406,10 @@ const PAINT_FS = `
 uniform float uBlush;
 uniform vec3 uBlushC[2];
 uniform vec2 uBrowInk;
-uniform vec3 uBrow[2];
+uniform vec4 uBrowG[2];
+uniform vec4 uBrowS[2];
+uniform vec4 uBrowP[2];
+uniform vec3 uBrowK;
 uniform float uTear;
 uniform vec4 uEye[2];
 varying vec3 vBlushP;`;
@@ -303,17 +423,22 @@ const PAINT_APPLY = `
     }
     bw = clamp(bw * uBlush * 1.15, 0.0, 1.0);
     diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.12, 0.52, 0.66) + vec3(0.16, 0.0, 0.03), bw);
-    // брови: мягкая тёмная дуга меха над глазом, у переносицы толще (координаты покоя — едет с кожей ключей бровей)
+    // брови (v5e): мазок по форме брови Tripo (её в текстуре нет — v5_brows.py) с позой эмоции: сдвиг внутреннего и
+    // внешнего концов, концы к переносице, дуга; к внешнему концу тоньше, концы мягкие (координаты покоя — едет с кожей)
     for (int i = 0; i < 2; i++) {
       float ink = i == 0 ? uBrowInk.x : uBrowInk.y;
-      if (ink > 0.001 && vBlushP.z > 0.06) {
-        vec3 b = uBrow[i];
-        float u = (vBlushP.x - b.x) / b.z;
-        float uo = u * sign(b.x);  // −1 у переносицы, +1 снаружи
-        float yA = b.y + 0.006 * (1.0 - u * u) - 0.004 * max(-uo, 0.0);
-        float th = mix(0.0075, 0.003, clamp(uo * 0.5 + 0.5, 0.0, 1.0));
-        float a = (1.0 - smoothstep(th * 0.35, th, abs(vBlushP.y - yA))) * (1.0 - smoothstep(0.78, 1.02, abs(u)));
-        diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(0.30, 0.30, 0.42), a * ink);
+      vec4 G = uBrowG[i], S = uBrowS[i], Q = uBrowP[i];
+      if (ink > 0.001 && vBlushP.z > S.z - 0.045) {
+        float sg = sign(G.x);
+        float u = (vBlushP.x - (G.x - sg * Q.z)) * sg / G.z;  // −1 у переносицы, +1 снаружи
+        float uc = clamp(u, -1.0, 1.0);
+        float bd = S.y + Q.w;
+        float yc = G.y + S.x * uc * G.z + bd * (1.0 - uc * uc) + Q.x * 0.5 * (1.0 - uc) + Q.y * 0.5 * (1.0 + uc);
+        float dd = (S.x * G.z - 2.0 * bd * uc + 0.5 * (Q.y - Q.x)) / G.z;
+        float d = abs(vBlushP.y - yc) / sqrt(1.0 + dd * dd);
+        float ht = G.w * 0.5 * mix(1.2, 0.6, uc * 0.5 + 0.5);
+        float a = (1.0 - smoothstep(ht * 0.15, ht * 1.25, d)) * (1.0 - smoothstep(0.78, 1.1, abs(u)));
+        diffuseColor.rgb *= pow(uBrowK, vec3(a * ink));
       }
     }
     // слёзы: голубая «лужица» по нижнему краю глаза и капля под ним
@@ -348,18 +473,25 @@ const PAINT_APPLY = `
 export interface V5PaintU {
   blush: { value: number };
   browInk: { value: THREE.Vector2 };
+  /** v5e: поза бровей по сторонам (м): сдвиг внутр./внешн. конца, концы к переносице, доп. дуга */
+  browPose: { value: THREE.Vector4[] };
   tear: { value: number };
+  /** v5e: брови рисует шейдер и в покое (в текстуре их нет — asset.extras.glitterV5.brows) */
+  browsDrawn: boolean;
 }
 
 /** подключить шейдер лица к материалу (обёртка поверх его onBeforeCompile; ключ программы — свой) */
-function patchPaint(m: THREE.Material, u: V5PaintU, centers: THREE.Vector3[], brows: THREE.Vector3[], eyes: THREE.Vector4[]) {
+function patchPaint(m: THREE.Material, u: V5PaintU, centers: THREE.Vector3[], bg: THREE.Vector4[], bs: THREE.Vector4[], bk: THREE.Vector3, eyes: THREE.Vector4[]) {
   const prev = m.onBeforeCompile;
   m.onBeforeCompile = (sh, r) => {
     prev.call(m, sh, r);
     sh.uniforms.uBlush = u.blush;
     sh.uniforms.uBlushC = { value: centers };
     sh.uniforms.uBrowInk = u.browInk;
-    sh.uniforms.uBrow = { value: brows };
+    sh.uniforms.uBrowG = { value: bg };
+    sh.uniforms.uBrowS = { value: bs };
+    sh.uniforms.uBrowP = u.browPose;
+    sh.uniforms.uBrowK = { value: bk };
     sh.uniforms.uTear = u.tear;
     sh.uniforms.uEye = { value: eyes };
     sh.vertexShader = sh.vertexShader
@@ -370,37 +502,50 @@ function patchPaint(m: THREE.Material, u: V5PaintU, centers: THREE.Vector3[], br
       .replace('#include <color_fragment>', '#include <color_fragment>' + PAINT_APPLY);
   };
   const prevKey = m.customProgramCacheKey?.bind(m);
-  m.customProgramCacheKey = () => (prevKey ? prevKey() : '') + '|v5-paint-2';
+  m.customProgramCacheKey = () => (prevKey ? prevKey() : '') + '|v5-paint-3';
   m.needsUpdate = true;
 }
 
-/** брови (центр x, y покоя, полуширина) и глаза (центр x, y, полуоси) из точек лица */
-function browsEyes(marks: Marks): { brows: THREE.Vector3[]; eyes: THREE.Vector4[] } {
-  const brows: THREE.Vector3[] = [], eyes: THREE.Vector4[] = [];
+/** брови Tripo (v5_brows.py: центр, полуширина, толщина, наклон, дуга, цвет) */
+export interface V5BrowShape { x: number; y: number; z: number; hw: number; th: number; slope: number; bend: number; col: number[]; dk: number }
+
+/** брови (форма) и глаза (центр x, y, полуоси) из точек лица; нет extras.brows (до v5e) — дуга над глазом по точкам */
+function browsEyes(marks: Marks, bro?: { L?: V5BrowShape; R?: V5BrowShape }): { bg: THREE.Vector4[]; bs: THREE.Vector4[]; eyes: THREE.Vector4[] } {
+  const bg: THREE.Vector4[] = [], bs: THREE.Vector4[] = [], eyes: THREE.Vector4[] = [];
   for (const s of ['L', 'R'] as const) {
     const o = marks[`eyeOuter${s}`], i = marks[`eyeInner${s}`], b = marks[`eyeBottom${s}`];
     const top = marks[`eyeTop${s}`] ?? b[1] + 0.06;
     const cx = (o[0] + i[0]) / 2, hw = Math.abs(o[0] - i[0]) / 2;
-    const br = marks[`brow${s}`] ?? [cx, top + 0.02, hw];
-    // дуга — ближе к ресницам, чем мягкая бровь Tripo (по рефу)
-    // v5d: ещё ниже — тонкая мягкая дуга прямо над ресницами (реф)
-    brows.push(new THREE.Vector3(br[0], br[1] - 0.012, br[2]));
+    const sh = bro?.[s];
+    if (sh) {
+      bg.push(new THREE.Vector4(sh.x, sh.y, sh.hw, sh.th));
+      bs.push(new THREE.Vector4(sh.slope, sh.bend, sh.z, sh.dk));
+    } else {
+      const br = marks[`brow${s}`] ?? [cx, top + 0.02, hw];
+      bg.push(new THREE.Vector4(br[0], br[1] - 0.012, br[2], 0.008));
+      bs.push(new THREE.Vector4(0, 0.006, 0.1, 1));
+    }
     // низ белка — eyeBottom; верх — ниже верха полосы ресниц
     const yTop = top - 0.008, cy = (yTop + b[1]) / 2;
     eyes.push(new THREE.Vector4(cx, cy, hw * 0.95, (yTop - b[1]) / 2));
   }
-  return { brows, eyes };
+  return { bg, bs, eyes };
 }
 
 /**
  * Шейдер лица v5 на теле, мех-оболочках и прядях (они в тех же координатах покоя): румянец (W.blush), дуги бровей
  * (насыщенность — v5BrowInk), слёзы (W.tear). Возвращает униформы; null — у модели нет точек лица.
  */
-export function attachV5Paint(model: THREE.Object3D, marks: Marks | undefined): V5PaintU | null {
+export function attachV5Paint(model: THREE.Object3D, marks: Marks | undefined, bro?: { L?: V5BrowShape; R?: V5BrowShape }): V5PaintU | null {
   if (!marks) return null;
-  const u: V5PaintU = { blush: { value: 0 }, browInk: { value: new THREE.Vector2() }, tear: { value: 0 } };
+  const u: V5PaintU = {
+    blush: { value: 0 }, browInk: { value: new THREE.Vector2() }, browPose: { value: [new THREE.Vector4(), new THREE.Vector4()] },
+    tear: { value: 0 }, browsDrawn: !!(bro?.L && bro?.R),
+  };
   const centers = v5CheekCenters(marks).map((c) => new THREE.Vector3(...c));
-  const { brows, eyes } = browsEyes(marks);
+  const { bg, bs, eyes } = browsEyes(marks, bro);
+  // цвет брови — во столько раз темнее меха (бровь Tripo: ~0.7 меха, к синему — меньше)
+  const bk = new THREE.Vector3(...V5_BROW_K);
   const done = new Set<THREE.Material>();
   model.traverse((o) => {
     const m = o as THREE.Mesh;
@@ -408,13 +553,17 @@ export function attachV5Paint(model: THREE.Object3D, marks: Marks | undefined): 
     for (const mat of Array.isArray(m.material) ? m.material : [m.material]) {
       if (done.has(mat)) continue;
       done.add(mat);
-      patchPaint(mat, u, centers, brows, eyes);
+      patchPaint(mat, u, centers, bg, bs, bk, eyes);
     }
   });
   return u;
 }
 
 /** прежнее имя (v5b): только сила румянца */
+/** v5e: множитель цвета брови к меху (покой — как бровь Tripo) и насыщенность в покое / в эмоции */
+export const V5_BROW_K: [number, number, number] = [0.52, 0.56, 0.68];
+export const V5_BROW_INK = { rest: 1, emo: 1.5 };
+
 export function attachV5Blush(model: THREE.Object3D, marks: Marks | undefined): { value: number } | null {
   return attachV5Paint(model, marks)?.blush ?? null;
 }
@@ -547,7 +696,8 @@ uniform float uEPupil;
 uniform float uEHi;
 uniform float uESpiral;
 uniform float uETime;
-uniform float uEWet;`;
+uniform float uEWet;
+uniform vec2 uEClosed;`;
 const EYE_MAP = `
   float v5Hl = 0.0;
   #ifdef USE_MAP
@@ -583,7 +733,8 @@ const EYE_MAP = `
     float b2 = 1.0 - smoothstep(0.035, 0.075, length(h2));
     v5Hl = (b1 * 0.85 + b2 * 0.7) * uEHi * inE * (1.0 - uESpiral);
     // влага у нижнего края (слёзы): блестящая полоска по низу белка
-    diffuseColor *= vec4(col, clamp(base.a / 0.75, 0.0, 1.0));
+    // v5e: глаз закрыт (моргание, «^») — накладки нет: под кромкой века не просвечивает полоска радужки
+    diffuseColor *= vec4(col, clamp(base.a / 0.75, 0.0, 1.0) * (1.0 - (si == 0 ? uEClosed.x : uEClosed.y)));
   }
   #endif`;
 const EYE_EMIT = `#include <emissivemap_fragment>
@@ -591,6 +742,8 @@ const EYE_EMIT = `#include <emissivemap_fragment>
 
 export interface V5EyesU {
   gaze: { value: THREE.Vector4[] };
+  /** v5e: закрытость глаз L, R (как у века) — накладка гаснет */
+  closed: { value: THREE.Vector2 };
   pupil: { value: number };
   hi: { value: number };
   spiral: { value: number };
@@ -603,7 +756,7 @@ export function attachV5Eyes(model: THREE.Object3D, info: V5EyesInfo | undefined
   if (!mesh?.isMesh || !info) return null;
   const u: V5EyesU = {
     gaze: { value: [new THREE.Vector4(0, 0, 1, 1), new THREE.Vector4(0, 0, 1, 1)] },
-    pupil: { value: 1 }, hi: { value: 1 }, spiral: { value: 0 }, time: { value: 0 },
+    pupil: { value: 1 }, hi: { value: 1 }, spiral: { value: 0 }, time: { value: 0 }, closed: { value: new THREE.Vector2() },
   };
   const sides = [info.L, info.R];
   const plate = sides.map((s) => new THREE.Vector3(s.plate[0], s.plate[1], s.plate[2]));
@@ -620,12 +773,13 @@ export function attachV5Eyes(model: THREE.Object3D, info: V5EyesInfo | undefined
     sh.uniforms.uEIris = { value: iris }; sh.uniforms.uEGaze = u.gaze; sh.uniforms.uEPr0 = { value: (info.L.pupil + info.R.pupil) / 2 };
     sh.uniforms.uEPupil = u.pupil; sh.uniforms.uEHi = u.hi; sh.uniforms.uESpiral = u.spiral; sh.uniforms.uETime = u.time;
     sh.uniforms.uEWet = { value: 0 };
+    sh.uniforms.uEClosed = u.closed;
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <common>', '#include <common>' + EYE_FS)
       .replace('#include <map_fragment>', EYE_MAP)
       .replace('#include <emissivemap_fragment>', EYE_EMIT);
   };
-  m.customProgramCacheKey = () => 'v5-eyes-1';
+  m.customProgramCacheKey = () => 'v5-eyes-2';
   m.needsUpdate = true;
   mesh.renderOrder = 1;
   return { mesh, u, info };
@@ -644,6 +798,9 @@ export interface V5GazeInput {
   /** удивление 0..1 — зрачок шире; спираль (dizzy) */
   wide: number;
   spiral: number;
+  /** v5e: взгляд позы эмоции (рад, прибавка) и «смотрит на зрителя» 0..1 (без взгляда в сторону, саккады мельче) */
+  emo?: [number, number];
+  focus?: number;
 }
 
 /** «радиус яблока» для перевода угла в сдвиг радужки, мм (глаз Tripo ~82 мм шириной, радужка ~50 мм) */
@@ -682,8 +839,10 @@ export class V5Gaze {
       this.sac.x = (this.rnd() - 0.5) * 0.1;
       this.sac.y = (this.rnd() - 0.5) * 0.07;
     }
+    const focus = i.focus ?? 0;
+    if (focus > 0.3) this.awayLeft = 0;
     if (this.awayLeft > 0) this.awayLeft -= dt;
-    else if (!this.still && i.idle && (this.awayT -= dt) <= 0) {
+    else if (!this.still && i.idle && focus < 0.3 && (this.awayT -= dt) <= 0) {
       this.awayT = 4 + this.rnd() * 6;
       this.awayLeft = 0.7 + this.rnd() * 1.0;
       this.away.x = (this.rnd() < 0.5 ? -1 : 1) * (0.25 + this.rnd() * 0.2);
@@ -693,9 +852,11 @@ export class V5Gaze {
     // смещение пресета — рад, как у EyeRig (прибавка к рысканью и тангажу; sad [0, −0.15] — вниз)
     this.biasS.x += ((i.bias?.[0] ?? 0) * 1.3 - this.biasS.x) * k0;
     this.biasS.y += ((i.bias?.[1] ?? 0) * 1.3 - this.biasS.y) * k0;
-    let ox = this.biasS.x, oy = this.biasS.y;
+    // v5e: поза эмоции (уже сглажена V5PoseMix) — вместо смещения пресета
+    let ox = focus > 0 ? this.biasS.x * (1 - focus) : this.biasS.x, oy = focus > 0 ? this.biasS.y * (1 - focus) : this.biasS.y;
+    if (i.emo) { ox += i.emo[0]; oy += i.emo[1]; }
     if (!this.still) {
-      ox += this.sac.x; oy += this.sac.y;
+      ox += this.sac.x * (1 - 0.6 * focus); oy += this.sac.y * (1 - 0.6 * focus);
       if (this.awayLeft > 0) { ox += this.away.x; oy += this.away.y; }
     }
     const k = 1 - Math.exp(-dt / 0.04);
@@ -709,7 +870,9 @@ export class V5Gaze {
       this.pitch[e] += (p - this.pitch[e]) * k;
     }
     // зрачок: пресет; удивление — шире (продакт), к свету не привязан
-    const pt = clamp(i.pupils * (1 + 0.5 * c01(i.wide)), 0.6, 1.55);
+    // v5e: на рефах зрачок почти не меняется (удивление — даже меньше): крупный зрачок радости/грусти с поворотом головы
+    // заливал дальний глаз чёрным — пределы уже
+    const pt = clamp(i.pupils, 0.85, 1.12) * (1 - 0.12 * c01(i.wide));
     this.pupil += (pt - this.pupil) * (1 - Math.exp(-dt / 0.12));
   }
 
@@ -782,6 +945,11 @@ export class V5FaceRig {
   readonly gaze = new V5Gaze();
   /** v5d: «закрытость» верхних век L, R (шейдер полосы ресниц века) */
   lidCover: { value: THREE.Vector2 } | null = null;
+  /** v5e: закрытый глаз (моргание, «^»): полоса ресниц века → мех и тонкая кромка (шейдер века) */
+  lidClosed: { value: THREE.Vector2 } | null = null;
+  /** v5e: поза эмоции (брови, голова, взгляд) — сглаженная; задаёт GlbCharacter (setPose) */
+  readonly pose = new V5PoseMix();
+  private readonly gz: [number, number] = [0, 0];
   constructor(
     private readonly lids: V5Lids | null,
     private readonly morph: THREE.Mesh[],
@@ -797,6 +965,12 @@ export class V5FaceRig {
     if (this.lids) {
       const lw = applyV5Lids(this.lids, W, st);
       if (lw && this.lidCover) this.lidCover.value.set(v5LidCover(lw, 'L'), v5LidCover(lw, 'R'));
+      if (lw && this.lidClosed) this.lidClosed.value.set(v5LidClosed(lw, 'L'), v5LidClosed(lw, 'R'));
+      if (lw && this.eyes) {
+        // накладка глаза гаснет только у почти закрытого (полоска радужки под кромкой), в «^» — сразу
+        const e = (sd: 'L' | 'R') => { const c = v5LidClosed(lw, sd); return c01((c - 0.6) / 0.35); };
+        this.eyes.u.closed.value.set(e('L'), e('R'));
+      }
     }
     const bw = v5BodyWeights(W, st, this.bw);
     for (const m of this.morph) {
@@ -808,7 +982,13 @@ export class V5FaceRig {
     }
     if (this.paint) {
       this.paint.blush.value = clamp(W.blush ?? 0, 0, 1);
-      this.paint.browInk.value.set(v5BrowInk(bw, 'L', st), v5BrowInk(bw, 'R', st));
+      if (this.paint.browsDrawn) {
+        const ps = this.pose, ink = V5_BROW_INK.rest + (V5_BROW_INK.emo - V5_BROW_INK.rest) * c01(ps.emo);
+        this.paint.browInk.value.set(ink, ink);
+        const bp = this.paint.browPose.value;
+        bp[0].set(ps.brow[0] / 1000, ps.brow[1] / 1000, ps.browIn / 1000, ps.bend / 1000);
+        bp[1].set(ps.brow[2] / 1000, ps.brow[3] / 1000, ps.browIn / 1000, ps.bend / 1000);
+      } else this.paint.browInk.value.set(v5BrowInk(bw, 'L', st), v5BrowInk(bw, 'R', st));
       this.paint.tear.value = c01(st.tear);
     }
     if (this.mouth) {
@@ -825,7 +1005,9 @@ export class V5FaceRig {
     if (!this.eyes) return;
     const aim = target && this.aimer ? this.aimer.aim(target) : null;
     const spiral = W.eyes_spiral ?? 0;
-    this.gaze.update(dt, { aim, pupils, idle, bias, wide: this.st.wide, spiral });
+    const ps = this.pose;
+    this.gz[0] = ps.gaze[0]; this.gz[1] = ps.gaze[1];
+    this.gaze.update(dt, { aim, pupils, idle, bias, wide: this.st.wide, spiral, emo: this.gz, focus: ps.focus });
     this.gaze.write(this.eyes.u, this.eyes.info.mmPerPx, spiral);
   }
 }
@@ -833,17 +1015,17 @@ export class V5FaceRig {
 /** собрать лицо v5c/v5d модели (asset.extras.glitterV5) */
 export function attachV5Face(
   model: THREE.Object3D,
-  ex: { marks?: Marks; mouth?: { uv0: number[]; mm: number[] }; eyes?: V5EyesInfo } | undefined,
+  ex: { marks?: Marks; mouth?: { uv0: number[]; mm: number[] }; eyes?: V5EyesInfo; brows?: { L?: V5BrowShape; R?: V5BrowShape } } | undefined,
   morph: THREE.Mesh[],
 ): V5FaceRig {
   const lids = model.getObjectByName('Lids_V5') as THREE.Mesh | undefined;
   // v5d: веко с альфой (мех над ресницами растворяется в мех тела) — поверх накладки глаз, с записью глубины
   const lm = lids?.material as THREE.MeshStandardMaterial | undefined;
-  const cover = { value: new THREE.Vector2() };
+  const cover = { value: new THREE.Vector2() }, closedU = { value: new THREE.Vector2() };
   if (lids && lm?.transparent) {
     lm.depthWrite = true;
     lids.renderOrder = 2;
-    patchLid(lm, cover);
+    patchLid(lm, cover, closedU);
   }
   const eyes = attachV5Eyes(model, ex?.eyes);
   let aimer: V5EyeAim | null = null;
@@ -852,8 +1034,8 @@ export function attachV5Face(
     const head = body.skeleton.bones.find((b) => /(^|:)Head$/.test(b.name.replace(/^mixamorig/, '')));
     if (head) aimer = new V5EyeAim(head, body, ex.marks);
   }
-  const rig = new V5FaceRig(lids?.morphTargetDictionary ? { mesh: lids } : null, morph.filter((m) => m.name !== 'Lids_V5'), attachV5Paint(model, ex?.marks), attachV5Mouth(model, ex?.mouth), eyes, aimer);
-  if (lm?.transparent) rig.lidCover = cover;
+  const rig = new V5FaceRig(lids?.morphTargetDictionary ? { mesh: lids } : null, morph.filter((m) => m.name !== 'Lids_V5'), attachV5Paint(model, ex?.marks, ex?.brows), attachV5Mouth(model, ex?.mouth), eyes, aimer);
+  if (lm?.transparent) { rig.lidCover = cover; rig.lidClosed = closedU; }
   return rig;
 }
 

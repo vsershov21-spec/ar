@@ -39,7 +39,7 @@ import { attachTulle, tulleMotion, tulleOf, type TulleMotion } from './tulleFx';
 import { alivePose } from './aliveIdle';
 import { attachTailSparkle } from './tailSparkle';
 import { FaceMixer, EMOTE_FACE, MORPH_TARGETS, facePreset, type FacePreset } from './face';
-import { attachV5Face, v5Emote, V5Life, type V5FaceRig } from './v5Face';
+import { attachV5Face, v5Emote, V5Life, V5_POSES, type V5FaceRig } from './v5Face';
 import { EyeRig } from './eyeRig';
 import { FaceWrinkles } from './faceWrinkles';
 import { FurTone } from './furTone';
@@ -1460,8 +1460,10 @@ export class GlbCharacter implements Character {
       const sin = kin * kin * (3 - 2 * kin);
       ee = (emo.from + (emo.w - emo.from) * sin) * kout * kout * (3 - 2 * kout);
       // веса слоя тянутся к пресету (~0.12 с): из смеха в удивление лицо перетекает, а не перескакивает
-      const a = 1 - Math.exp(-dt / 0.12);
-      const ew = emo.p.weights;
+      // v5e: Блёстка v5 — свои веса эмоции (V5_POSES.w) и смешивание быстрее (~0.2 с на всё лицо)
+      const v5w = this.v5Face ? V5_POSES[emo.p.id]?.w : undefined;
+      const a = 1 - Math.exp(-dt / (this.v5Face ? 0.07 : 0.12));
+      const ew = v5w ?? emo.p.weights;
       for (const k in L.w) L.w[k] += ((ew[k] ?? 0) - L.w[k]) * a;
       for (const k in ew) if (!(k in L.w)) L.w[k] = L.s > 0.02 ? ew[k] * a : ew[k];
       L.pupils += (emo.p.pupils - L.pupils) * (L.s > 0.02 ? a : 1);
@@ -1469,6 +1471,8 @@ export class GlbCharacter implements Character {
       if (emo.dur && emo.t >= emo.dur) this.emo = null;
     }
     L.s = ee;
+    // v5e: поза эмоции Блёстки v5 (брови шейдером, голова, взгляд) — сглажена своей постоянной
+    this.v5Face?.pose.update(dt, emo ? emo.p.id : null, ee);
     const facePresetId = emo && ee > 0.4 ? emo.p.id : this.faceMix.preset;
     const lw = this.life.update(dt, { persona: this.personaId, preset: facePresetId, open: this.mouth, idle: cs.idleMode });
     const W = this.W;
@@ -1570,11 +1574,17 @@ export class GlbCharacter implements Character {
         this.rotWorld(neck, up, yaw * 0.25 + h.yaw * 0.4);
         this.rotWorld(neck, side, -(pitch * 0.15 + h.pitch * 0.4));
       }
-      // v5: «взгляд» микроповоротами головы (глаза нарисованы) — V5Life.head
+      // v5: «взгляд» микроповоротами головы (глаза нарисованы) — V5Life.head; v5e: наклон/поворот головы по эмоции
+      // (V5_POSES.head: грусть — опущена, смех — запрокинута, удивление — набок, обида — отвёрнута), треть — шеей
       const vh = this.v5Life?.head;
-      this.rotWorld(head, up, yaw * 0.4 + h.yaw * 0.6 + (vh?.yaw ?? 0));
-      this.rotWorld(head, side, -(pitch * 0.35 + h.pitch * 0.6 + (vh?.pitch ?? 0)));
-      this.rotWorld(head, fwd, h.roll);
+      const ph = this.v5Face?.pose.head;
+      if (neck && ph) {
+        this.rotWorld(neck, up, ph[0] * 0.3);
+        this.rotWorld(neck, side, -ph[1] * 0.3);
+      }
+      this.rotWorld(head, up, yaw * 0.4 + h.yaw * 0.6 + (vh?.yaw ?? 0) + (ph ? ph[0] * 0.7 : 0));
+      this.rotWorld(head, side, -(pitch * 0.35 + h.pitch * 0.6 + (vh?.pitch ?? 0) + (ph ? ph[1] * 0.7 : 0)));
+      this.rotWorld(head, fwd, h.roll + (ph ? ph[2] : 0));
       const chest = this.bones.get('Spine2');
       if (chest) this.rotWorld(chest, side, h.breath);
     }

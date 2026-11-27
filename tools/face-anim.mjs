@@ -35,7 +35,13 @@ for f, m in zip(sorted(glob.glob(d + '/f*.png')), meta):
     im = Image.open(f).convert('RGB'); dr = ImageDraw.Draw(im)
     dr.rectangle((0, 0, 12 + 11 * len(m), 28), fill=(255, 255, 255)); dr.text((6, 4), m, fill=(20, 20, 30), font=F)
     fr.append(im)
-pal = fr[len(fr) // 2].quantize(colors=255, method=Image.Quantize.MEDIANCUT)
+# палитра — по кадрам со всей записи (смена эмоций: красный рот смеха, румянец; по одному кадру рот темнел)
+step = max(1, len(fr) // 16)
+sm = fr[::step]
+mont = Image.new('RGB', (sm[0].width * len(sm), sm[0].height))
+for i_, f_ in enumerate(sm):
+    mont.paste(f_, (i_ * sm[0].width, 0))
+pal = mont.quantize(colors=255, method=Image.Quantize.MEDIANCUT)
 q = [im.quantize(palette=pal, dither=Image.Dither.NONE) for im in fr]
 q[0].save(out, save_all=True, append_images=q[1:], duration=int(1000 / fps), loop=0, optimize=True)
 print(out, len(fr), 'кадров')

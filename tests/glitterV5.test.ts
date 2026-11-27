@@ -143,7 +143,8 @@ describe('glitter v5: флаг ?models=v5', () => {
     expect(mp.open2[0]).toBe(0);
     expect(v5LidWeights(sad, st).lidL_sad).toBeGreaterThan(0.9);
     const bw = v5BodyWeights(sad, st);
-    expect(bw.brow_sad_L).toBeGreaterThan(1);
+    // v5e: брови рисует шейдер с позой V5_POSES — ключ кожи без усиления
+    expect(bw.brow_sad_L).toBeCloseTo(1);
     expect(v5BrowInk(bw, 'L')).toBeGreaterThan(0.8);
     // смех: открытый рот с клычками и язычком, рот Tripo закрыт
     const l = v5Emote({ smile: 1, mouth_A: 0.85, eyes_laugh: 1, cheek_up: 1 }, st);
@@ -251,10 +252,11 @@ describe('glitter v5: флаг ?models=v5', () => {
     b.still = true;
     for (let i = 0; i < 90; i++) b.update(1 / 60, { ...inp, aim: null, bias: [-0.2, 0.02] });
     expect(b.yaw[0]).toBeLessThan(-0.2);
-    // зрачок: удивление шире покоя
+    // зрачок (v5e): на рефах почти не меняется — в пределах 0.85…1.12, удивление — чуть меньше
     const p = new V5Gaze(rnd);
-    for (let i = 0; i < 60; i++) p.update(1 / 60, { ...inp, wide: 1, pupils: 0.85 });
-    expect(p.pupil).toBeGreaterThan(1.15);
+    for (let i = 0; i < 60; i++) p.update(1 / 60, { ...inp, wide: 1, pupils: 1.35 });
+    expect(p.pupil).toBeLessThan(1.12);
+    expect(p.pupil).toBeGreaterThan(0.9);
     // взгляд вниз опускает верхнее веко немного, вверх — нет
     const st = v5State();
     st.look = -0.45;
@@ -288,6 +290,58 @@ describe('glitter v5: флаг ?models=v5', () => {
     // полоса ресниц века: в покое мех между ресницами прозрачен, закрытое веко — непрозрачно
     expect(v5LidCover({}, 'L')).toBe(0);
     expect(v5LidCover({ lidL_1: 1, lidL_2: 1, lidL_3: 1, lidL_4: 1 }, 'L')).toBe(1);
+  });
+
+  it('v5e: поза эмоции (брови, голова, взгляд) — плавно за ~0,2 с; рот без двойной формы; закрытый глаз; брови в модели', async () => {
+    const { V5_POSES, V5PoseMix, v5LidClosed, v5State, v5MouthParams, V5_LID_KEYS } = await import('../src/character/v5Face');
+    // каждая эмоция рефа: брови заметно (≥ 7 мм хоть одним концом), грусть — домиком, обида — сведены вниз, удивление — высоко
+    for (const id of ['excited', 'laugh', 'surprised', 'sad', 'offended', 'annoyed', 'shy', 'wink_r']) {
+      expect(Math.max(...V5_POSES[id].brow.map(Math.abs)), id).toBeGreaterThanOrEqual(7);
+    }
+    expect(V5_POSES.sad.brow[0] - V5_POSES.sad.brow[1]).toBeGreaterThan(15); // внутренний конец выше внешнего
+    expect(V5_POSES.offended.brow[0]).toBeLessThan(-8);
+    expect(V5_POSES.offended.browIn).toBeGreaterThan(3);
+    expect(V5_POSES.surprised.brow[0]).toBeGreaterThan(18);
+    // голова: грусть и смущение — вниз, смех — назад, удивление — набок, обида — отвёрнута; радость — взгляд на зрителя
+    expect(V5_POSES.sad.head[1]).toBeLessThan(-0.1);
+    expect(V5_POSES.shy.head[1]).toBeLessThan(-0.1);
+    expect(V5_POSES.laugh.head[1]).toBeGreaterThan(0.15);
+    expect(Math.abs(V5_POSES.surprised.head[2])).toBeGreaterThan(0.1);
+    expect(Math.abs(V5_POSES.offended.head[0])).toBeGreaterThan(0.2);
+    expect(V5_POSES.excited.gaze).toBeNull();
+    expect(V5_POSES.sad.gaze![1]).toBeGreaterThan(0.2); // глаза вверх
+    // подмигнуть (по рефу) — оба глаза «^»
+    expect(V5_POSES.wink_r.w!.wink_L).toBe(1);
+    expect(V5_POSES.wink_r.w!.wink_R).toBe(1);
+    // сглаживание: 90 % за 150–250 мс
+    const m = new V5PoseMix();
+    let t = 0;
+    while (m.brow[0] < 0.9 * V5_POSES.surprised.brow[0]) { m.update(1 / 60, 'surprised', 1); t += 1 / 60; }
+    expect(t).toBeGreaterThan(0.15);
+    expect(t).toBeLessThan(0.26);
+    // смена закрытой формы рта на открытую — в середине смешивания одна форма почти гаснет (нет двух ртов в полную силу)
+    const st = v5State();
+    st.mOff = 0.5; st.mLaugh = 0.5; st.cover = 1;
+    let mp = v5MouthParams(st);
+    expect(mp.line2[1] + mp.open2[0]).toBeLessThanOrEqual(1.01);
+    st.mOff = 0.8; st.mLaugh = 0.2;
+    mp = v5MouthParams(st);
+    expect(mp.open2[0]).toBeLessThan(0.05);
+    expect(mp.line2[1]).toBeGreaterThan(0.95);
+    // закрытый глаз: моргание до конца и «^» — 1, полуопущенное веко (грусть) — 0
+    const closed: Record<string, number> = {};
+    for (let k = 1; k <= V5_LID_KEYS; k++) closed[`lidL_${k}`] = 1;
+    expect(v5LidClosed(closed, 'L')).toBe(1);
+    expect(v5LidClosed({ lidL_laugh: 1 }, 'L')).toBe(1);
+    expect(v5LidClosed({ lidL_sad: 1, lidL_1: 1 }, 'L')).toBe(0);
+    // модель: брови Tripo закрашены, форма — в extras (шейдер рисует их и в покое)
+    const j = read('public/models/v2/glitter_v5.glb') as J;
+    const br = (j.asset.extras!.glitterV5 as { brows: Record<string, { hw: number; th: number; y: number }> }).brows;
+    for (const sd of ['L', 'R']) {
+      expect(br[sd].hw).toBeGreaterThan(0.025);
+      expect(br[sd].th).toBeGreaterThan(0.005);
+      expect(br[sd].y).toBeGreaterThan(0.77);
+    }
   });
 });
 

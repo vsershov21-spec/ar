@@ -30,7 +30,10 @@ python3 v5/v5_mouth.py "$W/face0.glb" "$W/face1.glb" --viz "$W/viz"
 # 4c. v5d: настоящие глаза поверх нарисованных — накладка Eyes_V5 (белок Tripo, радужка двигается шейдером, зрачок, блики);
 #     в текстуре тела разрез глаза закрашен белком, ресницы в полосе века — мехом (их несёт веко Lids_V5); до меха —
 #     цвет оболочек и прядей берётся с уже закрашенной текстуры
-python3 v5/v5_eyes.py "$W/face1.glb" "$W/face.glb" --viz "$W/viz"
+python3 v5/v5_eyes.py "$W/face1.glb" "$W/face2.glb" --viz "$W/viz"
+# 4d. v5e: брови Tripo в текстуре закрашены мехом — их рисует шейдер лица с позой по эмоции (центр, ширина, толщина, наклон,
+#     дуга, цвет — asset.extras.glitterV5.brows); в покое — на месте и в форме Tripo
+python3 v5/v5_brows.py "$W/face2.glb" "$W/face.glb" --viz "$W/viz"
 # 5. мех как у Хулигана/Добряка: оболочки тела (v5_fur), голова, щёки и пряди силуэта — общий fur_volume.py
 #    (точки лица — asset.extras.glitterV5.marks); кончики — цвет текстуры Tripo, без тона меха
 python3 v5/v5_fur.py "$W/face.glb" "$W/fur0.glb"
