@@ -1,0 +1,28 @@
+{
+  "id": "voice-names36-check-2411",
+  "sha": "d3693be315f59761f3fd2ce43e4a980ba6d3f6a7",
+  "status": "done",
+  "queuedAt": "2026-11-24T05:03:21.574Z",
+  "started": "2026-11-24T05:03:21.957Z",
+  "day": "2026-11-24",
+  "attempts": 1,
+  "refSha": "73cd31a34d0688400614fb4c44be8e13425474d1",
+  "credits": 0,
+  "files": {
+    "log": "out/voice-names36-check-2411/log.txt",
+    "exitCode": 0,
+    "background": false,
+    "sha": "73cd31a34d0688400614fb4c44be8e13425474d1"
+  },
+  "finished": "2026-11-24T05:03:30.337Z",
+  "kind": "script",
+  "args": [
+    "names=227"
+  ],
+  "maxCredits": 0,
+  "ref": "73cd31a34d0688400614fb4c44be8e13425474d1",
+  "path": "scripts/deploy/voice-headers.sh",
+  "env": {},
+  "timeoutMin": 40,
+  "note": "после пересборки: 227 имён × 3 кота в манифесте сайта, все mp3 имён 200"
+}

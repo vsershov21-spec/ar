@@ -1,0 +1,6 @@
+glitter/glitter.pick_intro.01.mp3
+glitter/glitter.pick_play.01.mp3
+hooligan/hooligan.pick_intro.01.mp3
+hooligan/hooligan.pick_play.01.mp3
+kind/kind.pick_intro.01.mp3
+kind/kind.pick_play.01.mp3

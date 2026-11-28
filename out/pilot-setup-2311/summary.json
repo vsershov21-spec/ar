@@ -1,0 +1,26 @@
+{
+  "id": "pilot-setup-2311",
+  "sha": "cce772c1896f608496f7792b46b6cf447eee6724",
+  "status": "done",
+  "queuedAt": "2026-11-23T15:25:59.821Z",
+  "started": "2026-11-23T15:26:00.303Z",
+  "day": "2026-11-23",
+  "attempts": 1,
+  "refSha": "b99f37a431f85708ebd6c9c396887b1af30afa19",
+  "credits": 0,
+  "files": {
+    "log": "out/pilot-setup-2311/log.txt",
+    "exitCode": 0,
+    "background": false,
+    "sha": "b99f37a431f85708ebd6c9c396887b1af30afa19"
+  },
+  "finished": "2026-11-23T15:26:11.356Z",
+  "kind": "script",
+  "args": [],
+  "maxCredits": 0,
+  "ref": "b99f37a431f85708ebd6c9c396887b1af30afa19",
+  "path": "scripts/deploy/pilot-setup.sh",
+  "env": {},
+  "timeoutMin": 15,
+  "note": ""
+}

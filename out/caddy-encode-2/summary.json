@@ -1,0 +1,26 @@
+{
+  "id": "caddy-encode-2",
+  "sha": "63bb8c89f9a7404740ac4eccfc2ba8dd280ac9c2",
+  "status": "done",
+  "queuedAt": "2026-11-22T12:15:14.307Z",
+  "started": "2026-11-22T12:15:14.678Z",
+  "day": "2026-11-22",
+  "attempts": 1,
+  "refSha": "82710b6887e4548ff9ce58f227d3b4ba4694a136",
+  "credits": 0,
+  "files": {
+    "log": "out/caddy-encode-2/log.txt",
+    "exitCode": 0,
+    "background": false,
+    "sha": "82710b6887e4548ff9ce58f227d3b4ba4694a136"
+  },
+  "finished": "2026-11-22T12:15:21.669Z",
+  "kind": "script",
+  "args": [],
+  "maxCredits": 0,
+  "ref": "82710b6887e4548ff9ce58f227d3b4ba4694a136",
+  "path": "scripts/deploy/caddy-encode.sh",
+  "env": {},
+  "timeoutMin": 15,
+  "note": ""
+}

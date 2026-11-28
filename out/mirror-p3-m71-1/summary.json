@@ -1,0 +1,32 @@
+{
+  "id": "mirror-p3-m71-1",
+  "sha": "d3693be315f59761f3fd2ce43e4a980ba6d3f6a7",
+  "status": "done",
+  "queuedAt": "2026-11-24T04:58:10.245Z",
+  "started": "2026-11-24T04:58:10.564Z",
+  "day": "2026-11-24",
+  "attempts": 1,
+  "refSha": "d3f51048a3ad04f7925257c52db120fd38902fcf",
+  "credits": 0,
+  "files": {
+    "log": "out/mirror-p3-m71-1/log.txt",
+    "exitCode": 0,
+    "background": false,
+    "sha": "d3f51048a3ad04f7925257c52db120fd38902fcf"
+  },
+  "finished": "2026-11-24T04:58:12.302Z",
+  "kind": "script",
+  "args": [
+    "glitter_p3_m71",
+    "glitter_p3_m71_thumb_front",
+    "glitter_p3_m71_thumb_right",
+    "glitter_p3_m71_thumb_back",
+    "glitter_p3_m71_thumb_left"
+  ],
+  "maxCredits": 0,
+  "ref": "d3f51048a3ad04f7925257c52db120fd38902fcf",
+  "path": "scripts/deploy/mirror-props.sh",
+  "env": {},
+  "timeoutMin": 10,
+  "note": ""
+}

@@ -1,0 +1,129 @@
+[ar-auto 2026-11-24T11:06:24.330Z] задача caddy-static-1124 (script scripts/deploy/caddy-static.sh) · очередь e3cfa1a · ref 4bebe04588fb5db6fab899590e97f87f55cc007d · таймаут 15 мин
+[ar-auto 2026-11-24T11:06:25.887Z] scripts/deploy/caddy-static.sh @ 4bebe04588fb · args [] · env {} · таймаут 15 мин
+=== 2026-11-24T11:06:25+00:00 caddy-static (2.6.2) ===
+--- блок ar.vershov.com (новый) ---
+ar.vershov.com {
+	# >>> caddy-static (scripts/deploy/caddy-static.sh): статика терминальная, кэш по существованию файла (PERF-02)
+	@arStatic path /assets/* /mvp/assets/* /lab/assets/* /test/assets/* /models/* /sounds/* /video/* /targets/* /stickers/* /voice/* /personas/* *.js *.mjs *.css *.map *.glb *.gltf *.bin *.wasm *.ktx2 *.mind *.gz *.mp3 *.m4a *.wav *.webp *.png *.jpg
+	handle @arStatic {
+		@arHashed {
+			path_regexp arHashed ^/((mvp|lab|test)/)?assets/|^/models/opt/|^/voice/el/.+[.]mp3$
+			file
+		}
+		header @arHashed Cache-Control "public, max-age=31536000, immutable"
+		@arPlain {
+			not path_regexp ^/((mvp|lab|test)/)?assets/|^/models/opt/|^/voice/|^/personas/
+			file
+		}
+		header @arPlain Cache-Control "public, max-age=86400"
+		@arMissing not file
+		header @arMissing Cache-Control "no-store"
+		file_server
+	}
+	@arHtml {
+		not path /api/*
+		not path /assets/* /mvp/assets/* /lab/assets/* /test/assets/* /models/* /sounds/* /video/* /targets/* /stickers/* /voice/* /personas/* *.js *.mjs *.css *.map *.glb *.gltf *.bin *.wasm *.ktx2 *.mind *.gz *.mp3 *.m4a *.wav *.webp *.png *.jpg
+	}
+	header @arHtml Cache-Control "no-cache"
+	# <<< caddy-static
+	# >>> caddy-encode (scripts/deploy/caddy-encode.sh): сжатие ответов — текст + модели/движения кота (.glb), wasm, ktx2
+	encode {
+		zstd
+		gzip 6
+		minimum_length 1024
+		match {
+			header Content-Type text/*
+			header Content-Type application/json*
+			header Content-Type application/manifest+json*
+			header Content-Type application/javascript*
+			header Content-Type application/x-javascript*
+			header Content-Type application/xml*
+			header Content-Type application/wasm*
+			header Content-Type image/svg+xml*
+			header Content-Type font/*
+			header Content-Type model/gltf-binary*
+			header Content-Type model/gltf+json*
+			header Content-Type image/ktx2*
+			header Content-Type application/octet-stream*
+		}
+	}
+	@voiceMp3 path /voice/el/*.mp3 /voice/el/*/*.mp3
+	header @voiceMp3 Cache-Control "public, max-age=31536000, immutable"
+	@voiceManifest path /voice/el/manifest.json
+	header @voiceManifest Cache-Control "no-cache"
+	# <<< caddy-encode
+    # редакция pilot (docs/EDITIONS.md «Пилот»): статика dist/mvp/, ассеты моделей и звука — из корня
+    redir /mvp /mvp/ 308
+    @pilot {
+        path /mvp/*
+        not path /mvp/assets/*
+        not path_regexp [.](js|mjs|css|map|glb|gltf|bin|wasm|ktx2|mind|gz|mp3|m4a|wav|webp|png|jpg)$ # caddy-static.sh+
+    }
+    rewrite @pilot /mvp/index.html
+    header @pilot Cache-Control "no-cache"
+# caddy-static.sh:     @pilotAssets path /mvp/assets/*
+# caddy-static.sh:     header @pilotAssets Cache-Control "public, max-age=31536000, immutable"
+	# редакция lab (docs/EDITIONS.md)
+	redir /lab /lab/ 308
+	@lab {
+		path /lab/*
+		not path /lab/assets/*
+		not path_regexp [.](js|mjs|css|map|glb|gltf|bin|wasm|ktx2|mind|gz|mp3|m4a|wav|webp|png|jpg)$ # caddy-static.sh+
+	}
+	rewrite @lab /lab/index.html
+	header @lab Cache-Control "no-cache"
+# caddy-static.sh: 	@labAssets path /lab/assets/*
+# caddy-static.sh: 	header @labAssets Cache-Control "public, max-age=31536000, immutable"
+	tls /etc/caddy/certs/ar/fullchain.pem /etc/caddy/certs/ar/key.pem
+# caddy-encode.sh: 	encode zstd gzip
+	root * /srv/ar/current
+	header {
+		X-Robots-Tag "noindex, nofollow"
+		Strict-Transport-Security "max-age=31536000"
+		Permissions-Policy "camera=(self), microphone=(self), accelerometer=(self), gyroscope=(self)"
+		-Server
+	}
+# caddy-static.sh: 	@assets path /assets/* /models/* /sounds/* /video/* /targets/*
+# caddy-static.sh: 	header @assets Cache-Control "public, max-age=31536000, immutable"
+	header /index.html Cache-Control "no-cache"
+        handle /api/progress/* {
+                reverse_proxy 127.0.0.1:8787
+        }
+        handle {
+                try_files {path} /index.html
+                file_server
+        }
+}
+validate: OK
+бэкап: /etc/caddy/Caddyfile.bak.1795518386
+CADDY OK
+--- curl -I: код, Content-Type, Cache-Control (существующие / несуществующие) ---
+mvp/ (HTML)            200  text/html; charset=utf-8           no-cache                                 https://ar.vershov.com/mvp/
+корень (HTML)    200  text/html; charset=utf-8           no-cache                                 https://ar.vershov.com/
+mvp deep (HTML)        200  text/html; charset=utf-8           no-cache                                 https://ar.vershov.com/mvp/x/y
+mvp deep → /mvp/assets/main-v8_YN8D3.js
+lab/ (HTML)            200  text/html; charset=utf-8           no-cache                                 https://ar.vershov.com/lab/
+main.js (есть)     200  text/javascript; charset=utf-8     public, max-age=31536000, immutable      https://ar.vershov.com/mvp/assets/main-v8_YN8D3.js
+models/opt (есть)  200  model/gltf-binary                  public, max-age=31536000, immutable      https://ar.vershov.com/models/opt/anims_v1.rest.ee36b94a07.glb
+модель без хэша 200  model/gltf-binary                  public, max-age=86400                    https://ar.vershov.com/models/anims_v1.glb
+range:                 206 (ждём 206)
+Vosk (есть?)       404  —                                no-store                                 https://ar.vershov.com/models/vosk-ru-small-0.22/model.tar.gz
+манифест озвучки 200  application/json                   no-cache                                 https://ar.vershov.com/voice/el/manifest.json
+нет файла      404  —                                no-store                                 https://ar.vershov.com/mvp/assets/main-NOPE0000.js
+нет файла      404  —                                no-store                                 https://ar.vershov.com/assets/nope-0000.js
+нет файла      404  —                                no-store                                 https://ar.vershov.com/lab/assets/nope-0000.js
+нет файла      404  —                                no-store                                 https://ar.vershov.com/models/opt/nope.0000000000.glb
+нет файла      404  —                                no-store                                 https://ar.vershov.com/models/nope.glb
+нет файла      404  —                                no-store                                 https://ar.vershov.com/mvp/assets/basis_transcoder-NOPE.wasm
+нет файла      404  —                                no-store                                 https://ar.vershov.com/mvp/nope.js
+нет файла      404  —                                no-store                                 https://ar.vershov.com/voice/el/nope.0000.mp3
+нет файла      404  —                                no-store                                 https://ar.vershov.com/models/vosk-nope/model.tar.gz
+--- окно совместимости (scripts/build/keep-assets.mjs, пул /srv/ar/asset-pool) ---
+пула нет — сборка с keep-assets ещё не прошла (ar-update)
+--- не сломалось ---
+api health:  {"ok":true,"store":"sqlite","events":true}
+voice-headers.sh:
+(нет рядом)
+ИТОГ: статика терминальная, 404 без immutable, HTML — no-cache
+=== done ===
+[ar-auto 2026-11-24T11:06:31.292Z] итог: done · кредитов 0

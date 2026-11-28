@@ -1,0 +1,26 @@
+{
+  "id": "release-setup-2611",
+  "sha": "061e9aed67a8252ef1018578e6d2b8b84c1e1b60",
+  "status": "done",
+  "queuedAt": "2026-11-26T19:15:16.435Z",
+  "started": "2026-11-26T19:15:16.955Z",
+  "day": "2026-11-26",
+  "attempts": 1,
+  "refSha": "16c5b0fdd90ec295fbf9e33078a682c1ccaf87a4",
+  "credits": 0,
+  "files": {
+    "log": "out/release-setup-2611/log.txt",
+    "exitCode": 0,
+    "background": false,
+    "sha": "16c5b0fdd90ec295fbf9e33078a682c1ccaf87a4"
+  },
+  "finished": "2026-11-26T19:19:30.747Z",
+  "kind": "script",
+  "args": [],
+  "maxCredits": 0,
+  "ref": "16c5b0fdd90ec295fbf9e33078a682c1ccaf87a4",
+  "path": "scripts/deploy/release-setup.sh",
+  "env": {},
+  "timeoutMin": 90,
+  "note": "ветка release → /mvp: новый ar-update.sh (бэкап, проверка меток, откат)"
+}

@@ -1,0 +1,27 @@
+{
+  "id": "caddy-encode-1",
+  "sha": "7b9e92f35890128716b0384633660bf2c82a8f4e",
+  "status": "failed",
+  "queuedAt": "2026-11-22T11:01:13.844Z",
+  "started": "2026-11-22T11:01:14.240Z",
+  "day": "2026-11-22",
+  "attempts": 1,
+  "refSha": "e530a7ade2ac2effddce6a914397b0440145a20f",
+  "credits": 0,
+  "reason": "код выхода 1",
+  "files": {
+    "log": "out/caddy-encode-1/log.txt",
+    "exitCode": 1,
+    "background": false,
+    "sha": "e530a7ade2ac2effddce6a914397b0440145a20f"
+  },
+  "finished": "2026-11-22T11:01:15.660Z",
+  "kind": "script",
+  "args": [],
+  "maxCredits": 0,
+  "ref": "e530a7ade2ac2effddce6a914397b0440145a20f",
+  "path": "scripts/deploy/caddy-encode.sh",
+  "env": {},
+  "timeoutMin": 15,
+  "note": ""
+}

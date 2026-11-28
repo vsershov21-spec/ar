@@ -1,0 +1,10 @@
+[ar-auto 2026-11-26T19:27:16.830Z] задача release-check-2611 (script scripts/deploy/release-check.sh) · очередь 061e9ae · ref 16c5b0fdd90ec295fbf9e33078a682c1ccaf87a4 · таймаут 40 мин
+[ar-auto 2026-11-26T19:27:18.485Z] scripts/deploy/release-check.sh @ 16c5b0fdd90e · args ["release=71f75a9"] · env {} · таймаут 40 мин
+=== 2026-11-26T19:27:18+00:00 release-check (ждём /mvp = 71f75a9) ===
+попытка 1: /mvp «71f75a9 pilot»
+GitHub: main 061e9aed67a8  release 71f75a9b0437   релиз на сервере: 061e9ae-r71f75a9
+/      «061e9ae mvp»   main.js 200 /assets/main-DdGeWk0A.js
+/lab/  «061e9ae lab»   main.js 200 /lab/assets/main-Bc81zc9V.js
+/mvp/  «71f75a9 pilot»   main.js 200 /mvp/assets/main-CZstHeju.js
+ИТОГ: OK — /mvp из release 71f75a9, /lab и корень из main 061e9ae (последний main на GitHub 061e9ae: если новее — ar-update соберёт через 2–5 мин)
+[ar-auto 2026-11-26T19:27:25.241Z] итог: done · кредитов 0

@@ -1,0 +1,58 @@
+[ar-auto 2026-11-26T19:21:26.796Z] задача voice-onb-pick-check-2611 (script scripts/deploy/voice-headers.sh) · очередь 061e9ae · ref 16c5b0fdd90ec295fbf9e33078a682c1ccaf87a4 · таймаут 40 мин
+[ar-auto 2026-11-26T19:21:28.034Z] scripts/deploy/voice-headers.sh @ 16c5b0fdd90e · args ["events=onb_,pick_:45"] · env {} · таймаут 40 мин
+=== озвучка https://ar.vershov.com (кот kind) ===
+попытка 1: реплик (onb_|pick_) в манифесте: 45 ( hooligan=15 kind=15 glitter=15) — ждём ≥ 45
+  el/glitter/glitter.onb_kids_go.01.1b00ad54.mp3
+  el/glitter/glitter.onb_kids_hello.01.69b2536a.mp3
+  el/glitter/glitter.onb_kids_later.01.1ad53f88.mp3
+  el/glitter/glitter.onb_kids_piggy.01.22694812.mp3
+  el/glitter/glitter.onb_kids_tour_1.01.89e64ab9.mp3
+  el/glitter/glitter.onb_kids_tour_2.01.ce23d0ff.mp3
+  el/glitter/glitter.onb_kids_tour_3.01.c062ef1e.mp3
+  el/glitter/glitter.onb_samokat_collect.01.afd08036.mp3
+  el/glitter/glitter.onb_samokat_hello.01.4c7510b6.mp3
+  el/glitter/glitter.onb_samokat_later.01.a684f0c1.mp3
+  el/glitter/glitter.onb_samokat_sent.01.3d27aa18.mp3
+  el/glitter/glitter.onb_samokat_sheet.01.6e31d0e4.mp3
+  el/glitter/glitter.onb_samokat_stub.01.08115266.mp3
+  el/glitter/glitter.pick_intro.01.9c81bec0.mp3
+  el/glitter/glitter.pick_play.01.c29f10ee.mp3
+  el/hooligan/hooligan.onb_kids_go.01.7de185f6.mp3
+  el/hooligan/hooligan.onb_kids_hello.01.f0b0368e.mp3
+  el/hooligan/hooligan.onb_kids_later.01.0fa2ecaa.mp3
+  el/hooligan/hooligan.onb_kids_piggy.01.0d95ab31.mp3
+  el/hooligan/hooligan.onb_kids_tour_1.01.c1fb8b29.mp3
+  el/hooligan/hooligan.onb_kids_tour_2.01.c72d9206.mp3
+  el/hooligan/hooligan.onb_kids_tour_3.01.dc52c7bb.mp3
+  el/hooligan/hooligan.onb_samokat_collect.01.12fad8b5.mp3
+  el/hooligan/hooligan.onb_samokat_hello.01.986de0c6.mp3
+  el/hooligan/hooligan.onb_samokat_later.01.cb568e49.mp3
+  el/hooligan/hooligan.onb_samokat_sent.01.8345eab0.mp3
+  el/hooligan/hooligan.onb_samokat_sheet.01.d6923c75.mp3
+  el/hooligan/hooligan.onb_samokat_stub.01.b7af26ad.mp3
+  el/hooligan/hooligan.pick_intro.01.16df1787.mp3
+  el/hooligan/hooligan.pick_play.01.ddff6a69.mp3
+  el/kind/kind.onb_kids_go.01.945227da.mp3
+  el/kind/kind.onb_kids_hello.01.22fdc4ab.mp3
+  el/kind/kind.onb_kids_later.01.a774a601.mp3
+  el/kind/kind.onb_kids_piggy.01.fb14f30e.mp3
+  el/kind/kind.onb_kids_tour_1.01.e6761fd7.mp3
+  el/kind/kind.onb_kids_tour_2.01.ad8a971d.mp3
+  el/kind/kind.onb_kids_tour_3.01.fb52456f.mp3
+  el/kind/kind.onb_samokat_collect.01.5fe9c6ce.mp3
+  el/kind/kind.onb_samokat_hello.01.6fc9b4b3.mp3
+  el/kind/kind.onb_samokat_later.01.bf9260eb.mp3
+  el/kind/kind.onb_samokat_sent.01.c5c3285e.mp3
+  el/kind/kind.onb_samokat_sheet.01.33dc7cec.mp3
+  el/kind/kind.onb_samokat_stub.01.9808c728.mp3
+  el/kind/kind.pick_intro.01.a2453548.mp3
+  el/kind/kind.pick_play.01.28e12be3.mp3
+HEAD: все 200
+el/glitter/glitter.onb_samokat_hello.01.4c7510b6.mp3: 200 audio/mpeg 33645 б magic=fffb50
+el/glitter/glitter.pick_intro.01.9c81bec0.mp3: 200 audio/mpeg 17554 б magic=fffb50
+el/hooligan/hooligan.onb_samokat_hello.01.986de0c6.mp3: 200 audio/mpeg 31137 б magic=fffb50
+el/hooligan/hooligan.pick_intro.01.16df1787.mp3: 200 audio/mpeg 24032 б magic=fffb50
+el/kind/kind.onb_samokat_hello.01.6fc9b4b3.mp3: 200 audio/mpeg 33645 б magic=fffb50
+el/kind/kind.pick_intro.01.a2453548.mp3: 200 audio/mpeg 16927 б magic=fffb50
+ИТОГ: OK (реплики в манифесте и отдаются)
+[ar-auto 2026-11-26T19:21:34.164Z] итог: done · кредитов 0

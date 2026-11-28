@@ -1,0 +1,30 @@
+{
+  "id": "el-plan-pick-2611",
+  "sha": "163f16e911a3809fe44fb0f080423ccf6895db0c",
+  "status": "done",
+  "queuedAt": "2026-11-26T18:59:04.592Z",
+  "started": "2026-11-26T18:59:05.091Z",
+  "day": "2026-11-26",
+  "attempts": 1,
+  "refSha": "71f75a9b04371fe644c897cf1b46d7391f88b104",
+  "credits": 0,
+  "files": {
+    "log": "out/el-plan-pick-2611/log.txt",
+    "exitCode": 0,
+    "background": false,
+    "sha": "71f75a9b04371fe644c897cf1b46d7391f88b104"
+  },
+  "finished": "2026-11-26T19:01:27.877Z",
+  "kind": "script",
+  "args": [
+    "--plan",
+    "--only",
+    "pick_"
+  ],
+  "maxCredits": 0,
+  "ref": "71f75a9b04371fe644c897cf1b46d7391f88b104",
+  "path": "scripts/voice/el-run.sh",
+  "env": {},
+  "timeoutMin": 20,
+  "note": ""
+}

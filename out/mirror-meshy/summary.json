@@ -1,0 +1,21 @@
+{
+  "id": "mirror-meshy",
+  "sha": "e530a7ade2ac2effddce6a914397b0440145a20f",
+  "status": "done",
+  "queuedAt": "2026-11-22T10:55:49.885Z",
+  "started": "2026-11-22T10:55:50.283Z",
+  "day": "2026-11-22",
+  "attempts": 1,
+  "credits": 0,
+  "files": {
+    "mirror": "out/latest/meshy/",
+    "clips": 109,
+    "copied": 109,
+    "skipped": []
+  },
+  "finished": "2026-11-22T10:55:50.317Z",
+  "kind": "meshy",
+  "args": [],
+  "maxCredits": 0,
+  "note": "Без генерации: выгрузить все готовые клипы Meshy (slim GLB + manifest) в server-out/out/latest/meshy для просмотра"
+}

@@ -1,0 +1,32 @@
+{
+  "id": "el-onb-2611",
+  "sha": "16c5b0fdd90ec295fbf9e33078a682c1ccaf87a4",
+  "status": "done",
+  "queuedAt": "2026-11-26T19:04:20.505Z",
+  "started": "2026-11-26T19:04:21.024Z",
+  "day": "2026-11-26",
+  "attempts": 1,
+  "credits": 1837,
+  "unit": "chars",
+  "files": {
+    "newMp3": 39,
+    "list": "out/el-onb-2611/new-mp3.txt",
+    "left": 0,
+    "dir": "/srv/ar-extra/voice-el"
+  },
+  "finished": "2026-11-26T19:05:44.138Z",
+  "rebuild": {
+    "triggered": true,
+    "at": "2026-11-26T19:05:49.378Z",
+    "releaseBefore": "/srv/ar/releases/16c5b0f",
+    "releaseAfter": "/srv/ar/releases/16c5b0f",
+    "changed": false
+  },
+  "kind": "eleven",
+  "args": [
+    "--only",
+    "onb_"
+  ],
+  "maxCredits": 1850,
+  "note": "13 реплик онбордов Самоката и СберKids × 3 кота: 39 заданий, 1837 симв. (план el-plan-onb-2611)"
+}

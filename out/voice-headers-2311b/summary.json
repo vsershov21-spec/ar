@@ -1,0 +1,26 @@
+{
+  "id": "voice-headers-2311b",
+  "sha": "4d3d30cb7768e26344b24492c4f69463f19346b7",
+  "status": "done",
+  "queuedAt": "2026-11-23T15:47:02.663Z",
+  "started": "2026-11-23T15:47:03.047Z",
+  "day": "2026-11-23",
+  "attempts": 1,
+  "refSha": "859d8a420771ed1330c73bf6136282703cc67a54",
+  "credits": 0,
+  "files": {
+    "log": "out/voice-headers-2311b/log.txt",
+    "exitCode": 0,
+    "background": false,
+    "sha": "859d8a420771ed1330c73bf6136282703cc67a54"
+  },
+  "finished": "2026-11-23T15:47:05.189Z",
+  "kind": "script",
+  "args": [],
+  "maxCredits": 0,
+  "ref": "859d8a420771ed1330c73bf6136282703cc67a54",
+  "path": "scripts/deploy/voice-headers.sh",
+  "env": {},
+  "timeoutMin": 10,
+  "note": ""
+}

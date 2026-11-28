@@ -1,0 +1,84 @@
+{
+  "version": 1,
+  "skeleton": "mixamo",
+  "clips": [
+    {
+      "id": "hold_sip_low",
+      "file": "hold_sip_low.glb",
+      "loop": false,
+      "duration": 5,
+      "durationGlb": 4.967,
+      "priority": "P2",
+      "mode": "prime",
+      "prompt": "Starts standing upright facing forward, arms relaxed. The right hand comes up in front of the chest as if holding a small cup, elbow down close to the side, left hand under it. The head bows down toward the cup for a slow sip, lifts a little, then bows down for a second sip. The head lifts with a content sigh, then the hands lower to a relaxed standing pose, in place, no turning.",
+      "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+      "motion_task_id": "01a20d06-d06b-7052-8621-7c5218aaa807",
+      "animation_task_id": "01a20d07-269b-74d3-b2fe-f8a0dcbb805d",
+      "credits": {
+        "motion": 10,
+        "animation": 3
+      },
+      "bytes": 27480,
+      "created": "2026-11-24T10:08:44.536Z"
+    },
+    {
+      "id": "hold_sip_low_b",
+      "file": "hold_sip_low_b.glb",
+      "loop": false,
+      "duration": 5,
+      "durationGlb": 4.967,
+      "priority": "P2",
+      "mode": "prime",
+      "prompt": "Starts standing upright facing forward, arms relaxed. Both hands come together in front of the chest as if holding a warm cup, elbows close to the body. The upper body leans forward a little and the head bows down to the hands for a slow sip, lifts, then bows again for a second sip. Then the head lifts with a happy sigh and the hands lower to a relaxed standing pose, in place, no turning.",
+      "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+      "motion_task_id": "01a20d07-568f-7275-86f0-3d96b139b459",
+      "animation_task_id": "01a20d07-835a-7139-8567-a65dbd135648",
+      "credits": {
+        "motion": 10,
+        "animation": 3
+      },
+      "bytes": 29136,
+      "created": "2026-11-24T10:09:13.545Z"
+    },
+    {
+      "id": "hold_treat_low",
+      "file": "hold_treat_low.glb",
+      "loop": false,
+      "duration": 4.5,
+      "durationGlb": 4.467,
+      "priority": "P2",
+      "mode": "prime",
+      "prompt": "Starts standing upright facing forward, arms relaxed. The right hand comes up in front of the chest as if holding a small cookie, elbow down close to the side. The head bows down toward the hand for a small bite, lifts a little with happy chewing nods, then bows down again for a second bite. The hand stays low at chest height. Then the hand lowers to a relaxed standing pose, in place, no turning.",
+      "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+      "motion_task_id": "01a20d06-d049-7080-92cb-68526d623d1b",
+      "animation_task_id": "01a20d06-fe5c-727a-81db-addab0f7441e",
+      "credits": {
+        "motion": 10,
+        "animation": 3
+      },
+      "bytes": 29024,
+      "created": "2026-11-24T10:08:34.333Z"
+    },
+    {
+      "id": "hold_treat_low_b",
+      "file": "hold_treat_low_b.glb",
+      "loop": false,
+      "duration": 4.5,
+      "durationGlb": 4.467,
+      "priority": "P2",
+      "mode": "prime",
+      "prompt": "Starts standing upright facing forward, arms relaxed. Both hands come together in front of the chest as if holding a small snack, elbows close to the body. The upper body leans forward a little and the head bows down to the hands to nibble, lifts with small happy nods, then bows down to nibble again. The hands stay at chest height, then lower to a relaxed standing pose, in place, no turning.",
+      "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+      "motion_task_id": "01a20d06-d051-7315-a5e5-d822222fb2ae",
+      "animation_task_id": "01a20d07-3c5a-7505-9321-6d64366f0cc4",
+      "credits": {
+        "motion": 10,
+        "animation": 3
+      },
+      "bytes": 33032,
+      "created": "2026-11-24T10:08:50.842Z"
+    }
+  ],
+  "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+  "updated": "2026-11-24T10:09:13.545Z"
+}

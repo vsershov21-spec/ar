@@ -1,0 +1,38 @@
+[ar-auto 2026-11-24T10:07:56.752Z] задача meshy-hold-low-2411 (meshy --only hold_treat_low,hold_treat_low_b,hold_sip_low,hold_sip_low_b) · sha d5173ec · maxCredits 60 · сегодня потрачено 65/400
+10:07:58 === meshy motion ПЛАН · клипов 4 · модель https://ar.vershov.com/models/hooligan_v1.glb ===
+10:07:58 баланс: 1613 кредитов
+• hold_treat_low              4.5 с       prime · 13 кр.
+• hold_treat_low_b            4.5 с       prime · 13 кр.
+• hold_sip_low                  5 с       prime · 13 кр.
+• hold_sip_low_b                5 с       prime · 13 кр.
+10:07:58 к генерации: 4 из 4; оценка ≈ 52 кредитов (риг 0 + движение 10/клип + анимация 3/клип); баланс 1613
+10:07:58 план; запуск: … --go
+Генерация в фоне (pid 3069947). Лог: tail -f /var/lib/vershov-commander/ar/meshy.log
+Готовые клипы — /srv/ar-extra/models/anims/meshy; на сайт — со следующей сборкой (любой push в main).
+=== 2026-11-24T10:07:59+00:00 meshy --go --only hold_treat_low,hold_treat_low_b,hold_sip_low,hold_sip_low_b --max-credits 60 ===
+10:07:59 === meshy motion GO · клипов 4 · модель https://ar.vershov.com/models/hooligan_v1.glb ===
+10:07:59 баланс: 1613 кредитов
+• hold_treat_low              4.5 с       prime · 13 кр.
+• hold_treat_low_b            4.5 с       prime · 13 кр.
+• hold_sip_low                  5 с       prime · 13 кр.
+• hold_sip_low_b                5 с       prime · 13 кр.
+10:07:59 к генерации: 4 из 4; оценка ≈ 52 кредитов (риг 0 + движение 10/клип + анимация 3/клип); баланс 1613
+10:07:59 риг: 01a1f046-e90d-72b9-908e-fcf581cea2ed (готов)
+10:08:01 ▶ hold_sip_low: движение 01a20d06-d06b-7052-8621-7c5218aaa807 (5 с)
+10:08:01 ▶ hold_treat_low: движение 01a20d06-d049-7080-92cb-68526d623d1b (4.5 с)
+10:08:01 ▶ hold_treat_low_b: движение 01a20d06-d051-7315-a5e5-d822222fb2ae (4.5 с)
+10:08:34   ключи 3996 → 616 (допуск 0.5°/1 мм), int16
+10:08:34 ✓ hold_treat_low.glb 28 КБ · 4.467 с · треков 29 · кредиты 10+3
+10:08:35 ▶ hold_sip_low_b: движение 01a20d07-568f-7275-86f0-3d96b139b459 (5 с)
+10:08:44   ключи 4440 → 490 (допуск 0.5°/1 мм), int16
+10:08:44 ✓ hold_sip_low.glb 27 КБ · 4.967 с · треков 29 · кредиты 10+3
+10:08:50   ключи 3996 → 944 (допуск 0.5°/1 мм), int16
+10:08:50 ✓ hold_treat_low_b.glb 32 КБ · 4.467 с · треков 29 · кредиты 10+3
+10:09:13   ключи 4440 → 625 (допуск 0.5°/1 мм), int16
+10:09:13 ✓ hold_sip_low_b.glb 28 КБ · 4.967 с · треков 29 · кредиты 10+3
+10:09:13 баланс после: 1561
+10:09:13 готово: в манифесте 113; на сайт — со следующей сборкой (push в main или перезапуск ar-update)
+=== 2026-11-24T10:09:13+00:00 код 0 ===
+[ar-auto 2026-11-24T10:09:14.557Z] пересборка: systemctl start ar-update
+[ar-auto 2026-11-24T10:09:19.591Z] пересборка: релиз не сменился (если ar-update не собирает без нового коммита — задать AUTO_REBUILD_CMD в /etc/ar-auto.env)
+[ar-auto 2026-11-24T10:09:19.592Z] итог: done · кредитов 52

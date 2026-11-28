@@ -1,0 +1,11 @@
+[ar-auto 2026-11-24T04:58:10.565Z] задача mirror-p3-m71-1 (script scripts/deploy/mirror-props.sh) · очередь d3693be · ref d3f51048a3ad04f7925257c52db120fd38902fcf · таймаут 10 мин
+[ar-auto 2026-11-24T04:58:12.001Z] scripts/deploy/mirror-props.sh @ d3f51048a3ad · args ["glitter_p3_m71","glitter_p3_m71_thumb_front","glitter_p3_m71_thumb_right","glitter_p3_m71_thumb_back","glitter_p3_m71_thumb_left"] · env {} · таймаут 10 мин
+=== 2026-11-24T04:58:12+00:00 mirror-props: /srv/ar-extra/models/props → /var/lib/ar-auto/out/latest/props ===
+glitter_p3_m71.glb 27782316 8a92347a6106ccd33f15c5caa0c81d51938ff2e872e400d8832df50b988b24ec 2026-11-24T04:51:49Z
+glitter_p3_m71.png 118516 b45c8d1af388eb9fc1f280318cae2054ad7afc4892a879306ea6453001178299 2026-11-24T04:51:49Z
+glitter_p3_m71_thumb_back.png 103164 61a7a295d8c49ff6200e59a6a00c1a24e07b2bae0904062e42c6c2963712874d 2026-11-24T04:51:49Z
+glitter_p3_m71_thumb_front.png 118516 b45c8d1af388eb9fc1f280318cae2054ad7afc4892a879306ea6453001178299 2026-11-24T04:51:49Z
+glitter_p3_m71_thumb_left.png 94387 fea23f4d9019efc863c567704cb2026981ec72c0374c59f451fbfbd9834d3c19 2026-11-24T04:51:50Z
+glitter_p3_m71_thumb_right.png 86273 2ef94b71b8bb7ed5aaecd49552a66e5f82e09150be1fc82e5f1cc97bfd036afb 2026-11-24T04:51:50Z
+готово: 6 файлов → out/latest/props/ (выгрузка в server-out — вместе с итогом задачи)
+[ar-auto 2026-11-24T04:58:12.303Z] итог: done · кредитов 0

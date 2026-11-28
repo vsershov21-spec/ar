@@ -1,0 +1,20 @@
+[ar-auto 2026-11-24T04:47:30.585Z] задача glitter-p3-meshy-1 (meshy --only glitter_p3_m71,glitter_p3_m6) · sha d1c52bc · maxCredits 100 · сегодня потрачено 0/400
+04:47:32 баланс: 1678 кредитов
+04:47:32 • glitter_p3_m71: ~40 кр. — 4 вида, latest
+04:47:32 • glitter_p3_m6: ~40 кр. — 4 вида, meshy-6
+04:47:32 к генерации: 2 из 2; оценка ≈ 80 кредитов; баланс 1678
+Генерация в фоне (pid 3010652). Лог: tail -f /var/lib/vershov-commander/ar/meshy.log
+Готовые клипы — /srv/ar-extra/models/anims/meshy; на сайт — со следующей сборкой (любой push в main).
+=== 2026-11-24T04:47:32+00:00 meshy --go --only glitter_p3_m71,glitter_p3_m6 --max-credits 100 ===
+04:47:33 баланс: 1678 кредитов
+04:47:33 • glitter_p3_m71: ~40 кр. — 4 вида, latest
+04:47:33 • glitter_p3_m6: ~40 кр. — 4 вида, meshy-6
+04:47:33 к генерации: 2 из 2; оценка ≈ 80 кредитов; баланс 1678
+04:47:34 ▶ glitter_p3_m71: отправляю (design/refs/glitter_views/front.png, design/refs/glitter_views/threequarter.png, design/refs/glitter_views/right.png, design/refs/glitter_views/back.png)
+04:51:50 ✓ glitter_p3_m71: GLB 27.8 МБ, картинок 3 (image/png 13.2М, image/jpeg 9.0М, image/jpeg 1.6М), кредитов 35
+04:51:50 ▶ glitter_p3_m6: отправляю (design/refs/glitter_views/front.png, design/refs/glitter_views/threequarter.png, design/refs/glitter_views/right.png, design/refs/glitter_views/back.png)
+04:51:51 ✗ glitter_p3_m6: не принято — 400 geometry_resolution is not supported for this ai_model; use meshy-7.1
+04:51:51 баланс после: 1643
+04:51:51 готово: файлы в /srv/ar-extra/models/props — в server-out задачей script scripts/deploy/mirror-props.sh
+=== 2026-11-24T04:51:51+00:00 код 0 ===
+[ar-auto 2026-11-24T04:52:03.101Z] итог: failed · кредитов 35 · 04:51:51 ✗ glitter_p3_m6: не принято — 400 geometry_resolution is not supported for this ai_model; use meshy-7.1

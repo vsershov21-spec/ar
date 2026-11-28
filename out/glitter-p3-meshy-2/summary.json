@@ -1,0 +1,25 @@
+{
+  "id": "glitter-p3-meshy-2",
+  "sha": "dd59361727d5cea2decfd00b2f6fb3a21c0e11b6",
+  "status": "done",
+  "queuedAt": "2026-11-24T06:33:01.862Z",
+  "started": "2026-11-24T06:33:02.250Z",
+  "day": "2026-11-24",
+  "attempts": 1,
+  "credits": 30,
+  "estimate": 40,
+  "files": {
+    "new": [],
+    "copied": [],
+    "tooBig": [],
+    "exitCode": 0
+  },
+  "finished": "2026-11-24T06:38:35.008Z",
+  "kind": "meshy",
+  "args": [
+    "--only",
+    "glitter_p3_m6"
+  ],
+  "maxCredits": 50,
+  "note": "Блёстка p3: вариант meshy-6 (без geometry_resolution) для сравнения с 7.1"
+}

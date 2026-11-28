@@ -1,0 +1,26 @@
+{
+  "id": "mirror-props-2311",
+  "sha": "a24cb6223f6eb6b306ee3a4406421a8a0df010df",
+  "status": "done",
+  "queuedAt": "2026-11-23T20:56:18.102Z",
+  "started": "2026-11-23T20:56:18.478Z",
+  "day": "2026-11-23",
+  "attempts": 1,
+  "refSha": "f5a4587018e665f4dbe546e0eb5499dbb7c8ff31",
+  "credits": 0,
+  "files": {
+    "log": "out/mirror-props-2311/log.txt",
+    "exitCode": 0,
+    "background": false,
+    "sha": "f5a4587018e665f4dbe546e0eb5499dbb7c8ff31"
+  },
+  "finished": "2026-11-23T20:56:20.452Z",
+  "kind": "script",
+  "args": [],
+  "maxCredits": 0,
+  "ref": "f5a4587018e665f4dbe546e0eb5499dbb7c8ff31",
+  "path": "scripts/deploy/mirror-props.sh",
+  "env": {},
+  "timeoutMin": 10,
+  "note": "Без трат: зеркало /srv/ar-extra/models/props в out/latest/props (bed.glb для стенда)"
+}

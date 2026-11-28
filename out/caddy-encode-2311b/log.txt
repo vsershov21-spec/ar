@@ -1,0 +1,90 @@
+[ar-auto 2026-11-23T15:41:52.770Z] задача caddy-encode-2311b (script scripts/deploy/caddy-encode.sh) · очередь 4d3d30c · ref 859d8a420771ed1330c73bf6136282703cc67a54 · таймаут 15 мин
+[ar-auto 2026-11-23T15:41:54.413Z] scripts/deploy/caddy-encode.sh @ 859d8a420771 · args [] · env {} · таймаут 15 мин
+=== 2026-11-23T15:41:54+00:00 caddy-encode (2.6.2) ===
+--- блок ar.vershov.com (новый) ---
+ar.vershov.com {
+	# >>> caddy-encode (scripts/deploy/caddy-encode.sh): сжатие ответов — текст + модели/движения кота (.glb), wasm, ktx2
+	encode {
+		zstd
+		gzip 6
+		minimum_length 1024
+		match {
+			header Content-Type text/*
+			header Content-Type application/json*
+			header Content-Type application/manifest+json*
+			header Content-Type application/javascript*
+			header Content-Type application/x-javascript*
+			header Content-Type application/xml*
+			header Content-Type application/wasm*
+			header Content-Type image/svg+xml*
+			header Content-Type font/*
+			header Content-Type model/gltf-binary*
+			header Content-Type model/gltf+json*
+			header Content-Type image/ktx2*
+			header Content-Type application/octet-stream*
+		}
+	}
+	@voiceMp3 path /voice/el/*.mp3 /voice/el/*/*.mp3
+	header @voiceMp3 Cache-Control "public, max-age=31536000, immutable"
+	@voiceManifest path /voice/el/manifest.json
+	header @voiceManifest Cache-Control "no-cache"
+	# <<< caddy-encode
+    # редакция pilot (docs/EDITIONS.md «Пилот»): статика dist/mvp/, ассеты моделей и звука — из корня
+    redir /mvp /mvp/ 308
+    @pilot {
+        path /mvp/*
+        not path /mvp/assets/*
+    }
+    rewrite @pilot /mvp/index.html
+    header @pilot Cache-Control "no-cache"
+    @pilotAssets path /mvp/assets/*
+    header @pilotAssets Cache-Control "public, max-age=31536000, immutable"
+	# редакция lab (docs/EDITIONS.md)
+	redir /lab /lab/ 308
+	@lab {
+		path /lab/*
+		not path /lab/assets/*
+	}
+	rewrite @lab /lab/index.html
+	header @lab Cache-Control "no-cache"
+	@labAssets path /lab/assets/*
+	header @labAssets Cache-Control "public, max-age=31536000, immutable"
+	tls /etc/caddy/certs/ar/fullchain.pem /etc/caddy/certs/ar/key.pem
+# caddy-encode.sh: 	encode zstd gzip
+	root * /srv/ar/current
+	header {
+		X-Robots-Tag "noindex, nofollow"
+		Strict-Transport-Security "max-age=31536000"
+		Permissions-Policy "camera=(self), microphone=(self), accelerometer=(self), gyroscope=(self)"
+		-Server
+	}
+	@assets path /assets/* /models/* /sounds/* /video/* /targets/*
+	header @assets Cache-Control "public, max-age=31536000, immutable"
+	header /index.html Cache-Control "no-cache"
+        handle /api/progress/* {
+                reverse_proxy 127.0.0.1:8787
+        }
+        handle {
+                try_files {path} /index.html
+                file_server
+        }
+}
+бэкап: /etc/caddy/Caddyfile.bak.1795448514
+CADDY OK
+--- сжатие (заголовок Content-Encoding, байт без сжатия → со сжатием) ---
+index пилота zstd      31054 →    11106 байт  https://ar.vershov.com/mvp/
+main.js        zstd    1052906 →   334817 байт  https://ar.vershov.com/mvp/assets/main-hfB9lKMQ.js
+движения (вся) zstd    2302440 →  1246716 байт  https://ar.vershov.com/models/anims_v1.glb
+движения старт zstd     531096 →   189765 байт  https://ar.vershov.com/models/opt/anims_v1.start.bf60329572.glb
+модель кота zstd    2066452 →  1507663 байт  https://ar.vershov.com/models/v2/opt/hooligan_p1.6f79131811.glb
+--- не сломалось ---
+mvp/:        200  cache-control: no-cache
+mvp deep:    /mvp/assets/main-hfB9lKMQ.js
+lab/:        200
+api health:  {"ok":true,"store":"sqlite","events":true}
+range:       206 (ждём 206)
+root /:      200
+--- озвучка (scripts/deploy/voice-headers.sh) ---
+(voice-headers.sh рядом нет — curl -fsSL …/scripts/deploy/voice-headers.sh | bash)
+=== done ===
+[ar-auto 2026-11-23T15:42:00.410Z] итог: done · кредитов 0

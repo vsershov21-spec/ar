@@ -1,0 +1,2155 @@
+{
+ "version": 1,
+ "skeleton": "mixamo",
+ "clips": [
+  {
+   "id": "admire_artwork",
+   "file": "admire_artwork.glb",
+   "loop": false,
+   "duration": 2,
+   "durationGlb": 1.967,
+   "priority": "P1",
+   "mode": "prime",
+   "prompt": "Starts standing upright facing forward with arms relaxed at the sides. Takes a small step back, looks down at the floor in front, tilts the head to one side and raises the left hand to the chin as if judging a drawing, then nods twice approvingly with a small satisfied bounce; then returns to the same relaxed standing pose and holds still, in place, no turning.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f208-a9c5-75ea-b67c-224b1c5d0aa2",
+   "animation_task_id": "01a1f209-14f9-7519-9237-ea422726f1ba",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 79748,
+   "created": "2026-11-19T04:21:01.614Z"
+  },
+  {
+   "id": "appear_jump_in",
+   "file": "appear_jump_in.glb",
+   "loop": false,
+   "duration": 2,
+   "durationGlb": 1.967,
+   "priority": "P0",
+   "mode": "prime",
+   "prompt": "Starts in a deep crouch with hands close to the chest. Springs straight up with both arms raised, lands softly on the same spot with bent knees, gives a quick shoulder shake and stands up proudly. Ends standing upright facing forward, arms relaxed, in place, no turning.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f048-3c58-75a9-a7a8-23dc5580c325",
+   "animation_task_id": "01a1f048-69b7-730d-b1d9-769fe3d3d6e6",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 79740,
+   "created": "2026-11-18T20:10:57.003Z"
+  },
+  {
+   "id": "brush_dip_stroke",
+   "file": "brush_dip_stroke.glb",
+   "loop": true,
+   "duration": 2,
+   "durationGlb": 1.967,
+   "priority": "P1",
+   "mode": "prime",
+   "prompt": "Bends forward from the hips and lowers the right hand to a small pot on the floor just in front of the right foot as if dipping a paintbrush, dips twice with small up-and-down motions, taps the hand lightly against an imaginary rim, then straightens up holding the right hand in front of the chest; left arm out to the side. Feet stay planted. Seamless loop, in place, no turning.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f209-44a8-73c2-9a88-2560b1d90886",
+   "animation_task_id": "01a1f209-c41d-774f-a88e-dccac54487b5",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 79752,
+   "created": "2026-11-19T04:21:46.392Z"
+  },
+  {
+   "id": "celebrate",
+   "file": "celebrate.glb",
+   "loop": false,
+   "duration": 2,
+   "durationGlb": 1.967,
+   "priority": "P1",
+   "mode": "prime",
+   "prompt": "Starts standing upright facing forward with arms relaxed at the sides. Jumps up with both fists in the air, lands and pumps one fist down with a big yes; then returns to the same relaxed standing pose and holds still, in place, no turning.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f04e-8779-75b6-b76f-007b255557ea",
+   "animation_task_id": "01a1f04e-c9d9-765c-809e-dfd2421d2091",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 79752,
+   "created": "2026-11-18T20:18:00.152Z"
+  },
+  {
+   "id": "comfort",
+   "file": "comfort.glb",
+   "loop": false,
+   "duration": 3,
+   "durationGlb": 2.967,
+   "priority": "P1",
+   "mode": "prime",
+   "prompt": "Starts standing upright facing forward with arms relaxed at the sides. Leans gently forward, places the right palm flat on an invisible window in front at chest height and nods softly twice; then returns to the same relaxed standing pose and holds still, in place, no turning.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f04d-276f-737b-b7d8-98f3db576b0a",
+   "animation_task_id": "01a1f04d-55a9-71b3-8c6c-5d5e6771e7d1",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 103876,
+   "created": "2026-11-18T20:16:24.922Z"
+  },
+  {
+   "id": "dance_glitter",
+   "file": "dance_glitter.glb",
+   "loop": true,
+   "duration": 4,
+   "durationGlb": 3.967,
+   "priority": "P2",
+   "mode": "prime",
+   "prompt": "Graceful cat dances in place on the toes, makes a heart shape with the paws above the head, does a half turn and back. Seamless loop, feet stay in place.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f050-cf8a-7187-b36e-08d4b655c7f1",
+   "animation_task_id": "01a1f050-fd87-747f-97f6-144da7fbb7ff",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 127948,
+   "created": "2026-11-18T20:20:24.358Z"
+  },
+  {
+   "id": "dance_kind",
+   "file": "dance_kind.glb",
+   "loop": true,
+   "duration": 4,
+   "durationGlb": 3.967,
+   "priority": "P2",
+   "mode": "prime",
+   "prompt": "Gentle cat dances in place swaying side to side and clapping on every sway, feet stepping lightly without travelling. Seamless loop.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f050-8a7e-7671-ad3e-299a0b00f46c",
+   "animation_task_id": "01a1f050-b8bc-72c5-8939-86a4eb8d31ad",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 127960,
+   "created": "2026-11-18T20:20:07.435Z"
+  },
+  {
+   "id": "dive_out",
+   "file": "dive_out.glb",
+   "loop": false,
+   "duration": 2,
+   "durationGlb": 1.967,
+   "priority": "P0",
+   "mode": "prime",
+   "prompt": "Starts standing upright facing forward with arms relaxed at the sides. Waves the right hand goodbye once, crouches, hops up and dives head first straight down with both arms together above the head, ending low in a deep crouch with the head down. In place, no turning.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f048-9860-7629-ac2c-e7a763f3c643",
+   "animation_task_id": "01a1f048-dab0-70d1-83e6-4e1c52e7e635",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 79744,
+   "created": "2026-11-18T20:11:25.893Z"
+  },
+  {
+   "id": "dizzy",
+   "file": "dizzy.glb",
+   "loop": false,
+   "duration": 2,
+   "durationGlb": 1.967,
+   "priority": "P1",
+   "mode": "prime",
+   "prompt": "Starts standing upright facing forward with arms relaxed at the sides. Sways the upper body in wobbly circles with knees buckling, almost loses balance, then shakes the head hard to recover; then returns to the same relaxed standing pose and holds still, in place, no turning.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f04d-7fdb-7607-92fe-6acf10d9622a",
+   "animation_task_id": "01a1f04d-c213-70bb-bd42-d26875f74bec",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 79752,
+   "created": "2026-11-18T20:16:47.365Z"
+  },
+  {
+   "id": "fall_asleep",
+   "file": "fall_asleep.glb",
+   "loop": false,
+   "duration": 2.5,
+   "durationGlb": 2.467,
+   "priority": "P0",
+   "mode": "prime",
+   "prompt": "Starts standing upright facing forward with arms relaxed at the sides. Yawns with one hand over the mouth, slowly kneels down, lies down on its right side and curls up with the knees pulled in and hands tucked under the chin, then stays still asleep. In place.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f048-b24f-7000-8015-60fddacffdc0",
+   "animation_task_id": "01a1f048-f53d-70a8-bbb3-92650174b14c",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 91812,
+   "created": "2026-11-18T20:11:32.629Z"
+  },
+  {
+   "id": "fall_off_card",
+   "file": "fall_off_card.glb",
+   "loop": false,
+   "duration": 2,
+   "durationGlb": 1.967,
+   "priority": "P2",
+   "mode": "prime",
+   "prompt": "Cat suddenly loses balance as if the floor tilts, windmills the arms, crouches low and grabs the floor with both paws. Stays in place. Starts and ends in a neutral standing pose facing forward, in place.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f050-68b6-7321-b4dc-2c71222eb22a",
+   "animation_task_id": "01a1f050-aaa9-778a-98a7-05a28d56703d",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 79756,
+   "created": "2026-11-18T20:20:03.384Z"
+  },
+  {
+   "id": "flinch",
+   "file": "flinch.glb",
+   "loop": false,
+   "duration": 2,
+   "durationGlb": 1.967,
+   "priority": "P1",
+   "mode": "prime",
+   "prompt": "Starts standing upright facing forward with arms relaxed at the sides. Recoils backward with the upper body, hands pulled up to the chest for a moment, feet stay planted; then returns to the same relaxed standing pose and holds still, in place, no turning.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f04c-b6f6-77c5-a99f-fa043fc6b0c0",
+   "animation_task_id": "01a1f04c-e4c3-72c7-adbc-346e2470fa74",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 79760,
+   "created": "2026-11-18T20:15:50.541Z"
+  },
+  {
+   "id": "flip",
+   "file": "flip.glb",
+   "loop": false,
+   "duration": 2,
+   "durationGlb": 1.967,
+   "priority": "P1",
+   "mode": "prime",
+   "prompt": "Starts standing upright facing forward with arms relaxed at the sides. Crouches, jumps and does a backflip on the spot, lands on the same spot and opens the arms in a ta-da pose; then returns to the same relaxed standing pose and holds still, in place, no turning.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f04c-a8d0-75fd-a1d2-27e63e3c17dd",
+   "animation_task_id": "01a1f04c-d6e2-7314-aabc-c478e70dc970",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 79756,
+   "created": "2026-11-18T20:15:47.404Z"
+  },
+  {
+   "id": "get_into_bed",
+   "file": "get_into_bed.glb",
+   "loop": false,
+   "duration": 2,
+   "durationGlb": 1.967,
+   "priority": "P0",
+   "mode": "prime",
+   "prompt": "Starts standing upright facing forward with arms relaxed at the sides. Puts both hands up on a knee-high platform in front, climbs up onto it one knee after the other and ends kneeling on all fours on top, then turns the head to the right. Stays in place, body keeps facing forward.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f055-a86d-70f7-881f-f3ad3307c4e9",
+   "animation_task_id": "01a1f055-d791-77f6-ad06-a14ca02ea527",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 79756,
+   "created": "2026-11-18T20:25:37.001Z"
+  },
+  {
+   "id": "glitter_react_coy",
+   "file": "glitter_react_coy.glb",
+   "loop": false,
+   "duration": 2.5,
+   "durationGlb": 2.467,
+   "priority": "P2",
+   "mode": "prime",
+   "prompt": "Starts standing upright facing forward. Raises the shoulders shyly, tilts the head to one side with a small giggling bounce, both hands rise to the cheeks, a small turn of the upper body to the side and back, then hands lower to a relaxed standing pose. In place, head stays facing forward, no bowing.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a20026-cc92-7481-aca3-04f3ad17a6b9",
+   "animation_task_id": "01a20027-0e40-700b-9952-c257da1ef9e9",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 28344,
+   "created": "2026-11-21T22:08:26.326Z"
+  },
+  {
+   "id": "glitter_react_happy",
+   "file": "glitter_react_happy.glb",
+   "loop": false,
+   "duration": 3,
+   "durationGlb": 2.967,
+   "priority": "P2",
+   "mode": "prime",
+   "prompt": "Starts standing upright facing forward. Two small happy bounces with knees bending in rhythm, arms swinging up together in time with the bounces, then hands twirl near the chest and a cheerful pose with one hand at the waist and the head tilted. Feet return to the same spot, in place, no turning.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a20026-df7c-76a5-aeaa-62be86456ccc",
+   "animation_task_id": "01a20027-0da4-7442-bb93-a668ac0b3c0f",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 37396,
+   "created": "2026-11-21T22:08:26.193Z"
+  },
+  {
+   "id": "hold_mirror_body",
+   "file": "hold_mirror_body.glb",
+   "loop": false,
+   "duration": 5.5,
+   "durationGlb": 5.467,
+   "priority": "P2",
+   "mode": "prime",
+   "prompt": "Starts standing upright facing forward. The left hand rises beside the left cheek as if holding a small hand mirror. The head turns toward the hand and tilts gently left and right twice, smiling. The right hand pats the top of the head twice and lowers. A small happy nod toward the left hand, then both hands lower to a relaxed standing pose, in place, no turning.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a20025-5a66-7468-867a-6a8b5ec58da5",
+   "animation_task_id": "01a20026-188a-7144-894b-845e499e2457",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 33268,
+   "created": "2026-11-21T22:07:28.669Z"
+  },
+  {
+   "id": "hold_sip_body",
+   "file": "hold_sip_body.glb",
+   "loop": false,
+   "duration": 5,
+   "durationGlb": 4.967,
+   "priority": "P2",
+   "mode": "prime",
+   "prompt": "Starts standing upright facing forward. The right hand rises to just below the mouth as if holding a small mug, elbow lifted out to the side; head and upper body lean forward toward it. Two small sips: the head dips forward twice. Then the head tilts back with a content sigh, the hand lowers to the chest, relaxed standing pose, in place, no turning.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1ff8a-a57d-75bd-a379-efe5dd16da08",
+   "animation_task_id": "01a1ff8a-fc47-71f3-b2cf-252a9a82f999",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 26968,
+   "created": "2026-11-21T19:18:03.444Z"
+  },
+  {
+   "id": "hold_sip_low",
+   "file": "hold_sip_low.glb",
+   "loop": false,
+   "duration": 5,
+   "durationGlb": 4.967,
+   "priority": "P2",
+   "mode": "prime",
+   "prompt": "Starts standing upright facing forward, arms relaxed. The right hand comes up in front of the chest as if holding a small cup, elbow down close to the side, left hand under it. The head bows down toward the cup for a slow sip, lifts a little, then bows down for a second sip. The head lifts with a content sigh, then the hands lower to a relaxed standing pose, in place, no turning.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a20d06-d06b-7052-8621-7c5218aaa807",
+   "animation_task_id": "01a20d07-269b-74d3-b2fe-f8a0dcbb805d",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 27480,
+   "created": "2026-11-24T10:08:44.536Z"
+  },
+  {
+   "id": "hold_sip_low_b",
+   "file": "hold_sip_low_b.glb",
+   "loop": false,
+   "duration": 5,
+   "durationGlb": 4.967,
+   "priority": "P2",
+   "mode": "prime",
+   "prompt": "Starts standing upright facing forward, arms relaxed. Both hands come together in front of the chest as if holding a warm cup, elbows close to the body. The upper body leans forward a little and the head bows down to the hands for a slow sip, lifts, then bows again for a second sip. Then the head lifts with a happy sigh and the hands lower to a relaxed standing pose, in place, no turning.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a20d07-568f-7275-86f0-3d96b139b459",
+   "animation_task_id": "01a20d07-835a-7139-8567-a65dbd135648",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 29136,
+   "created": "2026-11-24T10:09:13.545Z"
+  },
+  {
+   "id": "hold_treat_body",
+   "file": "hold_treat_body.glb",
+   "loop": false,
+   "duration": 4.5,
+   "durationGlb": 4.467,
+   "priority": "P2",
+   "mode": "prime",
+   "prompt": "Starts standing upright facing forward. The right hand rises to the mouth as if holding a small snack; the head leans in to bite, pulls back chewing with small happy head bobs; a second bite and more chewing with a little shoulder wiggle. The hand lowers to the chest, relaxed standing pose, in place, no turning.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1ff8a-a5ba-77da-9de9-a9604a850b9d",
+   "animation_task_id": "01a1ff8a-fdcf-73c4-b3cf-3cfc78dcca19",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 25744,
+   "created": "2026-11-21T19:18:04.354Z"
+  },
+  {
+   "id": "hold_treat_low",
+   "file": "hold_treat_low.glb",
+   "loop": false,
+   "duration": 4.5,
+   "durationGlb": 4.467,
+   "priority": "P2",
+   "mode": "prime",
+   "prompt": "Starts standing upright facing forward, arms relaxed. The right hand comes up in front of the chest as if holding a small cookie, elbow down close to the side. The head bows down toward the hand for a small bite, lifts a little with happy chewing nods, then bows down again for a second bite. The hand stays low at chest height. Then the hand lowers to a relaxed standing pose, in place, no turning.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a20d06-d049-7080-92cb-68526d623d1b",
+   "animation_task_id": "01a20d06-fe5c-727a-81db-addab0f7441e",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 29024,
+   "created": "2026-11-24T10:08:34.333Z"
+  },
+  {
+   "id": "hold_treat_low_b",
+   "file": "hold_treat_low_b.glb",
+   "loop": false,
+   "duration": 4.5,
+   "durationGlb": 4.467,
+   "priority": "P2",
+   "mode": "prime",
+   "prompt": "Starts standing upright facing forward, arms relaxed. Both hands come together in front of the chest as if holding a small snack, elbows close to the body. The upper body leans forward a little and the head bows down to the hands to nibble, lifts with small happy nods, then bows down to nibble again. The hands stay at chest height, then lower to a relaxed standing pose, in place, no turning.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a20d06-d051-7315-a5e5-d822222fb2ae",
+   "animation_task_id": "01a20d07-3c5a-7505-9321-6d64366f0cc4",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 33032,
+   "created": "2026-11-24T10:08:50.842Z"
+  },
+  {
+   "id": "hop_out_of_bed",
+   "file": "hop_out_of_bed.glb",
+   "loop": false,
+   "duration": 2,
+   "durationGlb": 1.967,
+   "priority": "P0",
+   "mode": "prime",
+   "prompt": "Starts sitting on a knee-high ledge facing forward with the lower legs hanging down and hands beside the hips. Pushes off with both hands, hops down forward to the floor, lands softly with bent knees and stands up upright facing forward with arms relaxed, in place.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f056-741d-775d-a15d-4b561a4650f9",
+   "animation_task_id": "01a1f056-a14e-7252-bd19-fe49f28f1075",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 79756,
+   "created": "2026-11-18T20:26:28.846Z"
+  },
+  {
+   "id": "hug_receive_glitter",
+   "file": "hug_receive_glitter.glb",
+   "loop": false,
+   "duration": 2.5,
+   "durationGlb": 2.467,
+   "priority": "P1",
+   "mode": "prime",
+   "prompt": "Starts standing upright facing forward with arms relaxed at the sides. Clasps both hands to the cheeks, then opens the arms and hugs forward warmly, swaying side to side on the toes; then returns to the same relaxed standing pose and holds still, in place, no turning.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f04e-324b-73b6-b753-d18482356369",
+   "animation_task_id": "01a1f04e-7416-71bb-879e-4efe57691b81",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 91832,
+   "created": "2026-11-18T20:17:38.332Z"
+  },
+  {
+   "id": "hug_receive_hooligan",
+   "file": "hug_receive_hooligan.glb",
+   "loop": false,
+   "duration": 2.5,
+   "durationGlb": 2.467,
+   "priority": "P1",
+   "mode": "prime",
+   "prompt": "Starts standing upright facing forward with arms relaxed at the sides. Shrugs, opens the arms, gives a quick hug forward with two pats, then scratches the back of the head awkwardly; then returns to the same relaxed standing pose and holds still, in place, no turning.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f04e-13b3-7581-82db-d5a66868d85d",
+   "animation_task_id": "01a1f04e-4123-7362-a96d-dbee54a24d48",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 91812,
+   "created": "2026-11-18T20:17:20.660Z"
+  },
+  {
+   "id": "idle_glitter_alive",
+   "file": "idle_glitter_alive.glb",
+   "loop": true,
+   "duration": 6,
+   "durationGlb": 5.967,
+   "priority": "P2",
+   "mode": "prime",
+   "prompt": "Seamless loop. A cheerful cartoon character standing in place: slowly shifts weight from one leg to the other, the free knee softly bent, the upper body balances gently, the head tilts to one side then the other, one hand rests at the waist for a while, then both hands meet in front of the tummy. Feet stay planted, no stepping, no turning.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a20026-6fec-76f5-8c3d-83c25249bab4",
+   "animation_task_id": "01a20026-b2ec-75ff-93bc-95fae8239da9",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 36428,
+   "created": "2026-11-21T22:08:08.112Z"
+  },
+  {
+   "id": "idle_glitter_mirror",
+   "file": "idle_glitter_mirror.glb",
+   "loop": false,
+   "duration": 3.5,
+   "durationGlb": 3.467,
+   "priority": "P1",
+   "mode": "prime",
+   "prompt": "Starts standing upright facing forward with arms relaxed at the sides. Lifts a small hand mirror in the left hand to the face, fixes the hair on top of the head with the right hand, turns the head left and right admiring itself, then lowers the mirror; then returns to the same relaxed standing pose and holds still, in place, no turning.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f04f-21ba-73dd-b715-bfa9ffb648ea",
+   "animation_task_id": "01a1f04f-51b9-7463-bfaa-212abbad6e40",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 115968,
+   "created": "2026-11-18T20:18:34.741Z"
+  },
+  {
+   "id": "idle_glitter_twirl",
+   "file": "idle_glitter_twirl.glb",
+   "loop": false,
+   "duration": 2.5,
+   "durationGlb": 2.467,
+   "priority": "P1",
+   "mode": "prime",
+   "prompt": "Starts standing upright facing forward with arms relaxed at the sides. Rises on the toes and does one full pirouette in place with arms curved overhead, finishing facing forward with one hand under the chin; then returns to the same relaxed standing pose and holds still, in place, no turning.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f04d-adc3-72c2-84ae-4b25a9222de7",
+   "animation_task_id": "01a1f04d-db76-74cc-86f2-52fbe36c5b30",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 91812,
+   "created": "2026-11-18T20:16:58.852Z"
+  },
+  {
+   "id": "idle_hooligan_headphones",
+   "file": "idle_hooligan_headphones.glb",
+   "loop": true,
+   "duration": 4,
+   "durationGlb": 3.967,
+   "priority": "P1",
+   "mode": "prime",
+   "prompt": "Stands facing forward nodding the head to a beat, taps the right foot and flicks the left hand in rhythm, right hand resting on the chest. Seamless loop, in place, no turning.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f04e-0572-7341-bf4c-5e3353416c41",
+   "animation_task_id": "01a1f04e-47e8-7632-bdbf-43616300da60",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 127980,
+   "created": "2026-11-18T20:17:26.725Z"
+  },
+  {
+   "id": "idle_kind_cocoa",
+   "file": "idle_kind_cocoa.glb",
+   "loop": false,
+   "duration": 4,
+   "durationGlb": 3.967,
+   "priority": "P1",
+   "mode": "prime",
+   "prompt": "Starts standing upright facing forward with arms relaxed at the sides. Brings both hands together at chest height as if holding a mug, raises it to the mouth, blows on it, tilts it for a slow sip, sighs happily and lowers the hands; then returns to the same relaxed standing pose and holds still, in place, no turning.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f04f-137e-734e-aab9-451a0aaf7e62",
+   "animation_task_id": "01a1f04f-4244-7414-bd3a-583b94fa5580",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 127988,
+   "created": "2026-11-18T20:18:25.675Z"
+  },
+  {
+   "id": "idle_kind_hug_self",
+   "file": "idle_kind_hug_self.glb",
+   "loop": false,
+   "duration": 3,
+   "durationGlb": 2.967,
+   "priority": "P2",
+   "mode": "prime",
+   "prompt": "Warm cat wraps the arms around itself in a cozy self hug, eyes closed, sways gently side to side with a smile. Starts and ends in a neutral standing pose facing forward, in place.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f04f-f7b3-7159-996d-77d737c33f7e",
+   "animation_task_id": "01a1f050-258d-7771-9bb1-632f6f0f035c",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 103868,
+   "created": "2026-11-18T20:19:23.854Z"
+  },
+  {
+   "id": "idle_look_around",
+   "file": "idle_look_around.glb",
+   "loop": false,
+   "duration": 3.5,
+   "durationGlb": 3.467,
+   "priority": "P2",
+   "mode": "prime",
+   "prompt": "Curious cat looks to the left, then to the right, then back at the viewer with a small head tilt. Starts and ends in a neutral standing pose facing forward, in place.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f050-1902-74ab-a048-bf95483def5f",
+   "animation_task_id": "01a1f050-46f9-709e-b35e-8d349020ea78",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 115984,
+   "created": "2026-11-18T20:19:32.507Z"
+  },
+  {
+   "id": "idle_tail_play",
+   "file": "idle_tail_play.glb",
+   "loop": false,
+   "duration": 3,
+   "durationGlb": 2.967,
+   "priority": "P2",
+   "mode": "prime",
+   "prompt": "Playful cat glances back over the shoulder at its own tail, swipes at it twice with a paw while twisting the upper body, then gives up and faces forward giggling. Starts and ends in a neutral standing pose facing forward, in place.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f050-5fca-715d-befb-b9aaf802696a",
+   "animation_task_id": "01a1f050-8d59-7560-b95a-e4f81d437384",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 103868,
+   "created": "2026-11-18T20:19:50.183Z"
+  },
+  {
+   "id": "jump",
+   "file": "jump.glb",
+   "loop": false,
+   "duration": 2,
+   "durationGlb": 1.967,
+   "priority": "P1",
+   "mode": "prime",
+   "prompt": "Starts standing upright facing forward with arms relaxed at the sides. Bends the knees and springs straight up with both arms raised, lands softly on the same spot; then returns to the same relaxed standing pose and holds still, in place, no turning.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f04c-8aaf-730c-8333-d74333d06190",
+   "animation_task_id": "01a1f04c-b7ea-734c-88c6-9217a9101c99",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 79780,
+   "created": "2026-11-18T20:15:38.992Z"
+  },
+  {
+   "id": "knock_glass",
+   "file": "knock_glass.glb",
+   "loop": false,
+   "duration": 2,
+   "durationGlb": 1.967,
+   "priority": "P1",
+   "mode": "prime",
+   "prompt": "Starts standing upright facing forward with arms relaxed at the sides. Leans forward and knocks twice with the right knuckles on an invisible window in front of the face; then returns to the same relaxed standing pose and holds still, in place, no turning.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f04c-fa4d-7719-a0c1-769ca2850216",
+   "animation_task_id": "01a1f04d-3c31-71c2-9591-88f14a9b2db7",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 79768,
+   "created": "2026-11-18T20:16:13.177Z"
+  },
+  {
+   "id": "lie_down_side",
+   "file": "lie_down_side.glb",
+   "loop": false,
+   "duration": 2,
+   "durationGlb": 1.967,
+   "priority": "P0",
+   "mode": "prime",
+   "prompt": "Starts kneeling on all fours facing forward. Slowly lowers onto the left elbow and rolls onto the left side, head toward its left, belly toward the front, pulls the knees up and tucks the hands to the chest, then lies still. In place.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f055-ca54-7413-8eef-8908ea88f36f",
+   "animation_task_id": "01a1f056-01bb-7369-9677-30188c7281ed",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 79728,
+   "created": "2026-11-18T20:25:47.895Z"
+  },
+  {
+   "id": "listen",
+   "file": "listen.glb",
+   "loop": true,
+   "duration": 2,
+   "durationGlb": 1.967,
+   "priority": "P1",
+   "mode": "prime",
+   "prompt": "Stands facing forward, tilts the head to one side and holds the right hand cupped behind the ear as if listening closely, nodding slightly. Seamless loop, in place, no turning.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f04d-1b2a-71de-98ad-b6e27e3aed67",
+   "animation_task_id": "01a1f04d-5d41-76c7-adb0-8b7de59ccdab",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 79736,
+   "created": "2026-11-18T20:16:22.096Z"
+  },
+  {
+   "id": "offended",
+   "file": "offended.glb",
+   "loop": false,
+   "duration": 2.5,
+   "durationGlb": 2.467,
+   "priority": "P0",
+   "mode": "prime",
+   "prompt": "Starts standing upright facing forward with arms relaxed at the sides. Crosses the arms over the chest, turns the head away to the left with the chin up and a huff, then peeks back forward out of the corner of the eye; the body keeps facing forward; then returns to the same relaxed standing pose and holds still, in place, no turning.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f04c-0463-73af-85b8-3fbfb8e89b1d",
+   "animation_task_id": "01a1f04c-31b8-716f-a95a-de897b48f786",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 91812,
+   "created": "2026-11-18T20:15:10.414Z"
+  },
+  {
+   "id": "paint_brush",
+   "file": "paint_brush.glb",
+   "loop": true,
+   "duration": 2,
+   "durationGlb": 1.967,
+   "priority": "P1",
+   "mode": "prime",
+   "prompt": "Leans forward from the hips over the floor holding a paintbrush in the right hand, painting wide smooth strokes left and right on the ground just in front of the feet; left arm out to the side for balance, head follows the brush. Feet stay planted. Seamless loop, in place, no turning.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f056-b63c-77c6-99a7-0e5942f06942",
+   "animation_task_id": "01a1f056-e428-706c-904d-88e1b498ad16",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 79776,
+   "created": "2026-11-18T20:26:45.905Z"
+  },
+  {
+   "id": "paint_spray",
+   "file": "paint_spray.glb",
+   "loop": true,
+   "duration": 2,
+   "durationGlb": 1.967,
+   "priority": "P1",
+   "mode": "prime",
+   "prompt": "Shakes a spray can in the right hand twice at chest height, then leans forward and sprays the ground just in front of the feet in wide arcs left and right, bobbing the head to a beat; left hand on the hip. Feet stay planted. Seamless loop, in place, no turning.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f056-e4e1-7285-9160-ee9bfe896c68",
+   "animation_task_id": "01a1f057-1240-74f3-b3b6-a06e29bf2da1",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 79736,
+   "created": "2026-11-18T20:26:58.017Z"
+  },
+  {
+   "id": "poke_belly",
+   "file": "poke_belly.glb",
+   "loop": false,
+   "duration": 2,
+   "durationGlb": 1.967,
+   "priority": "P0",
+   "mode": "prime",
+   "prompt": "Starts standing upright facing forward with arms relaxed at the sides. Quickly folds forward at the waist with both hands pressed to the belly, two short giggling shoulder bounces, then straightens up; feet stay planted; then returns to the same relaxed standing pose and holds still, in place, no turning.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f047-a0cd-7557-afed-563bbbc60d94",
+   "animation_task_id": "01a1f047-e2b9-7371-9852-b4d28cc33169",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 79752,
+   "created": "2026-11-18T20:10:22.947Z"
+  },
+  {
+   "id": "poke_cheek",
+   "file": "poke_cheek.glb",
+   "loop": false,
+   "duration": 2,
+   "durationGlb": 1.967,
+   "priority": "P0",
+   "mode": "prime",
+   "prompt": "Starts standing upright facing forward with arms relaxed at the sides. Quickly tilts the head to its left with a small shoulder shrug as if lightly tapped on the right cheek, then snaps back to center; then returns to the same relaxed standing pose and holds still, in place, no turning.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f047-a0e8-73cb-b19c-f83e56868fc8",
+   "animation_task_id": "01a1f047-f843-702c-b6ba-cbfae1ef1777",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 79776,
+   "created": "2026-11-18T20:10:28.205Z"
+  },
+  {
+   "id": "poke_head",
+   "file": "poke_head.glb",
+   "loop": false,
+   "duration": 2,
+   "durationGlb": 1.967,
+   "priority": "P0",
+   "mode": "prime",
+   "prompt": "Starts standing upright facing forward with arms relaxed at the sides. In the first half second the character ducks the head down sharply with the shoulders raised, then bounces back up; then returns to the same relaxed standing pose and holds still, in place, no turning.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f047-a0c0-7546-b45b-7c5f52b293b0",
+   "animation_task_id": "01a1f047-e30b-718f-9e57-26feeed136ab",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 79768,
+   "created": "2026-11-18T20:10:24.040Z"
+  },
+  {
+   "id": "poke_paw",
+   "file": "poke_paw.glb",
+   "loop": false,
+   "duration": 2,
+   "durationGlb": 1.967,
+   "priority": "P0",
+   "mode": "prime",
+   "prompt": "Starts standing upright facing forward with arms relaxed at the sides. Quickly yanks the right hand back to the chest, shakes the hand twice, then lowers it; feet stay planted; then returns to the same relaxed standing pose and holds still, in place, no turning.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f048-27ce-75c1-bbd8-baa2ddd4dae0",
+   "animation_task_id": "01a1f048-54c3-7580-81f6-138f875289ad",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 79776,
+   "created": "2026-11-18T20:10:51.762Z"
+  },
+  {
+   "id": "poke_tail",
+   "file": "poke_tail.glb",
+   "loop": false,
+   "duration": 2,
+   "durationGlb": 1.967,
+   "priority": "P0",
+   "mode": "prime",
+   "prompt": "Starts standing upright facing forward with arms relaxed at the sides. Does a small startled hop on the spot with arms flung out to the sides, glances back over the right shoulder with the head only, then looks forward again; then returns to the same relaxed standing pose and holds still, in place, no turning.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f048-2c1e-729c-9367-43364370ed6f",
+   "animation_task_id": "01a1f048-6e20-7308-8560-ec96d772fab5",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 79780,
+   "created": "2026-11-18T20:10:58.410Z"
+  },
+  {
+   "id": "press_glass",
+   "file": "press_glass.glb",
+   "loop": false,
+   "duration": 3,
+   "durationGlb": 2.967,
+   "priority": "P1",
+   "mode": "prime",
+   "prompt": "Starts standing upright facing forward with arms relaxed at the sides. Leans forward and presses both open palms flat against an invisible glass wall in front at face height, squishes the face forward against it for a moment, then pushes back off and returns to the same relaxed standing pose and holds still, in place, no turning.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f057-13e0-76a5-8075-25768f5c1289",
+   "animation_task_id": "01a1f057-41bf-72e9-b00b-26b327dc7c0b",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 103872,
+   "created": "2026-11-18T20:27:09.741Z"
+  },
+  {
+   "id": "rps_throw",
+   "file": "rps_throw.glb",
+   "loop": false,
+   "duration": 2,
+   "durationGlb": 1.967,
+   "priority": "P0",
+   "mode": "prime",
+   "prompt": "Starts standing upright facing forward with arms relaxed at the sides. Shakes the right fist up and down three times in front of the chest, then thrusts the right hand straight forward at chest height and holds it there for half a second, then lowers it; then returns to the same relaxed standing pose and holds still, in place, no turning.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f04b-33fc-76a9-a22e-8f671953cfc7",
+   "animation_task_id": "01a1f04b-763e-7305-91fd-519a0ee5a4c2",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 79788,
+   "created": "2026-11-18T20:14:17.760Z"
+  },
+  {
+   "id": "run",
+   "file": "run.glb",
+   "loop": true,
+   "duration": 2,
+   "durationGlb": 1.967,
+   "priority": "P1",
+   "mode": "prime",
+   "prompt": "Runs in place with quick light steps, arms pumping, leaning slightly forward. Seamless run cycle, no forward travel, no turning.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f04c-4662-7581-becf-e4619f4ea216",
+   "animation_task_id": "01a1f04c-73b8-718a-b156-b2fa7de57fdc",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 79740,
+   "created": "2026-11-18T20:15:21.753Z"
+  },
+  {
+   "id": "sad_sigh",
+   "file": "sad_sigh.glb",
+   "loop": false,
+   "duration": 2.5,
+   "durationGlb": 2.467,
+   "priority": "P0",
+   "mode": "prime",
+   "prompt": "Starts standing upright facing forward with arms relaxed at the sides. Slowly drops the shoulders and looks down, lets out a big heavy sigh with the chest sinking, scuffs the right foot on the floor once, then lifts the head a little; then returns to the same relaxed standing pose and holds still, in place, no turning.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f04b-0d29-720b-9bf4-a829855edd66",
+   "animation_task_id": "01a1f04b-4ed4-71e2-a7cc-dae97fc4d192",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 91820,
+   "created": "2026-11-18T20:14:06.906Z"
+  },
+  {
+   "id": "scratch_enjoy",
+   "file": "scratch_enjoy.glb",
+   "loop": false,
+   "duration": 2,
+   "durationGlb": 1.967,
+   "priority": "P0",
+   "mode": "prime",
+   "prompt": "Starts standing upright facing forward with arms relaxed at the sides. Leans the head to the side and up as if being scratched, rubs the head slowly side to side, shoulders relaxed, one knee bounces happily three times; then returns to the same relaxed standing pose and holds still, in place, no turning.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f049-a3ea-7325-9634-0d0b20db283e",
+   "animation_task_id": "01a1f049-fa38-74e6-9cd4-63c1431fb352",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 79764,
+   "created": "2026-11-18T20:12:45.227Z"
+  },
+  {
+   "id": "sing",
+   "file": "sing.glb",
+   "loop": true,
+   "duration": 4,
+   "durationGlb": 3.967,
+   "priority": "P1",
+   "mode": "prime",
+   "prompt": "Stands facing forward singing into an invisible microphone held in the right hand near the mouth, sways side to side and spreads the left arm dramatically. Seamless loop, in place, no turning.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f04e-cc82-72de-8df4-f7f12275dbd8",
+   "animation_task_id": "01a1f04e-fafe-7696-81fa-229fbb7a2d0f",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 127984,
+   "created": "2026-11-18T20:18:13.046Z"
+  },
+  {
+   "id": "sit_down",
+   "file": "sit_down.glb",
+   "loop": false,
+   "duration": 2,
+   "durationGlb": 1.967,
+   "priority": "P0",
+   "mode": "prime",
+   "prompt": "Starts standing upright facing forward with arms relaxed at the sides. Bends the knees and sits down on the floor, legs stretched forward, hands resting on the knees, and stays seated still. In place, no turning.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f04b-3c74-752d-917d-b2f1848c8604",
+   "animation_task_id": "01a1f04b-6a18-76c7-b441-a2f26ce90800",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 79740,
+   "created": "2026-11-18T20:14:13.667Z"
+  },
+  {
+   "id": "sit_idle",
+   "file": "sit_idle.glb",
+   "loop": true,
+   "duration": 3,
+   "durationGlb": 2.967,
+   "priority": "P0",
+   "mode": "prime",
+   "prompt": "Sits on the floor with the legs stretched forward and hands resting on the knees, swings the feet alternately and gently sways the head side to side. Seamless loop, stays seated, no turning.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f04b-9298-74d0-a7b3-a5ca4ba226d1",
+   "animation_task_id": "01a1f04b-c054-70a8-84db-ef7e80868d21",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 103864,
+   "created": "2026-11-18T20:14:36.023Z"
+  },
+  {
+   "id": "skate_cruise",
+   "file": "skate_cruise.glb",
+   "loop": true,
+   "duration": 3,
+   "durationGlb": 2.967,
+   "priority": "P2",
+   "mode": "prime",
+   "prompt": "Seamless loop. Sideways skateboard stance, feet wide apart left-right, knees bent, hips low. Smooth riding: gentle bounce from the knees, torso leaning a little forward then back as if carving, arms out to the sides balancing with slow waves, head facing forward. Feet stay planted in place.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a20025-5a5f-7207-a32a-c042bd05a059",
+   "animation_task_id": "01a20025-ee11-75c8-8725-32c3372c636e",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 28100,
+   "created": "2026-11-21T22:07:18.408Z"
+  },
+  {
+   "id": "skate_hop_off",
+   "file": "skate_hop_off.glb",
+   "loop": false,
+   "duration": 2.5,
+   "durationGlb": 2.467,
+   "priority": "P2",
+   "mode": "prime",
+   "prompt": "Starts in a sideways skateboard stance, knees bent. Hops forward to a normal standing pose, taps the floor behind with the right foot, then catches something rising beside the right hip with the right hand and holds it at the side, confident posture. Ends standing relaxed, in place, no turning.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a20026-5aa2-725d-8714-ed42862418f9",
+   "animation_task_id": "01a20026-9c80-752a-8a42-88a1effc9b39",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 29508,
+   "created": "2026-11-21T22:07:57.249Z"
+  },
+  {
+   "id": "skate_hop_on",
+   "file": "skate_hop_on.glb",
+   "loop": false,
+   "duration": 2,
+   "durationGlb": 1.967,
+   "priority": "P2",
+   "mode": "prime",
+   "prompt": "Starts standing upright facing forward. Crouches and makes a small two-footed hop forward, landing in a sideways skateboard stance: feet wide apart left-right, knees bent, hips low, torso upright facing forward, arms spread to the sides for balance. Holds the stance, in place.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a20025-5a65-7505-9d12-8c714f3cb1f9",
+   "animation_task_id": "01a20026-1807-7382-a7c2-f3bbf5cd5594",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 26536,
+   "created": "2026-11-21T22:07:23.232Z"
+  },
+  {
+   "id": "skate_ollie",
+   "file": "skate_ollie.glb",
+   "loop": false,
+   "duration": 2,
+   "durationGlb": 1.967,
+   "priority": "P2",
+   "mode": "prime",
+   "prompt": "Cool cat standing sideways on a skateboard crouches and does an ollie jump with knees tucked, lands back on the board and throws one arm up triumphantly. Stays in place.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f04f-8574-7735-8f75-85f1b886b74b",
+   "animation_task_id": "01a1f04f-b347-7476-bcac-5f7b4bf25a5d",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 79748,
+   "created": "2026-11-18T20:18:54.928Z"
+  },
+  {
+   "id": "skate_ollie_air",
+   "file": "skate_ollie_air.glb",
+   "loop": false,
+   "duration": 2,
+   "durationGlb": 1.967,
+   "priority": "P2",
+   "mode": "prime",
+   "prompt": "Starts in a sideways skateboard stance with knees bent. Crouches deep, jumps straight up with knees tucked high, arms thrown up and out for balance, lands softly back in the same wide stance absorbing with bent knees, holds. In place, no turning.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a20026-47cb-76b7-87c7-aa2974df7c79",
+   "animation_task_id": "01a20026-89eb-7022-b6dd-a102e1e422d4",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 32732,
+   "created": "2026-11-21T22:07:52.409Z"
+  },
+  {
+   "id": "skate_ride",
+   "file": "skate_ride.glb",
+   "loop": false,
+   "duration": 4,
+   "durationGlb": 3.967,
+   "priority": "P1",
+   "mode": "prime",
+   "prompt": "Stands sideways-balanced with knees bent and arms out as if riding a skateboard, pushes once with the right foot, glides balancing with small sways, then stands up straight facing forward. In place, no forward travel.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f04f-5414-7589-877b-b600cc7baf5a",
+   "animation_task_id": "01a1f04f-8192-7191-a19e-fd9d2b14c5e0",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 127968,
+   "created": "2026-11-18T20:18:47.663Z"
+  },
+  {
+   "id": "sleep_loop_bed",
+   "file": "sleep_loop_bed.glb",
+   "loop": true,
+   "duration": 4,
+   "durationGlb": 3.967,
+   "priority": "P0",
+   "mode": "prime",
+   "prompt": "Lies curled up on the left side, head resting toward its left, knees pulled up, hands tucked to the chest, sleeping and breathing slowly with the chest rising and falling. Seamless loop, stays lying in place.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f055-ee43-7087-928c-e2f300735e40",
+   "animation_task_id": "01a1f056-1cc2-72d2-819f-a39ee565b7e0",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 127952,
+   "created": "2026-11-18T20:25:59.994Z"
+  },
+  {
+   "id": "snowglobe_shake",
+   "file": "snowglobe_shake.glb",
+   "loop": false,
+   "duration": 2,
+   "durationGlb": 1.967,
+   "priority": "P1",
+   "mode": "prime",
+   "prompt": "Starts standing upright facing forward with arms relaxed at the sides. Holds a ball-sized object in both hands at chest height, shakes it up and down vigorously four times, then raises it to eye level and gazes at it; then returns to the same relaxed standing pose and holds still, in place, no turning.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f04d-a2af-74bd-b9e3-11774de7b58c",
+   "animation_task_id": "01a1f04d-d12e-746c-bba9-9381449cbd04",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 79756,
+   "created": "2026-11-18T20:16:51.029Z"
+  },
+  {
+   "id": "spray_low_sweep",
+   "file": "spray_low_sweep.glb",
+   "loop": true,
+   "duration": 2,
+   "durationGlb": 1.967,
+   "priority": "P1",
+   "mode": "prime",
+   "prompt": "Squats low with knees bent and back leaning forward, right arm extended forward and down toward the floor just in front of the feet as if spraying a can, sweeping the right fist slowly left and right in wide flat arcs close to the ground; left hand resting on the left knee for balance, head looking down following the right hand. Feet stay planted. Seamless loop, in place, no turning.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f208-a9a9-75cd-b7a1-8ff28cfb5acc",
+   "animation_task_id": "01a1f209-009d-702c-b0e8-175d492081e1",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 79744,
+   "created": "2026-11-19T04:20:55.992Z"
+  },
+  {
+   "id": "spray_shake",
+   "file": "spray_shake.glb",
+   "loop": true,
+   "duration": 2,
+   "durationGlb": 1.967,
+   "priority": "P1",
+   "mode": "prime",
+   "prompt": "Stands upright facing forward, right forearm raised in front of the chest with the fist closed as if gripping a spray can, shaking the fist up and down quickly and vigorously in a tight rhythm, elbow bent, left arm relaxed at the side, slight knee bounce, head nodding to the rhythm. Feet stay planted. Seamless loop, in place, no turning.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f208-a992-7688-ad80-39d946eab549",
+   "animation_task_id": "01a1f209-0046-7153-beea-c5cad1ab521c",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 79748,
+   "created": "2026-11-19T04:21:01.293Z"
+  },
+  {
+   "id": "stand_up",
+   "file": "stand_up.glb",
+   "loop": false,
+   "duration": 2,
+   "durationGlb": 1.967,
+   "priority": "P0",
+   "mode": "prime",
+   "prompt": "Starts sitting on the floor with the legs stretched forward and hands on the knees. Pulls the feet in, pushes up with the hands and stands up briskly, ending upright facing forward with arms relaxed at the sides, in place, no turning.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f04b-ad0a-7450-8095-e468613436c2",
+   "animation_task_id": "01a1f04b-ddb5-7791-89c8-58259969953c",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 79756,
+   "created": "2026-11-18T20:14:43.761Z"
+  },
+  {
+   "id": "sticker_react",
+   "file": "sticker_react.glb",
+   "loop": false,
+   "duration": 2,
+   "durationGlb": 1.967,
+   "priority": "P2",
+   "mode": "prime",
+   "prompt": "Cat follows something peeling off in front with the eyes and head, mouth open in surprise, one paw reaching up a little. Then stands still. Starts and ends in a neutral standing pose facing forward, in place.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f04f-db52-77ed-acd5-0ec614ccbe70",
+   "animation_task_id": "01a1f050-0900-7162-b3ba-4adf1a2390c5",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 79764,
+   "created": "2026-11-18T20:19:21.572Z"
+  },
+  {
+   "id": "sticker_slap",
+   "file": "sticker_slap.glb",
+   "loop": false,
+   "duration": 2,
+   "durationGlb": 1.967,
+   "priority": "P1",
+   "mode": "prime",
+   "prompt": "Starts standing upright facing forward with arms relaxed at the sides. Quickly slaps the right palm flat forward onto an invisible window at chest height, once; then returns to the same relaxed standing pose and holds still, in place, no turning.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f04e-9f22-7310-8bc6-bf736c53ec17",
+   "animation_task_id": "01a1f04e-cf61-7748-bc00-342c9cb85141",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 79756,
+   "created": "2026-11-18T20:17:56.492Z"
+  },
+  {
+   "id": "surprise_trick_glitter",
+   "file": "surprise_trick_glitter.glb",
+   "loop": false,
+   "duration": 2,
+   "durationGlb": 1.967,
+   "priority": "P0",
+   "mode": "prime",
+   "prompt": "Starts standing upright facing forward with arms relaxed at the sides. Rises on the toes, sways the hips side to side, then throws both arms wide open with jazz hands in a ta-da pose and holds it briefly; then returns to the same relaxed standing pose and holds still, in place, no turning.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f04a-538e-70d6-9f4f-3263a2313649",
+   "animation_task_id": "01a1f04a-818c-755c-b14b-0b2bfbb1a5b2",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 79744,
+   "created": "2026-11-18T20:13:15.365Z"
+  },
+  {
+   "id": "surprise_trick_hooligan",
+   "file": "surprise_trick_hooligan.glb",
+   "loop": false,
+   "duration": 2,
+   "durationGlb": 1.967,
+   "priority": "P0",
+   "mode": "prime",
+   "prompt": "Starts standing upright facing forward with arms relaxed at the sides. Hides both hands behind the back, then whips them out pointing both hands forward with a confident lean back; then returns to the same relaxed standing pose and holds still, in place, no turning.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f049-be0b-7676-9603-074448e2d955",
+   "animation_task_id": "01a1f049-eb42-755a-a770-8cfc0c6a1975",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 79744,
+   "created": "2026-11-18T20:12:47.090Z"
+  },
+  {
+   "id": "surprise_trick_kind",
+   "file": "surprise_trick_kind.glb",
+   "loop": false,
+   "duration": 2,
+   "durationGlb": 1.967,
+   "priority": "P0",
+   "mode": "prime",
+   "prompt": "Starts standing upright facing forward with arms relaxed at the sides. Hides both hands behind the back, then slowly brings them forward cupped together at chest height as if offering a gift, holds them out; then returns to the same relaxed standing pose and holds still, in place, no turning.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f04a-3fc3-76d8-9651-e9dab9621420",
+   "animation_task_id": "01a1f04a-6efd-7342-9a5f-cf2fc71cf26c",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 79756,
+   "created": "2026-11-18T20:13:10.540Z"
+  },
+  {
+   "id": "tease_glitter",
+   "file": "tease_glitter.glb",
+   "loop": false,
+   "duration": 2,
+   "durationGlb": 1.967,
+   "priority": "P0",
+   "mode": "prime",
+   "prompt": "Starts standing upright facing forward with arms relaxed at the sides. Lifts the chin up haughtily and turns the head away to the left with a little flick, then peeks back forward with a sly sideways glance; the body keeps facing forward; then returns to the same relaxed standing pose and holds still, in place, no turning.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f04a-c94d-77da-b065-79466275a00c",
+   "animation_task_id": "01a1f04a-f8e5-7249-b9a8-18c2aab3d30a",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 79768,
+   "created": "2026-11-18T20:13:44.857Z"
+  },
+  {
+   "id": "tease_hooligan",
+   "file": "tease_hooligan.glb",
+   "loop": false,
+   "duration": 2,
+   "durationGlb": 1.967,
+   "priority": "P0",
+   "mode": "prime",
+   "prompt": "Starts standing upright facing forward with arms relaxed at the sides. Puts the right hand at the nose and wiggles the fingers teasingly, bouncing from foot to foot on the spot; then returns to the same relaxed standing pose and holds still, in place, no turning.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f04a-5adb-7544-84c4-64217484c996",
+   "animation_task_id": "01a1f04a-9ed7-73ab-b649-fe7b1a279ba7",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 79768,
+   "created": "2026-11-18T20:13:32.746Z"
+  },
+  {
+   "id": "tease_kind",
+   "file": "tease_kind.glb",
+   "loop": false,
+   "duration": 2,
+   "durationGlb": 1.967,
+   "priority": "P0",
+   "mode": "prime",
+   "prompt": "Starts standing upright facing forward with arms relaxed at the sides. Holds both open hands next to the head and waggles them teasingly, then covers the mouth with one hand and giggles shyly with the shoulders; then returns to the same relaxed standing pose and holds still, in place, no turning.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f04a-b666-704f-b5b3-40ea48556d6b",
+   "animation_task_id": "01a1f04a-ed27-7382-9e48-77530c00f7ab",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 79764,
+   "created": "2026-11-18T20:13:42.683Z"
+  },
+  {
+   "id": "treat_eat_glitter",
+   "file": "treat_eat_glitter.glb",
+   "loop": false,
+   "duration": 2.5,
+   "durationGlb": 2.467,
+   "priority": "P0",
+   "mode": "prime",
+   "prompt": "Starts standing upright facing forward with arms relaxed at the sides. Delicately lifts a tiny snack to the mouth with the right hand, nibbles it, presses the left hand to the cheek in delight and does a small happy bounce on the toes; then returns to the same relaxed standing pose and holds still, in place, no turning.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f049-8e32-7533-9d3f-26dbbe44cf9f",
+   "animation_task_id": "01a1f049-d0a4-7669-836b-8e3920323d62",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 91816,
+   "created": "2026-11-18T20:12:40.162Z"
+  },
+  {
+   "id": "treat_eat_hooligan",
+   "file": "treat_eat_hooligan.glb",
+   "loop": false,
+   "duration": 2.5,
+   "durationGlb": 2.467,
+   "priority": "P0",
+   "mode": "prime",
+   "prompt": "Starts standing upright facing forward with arms relaxed at the sides. Tosses something small up with the right hand, catches it at the mouth, chews with a cocky nod and raises the right hand in a thumbs-up approval; then returns to the same relaxed standing pose and holds still, in place, no turning.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f049-3307-7700-a33f-d34242909053",
+   "animation_task_id": "01a1f049-60c8-764b-995c-6c9ff7676b8e",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 91824,
+   "created": "2026-11-18T20:12:00.254Z"
+  },
+  {
+   "id": "treat_eat_kind",
+   "file": "treat_eat_kind.glb",
+   "loop": false,
+   "duration": 2.5,
+   "durationGlb": 2.467,
+   "priority": "P0",
+   "mode": "prime",
+   "prompt": "Starts standing upright facing forward with arms relaxed at the sides. Brings both hands together in front of the mouth as if holding a small snack, takes a bite, chews happily rocking the head, then pats the belly with one hand; then returns to the same relaxed standing pose and holds still, in place, no turning.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f049-37ef-76f9-ade4-405edc38c58e",
+   "animation_task_id": "01a1f049-6621-750a-95a1-f72ad6ec0e42",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 91816,
+   "created": "2026-11-18T20:12:06.952Z"
+  },
+  {
+   "id": "tumble",
+   "file": "tumble.glb",
+   "loop": false,
+   "duration": 2.5,
+   "durationGlb": 2.467,
+   "priority": "P1",
+   "mode": "prime",
+   "prompt": "Starts standing upright facing forward with arms relaxed at the sides. Wobbles dizzily, tucks and does one small forward roll on the spot, pops back up to standing and brushes off the chest with both hands; then returns to the same relaxed standing pose and holds still, in place, no turning.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f04f-a8dc-7235-8c12-291ec1fb0f34",
+   "animation_task_id": "01a1f04f-d6a2-76d4-bd6f-c22facb0a54b",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 91812,
+   "created": "2026-11-18T20:19:03.455Z"
+  },
+  {
+   "id": "turn_over_sleep",
+   "file": "turn_over_sleep.glb",
+   "loop": false,
+   "duration": 2,
+   "durationGlb": 1.967,
+   "priority": "P0",
+   "mode": "prime",
+   "prompt": "Starts lying curled up asleep on the left side. Stirs, rolls halfway onto the back with a lazy wave of one hand, then rolls back onto the left side, tucks the hands to the chest and settles still again. In place.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f056-1a62-7239-ae95-377537408b22",
+   "animation_task_id": "01a1f056-4824-7478-b965-5c61cd7e3ba8",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 79740,
+   "created": "2026-11-18T20:26:06.190Z"
+  },
+  {
+   "id": "turn_step",
+   "file": "turn_step.glb",
+   "loop": true,
+   "duration": 2,
+   "durationGlb": 1.967,
+   "priority": "P0",
+   "mode": "prime",
+   "prompt": "Steps in place with small quick steps, lifting the feet alternately a little, body and head facing straight forward, arms relaxed at the sides. Seamless loop, no forward travel, no turning.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f048-acca-73d8-8168-d4174a2c552f",
+   "animation_task_id": "01a1f048-ef27-751a-8bf1-8ccafb38adf9",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 79748,
+   "created": "2026-11-18T20:11:31.371Z"
+  },
+  {
+   "id": "wake_stretch_in_bed",
+   "file": "wake_stretch_in_bed.glb",
+   "loop": false,
+   "duration": 2,
+   "durationGlb": 1.967,
+   "priority": "P0",
+   "mode": "prime",
+   "prompt": "Starts lying curled up on the left side. Stretches both arms over the head and the legs out long, yawns with one hand over the mouth, then sits up facing forward with the lower legs hanging down over a ledge and hands resting beside the hips. In place.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f056-44dc-7734-a832-9a690a3bcb00",
+   "animation_task_id": "01a1f056-72c8-7656-89c9-26a4f61bf50e",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 79756,
+   "created": "2026-11-18T20:26:16.918Z"
+  },
+  {
+   "id": "wake_up",
+   "file": "wake_up.glb",
+   "loop": false,
+   "duration": 2,
+   "durationGlb": 1.967,
+   "priority": "P0",
+   "mode": "prime",
+   "prompt": "Starts lying curled up on its right side asleep. Lifts the head, sits up rubbing one eye with the hand, stands up and does a short stretch with both arms up, then lowers the arms and stands upright facing forward, relaxed, in place.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f049-1da5-7493-ae25-9448a9da35a8",
+   "animation_task_id": "01a1f049-4ad4-73b8-a136-202181c7c3c3",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 79748,
+   "created": "2026-11-18T20:11:54.670Z"
+  },
+  {
+   "id": "walk",
+   "file": "walk.glb",
+   "loop": true,
+   "duration": 2,
+   "durationGlb": 1.967,
+   "priority": "P1",
+   "mode": "prime",
+   "prompt": "Walks in place with a bouncy cheerful stride, arms swinging, head facing forward. Seamless walk cycle, no forward travel, no turning.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f04c-2295-72c5-9776-57dd66966f3d",
+   "animation_task_id": "01a1f04c-6482-7495-b9e3-dd8f1026f0d9",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 79752,
+   "created": "2026-11-18T20:15:18.136Z"
+  },
+  {
+   "id": "walk_to_bedside",
+   "file": "walk_to_bedside.glb",
+   "loop": true,
+   "duration": 2,
+   "durationGlb": 1.967,
+   "priority": "P1",
+   "mode": "prime",
+   "prompt": "Walks slowly in place with small shuffling steps, head slightly lowered, sleepy, arms relaxed, rubs one eye with the right hand once. Seamless loop, no forward travel, no turning.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f056-8c6c-73c5-b431-22eae5597680",
+   "animation_task_id": "01a1f056-cf5c-7192-90f0-4fd772dd64a3",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 79748,
+   "created": "2026-11-18T20:26:40.873Z"
+  },
+  {
+   "id": "wave",
+   "file": "wave.glb",
+   "loop": false,
+   "duration": 2,
+   "durationGlb": 1.967,
+   "priority": "P0",
+   "mode": "prime",
+   "prompt": "Starts standing upright facing forward with arms relaxed at the sides. Raises the right hand above the head and waves it side to side three times, feet staying planted; then returns to the same relaxed standing pose and holds still, in place, no turning.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f04b-bd05-7229-b5a6-c5718cb7b60b",
+   "animation_task_id": "01a1f04b-ffb8-7073-8ca4-35f26e3eb62f",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 79756,
+   "created": "2026-11-18T20:14:52.920Z"
+  },
+  {
+   "id": "world_ball_catch",
+   "file": "world_ball_catch.glb",
+   "loop": false,
+   "duration": 2,
+   "durationGlb": 1.967,
+   "priority": "W1",
+   "mode": "prime",
+   "prompt": "Cat reaches both paws forward, catches a ball at chest height, hugs it and lifts it up proudly. Starts and ends in a neutral standing pose facing forward, in place.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f053-c9f5-7093-ade5-fcb792d98986",
+   "animation_task_id": "01a1f053-fa94-778a-b2e6-ea251a305e99",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 79752,
+   "created": "2026-11-18T20:23:34.864Z"
+  },
+  {
+   "id": "world_ball_kick",
+   "file": "world_ball_kick.glb",
+   "loop": false,
+   "duration": 2,
+   "durationGlb": 1.967,
+   "priority": "W1",
+   "mode": "prime",
+   "prompt": "Cat takes a small swing and kicks a ball with the right foot, then raises the arms happily. Then stands still. Starts and ends in a neutral standing pose facing forward, in place.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f053-8b08-72f6-8b77-9795e9ff7b20",
+   "animation_task_id": "01a1f053-b9c7-7531-8184-38c95ab546b6",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 79764,
+   "created": "2026-11-18T20:23:19.244Z"
+  },
+  {
+   "id": "world_ball_throw",
+   "file": "world_ball_throw.glb",
+   "loop": false,
+   "duration": 2,
+   "durationGlb": 1.967,
+   "priority": "W1",
+   "mode": "prime",
+   "prompt": "Cat holds a ball in both paws at the chest, raises it overhead and throws it toward the viewer. Then stands still. Starts and ends in a neutral standing pose facing forward, in place.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f053-8ccc-72f3-b4de-53121fc11ac9",
+   "animation_task_id": "01a1f053-bb0b-7120-a19e-67355e8186b1",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 79760,
+   "created": "2026-11-18T20:23:19.325Z"
+  },
+  {
+   "id": "world_bed_get_in",
+   "file": "world_bed_get_in.glb",
+   "loop": false,
+   "duration": 2.5,
+   "durationGlb": 2.467,
+   "priority": "W1",
+   "mode": "prime",
+   "prompt": "Sleepy cat yawns, sits down on the edge of a bed, lies back onto the pillow and folds the paws on the chest.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f052-5887-75da-9004-913115ee273a",
+   "animation_task_id": "01a1f052-8751-73a4-b4fa-e6f2c0adba22",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 91792,
+   "created": "2026-11-18T20:22:04.988Z"
+  },
+  {
+   "id": "world_bed_get_out",
+   "file": "world_bed_get_out.glb",
+   "loop": false,
+   "duration": 2.5,
+   "durationGlb": 2.467,
+   "priority": "W1",
+   "mode": "prime",
+   "prompt": "Cat lying on its back sits up with a big stretch, swings the legs down and hops out of bed onto the floor. Ends in a neutral standing pose facing forward, in place.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f052-bd32-77b8-8065-fb26ff621920",
+   "animation_task_id": "01a1f052-eb96-76a4-a458-ed907ed64e18",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 91796,
+   "created": "2026-11-18T20:22:35.981Z"
+  },
+  {
+   "id": "world_brush_teeth",
+   "file": "world_brush_teeth.glb",
+   "loop": true,
+   "duration": 3,
+   "durationGlb": 2.967,
+   "priority": "W1",
+   "mode": "prime",
+   "prompt": "Cat brushes its teeth with a toothbrush in the right paw, moving it quickly side to side in front of the mouth, swaying slightly. Seamless loop, stays in place.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f053-00db-777f-bd31-858b8f97e8d2",
+   "animation_task_id": "01a1f053-2f8d-77a8-87d4-784fa8914b02",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 103880,
+   "created": "2026-11-18T20:22:49.696Z"
+  },
+  {
+   "id": "world_drink_cup",
+   "file": "world_drink_cup.glb",
+   "loop": false,
+   "duration": 2.5,
+   "durationGlb": 2.467,
+   "priority": "W1",
+   "mode": "prime",
+   "prompt": "Cat raises a cup to the mouth with both paws, drinks in long gulps tilting it up, then lowers it and wipes the mouth with the back of a paw. Starts and ends in a neutral standing pose facing forward, in place.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f052-377c-7463-8d8a-d7e304388e6a",
+   "animation_task_id": "01a1f052-7929-7659-bef5-0c1e4a0f7ed7",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 91812,
+   "created": "2026-11-18T20:21:56.557Z"
+  },
+  {
+   "id": "world_eat_bowl",
+   "file": "world_eat_bowl.glb",
+   "loop": true,
+   "duration": 3,
+   "durationGlb": 2.967,
+   "priority": "W1",
+   "mode": "prime",
+   "prompt": "Cat crouches over a bowl on the floor, leans down and eats with three dips of the head, chewing happily. Seamless loop, stays crouched.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f051-c564-7352-9862-8b10f5220013",
+   "animation_task_id": "01a1f051-f497-7446-8b57-2df70da30b4f",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 103836,
+   "created": "2026-11-18T20:21:22.312Z"
+  },
+  {
+   "id": "world_eat_bowl_end",
+   "file": "world_eat_bowl_end.glb",
+   "loop": false,
+   "duration": 2,
+   "durationGlb": 1.967,
+   "priority": "W1",
+   "mode": "prime",
+   "prompt": "Full cat stands up from crouching over a bowl, pats the round tummy and licks the lips contentedly. Ends in a neutral standing pose facing forward, in place.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f051-f4f7-713c-8c99-3536537742ec",
+   "animation_task_id": "01a1f052-2488-71eb-8335-78fdb6e299f8",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 79760,
+   "created": "2026-11-18T20:21:39.909Z"
+  },
+  {
+   "id": "world_eat_bowl_start",
+   "file": "world_eat_bowl_start.glb",
+   "loop": false,
+   "duration": 2,
+   "durationGlb": 1.967,
+   "priority": "W1",
+   "mode": "prime",
+   "prompt": "Hungry cat rubs the paws together and crouches down over a bowl on the floor.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f051-e732-7345-b445-833748ab4288",
+   "animation_task_id": "01a1f052-1557-707e-a6af-c979d8f5270e",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 79760,
+   "created": "2026-11-18T20:21:30.770Z"
+  },
+  {
+   "id": "world_hungry",
+   "file": "world_hungry.glb",
+   "loop": false,
+   "duration": 2.5,
+   "durationGlb": 2.467,
+   "priority": "W2",
+   "mode": "prime",
+   "prompt": "Hungry cat holds its tummy with both paws, slumps a little and looks up at the viewer with pleading eyes. Starts and ends in a neutral standing pose facing forward, in place.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f054-f720-7722-a6ae-2b22f11b982e",
+   "animation_task_id": "01a1f055-2572-746e-bc3c-8d8f6e3b2adc",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 91836,
+   "created": "2026-11-18T20:24:51.704Z"
+  },
+  {
+   "id": "world_invite_follow",
+   "file": "world_invite_follow.glb",
+   "loop": false,
+   "duration": 2,
+   "durationGlb": 1.967,
+   "priority": "W0",
+   "mode": "prime",
+   "prompt": "Cat beckons the viewer with the right paw twice, then points over the shoulder with the paw as if saying come on, follow me. Starts and ends in a neutral standing pose facing forward, in place.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f051-5509-73b5-98eb-c96fb52436db",
+   "animation_task_id": "01a1f051-82bb-719c-866e-87ffbc9c680b",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 79768,
+   "created": "2026-11-18T20:20:53.105Z"
+  },
+  {
+   "id": "world_item_dislike",
+   "file": "world_item_dislike.glb",
+   "loop": false,
+   "duration": 2,
+   "durationGlb": 1.967,
+   "priority": "W2",
+   "mode": "prime",
+   "prompt": "Cat turns the head away with a grimace and pushes something away with one paw, shaking the head. Starts and ends in a neutral standing pose facing forward, in place.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f054-8634-70a1-b1dd-b34b9cf3638a",
+   "animation_task_id": "01a1f054-b3bf-7514-ae44-567fcd3207c5",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 79768,
+   "created": "2026-11-18T20:24:22.459Z"
+  },
+  {
+   "id": "world_item_like",
+   "file": "world_item_like.glb",
+   "loop": false,
+   "duration": 2,
+   "durationGlb": 1.967,
+   "priority": "W2",
+   "mode": "prime",
+   "prompt": "Cat sees something it loves, clasps the paws to the cheeks and does a happy little hop. Starts and ends in a neutral standing pose facing forward, in place.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f054-72f8-7468-b298-d7dd85b41306",
+   "animation_task_id": "01a1f054-a274-7540-909a-3d5a08953bc0",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 79784,
+   "created": "2026-11-18T20:24:18.162Z"
+  },
+  {
+   "id": "world_item_sniff",
+   "file": "world_item_sniff.glb",
+   "loop": false,
+   "duration": 2,
+   "durationGlb": 1.967,
+   "priority": "W2",
+   "mode": "prime",
+   "prompt": "Curious cat leans forward to sniff something on the floor in front, tilts the head, then straightens up. Starts and ends in a neutral standing pose facing forward, in place.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f054-3d2e-768e-b41d-9f25225bdc87",
+   "animation_task_id": "01a1f054-6b5b-75c5-9e7c-4a94d2cfccfe",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 79764,
+   "created": "2026-11-18T20:24:04.034Z"
+  },
+  {
+   "id": "world_knocked_over",
+   "file": "world_knocked_over.glb",
+   "loop": false,
+   "duration": 2.5,
+   "durationGlb": 2.467,
+   "priority": "W2",
+   "mode": "prime",
+   "prompt": "Cat gets pushed, stumbles backward and falls onto its bottom, rubs the back of the head, then gets up and dusts off. Starts and ends in a neutral standing pose facing forward, in place.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f055-5996-72ed-8f38-a5367da33301",
+   "animation_task_id": "01a1f055-876c-73e2-bc26-c4e1f8d3a99a",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 91784,
+   "created": "2026-11-18T20:25:16.521Z"
+  },
+  {
+   "id": "world_outfit_show",
+   "file": "world_outfit_show.glb",
+   "loop": false,
+   "duration": 2,
+   "durationGlb": 1.967,
+   "priority": "W1",
+   "mode": "prime",
+   "prompt": "Proud cat looks down at its outfit, puts the paws on the hips and turns slightly left and right like a model. Starts and ends in a neutral standing pose facing forward, in place.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f054-007e-7027-bc7b-ed0b644667a5",
+   "animation_task_id": "01a1f054-2eb1-7470-89af-d5da6cfb2a34",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 79768,
+   "created": "2026-11-18T20:23:48.631Z"
+  },
+  {
+   "id": "world_pick_up",
+   "file": "world_pick_up.glb",
+   "loop": false,
+   "duration": 2,
+   "durationGlb": 1.967,
+   "priority": "W2",
+   "mode": "prime",
+   "prompt": "Cat bends down, picks up an object from the floor with both paws and stands up holding it at the chest.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f054-af28-7064-9143-19b62ab5501c",
+   "animation_task_id": "01a1f054-de39-76de-9805-eb63534face4",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 79772,
+   "created": "2026-11-18T20:24:33.472Z"
+  },
+  {
+   "id": "world_pillow_hug",
+   "file": "world_pillow_hug.glb",
+   "loop": false,
+   "duration": 3,
+   "durationGlb": 2.967,
+   "priority": "W2",
+   "mode": "prime",
+   "prompt": "Cat hugs a big soft pillow to the chest, rubs the cheek against it and sways happily. Starts and ends in a neutral standing pose facing forward, in place.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f055-695b-7017-a540-7e90063122e4",
+   "animation_task_id": "01a1f055-9703-7617-924b-2a60dbe2b2ed",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 103876,
+   "created": "2026-11-18T20:25:25.733Z"
+  },
+  {
+   "id": "world_portal_jump_in",
+   "file": "world_portal_jump_in.glb",
+   "loop": false,
+   "duration": 2,
+   "durationGlb": 1.967,
+   "priority": "W0",
+   "mode": "prime",
+   "prompt": "Excited cat waves the viewer to follow, crouches and leaps up and forward toward the camera with both arms stretched ahead like diving through a hoop. Stays in place.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f051-031e-7773-9aab-94669cfeb74c",
+   "animation_task_id": "01a1f051-313a-71a6-969e-b1de82989415",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 79748,
+   "created": "2026-11-18T20:20:32.533Z"
+  },
+  {
+   "id": "world_portal_land",
+   "file": "world_portal_land.glb",
+   "loop": false,
+   "duration": 2,
+   "durationGlb": 1.967,
+   "priority": "W0",
+   "mode": "prime",
+   "prompt": "Cat flies in tucked into a ball, opens up, lands on both feet with a squash, and finishes with arms open in a ta-da pose. Ends in a neutral standing pose facing forward, in place.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f051-12ed-7636-b20b-6a9ff93c9de0",
+   "animation_task_id": "01a1f051-409c-7507-aa8d-145e182a3ee5",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 79756,
+   "created": "2026-11-18T20:20:36.322Z"
+  },
+  {
+   "id": "world_put_down",
+   "file": "world_put_down.glb",
+   "loop": false,
+   "duration": 2,
+   "durationGlb": 1.967,
+   "priority": "W2",
+   "mode": "prime",
+   "prompt": "Cat holding an object at the chest bends down, places it on the floor and stands up. Ends in a neutral standing pose facing forward, in place.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f054-e64d-74a8-9419-fa2e41953c24",
+   "animation_task_id": "01a1f055-1408-76d4-b19a-cb71cf132f52",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 79744,
+   "created": "2026-11-18T20:24:47.667Z"
+  },
+  {
+   "id": "world_room_enter",
+   "file": "world_room_enter.glb",
+   "loop": false,
+   "duration": 2,
+   "durationGlb": 1.967,
+   "priority": "W1",
+   "mode": "prime",
+   "prompt": "Cat walks two steps in place, stops, plants the feet and waves hello cheerfully. Starts and ends in a neutral standing pose facing forward, in place.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f051-74f8-74c6-9335-8898c2513405",
+   "animation_task_id": "01a1f051-a2e9-7541-bb86-32fdb59f5b7a",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 79764,
+   "created": "2026-11-18T20:21:01.774Z"
+  },
+  {
+   "id": "world_room_exit",
+   "file": "world_room_exit.glb",
+   "loop": false,
+   "duration": 2,
+   "durationGlb": 1.967,
+   "priority": "W1",
+   "mode": "prime",
+   "prompt": "Cat waves over the shoulder and starts walking in place with a bouncy stride. Stays in place.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f051-83c8-73ee-9de0-003874fdab57",
+   "animation_task_id": "01a1f051-b282-7110-bad2-b602341b2990",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 79780,
+   "created": "2026-11-18T20:21:05.300Z"
+  },
+  {
+   "id": "world_shake_off",
+   "file": "world_shake_off.glb",
+   "loop": false,
+   "duration": 2,
+   "durationGlb": 1.967,
+   "priority": "W1",
+   "mode": "prime",
+   "prompt": "Wet cat shakes its whole body vigorously from head to toes like a dog shaking off water, then stands proudly. Starts and ends in a neutral standing pose facing forward, in place.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f053-572c-777c-8b94-424baaeae80c",
+   "animation_task_id": "01a1f053-856d-7035-a4ba-5a73aa70cf20",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 79752,
+   "created": "2026-11-18T20:23:05.362Z"
+  },
+  {
+   "id": "world_sleep_bed",
+   "file": "world_sleep_bed.glb",
+   "loop": true,
+   "duration": 4,
+   "durationGlb": 3.967,
+   "priority": "W1",
+   "mode": "prime",
+   "prompt": "Cat sleeps on its back with paws folded on the chest, chest rising and falling slowly, one foot twitches once. Seamless loop.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f052-7c23-7464-9f61-cbabc22afacc",
+   "animation_task_id": "01a1f052-a93f-74f8-a573-0e1671043616",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 127984,
+   "created": "2026-11-18T20:22:13.879Z"
+  },
+  {
+   "id": "world_tired_idle",
+   "file": "world_tired_idle.glb",
+   "loop": true,
+   "duration": 4,
+   "durationGlb": 3.967,
+   "priority": "W2",
+   "mode": "prime",
+   "prompt": "Tired cat stands slouching, head slowly nodding off, jerks awake and slouches again. Seamless loop, stays in place.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f055-2225-73c9-be0f-3f9974654f70",
+   "animation_task_id": "01a1f055-501a-738c-86f0-ba01839e4aaf",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 127984,
+   "created": "2026-11-18T20:25:07.857Z"
+  },
+  {
+   "id": "world_wardrobe_change",
+   "file": "world_wardrobe_change.glb",
+   "loop": false,
+   "duration": 2,
+   "durationGlb": 1.967,
+   "priority": "W1",
+   "mode": "prime",
+   "prompt": "Cat covers itself with both arms, spins around quickly once and strikes a fashion pose showing off a new outfit. Starts and ends in a neutral standing pose facing forward, in place.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f054-0031-722e-87b7-043edf39daa8",
+   "animation_task_id": "01a1f054-43ab-73f6-9197-88c45fbc9510",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 79760,
+   "created": "2026-11-18T20:23:53.545Z"
+  },
+  {
+   "id": "world_wash_face",
+   "file": "world_wash_face.glb",
+   "loop": false,
+   "duration": 3,
+   "durationGlb": 2.967,
+   "priority": "W1",
+   "mode": "prime",
+   "prompt": "Cat licks the right paw, then rubs it over the face and behind the ear three times like a real cat washing, and admires the clean paw. Starts and ends in a neutral standing pose facing forward, in place.",
+   "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+   "motion_task_id": "01a1f052-de31-742e-8b22-1de33134b526",
+   "animation_task_id": "01a1f053-0b89-736d-b033-448f7b91b7cc",
+   "credits": {
+    "motion": 10,
+    "animation": 3
+   },
+   "bytes": 103888,
+   "created": "2026-11-18T20:22:49.253Z"
+  }
+ ],
+ "rig_task_id": "01a1f046-e90d-72b9-908e-fcf581cea2ed",
+ "updated": "2026-11-24T10:09:13.545Z"
+}

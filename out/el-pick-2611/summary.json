@@ -1,0 +1,32 @@
+{
+  "id": "el-pick-2611",
+  "sha": "16c5b0fdd90ec295fbf9e33078a682c1ccaf87a4",
+  "status": "done",
+  "queuedAt": "2026-11-26T19:09:46.418Z",
+  "started": "2026-11-26T19:09:46.903Z",
+  "day": "2026-11-26",
+  "attempts": 1,
+  "credits": 222,
+  "unit": "chars",
+  "files": {
+    "newMp3": 6,
+    "list": "out/el-pick-2611/new-mp3.txt",
+    "left": 0,
+    "dir": "/srv/ar-extra/voice-el"
+  },
+  "finished": "2026-11-26T19:10:04.088Z",
+  "rebuild": {
+    "triggered": true,
+    "at": "2026-11-26T19:10:09.258Z",
+    "releaseBefore": "/srv/ar/releases/16c5b0f",
+    "releaseAfter": "/srv/ar/releases/16c5b0f",
+    "changed": false
+  },
+  "kind": "eleven",
+  "args": [
+    "--only",
+    "pick_"
+  ],
+  "maxCredits": 240,
+  "note": "зов листа выбора кота pick_intro/pick_play × 3 кота: 6 заданий, 222 симв."
+}

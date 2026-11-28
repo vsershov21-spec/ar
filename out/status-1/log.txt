@@ -1,0 +1,2 @@
+[ar-auto 2026-11-22T11:06:34.160Z] задача status-1 (status) · очередь 7b9e92f · ref — · таймаут 5 мин
+[ar-auto 2026-11-22T11:06:35.226Z] итог: done · кредитов 0 · не active: ar-update=inactive

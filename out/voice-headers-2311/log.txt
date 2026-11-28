@@ -1,0 +1,17 @@
+[ar-auto 2026-11-23T15:36:42.515Z] задача voice-headers-2311 (script scripts/deploy/voice-headers.sh) · очередь cce772c · ref b99f37a431f85708ebd6c9c396887b1af30afa19 · таймаут 10 мин
+[ar-auto 2026-11-23T15:36:43.866Z] scripts/deploy/voice-headers.sh @ b99f37a431f8 · args [] · env {} · таймаут 10 мин
+=== озвучка https://ar.vershov.com (кот kind) ===
+manifest: 200  type=application/json  encoding=zstd  cache=no-cache  550885 байт
+в манифесте mp3: 2102; проверяю 5
+kind.intro.01.d66b0880.mp3: 200 audio/mpeg enc=нет len=21315/21315 magic=fffb50 cache=нет | range 206 bytes 0-99/21315 (100 б)
+  ВНИМАНИЕ: нет Cache-Control immutable (имена с хэшем — можно кэшировать на год; scripts/deploy/caddy-encode.sh)
+kind.point_camera.01.7151a742.mp3: 200 audio/mpeg enc=нет len=35944/35944 magic=fffb50 cache=нет | range 206 bytes 0-99/35944 (100 б)
+  ВНИМАНИЕ: нет Cache-Control immutable (имена с хэшем — можно кэшировать на год; scripts/deploy/caddy-encode.sh)
+kind.ask_name.01.e14043bb.mp3: 200 audio/mpeg enc=нет len=29466/29466 magic=fffb50 cache=нет | range 206 bytes 0-99/29466 (100 б)
+  ВНИМАНИЕ: нет Cache-Control immutable (имена с хэшем — можно кэшировать на год; scripts/deploy/caddy-encode.sh)
+kind.nice_name.04.ccfaf24c.mp3: 200 audio/mpeg enc=нет len=26540/26540 magic=fffb50 cache=нет | range 206 bytes 0-99/26540 (100 б)
+  ВНИМАНИЕ: нет Cache-Control immutable (имена с хэшем — можно кэшировать на год; scripts/deploy/caddy-encode.sh)
+kind.no_name.01.5e45a379.mp3: 200 audio/mpeg enc=нет len=37407/37407 magic=fffb50 cache=нет | range 206 bytes 0-99/37407 (100 б)
+  ВНИМАНИЕ: нет Cache-Control immutable (имена с хэшем — можно кэшировать на год; scripts/deploy/caddy-encode.sh)
+ИТОГ: ВНИМАНИЕ (звук работает, кэш/заголовки не идеальны)
+[ar-auto 2026-11-23T15:36:44.720Z] итог: done · кредитов 0

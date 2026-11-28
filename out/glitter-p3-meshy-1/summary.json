@@ -1,0 +1,26 @@
+{
+  "id": "glitter-p3-meshy-1",
+  "sha": "d1c52bc0cd505ade44d8a8e11bbfde615e8646c4",
+  "status": "failed",
+  "queuedAt": "2026-11-24T04:47:30.250Z",
+  "started": "2026-11-24T04:47:30.585Z",
+  "day": "2026-11-24",
+  "attempts": 1,
+  "credits": 35,
+  "estimate": 80,
+  "reason": "04:51:51 ✗ glitter_p3_m6: не принято — 400 geometry_resolution is not supported for this ai_model; use meshy-7.1",
+  "files": {
+    "new": [],
+    "copied": [],
+    "tooBig": [],
+    "exitCode": 0
+  },
+  "finished": "2026-11-24T04:52:03.101Z",
+  "kind": "meshy",
+  "args": [
+    "--only",
+    "glitter_p3_m71,glitter_p3_m6"
+  ],
+  "maxCredits": 100,
+  "note": "Блёстка p3: Meshy Multi-Image to 3D по 4 видам разворота 23.11 (7.1 и meshy-6)"
+}

@@ -1,0 +1,26 @@
+{
+  "id": "glitter-p3-tripo-1",
+  "sha": "635a0b93fb2188457bf0d02693e3f88a633dbaeb",
+  "status": "failed",
+  "queuedAt": "2026-11-23T21:28:17.432Z",
+  "started": "2026-11-23T21:28:17.844Z",
+  "day": "2026-11-23",
+  "attempts": 1,
+  "credits": 60,
+  "estimate": 60,
+  "reason": "✗ кредиты кончились — стоп (tripo topup)",
+  "files": {
+    "new": [],
+    "copied": [],
+    "tooBig": [],
+    "exitCode": 0
+  },
+  "finished": "2026-11-23T21:28:31.467Z",
+  "kind": "tripo",
+  "args": [
+    "--only",
+    "glitter_p3_tripo"
+  ],
+  "maxCredits": 120,
+  "note": "Блёстка p3: multiview по развороту 23.11 (H3.1, detailed)"
+}

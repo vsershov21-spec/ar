@@ -1,0 +1,26 @@
+{
+  "id": "caddy-static-1124",
+  "sha": "e3cfa1a55c6abc78f1da1c32eaecfd43ef521b33",
+  "status": "done",
+  "queuedAt": "2026-11-24T11:06:23.943Z",
+  "started": "2026-11-24T11:06:24.330Z",
+  "day": "2026-11-24",
+  "attempts": 1,
+  "refSha": "4bebe04588fb5db6fab899590e97f87f55cc007d",
+  "credits": 0,
+  "files": {
+    "log": "out/caddy-static-1124/log.txt",
+    "exitCode": 0,
+    "background": false,
+    "sha": "4bebe04588fb5db6fab899590e97f87f55cc007d"
+  },
+  "finished": "2026-11-24T11:06:31.291Z",
+  "kind": "script",
+  "args": [],
+  "maxCredits": 0,
+  "ref": "4bebe04588fb5db6fab899590e97f87f55cc007d",
+  "path": "scripts/deploy/caddy-static.sh",
+  "env": {},
+  "timeoutMin": 15,
+  "note": "PERF-02: статика терминальная, 404 без immutable, HTML no-cache; проверки curl -I"
+}

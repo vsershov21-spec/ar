@@ -1,0 +1,12 @@
+[ar-auto 2026-11-23T15:47:03.048Z] задача voice-headers-2311b (script scripts/deploy/voice-headers.sh) · очередь 4d3d30c · ref 859d8a420771ed1330c73bf6136282703cc67a54 · таймаут 10 мин
+[ar-auto 2026-11-23T15:47:04.412Z] scripts/deploy/voice-headers.sh @ 859d8a420771 · args [] · env {} · таймаут 10 мин
+=== озвучка https://ar.vershov.com (кот kind) ===
+manifest: 200  type=application/json  encoding=zstd  cache=no-cache  550885 байт
+в манифесте mp3: 2102; проверяю 5
+kind.intro.01.d66b0880.mp3: 200 audio/mpeg enc=нет len=21315/21315 magic=fffb50 cache=public, max-age=31536000, immutable | range 206 bytes 0-99/21315 (100 б)
+kind.point_camera.01.7151a742.mp3: 200 audio/mpeg enc=нет len=35944/35944 magic=fffb50 cache=public, max-age=31536000, immutable | range 206 bytes 0-99/35944 (100 б)
+kind.ask_name.01.e14043bb.mp3: 200 audio/mpeg enc=нет len=29466/29466 magic=fffb50 cache=public, max-age=31536000, immutable | range 206 bytes 0-99/29466 (100 б)
+kind.nice_name.04.ccfaf24c.mp3: 200 audio/mpeg enc=нет len=26540/26540 magic=fffb50 cache=public, max-age=31536000, immutable | range 206 bytes 0-99/26540 (100 б)
+kind.no_name.01.5e45a379.mp3: 200 audio/mpeg enc=нет len=37407/37407 magic=fffb50 cache=public, max-age=31536000, immutable | range 206 bytes 0-99/37407 (100 б)
+ИТОГ: OK
+[ar-auto 2026-11-23T15:47:05.189Z] итог: done · кредитов 0

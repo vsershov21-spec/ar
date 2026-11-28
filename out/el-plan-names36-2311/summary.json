@@ -1,0 +1,30 @@
+{
+  "id": "el-plan-names36-2311",
+  "sha": "a430aa7ac81618eabb0e3681638ff1a332db0181",
+  "status": "done",
+  "queuedAt": "2026-11-23T21:17:47.500Z",
+  "started": "2026-11-23T21:17:47.916Z",
+  "day": "2026-11-23",
+  "attempts": 1,
+  "refSha": "0452d3d1aad947c7bbe0e66d0f36f36615aa22d2",
+  "credits": 0,
+  "files": {
+    "log": "out/el-plan-names36-2311/log.txt",
+    "exitCode": 0,
+    "background": false,
+    "sha": "0452d3d1aad947c7bbe0e66d0f36f36615aa22d2"
+  },
+  "finished": "2026-11-23T21:18:27.073Z",
+  "kind": "script",
+  "args": [
+    "--plan",
+    "--only",
+    "slot"
+  ],
+  "maxCredits": 0,
+  "ref": "0452d3d1aad947c7bbe0e66d0f36f36615aa22d2",
+  "path": "scripts/voice/el-run.sh",
+  "env": {},
+  "timeoutMin": 20,
+  "note": "план: сколько слотов осталось озвучить после +36 имён"
+}

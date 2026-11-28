@@ -1,0 +1,31 @@
+[ar-auto 2026-11-23T21:55:05.851Z] задача el-names36-2311 (eleven --only slot) · sha 0ea189a · maxCredits 800 · сегодня потрачено 0/20000
+npm WARN EBADENGINE Unsupported engine {
+npm WARN EBADENGINE   package: 'jsdom@31.0.1',
+npm WARN EBADENGINE   required: { node: '^22.22.2 || ^24.15.0 || >=26.0.0' },
+npm WARN EBADENGINE   current: { node: 'v22.22.1', npm: '9.2.0' }
+npm WARN EBADENGINE }
+npm WARN EBADENGINE Unsupported engine {
+npm WARN EBADENGINE   package: 'w3c-xmlserializer@6.0.0',
+npm WARN EBADENGINE   required: { node: '^22.22.2 || ^24.15.0 || >=26.0.0' },
+npm WARN EBADENGINE   current: { node: 'v22.22.1', npm: '9.2.0' }
+npm WARN EBADENGINE }
+npm WARN deprecated npmlog@5.0.1: This package is no longer supported.
+npm WARN deprecated inflight@1.0.6: This module is not supported, and leaks memory. Do not use it. Check out lru-cache if you want a good and tested way to coalesce async requests by a key value, which is much more comprehensive and powerful.
+npm WARN deprecated rimraf@3.0.2: Rimraf versions prior to v4 are no longer supported
+npm WARN deprecated are-we-there-yet@2.0.0: This package is no longer supported.
+npm WARN deprecated glob@7.2.3: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+npm WARN deprecated gauge@3.0.2: This package is no longer supported.
+npm WARN deprecated tar@6.2.1: Old versions of tar are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+npm WARN deprecated uuid@9.0.0: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
+Озвучка запущена в фоне (pid 2946851). Лог: tail -f /var/lib/ar-auto/el-run.log
+=== 2026-11-23T21:55:32+00:00 el-run --only slot --max-chars 800 ===
+ElevenLabs: заданий 705, уже готово 597, к синтезу 108 (726 симв.). Папка: /srv/ar-extra/voice-el
+  20/108 готово, символов 133, 22 с
+  40/108 готово, символов 266, 44 с
+  60/108 готово, символов 401, 65 с
+  80/108 готово, символов 540, 86 с
+  100/108 готово, символов 669, 108 с
+Готово: новых 108, пропущено 597, ошибок 0; символов в этом прогоне 726; осталось 0; всего в манифесте 2210, 41.53 МБ
+[ar-auto 2026-11-23T21:57:32.672Z] пересборка: systemctl start ar-update
+[ar-auto 2026-11-23T21:57:37.702Z] пересборка: релиз не сменился (если ar-update не собирает без нового коммита — задать AUTO_REBUILD_CMD в /etc/ar-auto.env)
+[ar-auto 2026-11-23T21:57:37.702Z] итог: done · символов 726

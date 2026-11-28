@@ -1,0 +1,72 @@
+[ar-auto 2026-11-22T11:01:14.241Z] задача caddy-encode-1 (script scripts/deploy/caddy-encode.sh) · очередь 7b9e92f · ref e530a7ade2ac2effddce6a914397b0440145a20f · таймаут 15 мин
+[ar-auto 2026-11-22T11:01:15.512Z] scripts/deploy/caddy-encode.sh @ e530a7ade2ac · args [] · env {} · таймаут 15 мин
+=== 2026-11-22T11:01:15+00:00 caddy-encode (2.6.2) ===
+--- блок ar.vershov.com (новый) ---
+ar.vershov.com {
+	# >>> caddy-encode (scripts/deploy/caddy-encode.sh): сжатие ответов — текст + модели/движения кота (.glb), wasm, ktx2
+	encode {
+		zstd
+		gzip 6
+		minimum_length 1024
+		match {
+			header Content-Type text/*
+			header Content-Type application/json*
+			header Content-Type application/manifest+json*
+			header Content-Type application/javascript*
+			header Content-Type application/x-javascript*
+			header Content-Type application/xml*
+			header Content-Type application/wasm*
+			header Content-Type image/svg+xml*
+			header Content-Type font/*
+			header Content-Type model/gltf-binary*
+			header Content-Type model/gltf+json*
+			header Content-Type image/ktx2*
+			header Content-Type application/octet-stream*
+		}
+	}
+	# <<< caddy-encode
+    # редакция pilot (docs/EDITIONS.md «Пилот»): статика dist/mvp/, ассеты моделей и звука — из корня
+    redir /mvp /mvp/ 308
+    @pilot {
+        path /mvp/*
+        not path /mvp/assets/*
+    }
+    rewrite @pilot /mvp/index.html
+    header @pilot Cache-Control "no-cache"
+    @pilotAssets path /mvp/assets/*
+    header @pilotAssets Cache-Control "public, max-age=31536000, immutable"
+	# редакция lab (docs/EDITIONS.md)
+	redir /lab /lab/ 308
+	@lab {
+		path /lab/*
+		not path /lab/assets/*
+	}
+	rewrite @lab /lab/index.html
+	header @lab Cache-Control "no-cache"
+	@labAssets path /lab/assets/*
+	header @labAssets Cache-Control "public, max-age=31536000, immutable"
+	tls /etc/caddy/certs/ar/fullchain.pem /etc/caddy/certs/ar/key.pem
+# caddy-encode.sh: 	encode zstd gzip
+	root * /srv/ar/current
+	header {
+		X-Robots-Tag "noindex, nofollow"
+		Strict-Transport-Security "max-age=31536000"
+		Permissions-Policy "camera=(self), microphone=(self), accelerometer=(self), gyroscope=(self)"
+		-Server
+	}
+	@assets path /assets/* /models/* /sounds/* /video/* /targets/*
+	header @assets Cache-Control "public, max-age=31536000, immutable"
+	header /index.html Cache-Control "no-cache"
+        handle /api/progress/* {
+                reverse_proxy 127.0.0.1:8787
+        }
+        handle {
+                try_files {path} /index.html
+                file_server
+        }
+}
+бэкап: /etc/caddy/Caddyfile.bak.1795345275
+CADDY FAIL (validate) — файл не меняю:
+{"level":"info","ts":1795345275.651378,"msg":"using provided configuration","config_file":"/tmp/tmp.x22rWQxPrn","config_adapter":""}
+Error: decoding config: invalid character 'a' looking for beginning of value
+[ar-auto 2026-11-22T11:01:15.660Z] итог: failed · кредитов 0 · код выхода 1

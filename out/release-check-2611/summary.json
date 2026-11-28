@@ -1,0 +1,28 @@
+{
+  "id": "release-check-2611",
+  "sha": "061e9aed67a8252ef1018578e6d2b8b84c1e1b60",
+  "status": "done",
+  "queuedAt": "2026-11-26T19:27:16.345Z",
+  "started": "2026-11-26T19:27:16.829Z",
+  "day": "2026-11-26",
+  "attempts": 1,
+  "refSha": "16c5b0fdd90ec295fbf9e33078a682c1ccaf87a4",
+  "credits": 0,
+  "files": {
+    "log": "out/release-check-2611/log.txt",
+    "exitCode": 0,
+    "background": false,
+    "sha": "16c5b0fdd90ec295fbf9e33078a682c1ccaf87a4"
+  },
+  "finished": "2026-11-26T19:27:25.239Z",
+  "kind": "script",
+  "args": [
+    "release=71f75a9"
+  ],
+  "maxCredits": 0,
+  "ref": "16c5b0fdd90ec295fbf9e33078a682c1ccaf87a4",
+  "path": "scripts/deploy/release-check.sh",
+  "env": {},
+  "timeoutMin": 40,
+  "note": "/mvp из release 71f75a9, /lab и корень из main"
+}

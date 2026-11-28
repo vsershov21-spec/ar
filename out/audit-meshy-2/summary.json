@@ -1,0 +1,28 @@
+{
+  "id": "audit-meshy-2",
+  "sha": "63bb8c89f9a7404740ac4eccfc2ba8dd280ac9c2",
+  "status": "failed",
+  "queuedAt": "2026-11-22T12:20:34.216Z",
+  "started": "2026-11-22T12:20:34.584Z",
+  "day": "2026-11-22",
+  "attempts": 1,
+  "refSha": "82710b6887e4548ff9ce58f227d3b4ba4694a136",
+  "credits": 0,
+  "reason": "прогон не дошёл до «готово» (см. log.txt)",
+  "files": {
+    "list": [],
+    "sheets": {
+      "count": 0
+    },
+    "sha": "82710b6887e4548ff9ce58f227d3b4ba4694a136",
+    "serverDir": "/var/lib/ar-auto/work/ops/audit-meshy-2-res/anim-audit"
+  },
+  "finished": "2026-11-22T12:21:05.827Z",
+  "kind": "audit",
+  "args": [],
+  "maxCredits": 0,
+  "ref": "82710b6887e4548ff9ce58f227d3b4ba4694a136",
+  "env": {},
+  "timeoutMin": 120,
+  "note": ""
+}

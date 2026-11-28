@@ -1,0 +1,338 @@
+{
+  "day": "2026-11-28",
+  "caps": {
+    "meshy": 400,
+    "tripo": 400,
+    "eleven": 20000
+  },
+  "spentToday": {
+    "meshy": 0,
+    "tripo": 0,
+    "eleven": 0
+  },
+  "running": [],
+  "jobs": [
+    {
+      "id": "release-check-2611",
+      "kind": "script",
+      "status": "done",
+      "credits": 0,
+      "queuedAt": "2026-11-26T19:27:16.345Z",
+      "finished": "2026-11-26T19:27:25.239Z",
+      "sha": "061e9ae",
+      "ref": "16c5b0fdd90ec295fbf9e33078a682c1ccaf87a4",
+      "path": "scripts/deploy/release-check.sh"
+    },
+    {
+      "id": "voice-onb-pick-check-2611",
+      "kind": "script",
+      "status": "done",
+      "credits": 0,
+      "queuedAt": "2026-11-26T19:21:26.303Z",
+      "finished": "2026-11-26T19:21:34.163Z",
+      "sha": "061e9ae",
+      "ref": "16c5b0fdd90ec295fbf9e33078a682c1ccaf87a4",
+      "path": "scripts/deploy/voice-headers.sh"
+    },
+    {
+      "id": "release-setup-2611",
+      "kind": "script",
+      "status": "done",
+      "credits": 0,
+      "queuedAt": "2026-11-26T19:15:16.435Z",
+      "finished": "2026-11-26T19:19:30.747Z",
+      "sha": "061e9ae",
+      "ref": "16c5b0fdd90ec295fbf9e33078a682c1ccaf87a4",
+      "path": "scripts/deploy/release-setup.sh"
+    },
+    {
+      "id": "el-pick-2611",
+      "kind": "eleven",
+      "status": "done",
+      "credits": 222,
+      "unit": "chars",
+      "queuedAt": "2026-11-26T19:09:46.418Z",
+      "finished": "2026-11-26T19:10:04.088Z",
+      "sha": "16c5b0f"
+    },
+    {
+      "id": "el-onb-2611",
+      "kind": "eleven",
+      "status": "done",
+      "credits": 1837,
+      "unit": "chars",
+      "queuedAt": "2026-11-26T19:04:20.505Z",
+      "finished": "2026-11-26T19:05:44.138Z",
+      "sha": "16c5b0f"
+    },
+    {
+      "id": "el-plan-pick-2611",
+      "kind": "script",
+      "status": "done",
+      "credits": 0,
+      "queuedAt": "2026-11-26T18:59:04.592Z",
+      "finished": "2026-11-26T19:01:27.877Z",
+      "sha": "163f16e",
+      "ref": "71f75a9b04371fe644c897cf1b46d7391f88b104",
+      "path": "scripts/voice/el-run.sh"
+    },
+    {
+      "id": "el-plan-onb-2611",
+      "kind": "script",
+      "status": "done",
+      "credits": 0,
+      "queuedAt": "2026-11-26T18:53:20.414Z",
+      "finished": "2026-11-26T18:55:11.577Z",
+      "sha": "163f16e",
+      "ref": "71f75a9b04371fe644c897cf1b46d7391f88b104",
+      "path": "scripts/voice/el-run.sh"
+    },
+    {
+      "id": "caddy-static-1124",
+      "kind": "script",
+      "status": "done",
+      "credits": 0,
+      "queuedAt": "2026-11-24T11:06:23.943Z",
+      "finished": "2026-11-24T11:06:31.291Z",
+      "sha": "e3cfa1a",
+      "ref": "4bebe04588fb5db6fab899590e97f87f55cc007d",
+      "path": "scripts/deploy/caddy-static.sh"
+    },
+    {
+      "id": "meshy-hold-low-2411",
+      "kind": "meshy",
+      "status": "done",
+      "credits": 52,
+      "queuedAt": "2026-11-24T10:07:56.303Z",
+      "finished": "2026-11-24T10:09:14.522Z",
+      "sha": "d5173ec"
+    },
+    {
+      "id": "glitter-p3-meshy-2",
+      "kind": "meshy",
+      "status": "done",
+      "credits": 30,
+      "queuedAt": "2026-11-24T06:33:01.862Z",
+      "finished": "2026-11-24T06:38:35.008Z",
+      "sha": "dd59361"
+    },
+    {
+      "id": "voice-names36-check-2411",
+      "kind": "script",
+      "status": "done",
+      "credits": 0,
+      "queuedAt": "2026-11-24T05:03:21.574Z",
+      "finished": "2026-11-24T05:03:30.337Z",
+      "sha": "d3693be",
+      "ref": "73cd31a34d0688400614fb4c44be8e13425474d1",
+      "path": "scripts/deploy/voice-headers.sh"
+    },
+    {
+      "id": "mirror-p3-m71-1",
+      "kind": "script",
+      "status": "done",
+      "credits": 0,
+      "queuedAt": "2026-11-24T04:58:10.245Z",
+      "finished": "2026-11-24T04:58:12.302Z",
+      "sha": "d3693be",
+      "ref": "d3f51048a3ad04f7925257c52db120fd38902fcf",
+      "path": "scripts/deploy/mirror-props.sh"
+    },
+    {
+      "id": "glitter-p3-meshy-1",
+      "kind": "meshy",
+      "status": "failed",
+      "credits": 35,
+      "reason": "04:51:51 ✗ glitter_p3_m6: не принято — 400 geometry_resolution is not supported for this ai_model; use meshy-7.1",
+      "queuedAt": "2026-11-24T04:47:30.250Z",
+      "finished": "2026-11-24T04:52:03.101Z",
+      "sha": "d1c52bc"
+    },
+    {
+      "id": "el-names36-2311",
+      "kind": "eleven",
+      "status": "done",
+      "credits": 726,
+      "unit": "chars",
+      "queuedAt": "2026-11-23T21:55:05.449Z",
+      "finished": "2026-11-23T21:57:32.599Z",
+      "sha": "0ea189a"
+    },
+    {
+      "id": "glitter-p3-tripo-1",
+      "kind": "tripo",
+      "status": "failed",
+      "credits": 60,
+      "reason": "✗ кредиты кончились — стоп (tripo topup)",
+      "queuedAt": "2026-11-23T21:28:17.432Z",
+      "finished": "2026-11-23T21:28:31.467Z",
+      "sha": "635a0b9"
+    },
+    {
+      "id": "el-plan-names36-2311",
+      "kind": "script",
+      "status": "done",
+      "credits": 0,
+      "queuedAt": "2026-11-23T21:17:47.500Z",
+      "finished": "2026-11-23T21:18:27.073Z",
+      "sha": "a430aa7",
+      "ref": "0452d3d1aad947c7bbe0e66d0f36f36615aa22d2",
+      "path": "scripts/voice/el-run.sh"
+    },
+    {
+      "id": "mirror-props-2311",
+      "kind": "script",
+      "status": "done",
+      "credits": 0,
+      "queuedAt": "2026-11-23T20:56:18.102Z",
+      "finished": "2026-11-23T20:56:20.452Z",
+      "sha": "a24cb62",
+      "ref": "f5a4587018e665f4dbe546e0eb5499dbb7c8ff31",
+      "path": "scripts/deploy/mirror-props.sh"
+    },
+    {
+      "id": "pilot-setup-2311b",
+      "kind": "script",
+      "status": "done",
+      "credits": 0,
+      "queuedAt": "2026-11-23T17:16:25.792Z",
+      "finished": "2026-11-23T17:16:43.366Z",
+      "sha": "73d4177",
+      "ref": "0971621f791390cd6818b1ce252b80180826b9c3",
+      "path": "scripts/deploy/pilot-setup.sh"
+    },
+    {
+      "id": "voice-headers-2311b",
+      "kind": "script",
+      "status": "done",
+      "credits": 0,
+      "queuedAt": "2026-11-23T15:47:02.663Z",
+      "finished": "2026-11-23T15:47:05.189Z",
+      "sha": "4d3d30c",
+      "ref": "859d8a420771ed1330c73bf6136282703cc67a54",
+      "path": "scripts/deploy/voice-headers.sh"
+    },
+    {
+      "id": "caddy-encode-2311b",
+      "kind": "script",
+      "status": "done",
+      "credits": 0,
+      "queuedAt": "2026-11-23T15:41:52.383Z",
+      "finished": "2026-11-23T15:42:00.410Z",
+      "sha": "4d3d30c",
+      "ref": "859d8a420771ed1330c73bf6136282703cc67a54",
+      "path": "scripts/deploy/caddy-encode.sh"
+    },
+    {
+      "id": "voice-headers-2311",
+      "kind": "script",
+      "status": "done",
+      "credits": 0,
+      "queuedAt": "2026-11-23T15:36:42.098Z",
+      "finished": "2026-11-23T15:36:44.720Z",
+      "sha": "cce772c",
+      "ref": "b99f37a431f85708ebd6c9c396887b1af30afa19",
+      "path": "scripts/deploy/voice-headers.sh"
+    },
+    {
+      "id": "caddy-encode-2311",
+      "kind": "script",
+      "status": "done",
+      "credits": 0,
+      "queuedAt": "2026-11-23T15:31:15.036Z",
+      "finished": "2026-11-23T15:31:22.702Z",
+      "sha": "cce772c",
+      "ref": "b99f37a431f85708ebd6c9c396887b1af30afa19",
+      "path": "scripts/deploy/caddy-encode.sh"
+    },
+    {
+      "id": "pilot-setup-2311",
+      "kind": "script",
+      "status": "done",
+      "credits": 0,
+      "queuedAt": "2026-11-23T15:25:59.821Z",
+      "finished": "2026-11-23T15:26:11.356Z",
+      "sha": "cce772c",
+      "ref": "b99f37a431f85708ebd6c9c396887b1af30afa19",
+      "path": "scripts/deploy/pilot-setup.sh"
+    },
+    {
+      "id": "voice-preview-1",
+      "kind": "script",
+      "status": "done",
+      "credits": 0,
+      "queuedAt": "2026-11-22T12:25:45.871Z",
+      "finished": "2026-11-22T12:25:50.072Z",
+      "sha": "4d0f532",
+      "ref": "bbc9dbf99a3b3efd5769bd8ad2ea7dc3cc11db71",
+      "path": "scripts/deploy/voice-preview.sh"
+    },
+    {
+      "id": "audit-meshy-2",
+      "kind": "audit",
+      "status": "failed",
+      "credits": 0,
+      "reason": "прогон не дошёл до «готово» (см. log.txt)",
+      "queuedAt": "2026-11-22T12:20:34.216Z",
+      "finished": "2026-11-22T12:21:05.827Z",
+      "sha": "63bb8c8",
+      "ref": "82710b6887e4548ff9ce58f227d3b4ba4694a136"
+    },
+    {
+      "id": "caddy-encode-2",
+      "kind": "script",
+      "status": "done",
+      "credits": 0,
+      "queuedAt": "2026-11-22T12:15:14.307Z",
+      "finished": "2026-11-22T12:15:21.669Z",
+      "sha": "63bb8c8",
+      "ref": "82710b6887e4548ff9ce58f227d3b4ba4694a136",
+      "path": "scripts/deploy/caddy-encode.sh"
+    },
+    {
+      "id": "audit-meshy-1",
+      "kind": "audit",
+      "status": "failed",
+      "credits": 0,
+      "reason": "прогон не дошёл до «готово» (см. log.txt)",
+      "queuedAt": "2026-11-22T11:12:03.757Z",
+      "finished": "2026-11-22T11:12:35.440Z",
+      "sha": "7b9e92f",
+      "ref": "e530a7ade2ac2effddce6a914397b0440145a20f"
+    },
+    {
+      "id": "status-1",
+      "kind": "status",
+      "status": "done",
+      "credits": 0,
+      "reason": "не active: ar-update=inactive",
+      "queuedAt": "2026-11-22T11:06:33.809Z",
+      "finished": "2026-11-22T11:06:35.225Z",
+      "sha": "7b9e92f"
+    },
+    {
+      "id": "caddy-encode-1",
+      "kind": "script",
+      "status": "failed",
+      "credits": 0,
+      "reason": "код выхода 1",
+      "queuedAt": "2026-11-22T11:01:13.844Z",
+      "finished": "2026-11-22T11:01:15.660Z",
+      "sha": "7b9e92f",
+      "ref": "e530a7ade2ac2effddce6a914397b0440145a20f",
+      "path": "scripts/deploy/caddy-encode.sh"
+    },
+    {
+      "id": "mirror-meshy",
+      "kind": "meshy",
+      "status": "done",
+      "credits": 0,
+      "queuedAt": "2026-11-22T10:55:49.885Z",
+      "finished": "2026-11-22T10:55:50.317Z",
+      "sha": "e530a7a"
+    }
+  ],
+  "sha": "1bd9dcde54f3f366ec8d5f27d94f5b79c5d10211",
+  "tick": "2026-11-28T00:02:57.678Z",
+  "updated": "2026-11-28T00:02:57.763Z"
+}

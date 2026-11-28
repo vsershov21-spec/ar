@@ -1,0 +1,16 @@
+[ar-auto 2026-11-23T21:28:17.845Z] задача glitter-p3-tripo-1 (tripo --only glitter_p3_tripo) · sha 635a0b9 · maxCredits 120 · сегодня потрачено 0/400
+=== 2026-11-23T21:28:18+00:00 props-run PLAN ===
+баланс: {"balance":10,"frozen":0}
+• glitter_p3_tripo — ~60 кредитов
+оценка ≈ 60 кредитов
+к генерации: 1 из 1 (≈110 кредитов за предмет). Запуск: nohup bash /tmp/props.sh --go >/tmp/props.log 2>&1 &
+=== done ===
+=== 2026-11-23T21:28:22+00:00 props-run GO ===
+баланс: {"balance":10,"frozen":0}
+▶ glitter_p3_tripo · ~60 кр.
+✗ кредиты кончились — стоп (tripo topup)
+потрачено по оценке ≈ 60 кредитов
+баланс после: {"balance":10,"frozen":0}
+готово; на сайт — со следующей сборкой (любой push в main)
+=== done ===
+[ar-auto 2026-11-23T21:28:31.467Z] итог: failed · кредитов 60 · ✗ кредиты кончились — стоп (tripo topup)

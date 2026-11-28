@@ -1,0 +1,85 @@
+[ar-auto 2026-11-23T17:16:26.214Z] задача pilot-setup-2311b (script scripts/deploy/pilot-setup.sh) · очередь 73d4177 · ref 0971621f791390cd6818b1ce252b80180826b9c3 · таймаут 15 мин
+[ar-auto 2026-11-23T17:16:27.600Z] scripts/deploy/pilot-setup.sh @ 0971621f7913 · args [] · env {} · таймаут 15 мин
+=== 2026-11-23T17:16:27+00:00 pilot-setup (ref 0971621f791390cd6818b1ce252b80180826b9c3) ===
+PROGRESS: не поднялся — откатил на /opt/ar-progress/bak.1795454187
+PROGRESS local: {"ok":true,"store":"sqlite","events":true}
+CADDY: /mvp уже прописан
+--- блок ar.vershov.com ---
+ar.vershov.com {
+	# >>> caddy-encode (scripts/deploy/caddy-encode.sh): сжатие ответов — текст + модели/движения кота (.glb), wasm, ktx2
+	encode {
+		zstd
+		gzip 6
+		minimum_length 1024
+		match {
+			header Content-Type text/*
+			header Content-Type application/json*
+			header Content-Type application/manifest+json*
+			header Content-Type application/javascript*
+			header Content-Type application/x-javascript*
+			header Content-Type application/xml*
+			header Content-Type application/wasm*
+			header Content-Type image/svg+xml*
+			header Content-Type font/*
+			header Content-Type model/gltf-binary*
+			header Content-Type model/gltf+json*
+			header Content-Type image/ktx2*
+			header Content-Type application/octet-stream*
+		}
+	}
+	@voiceMp3 path /voice/el/*.mp3 /voice/el/*/*.mp3
+	header @voiceMp3 Cache-Control "public, max-age=31536000, immutable"
+	@voiceManifest path /voice/el/manifest.json
+	header @voiceManifest Cache-Control "no-cache"
+	# <<< caddy-encode
+    # редакция pilot (docs/EDITIONS.md «Пилот»): статика dist/mvp/, ассеты моделей и звука — из корня
+    redir /mvp /mvp/ 308
+    @pilot {
+        path /mvp/*
+        not path /mvp/assets/*
+    }
+    rewrite @pilot /mvp/index.html
+    header @pilot Cache-Control "no-cache"
+    @pilotAssets path /mvp/assets/*
+    header @pilotAssets Cache-Control "public, max-age=31536000, immutable"
+	# редакция lab (docs/EDITIONS.md)
+	redir /lab /lab/ 308
+	@lab {
+		path /lab/*
+		not path /lab/assets/*
+	}
+	rewrite @lab /lab/index.html
+	header @lab Cache-Control "no-cache"
+	@labAssets path /lab/assets/*
+	header @labAssets Cache-Control "public, max-age=31536000, immutable"
+	tls /etc/caddy/certs/ar/fullchain.pem /etc/caddy/certs/ar/key.pem
+# caddy-encode.sh: 	encode zstd gzip
+	root * /srv/ar/current
+	header {
+		X-Robots-Tag "noindex, nofollow"
+		Strict-Transport-Security "max-age=31536000"
+		Permissions-Policy "camera=(self), microphone=(self), accelerometer=(self), gyroscope=(self)"
+		-Server
+	}
+	@assets path /assets/* /models/* /sounds/* /video/* /targets/*
+	header @assets Cache-Control "public, max-age=31536000, immutable"
+	header /index.html Cache-Control "no-cache"
+        handle /api/progress/* {
+                reverse_proxy 127.0.0.1:8787
+        }
+        handle {
+                try_files {path} /index.html
+                file_server
+        }
+}
+CADDY OK
+mvp/ cache:  cache-control: no-cache
+mvp redir:   308 → https://ar.vershov.com/mvp/
+mvp deep:    /mvp/assets/main-IOE4jSOm.js   (ждём /mvp/assets/main-…)
+mvp asset:   cache-control: public, max-age=31536000, immutable
+health:      {"ok":true,"store":"sqlite","events":true}   (ждём "events":true — новый код сервиса)
+stats:       401   (ждём 401 без токена)
+event:       {"error":"device: uuid v4"}   (ждём {"error":"device: uuid v4"} — без записи)
+root /:      200   lab: /lab/assets/main-B6lSUWta.js
+=== done ===
+[ar-auto 2026-11-23T17:16:43.367Z] итог: done · кредитов 0

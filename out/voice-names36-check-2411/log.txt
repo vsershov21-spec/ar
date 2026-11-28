@@ -1,0 +1,11 @@
+[ar-auto 2026-11-24T05:03:21.958Z] задача voice-names36-check-2411 (script scripts/deploy/voice-headers.sh) · очередь d3693be · ref 73cd31a34d0688400614fb4c44be8e13425474d1 · таймаут 40 мин
+[ar-auto 2026-11-24T05:03:23.370Z] scripts/deploy/voice-headers.sh @ 73cd31a34d06 · args ["names=227"] · env {} · таймаут 40 мин
+=== озвучка https://ar.vershov.com (кот kind) ===
+попытка 1: слотов имени в манифесте: hooligan=227 kind=227 glitter=227 (ждём ≥ 227)
+--- HEAD на все 681 mp3 имён ---
+  все 200
+el/glitter/glitter.slot.name.Слава.1ffcf90a.mp3: 200 audio/mpeg 7314 б magic=fffb50
+el/hooligan/hooligan.slot.name.Тихон.6409ef92.mp3: 200 audio/mpeg 5433 б magic=fffb50
+el/kind/kind.slot.name.Александра.7f3c7f26.mp3: 200 audio/mpeg 8150 б magic=fffb50
+ИТОГ: OK (имена в манифесте и отдаются)
+[ar-auto 2026-11-24T05:03:30.337Z] итог: done · кредитов 0

@@ -1,0 +1,32 @@
+{
+  "id": "el-names36-2311",
+  "sha": "0ea189ab4ead506b1e053a523832e66ae794cfa9",
+  "status": "done",
+  "queuedAt": "2026-11-23T21:55:05.449Z",
+  "started": "2026-11-23T21:55:05.851Z",
+  "day": "2026-11-23",
+  "attempts": 1,
+  "credits": 726,
+  "unit": "chars",
+  "files": {
+    "newMp3": 108,
+    "list": "out/el-names36-2311/new-mp3.txt",
+    "left": 0,
+    "dir": "/srv/ar-extra/voice-el"
+  },
+  "finished": "2026-11-23T21:57:32.599Z",
+  "rebuild": {
+    "triggered": true,
+    "at": "2026-11-23T21:57:37.702Z",
+    "releaseBefore": "/srv/ar/releases/0ea189a",
+    "releaseAfter": "/srv/ar/releases/0ea189a",
+    "changed": false
+  },
+  "kind": "eleven",
+  "args": [
+    "--only",
+    "slot"
+  ],
+  "maxCredits": 800,
+  "note": "36 новых имён × 3 кота = 108 слотов, 726 симв.; --only slot, уже озвученное пропускается по хэшу"
+}

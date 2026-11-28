@@ -1,0 +1,11 @@
+[ar-auto 2026-11-22T12:25:46.282Z] задача voice-preview-1 (script scripts/deploy/voice-preview.sh) · очередь 4d0f532 · ref bbc9dbf99a3b3efd5769bd8ad2ea7dc3cc11db71 · таймаут 10 мин
+[ar-auto 2026-11-22T12:25:47.521Z] scripts/deploy/voice-preview.sh @ bbc9dbf99a3b · args ["dobryak_1_spokoyny","uEibyhkDUw8ccHq9jUO3:1795359600:_Pz-ZGiFLvqSMjdL0zz4DT704ZU=","dobryak_2_spokoyny","yeNrgCHKM06d9XRhRlIW:1795359600:DSh016WbMuVB9z0tT--D282OxZU=","dobryak_3_spokoyny","fYCAwnYKzCl1fQHjfyRP:1795359600:tDWjvwO035ElODKmjQ5FNsKfdBU=","dobryak_4_energichny","dWUXgLr3xXVJzPcvoGMl:1795359600:TdsJc4g84kxhWSnFd4BZwWD6HSs=","dobryak_5_energichny","4uoAWA5lGmLKEWpm8QMV:1795359600:y3kJeYPyxsTjAA-Xqf5dJbmxl2M=","dobryak_6_energichny","nrDDckraMcifi2Jru1IO:1795359600:kqgDZ5acL1m2411PpKJjgZRogds="] · env {} · таймаут 10 мин
+ok dobryak_1_spokoyny 373699 байт
+ok dobryak_2_spokoyny 438901 байт
+ok dobryak_3_spokoyny 336710 байт
+ok dobryak_4_energichny 346741 байт
+ok dobryak_5_energichny 359906 байт
+ok dobryak_6_energichny 348622 байт
+страница: https://ar.vershov.com/test/voice/ (после пересборки ~3–5 мин)
+ar-update запущен
+[ar-auto 2026-11-22T12:25:50.072Z] итог: done · кредитов 0

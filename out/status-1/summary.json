@@ -1,0 +1,25 @@
+{
+  "id": "status-1",
+  "sha": "7b9e92f35890128716b0384633660bf2c82a8f4e",
+  "status": "done",
+  "queuedAt": "2026-11-22T11:06:33.809Z",
+  "started": "2026-11-22T11:06:34.159Z",
+  "day": "2026-11-22",
+  "attempts": 1,
+  "credits": 0,
+  "reason": "не active: ar-update=inactive",
+  "files": {
+    "list": [
+      "out/status-1/status.md",
+      "out/status-1/status.json"
+    ]
+  },
+  "finished": "2026-11-22T11:06:35.225Z",
+  "kind": "status",
+  "args": [],
+  "maxCredits": 0,
+  "ref": null,
+  "env": {},
+  "timeoutMin": 5,
+  "note": ""
+}

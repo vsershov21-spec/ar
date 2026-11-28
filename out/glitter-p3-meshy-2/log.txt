@@ -1,0 +1,16 @@
+[ar-auto 2026-11-24T06:33:02.251Z] задача glitter-p3-meshy-2 (meshy --only glitter_p3_m6) · sha dd59361 · maxCredits 50 · сегодня потрачено 35/400
+06:33:04 баланс: 1643 кредитов
+06:33:04 • glitter_p3_m6: ~40 кр. — 4 вида, meshy-6
+06:33:04 к генерации: 1 из 1; оценка ≈ 40 кредитов; баланс 1643
+Генерация в фоне (pid 3041074). Лог: tail -f /var/lib/vershov-commander/ar/meshy.log
+Готовые клипы — /srv/ar-extra/models/anims/meshy; на сайт — со следующей сборкой (любой push в main).
+=== 2026-11-24T06:33:04+00:00 meshy --go --only glitter_p3_m6 --max-credits 50 ===
+06:33:05 баланс: 1643 кредитов
+06:33:05 • glitter_p3_m6: ~40 кр. — 4 вида, meshy-6
+06:33:05 к генерации: 1 из 1; оценка ≈ 40 кредитов; баланс 1643
+06:33:06 ▶ glitter_p3_m6: отправляю (design/refs/glitter_views/front.png, design/refs/glitter_views/threequarter.png, design/refs/glitter_views/right.png, design/refs/glitter_views/back.png)
+06:38:33 ✓ glitter_p3_m6: GLB 35.7 МБ, картинок 4 (image/jpeg 0.1М, image/png 17.6М, image/jpeg 12.2М, image/png 1.8М), кредитов 30
+06:38:33 баланс после: 1613
+06:38:33 готово: файлы в /srv/ar-extra/models/props — в server-out задачей script scripts/deploy/mirror-props.sh
+=== 2026-11-24T06:38:33+00:00 код 0 ===
+[ar-auto 2026-11-24T06:38:35.009Z] итог: done · кредитов 30

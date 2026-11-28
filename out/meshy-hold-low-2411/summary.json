@@ -1,0 +1,42 @@
+{
+  "id": "meshy-hold-low-2411",
+  "sha": "d5173ecb4c3987fe5605caca86110789b619eead",
+  "status": "done",
+  "queuedAt": "2026-11-24T10:07:56.303Z",
+  "started": "2026-11-24T10:07:56.752Z",
+  "day": "2026-11-24",
+  "attempts": 1,
+  "credits": 52,
+  "estimate": 52,
+  "files": {
+    "new": [
+      "hold_sip_low",
+      "hold_sip_low_b",
+      "hold_treat_low",
+      "hold_treat_low_b"
+    ],
+    "copied": [
+      "out/meshy-hold-low-2411/meshy/hold_sip_low.glb",
+      "out/meshy-hold-low-2411/meshy/hold_sip_low_b.glb",
+      "out/meshy-hold-low-2411/meshy/hold_treat_low.glb",
+      "out/meshy-hold-low-2411/meshy/hold_treat_low_b.glb"
+    ],
+    "tooBig": [],
+    "exitCode": 0
+  },
+  "finished": "2026-11-24T10:09:14.522Z",
+  "rebuild": {
+    "triggered": true,
+    "at": "2026-11-24T10:09:19.591Z",
+    "releaseBefore": "/srv/ar/releases/d5173ec",
+    "releaseAfter": "/srv/ar/releases/d5173ec",
+    "changed": false
+  },
+  "kind": "meshy",
+  "args": [
+    "--only",
+    "hold_treat_low,hold_treat_low_b,hold_sip_low,hold_sip_low_b"
+  ],
+  "maxCredits": 60,
+  "note": "Предмет у груди, голова к нему: 4 клипа удержания вместо позы «лапа в струну» (anim-audit 24.11 п. 2)"
+}
