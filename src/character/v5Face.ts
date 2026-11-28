@@ -374,19 +374,26 @@ export const V5_LID_VS = 0.3;
  * только полосу ресниц Tripo; закрытый глаз (моргание, «^», сон) — тонкая тёмная дуга-щель и ресницы у внешнего края.
  */
 export const V5_LID_LINE = { a: 0.9, b: 0.945, col: [0.07, 0.08, 0.16] as [number, number, number] };
-function patchLid(m: THREE.Material, cover: { value: THREE.Vector2 }, closed: { value: THREE.Vector2 }) {
+function patchLid(m: THREE.Material, cover: { value: THREE.Vector2 }, closed: { value: THREE.Vector2 }, outer: THREE.Vector2) {
   const prev = m.onBeforeCompile;
   m.onBeforeCompile = (sh, r) => {
     prev.call(m, sh, r);
     sh.uniforms.uLidCover = cover;
     sh.uniforms.uLidClosed = closed;
+    sh.uniforms.uLidO = { value: outer };
     sh.fragmentShader = sh.fragmentShader
-      .replace('#include <common>', '#include <common>\nuniform vec2 uLidCover;\nuniform vec2 uLidClosed;')
+      .replace('#include <common>', '#include <common>\nuniform vec2 uLidCover;\nuniform vec2 uLidClosed;\nuniform vec2 uLidO;')
       .replace('#include <map_fragment>', `#include <map_fragment>
   {
     float lv = vMapUv.y * 2.0;
     bool eL = vMapUv.x < 0.5;
-    float sc = clamp((vMapUv.x - (eL ? 0.0 : 0.5)) * 2.0, 0.0, 1.0);  // столбец века 0..1 (+X модели)
+    float sc0 = clamp((vMapUv.x - (eL ? 0.0 : 0.5)) * 2.0, 0.0, 1.0);  // столбец сетки века 0..1 (+X модели)
+    // v5h: сетка продлена за внешний уголок (L — к +X, R — к −X) на долю uLidO: там только большие ресницы Tripo, они
+    // едут с веком; кромка, «^» и нижнее веко — по прежней ширине (sc)
+    float fo = eL ? uLidO.x : uLidO.y;
+    float sc = eL ? sc0 / (1.0 - fo) : (sc0 - fo) / (1.0 - fo);
+    float inW = step(-0.001, sc) * step(sc, 1.001);
+    sc = clamp(sc, 0.0, 1.0);
     float cl = eL ? uLidClosed.x : uLidClosed.y;
     if (lv < 1.0) {
       float VS = ${V5_LID_VS.toFixed(3)};
@@ -408,18 +415,19 @@ function patchLid(m: THREE.Material, cover: { value: THREE.Vector2 }, closed: { 
       }
       float aC = max(max(edge, lash), clamp(diffuseColor.a * 1.6, 0.0, 1.0) * outer * 0.5 * (1.0 - smoothstep(0.82, 0.9, f)));
       vec3 cC = mix(diffuseColor.rgb, diffuse * vec3(${V5_LID_LINE.col.join(', ')}), max(edge, lash));
-      diffuseColor.rgb = mix(diffuseColor.rgb, cC, cl);
-      diffuseColor.a = mix(diffuseColor.a, aC, cl);
-      diffuseColor.a *= smoothstep(0.0, 0.04, sc) * smoothstep(1.0, 0.96, sc);
+      diffuseColor.rgb = mix(diffuseColor.rgb, cC, cl * inW);
+      // за уголком закрытое веко гаснет целиком (ресницы закрытого глаза рисует дуга)
+      diffuseColor.a = mix(diffuseColor.a, aC * inW, cl);
+      diffuseColor.a *= smoothstep(0.0, 0.04, sc0) * smoothstep(1.0, 0.96, sc0) * mix(1.0, smoothstep(0.0, 0.04, sc) * smoothstep(1.0, 0.96, sc), cl);
     } else {
       // нижнее веко: только мягкая линия у кромки (нижние ресницы), у закрытого глаза — нет (дуга верхнего)
       float s2 = lv - 1.0;
       diffuseColor.rgb = diffuse * vec3(${V5_LID_LINE.col.join(', ')}) * 1.6;
-      diffuseColor.a = 0.45 * smoothstep(0.9, 0.98, s2) * (1.0 - cl) * smoothstep(0.0, 0.1, sc) * smoothstep(1.0, 0.9, sc);
+      diffuseColor.a = 0.45 * smoothstep(0.9, 0.98, s2) * (1.0 - cl) * smoothstep(0.0, 0.1, sc) * smoothstep(1.0, 0.9, sc) * inW;
     }
   }`);
   };
-  m.customProgramCacheKey = () => 'v5-lid-4';
+  m.customProgramCacheKey = () => 'v5-lid-5';
   m.needsUpdate = true;
 }
 
@@ -547,9 +555,10 @@ const PAINT_APPLY = `
         if (abs(u) < 1.0 && vBlushP.z > 0.08) {
           float yb = e.y - e.w * sqrt(1.0 - u * u);
           float dy = vBlushP.y - yb;
-          float edge = 1.0 - smoothstep(0.55, 0.85, abs(u + 0.12 * sign(e.x)));
-          float pool = smoothstep(-0.0035, -0.0015, dy) * (1.0 - smoothstep(0.004, 0.0065, dy)) * edge;
-          float hl = (1.0 - smoothstep(0.0, 0.0009, abs(dy - 0.0042))) * edge * step(abs(u), 0.6);
+          // v5h: голубая лужица вдоль всего нижнего века (реф грусти)
+          float edge = 1.0 - smoothstep(0.82, 0.98, abs(u));
+          float pool = smoothstep(-0.0045, -0.002, dy) * (1.0 - smoothstep(0.0055, 0.0085, dy)) * edge;
+          float hl = (1.0 - smoothstep(0.0, 0.0011, abs(dy - 0.0052))) * edge * step(abs(u), 0.7);
           vec3 tc = mix(vec3(0.55, 0.80, 1.0), vec3(1.0), hl);
           diffuseColor.rgb = mix(diffuseColor.rgb, tc, clamp(pool * 0.8 + hl, 0.0, 1.0) * uTear);
         }
@@ -557,7 +566,7 @@ const PAINT_APPLY = `
         // v5g: капля нарастает у века (фаза 0…0.3), скатывается по щеке (до 42 мм) и гаснет; за ней — влажная дорожка
         float ph = i == 0 ? uTearT.x : uTearT.y;
         float grow = smoothstep(0.0, 0.28, ph), run = smoothstep(0.3, 0.92, ph), fadeD = 1.0 - smoothstep(0.86, 1.0, ph);
-        float dsc = mix(0.45, 1.0, grow) * (1.0 - 0.25 * run);
+        float dsc = 1.35 * mix(0.45, 1.0, grow) * (1.0 - 0.25 * run);  // v5h: капля крупнее (читается на телефоне)
         float x0d = e.x - 0.3 * e.z * sign(e.x), y0d = e.y - e.w - 0.006;
         float yd = y0d - 0.004 * grow - 0.042 * run;
         vec2 dc = vec2(vBlushP.x - x0d, vBlushP.y - yd) / dsc;
@@ -611,7 +620,7 @@ function patchPaint(m: THREE.Material, u: V5PaintU, centers: THREE.Vector3[], bg
       .replace('#include <color_fragment>', '#include <color_fragment>' + PAINT_APPLY);
   };
   const prevKey = m.customProgramCacheKey?.bind(m);
-  m.customProgramCacheKey = () => (prevKey ? prevKey() : '') + '|v5-paint-4';
+  m.customProgramCacheKey = () => (prevKey ? prevKey() : '') + '|v5-paint-5';
   m.needsUpdate = true;
 }
 
@@ -814,6 +823,8 @@ uniform float uESpark;
 uniform vec2 uEClosed;
 uniform vec4 uLidE[60];
 uniform vec4 uLidX;
+uniform float uETear;
+uniform vec4 uETearE[2];
 varying vec3 vEP;
 // v5f: накладка прячется над кромкой опущенного верхнего века и под кромкой поднятого нижнего (там — кожа тела)
 float v5LidHide(vec3 p) {
@@ -829,6 +840,8 @@ float v5LidHide(vec3 p) {
   float hl = smoothstep(0.0002, 0.0008, E.z - E.w) * (1.0 - smoothstep(E.z, E.z + 0.0005, p.y));
   return max(hu, hl);
 }`;
+/** v5h: лужица слёз в накладке глаза — высота воды над низом разреза у центра, м */
+export const V5_TEAR_POOL = { h: 0.006 };
 /** v5f: радужка крупнее (реф: крупная радужка, белка мало) — масштаб круга радужки на плашке */
 export const V5_IRIS_SCALE = 1.18;
 const EYE_MAP = `
@@ -872,6 +885,25 @@ const EYE_MAP = `
     float b4 = 1.0 - smoothstep(0.02, 0.05, length(q - vec2(0.12, -0.52)));
     v5Hl = (b1 * 0.85 + b2 * 0.7 + (b3 * 0.55 + b4 * 0.6) * uEWet) * uEHi * inE * (1.0 - uESpiral);
     col = mix(col, col * 1.12 + vec3(0.02, 0.04, 0.06), 0.6 * uEWet * inE);
+    // v5h: слёзы — голубая «лужица» вдоль всего нижнего края разреза (реф sad): вода по низу белка и радужки, светлая
+    // кромка-блик сверху; координаты покоя (едет с веком и кожей). Под накладкой кожа не видна — лужица здесь, не на теле
+    if (uETear > 0.001) {
+      vec4 te = vEP.x > 0.0 ? uETearE[0] : uETearE[1];
+      float tu = (vEP.x - te.x) / te.z;
+      if (abs(tu) < 1.1) {
+        float tuc = clamp(tu, -0.995, 0.995);
+        float yb = te.y - te.w * sqrt(1.0 - tuc * tuc);
+        float dy = vEP.y - yb;
+        float side = 1.0 - smoothstep(0.78, 1.02, abs(tu));
+        float lvl = ${V5_TEAR_POOL.h.toFixed(4)} * (1.0 - 0.35 * tuc * tuc);
+        float pool = smoothstep(-0.0025, -0.0008, dy) * (1.0 - smoothstep(lvl - 0.0012, lvl, dy)) * side;
+        float hl = (1.0 - smoothstep(0.0003, 0.0011, abs(dy - lvl + 0.0007))) * (1.0 - smoothstep(0.5, 0.85, abs(tu)));
+        vec3 wc = mix(vec3(0.30, 0.58, 0.98), vec3(0.55, 0.80, 1.0), smoothstep(-0.001, lvl, dy));
+        col = mix(col, mix(col, wc, 0.55) * 1.08 + vec3(0.0, 0.05, 0.12), pool * uETear);
+        col = mix(col, vec3(0.95, 0.98, 1.0), hl * 0.85 * uETear);
+        v5Hl = max(v5Hl, hl * 0.5 * uETear * uEHi);
+      }
+    }
     // влага у нижнего края (слёзы): блестящая полоска по низу белка
     // v5e: глаз закрыт (моргание, «^») — накладки нет: под кромкой века не просвечивает полоска радужки
     diffuseColor *= vec4(col, clamp(base.a / 0.75, 0.0, 1.0) * (1.0 - (si == 0 ? uEClosed.x : uEClosed.y)) * (1.0 - v5LidHide(vEP)));
@@ -894,6 +926,9 @@ export interface V5EyesU {
   /** v5g: влажность глаз и сияние бликов */
   wet: { value: number };
   spark: { value: number };
+  /** v5h: слёзы 0..1 (лужица по низу разреза) и овалы глаз (центр x, y, полуоси; L, R — как uEye шейдера лица) */
+  tear: { value: number };
+  tearE: { value: THREE.Vector4[] };
 }
 
 /** накладка глаз Eyes_V5: шейдер белка/радужки/зрачка/бликов; null — у модели нет */
@@ -903,7 +938,7 @@ export function attachV5Eyes(model: THREE.Object3D, info: V5EyesInfo | undefined
   const u: V5EyesU = {
     gaze: { value: [new THREE.Vector4(0, 0, 1, 1), new THREE.Vector4(0, 0, 1, 1)] },
     pupil: { value: 1 }, hi: { value: 1 }, spiral: { value: 0 }, time: { value: 0 }, closed: { value: new THREE.Vector2() },
-    wet: { value: 0 }, spark: { value: 0 },
+    wet: { value: 0 }, spark: { value: 0 }, tear: { value: 0 }, tearE: { value: [new THREE.Vector4(0, 0, 1, 1), new THREE.Vector4(0, 0, 1, 1)] },
     lidE: { value: Array.from({ length: 60 }, () => new THREE.Vector4(0, 0, -1, -1)) }, lidX: { value: new THREE.Vector4(0, 0, 0, 0) },
   };
   const sides = [info.L, info.R];
@@ -925,6 +960,7 @@ export function attachV5Eyes(model: THREE.Object3D, info: V5EyesInfo | undefined
     sh.uniforms.uEWet = u.wet; sh.uniforms.uESpark = u.spark;
     sh.uniforms.uEClosed = u.closed;
     sh.uniforms.uLidE = u.lidE; sh.uniforms.uLidX = u.lidX;
+    sh.uniforms.uETear = u.tear; sh.uniforms.uETearE = u.tearE;
     sh.vertexShader = sh.vertexShader
       .replace('#include <common>', '#include <common>\nvarying vec3 vEP;')
       .replace('#include <morphtarget_vertex>', '#include <morphtarget_vertex>\n  vEP = transformed;');
@@ -933,7 +969,7 @@ export function attachV5Eyes(model: THREE.Object3D, info: V5EyesInfo | undefined
       .replace('#include <map_fragment>', EYE_MAP)
       .replace('#include <emissivemap_fragment>', EYE_EMIT);
   };
-  m.customProgramCacheKey = () => 'v5-eyes-5';
+  m.customProgramCacheKey = () => 'v5-eyes-6';
   m.needsUpdate = true;
   mesh.renderOrder = 1;
   return { mesh, u, info };
@@ -1127,7 +1163,9 @@ export class V5FaceRig {
       this.lidEdges?.update();
       if (lw && this.eyes) {
         // накладка глаза гаснет только у почти закрытого (полоска радужки под кромкой), в «^» — сразу
-        const e = (sd: 'L' | 'R') => { const c = v5LidClosed(lw, sd); return c01((c - 0.6) / 0.35); };
+        // v5h: раньше (0.45…0.75 вместо 0.6…0.95): веко уже рисует дугу закрытого глаза — под ней не просвечивает
+        // бледный серп накладки (открытие после моргания)
+        const e = (sd: 'L' | 'R') => { const c = v5LidClosed(lw, sd); return c01((c - 0.45) / 0.3); };
         this.eyes.u.closed.value.set(e('L'), e('R'));
       }
     }
@@ -1174,6 +1212,7 @@ export class V5FaceRig {
     // v5g: влага и сияние — по позе эмоции; капля слезы — свой цикл (нарастает у века и скатывается по щеке)
     this.eyes.u.wet.value = c01(Math.max(ps.wet, this.st.tear));
     this.eyes.u.spark.value = c01(ps.sparkle);
+    this.eyes.u.tear.value = c01(this.st.tear);
     if (this.paint) {
       this.tearClock = this.st.tear > 0.02 ? this.tearClock + dt : 0;
       this.paint.tearT.value.set(v5TearPhase(this.tearClock, 0), v5TearPhase(this.tearClock, 1));
@@ -1185,7 +1224,7 @@ export class V5FaceRig {
 /** собрать лицо v5c/v5d модели (asset.extras.glitterV5) */
 export function attachV5Face(
   model: THREE.Object3D,
-  ex: { marks?: Marks; mouth?: { uv0: number[]; mm: number[] }; eyes?: V5EyesInfo; brows?: { L?: V5BrowShape; R?: V5BrowShape } } | undefined,
+  ex: { marks?: Marks; mouth?: { uv0: number[]; mm: number[] }; eyes?: V5EyesInfo; brows?: { L?: V5BrowShape; R?: V5BrowShape }; lidOuter?: { L?: number; R?: number } } | undefined,
   morph: THREE.Mesh[],
 ): V5FaceRig {
   const lids = model.getObjectByName('Lids_V5') as THREE.Mesh | undefined;
@@ -1195,7 +1234,7 @@ export function attachV5Face(
   if (lids && lm?.transparent) {
     lm.depthWrite = true;
     lids.renderOrder = 2;
-    patchLid(lm, cover, closedU);
+    patchLid(lm, cover, closedU, new THREE.Vector2(ex?.lidOuter?.L ?? 0, ex?.lidOuter?.R ?? 0));
   }
   const eyes = attachV5Eyes(model, ex?.eyes);
   let aimer: V5EyeAim | null = null;
@@ -1206,6 +1245,7 @@ export function attachV5Face(
   }
   const rig = new V5FaceRig(lids?.morphTargetDictionary ? { mesh: lids } : null, morph.filter((m) => m.name !== 'Lids_V5'), attachV5Paint(model, ex?.marks, ex?.brows), attachV5Mouth(model, ex?.mouth), eyes, aimer);
   if (lm?.transparent) { rig.lidCover = cover; rig.lidClosed = closedU; }
+  if (eyes && ex?.marks) eyes.u.tearE.value = browsEyes(ex.marks, ex.brows).eyes;
   if (lids && eyes) {
     rig.lidEdges = new V5LidEdges(lids);
     eyes.u.lidE.value = rig.lidEdges.E;

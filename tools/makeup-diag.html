@@ -1,0 +1,75 @@
+<!doctype html><html><head><meta charset="utf-8"><title>makeup diag</title>
+<style>html,body{margin:0;background:#e6e6ea}canvas{display:block}</style></head>
+<body><script type="module">
+// v5h: «макияж» Блёстки (веки, ресницы, подводка, накладка глаз, брови, румянец, слёзы, звёздочки) на клипах тела —
+// крупно глаза камерой, привязанной к голове (смотрит спереди головы, как бы ни шло тело): видно, что отстаёт от кожи.
+// ?models=v5&s=idle@1,dance_01@2.4:blink@0.07,turn@1:sad&cols=4&tile=360&eyes=2.4&ey=0.12&side=30
+//   «клип@сек[:лицо[@сек]]»: лицо — blink@t (кадр моргания через t с), wink, эмоция (sad, laugh…), close (оба века закрыты)
+import * as THREE from 'three';
+let seed = 12345; Math.random = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+const { GlbCharacter } = await import('../src/character/glbCharacter.ts');
+const { variantGlb } = await import('../src/character/modelVariant.ts');
+const q = new URLSearchParams(location.search);
+const persona = q.get('p') || 'glitter';
+const url = q.get('m') || variantGlb(`/models/${persona}_v1.glb`);
+const states = (q.get('s') || 'idle@1').split(',');
+const cols = +(q.get('cols') || Math.min(4, states.length));
+const T = +(q.get('tile') || 360), rows = Math.ceil(states.length / cols);
+const side = +(q.get('side') || 0) * Math.PI / 180;
+const r = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+(await import('../src/core/glRenderer.ts')).setGlRenderer(r);
+r.setPixelRatio(1); r.setSize(cols * T, rows * T); r.setScissorTest(true); document.body.appendChild(r.domElement);
+r.outputColorSpace = THREE.SRGBColorSpace;
+const sc = new THREE.Scene(); sc.background = new THREE.Color(0xe6e6ea);
+sc.add(new THREE.HemisphereLight(0xffffff, 0x8899aa, 2.2));
+const dl = new THREE.DirectionalLight(0xffffff, 1.6); dl.position.set(0.5, 1, 1); sc.add(dl);
+const ch = new GlbCharacter(url, '/models/anims_v1.glb');
+await ch.load(); ch.setPersona?.({ id: persona }); ch.clips.setIdles(['idle'], persona); sc.add(ch.object); ch.play('idle');
+if (ch.loadDeferred) await ch.loadDeferred();
+if (q.get('hide')) ch.object.traverse((o) => { if (o.isMesh && new RegExp(q.get('hide')).test(o.name)) o.visible = false; });
+ch.faceMix.nextBlink = 1e9; ch.life.nextMicro = 1e9;
+if (ch.v5Life && !q.get('life')) ch.v5Life.off = true;
+const bone = (n) => { let b = null; ch.object.traverse((o) => { if (!b && o.name.replace(/^mixamorig:?/, '') === n) b = o; }); return b; };
+const head = bone('Head');
+const cam = new THREE.PerspectiveCamera(22, 1, 0.01, 50);
+const em = ch.object.getObjectByName('Eyes_V5');
+// центр глаз и «вперёд» головы — из позы привязки (bind) через кость головы: точка едет как вершина со скином 1.0 на голову
+for (let k = 0; k < 20; k++) ch.update(1 / 30, cam);
+em.geometry.computeBoundingBox();
+const gb = em.geometry.boundingBox, w0 = gb.max.x - gb.min.x;
+const hi = em.skeleton.bones.indexOf(head);
+const H0 = new THREE.Matrix4().multiplyMatrices(em.skeleton.boneInverses[hi], em.bindMatrix);  // bind → кость головы
+const cL = gb.getCenter(new THREE.Vector3()); cL.y += w0 * +(q.get('ey') || 0); cL.applyMatrix4(H0);
+const fL = new THREE.Vector3(Math.sin(side), 0, Math.cos(side)).transformDirection(H0);
+const upL = new THREE.Vector3(0, 1, 0).transformDirection(H0);
+const dist = w0 * +(q.get('eyes') || 2.4);
+const camAt = () => {
+  ch.object.updateMatrixWorld(true);
+  const c = cL.clone().applyMatrix4(head.matrixWorld);
+  const f = fL.clone().transformDirection(head.matrixWorld);
+  cam.up.copy(upL.clone().transformDirection(head.matrixWorld));
+  cam.position.copy(c).addScaledVector(f, dist); cam.lookAt(c);
+};
+const run = (sec) => { for (let k = 0; k < Math.round(sec * 60); k++) ch.update(1 / 60, cam); };
+const info = [];
+states.forEach((st, i) => {
+  const [clipT, face] = st.split(':');
+  const [clip, ts] = clipT.split('@'); const t = +(ts || 1);
+  ch.clearEmotion(); ch.setMouth('X', 0, { open: 0, wide: 0, round: 0 });
+  ch.play('idle', { force: true }); run(0.5);
+  ch.play(clip, { force: true, loop: true });
+  const [fn, fts] = (face || '').split('@');
+  const ft = +(fts || 0.07);
+  if (fn === 'blink' || fn === 'wink') { run(Math.max(0, t - ft)); fn === 'blink' ? ch.faceMix.blink() : ch.setEmotion('wink_r', 1, 0); run(Math.min(t, ft)); }
+  else if (fn === 'close') { ch.setEmotion('sleep', 1, 0); run(t); }
+  else if (fn) { ch.setEmotion(fn, 1, 0); run(t); }
+  else run(t);
+  camAt();
+  const x = (i % cols) * T, y = (rows - 1 - Math.floor(i / cols)) * T;
+  r.setViewport(x, y, T, T); r.setScissor(x, y, T, T); r.render(sc, cam);
+  const lm = ch.object.getObjectByName('Lids_V5'), lw = {};
+  if (q.get('dbg') && lm?.morphTargetDictionary) for (const k in lm.morphTargetDictionary) { const v = lm.morphTargetInfluences[lm.morphTargetDictionary[k]]; if (v > 0.01) lw[k] = +v.toFixed(2); }
+  info.push({ st, clip: ch.clips.cur?.id, ...(q.get('dbg') ? { lw, emo: ch.emo?.p?.id, W: Object.fromEntries(Object.entries(ch.W ?? {}).filter(([, v]) => v > 0.02).map(([k, v]) => [k, +v.toFixed(2)])) } : {}) });
+});
+window.__labels = states; window.__morphs = info; window.__ch = ch; window.__ready = true;
+</script></body></html>

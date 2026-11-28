@@ -245,7 +245,9 @@ for side in ('L', 'R'):
     D_, Q, inz, wx_, wy_ = MB[side]
     e = eyes[side]
     w_e = e['x'][-1] - e['x'][0]
-    keep_out = (wx_ > e['x'][-1] - 0.25 * w_e) if side == 'L' else (wx_ < e['x'][0] + 0.25 * w_e)
+    # v5h: и большие внешние ресницы у уголка — за кожу: их несёт веко (столбцы века продлены наружу на LID_XO), иначе при
+    # моргании они «висели» на месте над закрытым глазом
+    keep_out = np.zeros_like(wx_, bool)
     topx = np.interp(wx_, e['x'], e['top'])
     fv = _finv & inz & ~keep_out & (wy_ < topx + 2)
     Pw_[fv, 2] = Pw_[fv, 2] - 0.0035
@@ -369,7 +371,7 @@ def esk_w(c):
 
 # v5d: снимок 0.1 мм у глаз — полоса ресниц Tripo для века (на 0.4 мм тонкие лепестки ресниц размываются в мех)
 PXH = 0.0001
-_xa = BOX[0] + (min(eyes['R']['x'][0], eyes['L']['x'][0]) - 60) * PX; _xb = BOX[0] + (max(eyes['R']['x'][-1], eyes['L']['x'][-1]) + 60) * PX
+_xa = BOX[0] + (min(eyes['R']['x'][0], eyes['L']['x'][0]) - 80) * PX; _xb = BOX[0] + (max(eyes['R']['x'][-1], eyes['L']['x'][-1]) + 80) * PX
 _ya = BOX[3] - (max(eyes['R']['bot'].max(), eyes['L']['bot'].max()) + 10) * PX
 _yb = BOX[3] - (min(eyes['R']['lt'].min(), eyes['L']['lt'].min()) - 70) * PX
 BOXH = (_xa, _xb, _ya, _yb)
@@ -390,12 +392,14 @@ NC, NR = 30, 16
 NF, VS, PET = 6, 0.3, 60.0  # v5d: рядов меха над полосой ресниц, доля текстуры меха, запас над полосой ресниц (px)
 DT, DM = 0.0008, 0.0024  # отступ века от поверхности: у верха (покой) и к кромке (м); радужка Tripo выпуклее белка
 TW, TH = 384, 128  # текстура века одного глаза (v5d: крупнее — ресницы на веке; < 1024 px — model-opt не жмёт в KTX2)
+LID_XO = 46.0  # v5h: столбцы верхнего века продлены за внешний уголок (px снимка): большие ресницы Tripo едут с веком
 LID_X, LID_Y = 13.0, 17.0  # запас закрытого века за разрез: по бокам и снизу (px снимка, 0.4 мм)
 lid_img = np.zeros((2 * TH, TW * 2, 3), np.uint8)  # верх — верхние веки, низ — нижние (v5c)
 lid_a = np.full((2 * TH, TW * 2), 255, np.uint8)  # v5d: альфа — верх века (мех над ресницами) растворяется в мех тела
 NRL = 8  # рядов нижнего века
 DLO = 0.0010  # отступ нижнего века (под верхним: у кромки верхнего 1.8 мм)
 lid_base = {}
+lid_outer = {}  # v5h
 lid_strip = {}  # v5d: полоса ресниц в покое по столбцам века (x, верх, низ — px снимка)
 skin_pos = []  # положение для скина (закрытое веко / поднятое нижнее)
 LV, LUV, LF, LN = [], [], [], []
@@ -416,7 +420,11 @@ for ei, side in enumerate(('L', 'R')):
     e = eyes[side]
     # на LID_X px шире разреза: закрытое веко накрывает и тёмный контур глаза Tripo в уголках (27.11: при 6 px контур
     # читался тёмной обводкой вокруг закрытого века)
-    xs_e = np.linspace(e['x'][0] - LID_X, e['x'][-1] + LID_X, NC)
+    xo0 = LID_X + (LID_XO if side == 'R' else 0.0); xo1 = LID_X + (LID_XO if side == 'L' else 0.0)
+    xs_e = np.linspace(e['x'][0] - xo0, e['x'][-1] + xo1, NC)
+    # доля столбцов за прежней шириной века (снаружи): шейдер века — без кромки и нижнего века там (uLidO)
+    lid_outer[side] = round(float(LID_XO / (xs_e[-1] - xs_e[0])), 5)
+    x_in0, x_in1 = e['x'][0] - LID_X, e['x'][-1] + LID_X
     t = np.interp(xs_e, e['x'], e['top']); bt = np.interp(xs_e, e['x'], e['bot']); lt_ = np.interp(xs_e, e['x'], e['lt'])
     # v5d: в покое веко — полоса ресниц Tripo на своём месте (копия; на теле ресницы закрашены мехом — v5_eyes.py), кромка —
     # у верха глаза; закрываясь, полоса едет с кромкой, над ней тянется мех века
@@ -459,7 +467,7 @@ for ei, side in enumerate(('L', 'R')):
         x = xs_e[0] + (i + 0.5) / TW * (xs_e[-1] - xs_e[0])
         k = np.interp(x, xs_e, np.arange(NC))
         ftop = np.array([np.interp(k, np.arange(NC), FT[:, q]) for q in range(3)])
-        l0 = np.interp(k, np.arange(NC), lt_) - PET; l1 = np.interp(k, np.arange(NC), yT)
+        l0 = np.interp(k, np.arange(NC), np.where((xs_e < x_in0) | (xs_e > x_in1), np.minimum(lt_ - PET, lt_.min() - PET), lt_ - PET)); l1 = np.interp(k, np.arange(NC), yT)
         ltk = np.interp(k, np.arange(NC), lt_)
         for jj in range(TH):
             v = (jj + 0.5) / TH
@@ -469,6 +477,12 @@ for ei, side in enumerate(('L', 'R')):
                 f = (v - VS) / (1 - VS)
                 yy = l0 + (l1 - l0) * f
                 c = hires(x, yy)[0]
+                if x < x_in0 or x > x_in1:
+                    # v5h: за внешним уголком — только тёмные ресницы (мех кожи между ними прозрачен всегда)
+                    a = float(np.clip((140 - c.mean()) / 45, 0, 1))
+                    lid_img[jj, ei * TW + i] = np.clip(ftop + (c - ftop) * a, 0, 255)
+                    lid_a[jj, ei * TW + i] = int(round(255 * a))
+                    continue
                 # v5e: белок и светлая кайма у низа полосы (захват снимка) — цветом линии ресниц: на опущенном веке
                 # (грусть, обида, моргание) не светлая полоска с зеленью радужки, а тёмная кромка
                 if yy >= ltk - 1 and c.mean() > 120:
@@ -495,6 +509,9 @@ for ei, side in enumerate(('L', 'R')):
     S = np.linspace(0, 1, NR + 1)
 
     yTop0 = lt_ - PET  # верх века (неподвижен): верх полосы ресниц в покое
+    # v5h: за внешним уголком полоса выше — до верха ресниц над серединой глаза (большие ресницы Tripo торчат вверх-наружу)
+    ext_c = (xs_e < x_in0) | (xs_e > x_in1)
+    yTop0 = np.where(ext_c, np.minimum(yTop0, lt_.min() - PET), yTop0)
     HS = yT - yTop0  # высота полосы ресниц, px снимка
     lid_strip[side] = (xs_e.copy(), yTop0.copy(), yT.copy())
 
@@ -924,6 +941,7 @@ j['asset'].setdefault('extras', {})['glitterV5'] = {
     # v5d: полоса ресниц Tripo, перенесённая на веко (на теле её закрашивает мехом v5_eyes.py): x, верх, низ (м модели)
     'lidStrip': {sd: [[round(float(BOX[0] + x * PX), 5), round(float(BOX[3] - a * PX), 5), round(float(BOX[3] - b * PX), 5)]
                       for x, a, b in zip(*lid_strip[sd])] for sd in lid_strip},
+    'lidOuter': lid_outer,
     'source': 'design/models/glitter_v5_rigged.glb (Tripo 4 вида, H3.1, Ultra, 4K PBR, одна сетка; Auto Rig Mixamo)',
 }
 if spk.any():

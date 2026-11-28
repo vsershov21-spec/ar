@@ -44,8 +44,9 @@ ex5 = j['asset']['extras']['glitterV5']
 marks = ex5['marks']
 
 PX = 0.0001
-xa = min(marks['eyeOuterR'][0], marks['eyeInnerR'][0]) - 0.015
-xb = max(marks['eyeOuterL'][0], marks['eyeInnerL'][0]) + 0.015
+# v5h: шире (±28 мм): веко продлено за внешний уголок (v5_face.py LID_XO) — полоса ресниц там тоже закрашивается
+xa = min(marks['eyeOuterR'][0], marks['eyeInnerR'][0]) - 0.028
+xb = max(marks['eyeOuterL'][0], marks['eyeInnerL'][0]) + 0.028
 ya = min(marks['eyeBottomL'][1], marks['eyeBottomR'][1]) - 0.012
 yb = max(marks['eyeTopL'], marks['eyeTopR']) + 0.024
 BOX = (xa, xb, ya, yb)
@@ -185,6 +186,55 @@ wl = nd.gaussian_filter(lpm.astype(float), 1.2) * lpm
 wl = np.maximum(wl, nd.binary_erosion(lpm, iterations=2))
 tex2 = (tex2 * (1 - wl[..., None]) + lcol * wl[..., None]).astype(np.uint8)
 print(f'текстура тела: ресницы в полосе века закрашены мехом ({int(lpm.sum())} текселей)')
+# v5h: лепестки ресниц Tripo (прижатые к коже и убранные за кожу, v5_face.py) — в UV целиком, все их тексели: снимок
+# спереди видит только верхний слой, и у прижатых лепестков оставались светлые контуры, а у больших внешних ресниц —
+# тёмные «ромбы», которые висели на месте при моргании (их теперь несёт веко)
+Mz = np.zeros((H_, W_), bool)
+for m_ in MSK.values():
+    Mz |= m_
+# и тёмные кончики ресниц рядом с полосой (над внешним уголком полоса ниже ресниц)
+_Ed = np.zeros((H_, W_), bool)
+for _sd in 'LR':
+    _Ed |= nd.binary_dilation(EYES[_sd]['E'], iterations=4)
+Mz = nd.binary_dilation(Mz, iterations=6) | (nd.binary_dilation(Mz, iterations=50) & nd.binary_dilation(Lum < 100, iterations=3) & ~_Ed)
+cen = P[I].mean(1)
+ccx = (cen[:, 0] - BOX[0]) / PX; ccy = (BOX[3] - cen[:, 1]) / PX
+okc = (ccx >= 0) & (ccx < W_ - 1) & (ccy >= 0) & (ccy < H_ - 1)
+cxi = np.clip(ccx.astype(int), 0, W_ - 1); cyi = np.clip(ccy.astype(int), 0, H_ - 1)
+selt = np.where(okc & Mz[cyi, cxi] & (cen[:, 2] > depth[cyi, cxi] - 0.012) & (cen[:, 2] > 0.05))[0]
+_ty, _tx, _uvl, _pp = [], [], [], []
+for t_ in selt:
+    uvt = UV[I[t_]] % 1.0
+    if np.ptp(UV[I[t_]][:, 0]) > 0.5 or np.ptp(UV[I[t_]][:, 1]) > 0.5:
+        continue
+    pxy = uvt * np.array([tw, th])
+    x0_, y0_ = np.floor(pxy.min(0) - 1).astype(int); x1_, y1_ = np.ceil(pxy.max(0) + 1).astype(int)
+    gx, gy = np.meshgrid(np.arange(max(x0_, 0), min(x1_, tw - 1) + 1), np.arange(max(y0_, 0), min(y1_, th - 1) + 1))
+    gx = gx.ravel(); gy = gy.ravel()
+    a_, b_, c_ = pxy
+    den = (b_[1] - c_[1]) * (a_[0] - c_[0]) + (c_[0] - b_[0]) * (a_[1] - c_[1])
+    if abs(den) < 1e-9:
+        continue
+    qx, qy = gx + 0.5, gy + 0.5
+    w0 = ((b_[1] - c_[1]) * (qx - c_[0]) + (c_[0] - b_[0]) * (qy - c_[1])) / den
+    w1 = ((c_[1] - a_[1]) * (qx - c_[0]) + (a_[0] - c_[0]) * (qy - c_[1])) / den
+    w2 = 1 - w0 - w1
+    tol = -0.6 / max(np.sqrt(abs(den)), 1.0)  # и тексели у края (полтекселя)
+    ins = (w0 >= tol) & (w1 >= tol) & (w2 >= tol)
+    if not ins.any():
+        continue
+    W3 = np.stack([w0[ins], w1[ins], w2[ins]], 1).clip(0, 1)
+    W3 /= W3.sum(1, keepdims=True)
+    _ty.append(gy[ins]); _tx.append(gx[ins]); _pp.append(W3 @ P[I[t_]])
+    _uvl.append(np.stack([(gx[ins] + 0.5) / tw, (gy[ins] + 0.5) / th], 1))
+if _ty:
+    _ty = np.concatenate(_ty); _tx = np.concatenate(_tx); _pp = np.concatenate(_pp)
+    fx_ = (_pp[:, 0] - BOX[0]) / PX - 0.5; fy_ = (BOX[3] - _pp[:, 1]) / PX - 0.5
+    fc = np.stack([nd.map_coordinates(FILL[..., q], [fy_, fx_], order=1, mode='nearest') for q in range(3)], -1)
+    tex2[_ty, _tx] = fc.clip(0, 255).astype(np.uint8)
+    lpm[_ty, _tx] = True
+    LP_UV.extend(np.concatenate(_uvl).tolist())
+    print(f'лепестки ресниц в UV целиком: {len(selt)} треуг., {len(_ty)} текселей')
 
 # v5f: накладка шире разреза — кайма RING px (пиксели тела ПОСЛЕ закраски ресниц: обводка Tripo, мех), под ней кожа тела —
 # мех (inpaint): закрытое веко — эта кожа, накладка под ним прячется целиком (шейдер, линия кромки века)
