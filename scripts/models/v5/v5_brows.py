@@ -18,7 +18,7 @@ import cv2
 from PIL import Image
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from v5_common import Glb, body, raster_front, interp, sample  # noqa: E402
+from v5_common import Glb, body, raster_front, interp, sample, uv_cover, bleed  # noqa: E402
 
 src, dst = sys.argv[1:3]
 VIZ = sys.argv[sys.argv.index('--viz') + 1] if '--viz' in sys.argv else None
@@ -117,6 +117,7 @@ w = np.maximum(w, nd.binary_erosion(pm, iterations=3))
 hi = tex.astype(float) - np.stack([nd.gaussian_filter(tex[..., q].astype(float), 3) for q in range(3)], -1)
 new = np.clip(pcol + 0.6 * hi, 0, 255)
 tex2 = (tex * (1 - w[..., None]) + new * w[..., None]).astype(np.uint8)
+print(f'швы UV: поля острова закрашены ({bleed(tex2, pm, uv_cover(UV, I, *tex.shape[:2]))} текселей)')
 g.set_image(tex_i, Image.fromarray(tex2))
 ex5['brows'] = out
 print(f'текстура тела: брови закрашены мехом ({int(pm.sum())} текселей)')

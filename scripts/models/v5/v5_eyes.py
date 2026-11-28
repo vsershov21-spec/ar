@@ -24,7 +24,7 @@ from scipy.spatial import cKDTree
 from PIL import Image
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from v5_common import Glb, body, raster_front, interp, sample  # noqa: E402
+from v5_common import Glb, body, raster_front, interp, sample, uv_cover, bleed  # noqa: E402
 
 src, dst = sys.argv[1:3]
 VIZ = sys.argv[sys.argv.index('--viz') + 1] if '--viz' in sys.argv else None
@@ -129,6 +129,67 @@ for side in 'RL':  # R — справа у кота (−X, слева на сн�
     print(f'глаз {side}: разрез x {xs.min()}…{xs.max()} y {ys.min()}…{ys.max()} px; радужка ({ex:.0f}, {ey:.0f}) '
           f'{ea * PX * 1000:.1f}×{eb * PX * 1000:.1f} мм {eang:.0f}°; зрачок {pr0:.2f} радиуса (сдвиг {pq.round(3)})')
 
+# ── текстура тела: ресницы Tripo в полосе века закрашены мехом (их несёт веко Lids_V5 — v5_face.py, lidStrip) ──
+th, tw = tex.shape[:2]
+tex2 = tex.copy()
+strip = ex5.get('lidStrip', {})
+LP_UV = []
+lpaint = np.zeros((th, tw), bool); lcol = np.zeros((th, tw, 3), float)
+MSK = {}
+for side, rows in strip.items():
+    rows = np.array(rows)
+    xs_p = (rows[:, 0] - BOX[0]) / PX; top_p = (BOX[3] - rows[:, 1]) / PX; bot_p = (BOX[3] - rows[:, 2]) / PX
+    xa_, xb_ = int(np.ceil(xs_p.min())), int(np.floor(xs_p.max()))
+    xx = np.arange(xa_, xb_ + 1)
+    tp = np.interp(xx, xs_p, top_p); bp = np.interp(xx, xs_p, bot_p)
+    # закраска: inpaint снимка 0.1 мм по меху вокруг (ресницы и полоса — тёмное в полосе века, с запасом)
+    R = np.zeros((H_, W_), bool)
+    for x, t0, b0 in zip(xx, tp, bp):
+        R[max(int(np.floor(t0)) - 2, 0):int(np.ceil(b0)) + 1, x] = True
+    # вся полоса (ресницы с их светлой каймой — иначе по краю лепестков оставались бледные контуры), без белка
+    # v5e: светлое исключается только в разрезе глаза (белок): светлая кайма лепестков ресниц над глазом закрашивается
+    # тоже — иначе при закрытом веке на теле оставались бледные «призраки» лепестков
+    msk = nd.binary_dilation(R, iterations=3) & ~(((Lum > 175) & (mx - mn < 60)) & nd.binary_dilation(EYES[side]['E'], iterations=3))
+    MSK[side] = msk
+# v5f: цвет — гармоническое продолжение меха вокруг (inpaint снимка, 4× мельче; маска — полоса ресниц и глаз с каймой RB:
+# белок и обводка не «затекают»): без светлой полосы с дугой-ступенькой над глазом (раньше — медиана меха по столбцу)
+RB = 47  # кожа под накладкой глаза закрашена мехом до RB px от разреза (v5_eyes: накладка шире разреза)
+MALL = np.zeros((H_, W_), bool)
+for side in MSK:
+    MALL |= MSK[side]
+for side in 'LR':
+    MALL |= nd.distance_transform_edt(~EYES[side]['E']) <= RB
+# тёмное рядом (лепестки ресниц у уголков, обводка) — не источник цвета
+MALL_SRC = MALL | (nd.binary_dilation(MALL, iterations=60) & (Lum < 125))
+DS = 4
+_sub = cv2.resize(img.clip(0, 255).astype(np.uint8), (W_ // DS, H_ // DS), interpolation=cv2.INTER_AREA)
+_ms = nd.binary_dilation(cv2.resize(MALL_SRC.astype(np.uint8), (W_ // DS, H_ // DS), interpolation=cv2.INTER_NEAREST) > 0, iterations=2)
+_fs = cv2.inpaint(_sub, _ms.astype(np.uint8) * 255, 14, cv2.INPAINT_TELEA).astype(np.float32)
+_fs = np.stack([nd.gaussian_filter(_fs[..., q], 2.5) * _ms + _fs[..., q] * (1 - _ms) for q in range(3)], -1)
+FILL = cv2.resize(_fs, (W_, H_), interpolation=cv2.INTER_LINEAR).astype(float)
+for side, msk in MSK.items():
+    ys_, xs_ = np.where(msk)
+    uv = img_uv[ys_, xs_]
+    ok = tri[ys_, xs_] >= 0
+    tx = np.clip((uv[ok, 0] % 1) * tw, 0, tw - 1).astype(int); ty = np.clip((uv[ok, 1] % 1) * th, 0, th - 1).astype(int)
+    lpaint[ty, tx] = True; lcol[ty, tx] = FILL[ys_[ok], xs_[ok]]
+    LP_UV.extend(uv[ok].tolist())
+# карта нормалей и шероховатость в полосе — ровный мех (рельеф лепестков Tripo давал блики-контуры ресниц)
+lpm = nd.binary_closing(lpaint, iterations=2)
+hl = lpm & ~lpaint
+if hl.any():
+    idx = nd.distance_transform_edt(~lpaint, return_distances=False, return_indices=True)
+    lcol[hl] = lcol[idx[0][hl], idx[1][hl]]
+# край закраски — мягко (2 текселя)
+wl = nd.gaussian_filter(lpm.astype(float), 1.2) * lpm
+wl = np.maximum(wl, nd.binary_erosion(lpm, iterations=2))
+tex2 = (tex2 * (1 - wl[..., None]) + lcol * wl[..., None]).astype(np.uint8)
+print(f'текстура тела: ресницы в полосе века закрашены мехом ({int(lpm.sum())} текселей)')
+
+# v5f: накладка шире разреза — кайма RING px (пиксели тела ПОСЛЕ закраски ресниц: обводка Tripo, мех), под ней кожа тела —
+# мех (inpaint): закрытое веко — эта кожа, накладка под ним прячется целиком (шейдер, линия кромки века)
+RIN, RING = 44, 54  # кайма непрозрачна до RIN px (3 мм: обводка и тень у разреза), RIN…RING — растворяется в тело
+img2 = sample(tex2, img_uv).astype(float); img2[tri < 0] = 255
 # ── текстура: плашки (белок) и радужки ──
 AT = 512; PT = 256  # атлас; плашка глаза — квадрат PT (верхняя половина), радужка — квадрат PT (нижняя)
 atlas = np.zeros((AT, AT, 4), np.uint8)
@@ -138,7 +199,7 @@ for si, side in enumerate('LR'):
     e = EYES[side]
     E, rq, qq = e['E'], e['rq'], e['qq']
     x0, x1, y0, y1 = e['bbox']
-    pad = 30
+    pad = RING + 6
     x0 -= pad; x1 += pad; y0 -= pad; y1 += pad
     side_px = max(x1 - x0, y1 - y0)
     cxp, cyp = (x0 + x1) / 2, (y0 + y1) / 2
@@ -170,11 +231,14 @@ for si, side in enumerate('LR'):
     zd = nd.distance_transform_edt(~zone)
     bl = np.clip(1 - (zd - 2) / 6.0, 0, 1)[..., None]
     fill = (fill * (1 - bl) + smooth * bl).clip(0, 255).astype(np.uint8)
+    # v5f: вне разреза — тело после закраски ресниц (их несёт веко)
+    fill = np.where(Ec[..., None], fill, img2[Y0:Y0 + S, X0:X0 + S].clip(0, 255).astype(np.uint8))
     # альфа: разрез, край ~1.5 px снимка (мягко)
     dist_in = nd.distance_transform_edt(Ec) - nd.distance_transform_edt(~Ec)
     # альфа в два уровня: 0…0.75 — 4 px за краем разреза (край — пиксели Tripo, накладка там уже непрозрачна),
     # 0.75…1 — внутри разреза (шейдер: радужка видна только там — её режут обводка и ресницы)
-    alpha = np.where(dist_in < 0, 0.75 * np.clip((dist_in + 4.0) / 3.0, 0, 1), 0.75 + 0.25 * np.clip(dist_in / 2.0, 0, 1))
+    # v5f: снаружи — кайма RING px: до RIN непрозрачна (0.75), дальше растворяется в тело
+    alpha = np.where(dist_in < 0, 0.75 * np.clip((dist_in + RING) / (RING - RIN), 0, 1), 0.75 + 0.25 * np.clip(dist_in / 2.0, 0, 1))
     plate = np.dstack([fill, (alpha * 255).astype(np.uint8)])
     ps = Image.fromarray(plate[..., :3]).resize((PT, PT), Image.LANCZOS)
     pa_ = Image.fromarray(plate[..., 3]).resize((PT, PT), Image.LANCZOS)
@@ -228,8 +292,9 @@ V, UVs, F, PXY = [], [], [], []
 for si, side in enumerate('LR'):
     e = EYES[side]
     x0, x1, y0, y1 = e['bbox']
-    NXg, NYg = 56, int(round(56 * (y1 - y0 + 8) / (x1 - x0 + 8)))
-    gx = np.linspace(x0 - 4, x1 + 4, NXg); gy = np.linspace(y0 - 4, y1 + 4, NYg)
+    GP = RING + 3
+    NXg, NYg = 56, int(round(56 * (y1 - y0 + 2 * GP) / (x1 - x0 + 2 * GP)))
+    gx = np.linspace(x0 - GP, x1 + GP, NXg); gy = np.linspace(y0 - GP, y1 + GP, NYg)
     GX, GY = np.meshgrid(gx, gy)
     base = len(V)
 
@@ -243,7 +308,7 @@ for si, side in enumerate('LR'):
     pl = info[side]['plate']
     UVs.extend(np.c_[pl[0] + GX.ravel() * pl[2], pl[1] + GY.ravel() * pl[2]])
     PXY.extend(np.c_[GX.ravel(), GY.ravel()])
-    Ed = nd.binary_dilation(e['E'], iterations=3)
+    Ed = nd.distance_transform_edt(~e['E']) <= RING + 1
     ins = nd.map_coordinates(Ed.astype(float), [GY.ravel() - 0.5, GX.ravel() - 0.5], order=0) > 0.5
     for r in range(NYg - 1):
         for c in range(NXg - 1):
@@ -280,70 +345,31 @@ J = B['J'][fi[nn]]; Wt = B['W'][fi[nn]].astype(np.float32)
 if Wt.max() > 1.5:
     Wt = Wt / 255.0
 
-# ── текстура тела: ресницы Tripo в полосе века закрашены мехом (их несёт веко Lids_V5 — v5_face.py, lidStrip) ──
-th, tw = tex.shape[:2]
-tex2 = tex.copy()
-strip = ex5.get('lidStrip', {})
-LP_UV = []
-lpaint = np.zeros((th, tw), bool); lcol = np.zeros((th, tw, 3), float)
-for side, rows in strip.items():
-    rows = np.array(rows)
-    xs_p = (rows[:, 0] - BOX[0]) / PX; top_p = (BOX[3] - rows[:, 1]) / PX; bot_p = (BOX[3] - rows[:, 2]) / PX
-    xa_, xb_ = int(np.ceil(xs_p.min())), int(np.floor(xs_p.max()))
-    xx = np.arange(xa_, xb_ + 1)
-    tp = np.interp(xx, xs_p, top_p); bp = np.interp(xx, xs_p, bot_p)
-    # закраска: inpaint снимка 0.1 мм по меху вокруг (ресницы и полоса — тёмное в полосе века, с запасом)
-    R = np.zeros((H_, W_), bool)
-    for x, t0, b0 in zip(xx, tp, bp):
-        R[max(int(np.floor(t0)) - 2, 0):int(np.ceil(b0)) + 1, x] = True
-    # вся полоса (ресницы с их светлой каймой — иначе по краю лепестков оставались бледные контуры), без белка
-    # v5e: светлое исключается только в разрезе глаза (белок): светлая кайма лепестков ресниц над глазом закрашивается
-    # тоже — иначе при закрытом веке на теле оставались бледные «призраки» лепестков
-    msk = nd.binary_dilation(R, iterations=3) & ~(((Lum > 175) & (mx - mn < 60)) & nd.binary_dilation(EYES[side]['E'], iterations=3))
-    # цвет: мех над полосой по столбцу (светлое, не ресницы, 1…6 мм выше), вдоль глаза — сглажено
-    fc = []
-    for x, t0 in zip(xx, tp):
-        c = img[np.clip(np.arange(int(t0) - 60, int(t0) - 10), 0, H_ - 1), x]
-        ok = (c.mean(-1) > 100) & (c.mean(-1) < 200)
-        fc.append(np.median(c[ok], 0) if ok.sum() > 3 else np.array([np.nan] * 3))
-    fc = np.array(fc)
-    for q in range(3):
-        bad = np.isnan(fc[:, q])
-        if bad.any():
-            fc[bad, q] = np.interp(np.where(bad)[0], np.where(~bad)[0], fc[~bad, q])
-        fc[:, q] = nd.uniform_filter1d(nd.median_filter(fc[:, q], 31, mode='nearest'), 41, mode='nearest')
-    big = np.zeros((H_, W_, 3), np.float32)
-    big[:, xx] = fc[None, :, :]
-    ys_, xs_ = np.where(msk)
-    uv = img_uv[ys_, xs_]
-    ok = tri[ys_, xs_] >= 0
-    tx = np.clip((uv[ok, 0] % 1) * tw, 0, tw - 1).astype(int); ty = np.clip((uv[ok, 1] % 1) * th, 0, th - 1).astype(int)
-    lpaint[ty, tx] = True; lcol[ty, tx] = big[ys_[ok], xs_[ok]]
-    LP_UV.extend(uv[ok].tolist())
-# карта нормалей и шероховатость в полосе — ровный мех (рельеф лепестков Tripo давал блики-контуры ресниц)
-lpm = nd.binary_closing(lpaint, iterations=2)
-hl = lpm & ~lpaint
-if hl.any():
-    idx = nd.distance_transform_edt(~lpaint, return_distances=False, return_indices=True)
-    lcol[hl] = lcol[idx[0][hl], idx[1][hl]]
-# край закраски — мягко (2 текселя)
-wl = nd.gaussian_filter(lpm.astype(float), 1.2) * lpm
-wl = np.maximum(wl, nd.binary_erosion(lpm, iterations=2))
-tex2 = (tex2 * (1 - wl[..., None]) + lcol * wl[..., None]).astype(np.uint8)
-print(f'текстура тела: ресницы в полосе века закрашены мехом ({int(lpm.sum())} текселей)')
 
-# ── текстура тела: разрез закрашен белком (радужка Tripo не просвечивает при взгляде в сторону) ──
+# ── v5f: кожа под накладкой (разрез + кайма RB px) — мех: inpaint снимка по меху вокруг (4× мельче) + зерно меха ──
+# (раньше разрез закрашивался белком; закрытое веко — кожа тела, накладка под ним прячется — v5Face.ts)
 paint = np.zeros((th, tw), bool); col = np.zeros((th, tw, 3), float)
-for si, side in enumerate('LR'):
-    e = EYES[side]
-    Ein = nd.binary_erosion(e['E'], iterations=1)
-    ys, xs = np.where(Ein)
-    pl = info[side]['plate']
-    u_ = pl[0] + (xs + 0.5) * pl[2]; v_ = pl[1] + (ys + 0.5) * pl[2]
-    cc = atlas[np.clip((v_ * AT).astype(int), 0, AT - 1), np.clip((u_ * AT).astype(int), 0, AT - 1), :3]
-    uv = img_uv[ys, xs]
-    tx = np.clip((uv[:, 0] % 1) * tw, 0, tw - 1).astype(int); ty = np.clip((uv[:, 1] % 1) * th, 0, th - 1).astype(int)
-    paint[ty, tx] = True; col[ty, tx] = cc
+Mfp = np.zeros((H_, W_), bool)
+for side in 'LR':
+    Mfp |= nd.distance_transform_edt(~EYES[side]['E']) <= RB
+ffull = FILL.copy()
+# зерно: шум со спектром и силой высоких частот меха вокруг (кольцо 45…90 px)
+ringz = np.zeros((H_, W_), bool)
+for side in 'LR':
+    dd = nd.distance_transform_edt(~EYES[side]['E'])
+    ringz |= (dd > 45) & (dd < 90)
+hp = img2.mean(-1) - nd.gaussian_filter(img2.mean(-1), 4)
+sd = float(np.std(hp[ringz & (tri >= 0)]))
+rng = np.random.default_rng(5)
+nz = nd.gaussian_filter(rng.standard_normal((H_, W_)), 1.2)
+nz *= sd / max(float(np.std(nz)), 1e-6)
+ffull = ffull + nz[..., None] * 0.3
+print(f'кожа под накладкой глаз: {int(Mfp.sum())} px снимка, зерно {sd:.1f}')
+ys, xs = np.where(Mfp & (tri >= 0))
+uv = img_uv[ys, xs]
+tx = np.clip((uv[:, 0] % 1) * tw, 0, tw - 1).astype(int); ty = np.clip((uv[:, 1] % 1) * th, 0, th - 1).astype(int)
+paint[ty, tx] = True; col[ty, tx] = ffull[ys, xs]
+LP_UV.extend(uv.tolist())
 # швы UV и края треугольников: соседние тексели (до 4) — тоже, если там радужка Tripo или белок (обводку не трогаем)
 tf = tex.astype(int)
 irisish = ((tf[..., 1] > tf[..., 0] + 15) & (tf[..., 1] > tf[..., 2] - 25)) | ((tf.mean(-1) > 170) & (tf.max(-1) - tf.min(-1) < 70))
@@ -352,7 +378,25 @@ holes = pm & ~paint
 if holes.any():
     idx = nd.distance_transform_edt(~paint, return_distances=False, return_indices=True)
     col[holes] = col[idx[0][holes], idx[1][holes]]
-tex2[pm] = col[pm].astype(np.uint8)
+tex2[pm] = col[pm].clip(0, 255).astype(np.uint8)
+# v5f: закрытое веко (ключи eyeskin): тёмное, что открывает кожа закрытого века (изнанка лепестков ресниц Tripo) — мехом
+if 'eyeskin_L' in TG:
+    Desk = TG['eyeskin_L'] + TG['eyeskin_R']
+    tric, baryc, _ = raster_front(P + Desk, I, BOX, PX)
+    uvc = interp(UV, I, tric, baryc)
+    imc = sample(tex2, uvc).astype(float)
+    mvd = (interp(np.linalg.norm(Desk, axis=1)[:, None], I, tric, baryc)[..., 0] > 2e-4) & (tric >= 0)
+    dk = nd.binary_dilation((imc.mean(-1) < 125) & mvd, iterations=3) & mvd
+    ys, xs = np.where(dk)
+    uv = uvc[ys, xs]
+    tx = np.clip((uv[:, 0] % 1) * tw, 0, tw - 1).astype(int); ty = np.clip((uv[:, 1] % 1) * th, 0, th - 1).astype(int)
+    tex2[ty, tx] = ffull[ys, xs].clip(0, 255).astype(np.uint8)
+    pm[ty, tx] = True
+    LP_UV.extend(uv.tolist())
+    print(f'закрытое веко: тёмное под кожей века — мехом ({len(ys)} px снимка)')
+# v5f: поля островов у швов — тем же цветом (у внутреннего уголка глаза оставалась вертикальная тёмная черта)
+_cov = uv_cover(UV, I, th, tw)
+print(f'швы UV: поля острова закрашены ({bleed(tex2, pm | lpm, _cov)} текселей)')
 g.set_image(tex_i, Image.fromarray(tex2))
 if LP_UV:
     uvs_ = np.array(LP_UV)
@@ -374,7 +418,7 @@ if LP_UV:
         arr[m_] = val
         g.set_image(si_, Image.fromarray(arr))
         print(f'{key_}: полоса ресниц — ровный мех ({int(m_.sum())} текселей)')
-print(f'текстура тела: закрашено {int(pm.sum())} текселей разреза')
+print(f'текстура тела: под накладкой глаз — мех ({int(pm.sum())} текселей)')
 
 def add_sparse(arr):
     """ключ разреженным accessor (как v5_face.py): только вершины со сдвигом > 0.02 мм"""

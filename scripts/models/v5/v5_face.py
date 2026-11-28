@@ -54,6 +54,7 @@ if '--src' in sys.argv:
             k += 1
     print('концевые кости — как у Tripo:', k)
 P, N, UV, I = B['P'], B['N'], B['UV'], B['I']
+P0 = P.copy()  # v5f: до прижатия лепестков ресниц и сглаживания лба (снимок полосы ресниц века — с лепестками Tripo)
 Nn = N / np.maximum(np.linalg.norm(N, axis=1, keepdims=True), 1e-9)
 mat0 = j['materials'][B['pr']['material']]
 tex = np.array(g.image(j['textures'][mat0['pbrMetallicRoughness']['baseColorTexture']['index']]['source']).convert('RGB'))
@@ -168,13 +169,211 @@ marks = {
 }
 print('шарнир челюсти', hinge.round(3), 'вершин полости', int(cav.sum()))
 
+# ════════════════ v5f: кожа закрытого века (ключи eyeskin_L/R) ════════════════
+# Закрытый глаз — кожа тела (не оболочка-«шапочка»): кожа над нарисованным глазом, полосой ресниц и лепестками ресниц Tripo
+# (геометрия) растягивается мембраной (гармоническое сглаживание, край зоны неподвижен) — без купола глаза, обводки-складки,
+# колец радужки и торчащих лепестков. Вес — «закрытость» глаза (v5Face.ts: v5LidClosed); веко-полоса ресниц при закрытии
+# едет по этой коже.
+from scipy import sparse as _sp  # noqa: E402
+ESK_UP, ESK_SIDE, ESK_DN = 30.0, 14.0, 16.0  # зона: над верхом полосы ресниц, по бокам и под глазом (px снимка 0.4 мм)
+_kq = np.round(P * 1e5).astype(np.int64)
+_, WQ = np.unique(_kq, axis=0, return_inverse=True); WQ = WQ.ravel(); nWQ = WQ.max() + 1
+Pw_ = np.zeros((nWQ, 3)); np.add.at(Pw_, WQ, P); _cnt = np.bincount(WQ, minlength=nWQ); Pw_ /= _cnt[:, None]
+_E = WQ[np.r_[I[:, [0, 1]], I[:, [1, 2]], I[:, [2, 0]]]]
+_E = _E[_E[:, 0] != _E[:, 1]]
+_A = _sp.coo_matrix((np.ones(len(_E) * 2), (np.r_[_E[:, 0], _E[:, 1]], np.r_[_E[:, 1], _E[:, 0]])), shape=(nWQ, nWQ)).tocsr()
+_A.data[:] = 1.0
+_deg = np.asarray(_A.sum(1)).ravel()
+ZONES = {}
+for side in ('L', 'R'):
+    e = eyes[side]
+    zone = np.zeros((H_, W_), bool)
+    zone |= nd.binary_dilation(e['eye'], iterations=int(ESK_DN))
+    for x, l_, t_ in zip(e['x'], e['lt'], e['top']):
+        zone[int(max(l_ - ESK_UP, 0)):int(t_) + 2, int(x)] = True
+    xa_, xb_ = int(e['x'][0] - ESK_SIDE), int(e['x'][-1] + ESK_SIDE)
+    band = np.zeros_like(zone); band[:, max(xa_, 0):xb_] = True
+    zone = nd.binary_closing(zone | (nd.binary_dilation(zone, iterations=int(ESK_SIDE)) & band & (np.arange(H_)[:, None] < np.interp(np.arange(W_), e['x'], e['bot'])[None, :] + ESK_DN)), iterations=3)
+    ZONES[side] = (zone, nd.distance_transform_edt(zone))
+
+
+def membrane(Pw_):
+    """по сторонам: (сдвиг к мембране по сваренным вершинам, мембрана, вершины зоны)"""
+    wx_, wy_ = to_px(Pw_)
+    out = {}
+    for side in ('L', 'R'):
+        zone, din = ZONES[side]
+        ok = (wx_ >= 0) & (wx_ < W_ - 1) & (wy_ >= 0) & (wy_ < H_ - 1)
+        xi = np.clip(wx_.astype(int), 0, W_ - 1); yi = np.clip(wy_.astype(int), 0, H_ - 1)
+        # вершины в зоне: кожа и лепестки ресниц над ней (до 6 мм перед поверхностью снимка); тыльная сторона — нет
+        inz = ok & zone[yi, xi] & (Pw_[:, 2] > depth[yi, xi] - 0.012) & (Pw_[:, 2] > 0.05)
+        free = np.where(inz)[0]
+        Q = Pw_.copy()
+        # только глубина (x, y вершин на месте — текстура не съезжает): гармоническая «высота» кожи, точное решение
+        # (deg·z_f − A_ff·z_f = A_fb·z_b)
+        from scipy.sparse.linalg import spsolve
+        isf = np.zeros(nWQ, bool); isf[free] = True
+        Aff = _A[free][:, free]; Afb = _A[free][:, ~isf]
+        M_ = _sp.diags(_deg[free]) - Aff
+        Q[free, 2] = spsolve(M_.tocsc(), Afb @ Q[~isf, 2])
+        # к краю зоны — плавно (4 мм), без складки
+        tw_ = np.clip(din[yi, xi] / 10.0, 0, 1); tw_ = tw_ * tw_ * (3 - 2 * tw_)
+        out[side] = ((Q - Pw_) * (tw_ * inz)[:, None], Q, inz, wx_, wy_)
+    return out
+
+
+# v5f: лепестки ресниц Tripo над глазом (геометрия: торчащие «шипы» серого меха — ресницы рисует полоса века) — прижаты
+# к коже в покое; большие внешние ресницы у уголка (за разрезом) — как у Tripo
+MB = membrane(Pw_)
+spk = np.zeros(nWQ, bool)
+# v5f: глазница Tripo (разрез глаза утоплен, вокруг — ложбина со стенкой: тёмная дуга-«кратер» над глазом) и лепестки
+# ресниц — в покое кожа ровная: глаз и ложбина — по мембране (глубина, x/y на месте), к краю зоны — плавно
+REST_K = 1.0
+for side in ('L', 'R'):
+    D_, Q, inz, wx_, wy_ = MB[side]
+    sp_ = inz & (np.abs(D_[:, 2]) > 1e-7)
+    spk |= sp_
+    Pw_[sp_, 2] += REST_K * D_[sp_, 2]
+# лепестки ресниц (тонкие «плавники» в плоскости лица поверх кожи, тёмные в текстуре Tripo) — за кожу (их рисует
+# полоса века); у внешнего уголка (четверть глаза) — как у Tripo
+_C = sample(tex, UV).astype(float).mean(1)
+_tdark = _C[I].mean(1) < 95
+_vt_all = np.zeros(nWQ); _vt_dk = np.zeros(nWQ)
+np.add.at(_vt_all, WQ[I].ravel(), 1); np.add.at(_vt_dk, WQ[I].ravel(), np.repeat(_tdark, 3).astype(float))
+_finv = (_vt_dk == _vt_all) & (_vt_all > 0)
+for side in ('L', 'R'):
+    D_, Q, inz, wx_, wy_ = MB[side]
+    e = eyes[side]
+    w_e = e['x'][-1] - e['x'][0]
+    keep_out = (wx_ > e['x'][-1] - 0.25 * w_e) if side == 'L' else (wx_ < e['x'][0] + 0.25 * w_e)
+    topx = np.interp(wx_, e['x'], e['top'])
+    fv = _finv & inz & ~keep_out & (wy_ < topx + 2)
+    Pw_[fv, 2] = Pw_[fv, 2] - 0.0035
+    spk |= fv
+    print(f'лепестки ресниц {side} — за кожу: {int(fv.sum())} вершин')
+print(f'глазница и лепестки ресниц — кожа по мембране: {int(spk.sum())} вершин')
+if spk.any():
+    moved_v = spk[WQ]
+    P[moved_v] = Pw_[WQ][moved_v]
+    _fn = np.cross(P[I[:, 1]] - P[I[:, 0]], P[I[:, 2]] - P[I[:, 0]])
+    _Nf = np.zeros_like(P)
+    for _k in range(3):
+        np.add.at(_Nf, I[:, _k], _fn)
+    _Nw = np.zeros((nWQ, 3)); np.add.at(_Nw, WQ, _Nf); _Nf = _Nw[WQ]
+    _Nf /= np.maximum(np.linalg.norm(_Nf, axis=1, keepdims=True), 1e-12)
+    # нормали сдвинутых и соседних вершин — пересчитаны
+    nb = np.zeros(nWQ, bool); nb[spk] = True; nb = nb | ((_A @ nb.astype(float)) > 0)
+    Nn[nb[WQ]] = _Nf[nb[WQ]]
+    N = Nn.copy()
+    BODY_REST = True
+    tri, bary, depth = raster_front(P, I, BOX, PX)
+    img_uv = interp(UV, I, tri, bary)
+    img_P = interp(P, I, tri, bary)
+    img_N = interp(Nn, I, tri, bary); img_N /= np.maximum(np.linalg.norm(img_N, axis=-1, keepdims=True), 1e-9)
+    vx, vy = to_px(P)
+    inb = (vx >= 0) & (vx < W_ - 1) & (vy >= 0) & (vy < H_ - 1)
+    front = np.zeros(len(P), bool)
+    front[inb] = np.abs(depth[vy[inb].astype(int), vx[inb].astype(int)] - P[inb, 2]) < 0.0025
+    MB = membrane(Pw_)
+# v5f: лоб над глазами — мягче: валик брови Tripo и ложбина между ним и ресницами (в тени — «кратер» над глазом)
+# сглажены по глубине (z, x/y на месте — текстура не съезжает), 40 шагов лапласиана, к краю зоны — в ноль
+BROW_SMOOTH, BROW_UP = 0.75, 110.0  # доля сглаживания; высота зоны над верхом полосы ресниц (px снимка 0.4 мм)
+_xr0 = eyes['R']['x'][0] - 20; _xr1 = eyes['L']['x'][-1] + 20
+_ltx = np.interp(np.arange(W_), np.r_[eyes['R']['x'], eyes['L']['x']], np.r_[eyes['R']['lt'], eyes['L']['lt']])
+_rows = np.arange(H_)[:, None]
+_tpx = np.interp(np.arange(W_), np.r_[eyes['R']['x'], eyes['L']['x']], np.r_[eyes['R']['top'], eyes['L']['top']])
+# снизу — верх разреза глаза (полоса ресниц и лепестки — в зоне: без складки над ресницами), сверху — BROW_UP над ресницами
+fz = (_rows < _tpx[None, :] - 1) & (_rows > _ltx[None, :] - BROW_UP) & (np.arange(W_)[None, :] > _xr0) & (np.arange(W_)[None, :] < _xr1)
+fz_d = nd.distance_transform_edt(fz)
+wx2, wy2 = to_px(Pw_)
+xi2 = np.clip(wx2.astype(int), 0, W_ - 1); yi2 = np.clip(wy2.astype(int), 0, H_ - 1)
+ok2 = (wx2 >= 0) & (wx2 < W_ - 1) & (wy2 >= 0) & (wy2 < H_ - 1)
+infz = ok2 & fz[yi2, xi2] & (np.abs(Pw_[:, 2] - depth[yi2, xi2]) < 0.004) & (Pw_[:, 2] > 0.05)
+fr_ = np.where(infz)[0]
+Zs = Pw_[:, 2].copy()
+_Af2 = _A[fr_]; _df2 = _deg[fr_]
+for _ in range(40):
+    Zs[fr_] = 0.5 * Zs[fr_] + 0.5 * (_Af2 @ Zs) / _df2
+tf_ = np.clip(fz_d[yi2, xi2] / 10.0, 0, 1); tf_ = tf_ * tf_ * (3 - 2 * tf_)
+dzf = (Zs - Pw_[:, 2]) * BROW_SMOOTH * tf_ * infz
+print(f'лоб над глазами сглажен: вершин {len(fr_)}, сдвиг {dzf.min() * 1000:.1f}…{dzf.max() * 1000:.1f} мм')
+if len(fr_):
+    Pw_[:, 2] += dzf
+    mv2 = np.abs(dzf) > 1e-7
+    spk = spk | mv2
+    P[:, 2] = Pw_[WQ][:, 2]
+    _fn = np.cross(P[I[:, 1]] - P[I[:, 0]], P[I[:, 2]] - P[I[:, 0]])
+    _Nf = np.zeros_like(P)
+    for _k in range(3):
+        np.add.at(_Nf, I[:, _k], _fn)
+    _Nw = np.zeros((nWQ, 3)); np.add.at(_Nw, WQ, _Nf); _Nf = _Nw[WQ]
+    _Nf /= np.maximum(np.linalg.norm(_Nf, axis=1, keepdims=True), 1e-12)
+    nb = mv2 | ((_A @ mv2.astype(float)) > 0)
+    Nn[nb[WQ]] = _Nf[nb[WQ]]
+    N = Nn.copy()
+    tri, bary, depth = raster_front(P, I, BOX, PX)
+    img_uv = interp(UV, I, tri, bary)
+    img_P = interp(P, I, tri, bary)
+    img_N = interp(Nn, I, tri, bary); img_N /= np.maximum(np.linalg.norm(img_N, axis=-1, keepdims=True), 1e-9)
+    vx, vy = to_px(P)
+    inb = (vx >= 0) & (vx < W_ - 1) & (vy >= 0) & (vy < H_ - 1)
+    front = np.zeros(len(P), bool)
+    front[inb] = np.abs(depth[vy[inb].astype(int), vx[inb].astype(int)] - P[inb, 2]) < 0.0025
+    MB = membrane(Pw_)
+ESK = {}
+for side in ('L', 'R'):
+    D_ = MB[side][0]
+    ESK[side] = D_[WQ]
+    print(f'кожа века {side}: вершин {int(MB[side][2].sum())}, макс. сдвиг {np.abs(D_).max() * 1000:.1f} мм')
+# снимок кожи закрытого века (обе стороны) — по ней едет закрытое веко-полоса
+_Psk = P + ESK['L'] + ESK['R']
+_trk, _bak, _ = raster_front(_Psk, I, BOX, PX)
+img_P2 = interp(_Psk, I, _trk, _bak)
+_Nsk = np.zeros_like(P)
+_fn = np.cross(_Psk[I[:, 1]] - _Psk[I[:, 0]], _Psk[I[:, 2]] - _Psk[I[:, 0]])
+for _k in range(3):
+    np.add.at(_Nsk, I[:, _k], _fn)
+_Nw = np.zeros((nWQ, 3)); np.add.at(_Nw, WQ, _Nsk); _Nsk = _Nw[WQ]
+_Nsk /= np.maximum(np.linalg.norm(_Nsk, axis=1, keepdims=True), 1e-12)
+img_N2 = interp(_Nsk, I, _trk, _bak); img_N2 /= np.maximum(np.linalg.norm(img_N2, axis=-1, keepdims=True), 1e-9)
+img_P2 = np.where((_trk >= 0)[..., None], img_P2, img_P); img_N2 = np.where((_trk >= 0)[..., None], img_N2, img_N)
+
+
+def surf_k(x, y, w):
+    """точка и нормаль: кожа покоя (w = 0) → кожа закрытого века (w = 1); w — число или по столбцам"""
+    p0, n0 = surf(x, y)
+    if np.all(np.asarray(w) == 0):
+        return p0, n0
+    xi = np.clip(np.floor(x - 0.5).astype(int), 0, W_ - 2); yi = np.clip(np.floor(y - 0.5).astype(int), 0, H_ - 2)
+    fx = np.clip(x - 0.5 - xi, 0, 1)[..., None]; fy = np.clip(y - 0.5 - yi, 0, 1)[..., None]
+
+    def bl(A):
+        return (A[yi, xi] * (1 - fx) * (1 - fy) + A[yi, xi + 1] * fx * (1 - fy) + A[yi + 1, xi] * (1 - fx) * fy + A[yi + 1, xi + 1] * fx * fy)
+    p1 = bl(img_P2); n1 = bl(img_N2); n1 /= np.maximum(np.linalg.norm(n1, axis=-1, keepdims=True), 1e-9)
+    ww = np.broadcast_to(np.asarray(w, float), np.shape(x))[..., None]
+    n = n0 * (1 - ww) + n1 * ww
+    return p0 * (1 - ww) + p1 * ww, n / np.maximum(np.linalg.norm(n, axis=-1, keepdims=True), 1e-9)
+
+
+# ключи eyeskin — только если кожа закрытого века заметно отличается от кожи покоя (после выравнивания глазницы в покое
+# разница ≲ 3 мм — ключи не нужны: размер)
+ESK_KEYS = max(np.abs(ESK['L']).max(), np.abs(ESK['R']).max()) > 0.004
+print('ключи кожи закрытого века:', 'да' if ESK_KEYS else 'не нужны (глазница выровнена в покое)')
+
+
+def esk_w(c):
+    """вес кожи закрытого века по закрытию c (как v5LidClosed в v5Face.ts)"""
+    k = np.clip((np.asarray(c, float) - 0.55) / 0.4, 0, 1)
+    return k * k * (3 - 2 * k) * ESK_KEYS
+
+
 # v5d: снимок 0.1 мм у глаз — полоса ресниц Tripo для века (на 0.4 мм тонкие лепестки ресниц размываются в мех)
 PXH = 0.0001
 _xa = BOX[0] + (min(eyes['R']['x'][0], eyes['L']['x'][0]) - 60) * PX; _xb = BOX[0] + (max(eyes['R']['x'][-1], eyes['L']['x'][-1]) + 60) * PX
 _ya = BOX[3] - (max(eyes['R']['bot'].max(), eyes['L']['bot'].max()) + 10) * PX
 _yb = BOX[3] - (min(eyes['R']['lt'].min(), eyes['L']['lt'].min()) - 70) * PX
 BOXH = (_xa, _xb, _ya, _yb)
-trih, baryh, _ = raster_front(P, I, BOXH, PXH)
+trih, baryh, _ = raster_front(P0, I, BOXH, PXH)
 imgh = sample(tex, interp(UV, I, trih, baryh)).astype(float)
 
 
@@ -299,9 +498,11 @@ for ei, side in enumerate(('L', 'R')):
     HS = yT - yTop0  # высота полосы ресниц, px снимка
     lid_strip[side] = (xs_e.copy(), yTop0.copy(), yT.copy())
 
-    def pos_at(c, shape=None):
-        """позиции и нормали века при закрытии c (shape — своё c по столбцам: наклоны, «^»)"""
+    def pos_at(c, shape=None, wsk=None):
+        """позиции и нормали века при закрытии c (shape — своё c по столбцам: наклоны, «^»); wsk — вес кожи закрытого
+        века (v5f), по умолчанию — по c"""
         cc = np.full(NC, c) if shape is None else shape
+        wk = esk_w(c) if wsk is None else wsk
         yE_ = yT + cc * Lg
         yS = yE_ - HS
         Y = np.zeros((NR + 1, NC))
@@ -316,7 +517,7 @@ for ei, side in enumerate(('L', 'R')):
             else:
                 Y[r] = yS + (yE_ - yS) * ((r - NF) / (NR - NF))
         X = np.repeat(xs_e[None, :], NR + 1, 0)
-        p, n_ = surf(X, Y)
+        p, n_ = surf_k(X, Y, wk)
         fr = np.clip((Y - yTop0[None, :]) / np.maximum(yE_ - yTop0, 1e-6)[None, :], 0, 1)
         dlt = DT + (DM - DT) * np.sqrt(fr) * np.clip(4 * cc, 0, 1)[None, :]
         return (p + n_ * dlt[..., None]).reshape(-1, 3), n_.reshape(-1, 3)
@@ -357,18 +558,18 @@ for ei, side in enumerate(('L', 'R')):
     }
     for nm, ye in EDGES.items():
         cc = np.clip((ye - yT) / Lg, 0, 1)
-        pk, nk = pos_at(0.0, shape=cc)
+        pk, nk = pos_at(0.0, shape=cc, wsk=float(ESK_KEYS) if nm == 'laugh' else 0.0)
         keys.setdefault(f'lid{side}_{nm}', []).append((base, pk - p0, nk - n0))
     # ── v5c: нижнее веко — ряды от линии под глазом (покой: стянуты в линию) вверх ──
     baseL = base + (NR + 1) * NC
     yB = yE.copy()
     SL = np.linspace(0, 1, NRL + 1)
 
-    def pos_lo(ytop):
+    def pos_lo(ytop, wsk=0.0):
         ytop = np.minimum(ytop, yB)
         X = np.repeat(xs_e[None, :], NRL + 1, 0)
         Y = yB[None, :] - SL[:, None] * (yB - ytop)[None, :]
-        p, n_ = surf(X, Y)
+        p, n_ = surf_k(X, Y, wsk)
         dlt = DT + (DLO - DT) * np.clip(SL * 3, 0, 1)[:, None] * np.ones(NC)[None, :]
         return (p + n_ * dlt[..., None]).reshape(-1, 3), n_.reshape(-1, 3)
     q0, m0 = pos_lo(yB)
@@ -390,9 +591,9 @@ for ei, side in enumerate(('L', 'R')):
         'lolaugh': arc - 6.0,
     }
     for nm, ye in LOS.items():
-        pk, nk = pos_lo(ye)
+        pk, nk = pos_lo(ye, float(ESK_KEYS) if nm == 'lolaugh' else 0.0)
         keys.setdefault(f'lid{side}_{nm}', []).append((baseL, pk - q0, nk - m0))
-    skin_pos.append(pos_lo(LOS['lolaugh'])[0])
+    skin_pos.append(pos_lo(LOS['lolaugh'], float(ESK_KEYS))[0])
     print(f'веко {side}: {NC}×{NR + 1} вершин, ход кромки {Lg.max() * PX * 1000:.0f} мм, полоса ресниц {np.median(band):.0f} px')
 
 LV = np.array(LV, np.float32); LUV = np.array(LUV, np.float32); LF = np.array(LF, np.uint32)
@@ -621,6 +822,9 @@ def cheeks_puff(amt=0.0075):
 
 
 BODY_KEYS['cheeks_puff'] = cheeks_puff()
+# v5f: кожа закрытого века (вес — закрытость глаза, v5Face.ts)
+for sd in 'LR' if ESK_KEYS else '':
+    BODY_KEYS[f'eyeskin_{sd}'] = ESK[sd].copy()
 # веки едут вместе с растянутым глазом (иначе линия покоя века осталась бы на белке)
 for sd in 'LR':
     b0 = lid_base[sd]; nU = (NR + 1) * NC; nLo = (NRL + 1) * NC
@@ -702,7 +906,7 @@ for nm in lid_names:
     dp = np.zeros((nL, 3), np.float32); dn = np.zeros((nL, 3), np.float32)
     for base, a, b in keys[nm]:
         dp[base:base + len(a)] = a; dn[base:base + len(b)] = b
-    ltargets.append({'POSITION': add_sparse(dp), 'NORMAL': add_sparse(dn)})
+    ltargets.append({'POSITION': add_sparse(dp)})  # v5f: без нормалей ключей (веко — полоса ресниц; размер)
 Wn = LW.astype(np.float32)
 if Wn.dtype != np.float32 or Wn.max() > 1.5:
     Wn = Wn / 255.0
@@ -722,6 +926,9 @@ j['asset'].setdefault('extras', {})['glitterV5'] = {
                       for x, a, b in zip(*lid_strip[sd])] for sd in lid_strip},
     'source': 'design/models/glitter_v5_rigged.glb (Tripo 4 вида, H3.1, Ultra, 4K PBR, одна сетка; Auto Rig Mixamo)',
 }
+if spk.any():
+    g.set_acc(B['pr']['attributes']['POSITION'], P.astype(np.float32))
+    g.set_acc(B['pr']['attributes']['NORMAL'], Nn.astype(np.float32))
 size = g.save(dst)
 print(f'→ {dst} ({size / 1e6:.2f} МБ): ключей тела {len(body_targets)}, век {len(lid_names)}, вершин век {nL}')
 

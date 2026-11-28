@@ -66,3 +66,23 @@ def sample(tex, uv):
     h, w = tex.shape[:2]
     x = np.clip((uv[..., 0] % 1) * w, 0, w - 1).astype(int); y = np.clip((uv[..., 1] % 1) * h, 0, h - 1).astype(int)
     return tex[y, x]
+
+
+def uv_cover(UV, I, h, w):
+    """тексели, покрытые треугольниками (UV glTF, v вниз) — остальное поля острова (их видно у швов при фильтрации)"""
+    import cv2
+    m = np.zeros((h, w), np.uint8)
+    pts = np.stack([(UV[I][..., 0] % 1) * w, (UV[I][..., 1] % 1) * h], -1)
+    pts = np.round(pts * 4).astype(np.int32)  # 2 бита подпиксельной точности
+    cv2.fillPoly(m, list(pts), 1, lineType=cv2.LINE_8, shift=2)
+    return m > 0
+
+
+def bleed(tex, painted, cover, n=8):
+    """v5f: закраска заходит на поля острова у швов UV (до n текселей): иначе у шва — тёмная/светлая черта прежнего цвета"""
+    from scipy import ndimage as nd
+    ext = nd.binary_dilation(painted, iterations=n) & ~cover & ~painted
+    if ext.any():
+        idx = nd.distance_transform_edt(~painted, return_distances=False, return_indices=True)
+        tex[ext] = tex[idx[0][ext], idx[1][ext]]
+    return int(ext.sum())
