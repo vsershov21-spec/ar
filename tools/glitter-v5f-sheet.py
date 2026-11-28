@@ -136,7 +136,7 @@ def sheet(D, OUT):
         p = Image.new('RGB', (2 * T + 6, T + 40), BG)
         ImageDraw.Draw(p).text((8, 6), n, fill=(20, 20, 30), font=FB)
         p.paste(lab(crop(ref_img(rf), T), 'реф design/cut'), (0, 40))
-        p.paste(lab(crop(Image.open(f'{D}/{st}.png').convert('RGBA'), T), 'v5f'), (T + 6, 40))
+        p.paste(lab(crop(Image.open(f'{D}/{st}.png').convert('RGBA'), T), os.environ.get('LABEL', 'v5f')), (T + 6, 40))
         pairs.append(p)
     cols = 3
     W = cols * (2 * T + 6) + (cols - 1) * 16

@@ -94,6 +94,9 @@ export interface V5Pose {
   head: [number, number, number];
   gaze: [number, number] | null;
   w?: Record<string, number>;
+  /** v5g: глаза «на мокром месте» (влажный блик по низу радужки, капли катятся) и «сияющие» крупные блики (умиление) 0..1 */
+  wet?: number;
+  sparkle?: number;
 }
 const WINK_BOTH: Record<string, number> = { wink_L: 1, wink_R: 1, smile: 0.7, cheek_up: 0.6, brow_up: 0.25 };
 export const V5_POSES: Record<string, V5Pose> = {
@@ -112,7 +115,7 @@ export const V5_POSES: Record<string, V5Pose> = {
   },
   sad: {
     brow: [16, -7, 16, -7], browIn: 3, bend: -3, head: [0, -0.17, 0.07], gaze: [0, 0.3],
-    w: { brow_sad: 1, frown: 0.7, tear: 1 },
+    w: { brow_sad: 1, frown: 0.7, tear: 1 }, wet: 1,
   },
   offended: {
     brow: [-11, 3, -11, 3], browIn: 5, bend: -4, head: [0.3, 0.06, -0.06], gaze: [-0.62, 0.02],
@@ -126,6 +129,11 @@ export const V5_POSES: Record<string, V5Pose> = {
     brow: [9, -3, 9, -3], browIn: 1, bend: -1, head: [-0.2, -0.17, 0.15], gaze: [0.4, -0.34],
     w: { blush: 1, brow_sad: 0.55, eyes_sleepy: 0.25, frown: 0.15, smile: 0.2, cheek_up: 0.3 },
   },
+  // v5g: умиление («ми-ми»): мягкий домик, голова набок, тёплая улыбка с прищуром снизу, румянец, сияющие глаза
+  caring: {
+    brow: [9, 3, 9, 3], browIn: 1, bend: 1, head: [-0.06, -0.06, 0.2], gaze: null, sparkle: 1, wet: 0.35,
+    w: { smile: 0.5, cheek_up: 0.7, blush: 0.85, brow_sad: 0.3, mouth_omega: 1 },
+  },
   wink: { brow: [7, 5, 7, 5], browIn: 0, bend: 2, head: [0, 0.05, 0.11], gaze: null, w: WINK_BOTH },
   wink_r: { brow: [7, 5, 7, 5], browIn: 0, bend: 2, head: [0, 0.05, 0.11], gaze: null, w: WINK_BOTH },
   wink_l: { brow: [7, 5, 7, 5], browIn: 0, bend: 2, head: [0, 0.05, -0.11], gaze: null, w: WINK_BOTH },
@@ -134,6 +142,12 @@ export const V5_POSES: Record<string, V5Pose> = {
 export const V5_POSE_TAU = 0.085;
 
 /** сглаженная поза кадра (без аллокаций): brow, browIn, bend (мм), head (рад), gaze (рад), focus — 0..1 «смотрит на зрителя» */
+/** v5g: фаза капли слезы (0..1, цикл 3.2 с; правый глаз — со сдвигом) по времени плача t (с); в начале — капля у века */
+export function v5TearPhase(t: number, eye: 0 | 1): number {
+  const T = 3.2;
+  const x = (t + 0.3 * T + (eye ? 0.45 * T : 0)) / T;
+  return x - Math.floor(x);
+}
 export class V5PoseMix {
   readonly brow = [0, 0, 0, 0];
   browIn = 0;
@@ -143,6 +157,9 @@ export class V5PoseMix {
   /** доля эмоции с «прямо на зрителя» (без взгляда в сторону) и доля эмоции вообще */
   focus = 0;
   emo = 0;
+  /** v5g: влажность глаз и сияние бликов 0..1 */
+  wet = 0;
+  sparkle = 0;
   /** id — пресет эмоции, s — её сила 0..1 (0 — покой) */
   update(dt: number, id: string | null, s: number) {
     const p = id ? V5_POSES[id] : undefined;
@@ -155,6 +172,8 @@ export class V5PoseMix {
     for (let i = 0; i < 2; i++) this.gaze[i] += ((p?.gaze ? p.gaze[i] * w : 0) - this.gaze[i]) * k;
     this.focus += ((p ? w : 0) - this.focus) * k;
     this.emo += (w - this.emo) * k;
+    this.wet += ((p?.wet ?? 0) * w - this.wet) * k;
+    this.sparkle += ((p?.sparkle ?? 0) * w - this.sparkle) * k;
   }
 }
 
@@ -183,7 +202,8 @@ export function v5Emote(w: Record<string, number>, st: V5State = _st): Record<st
   // v5d: подмигнуть — закрытая улыбка «ω»; радость — открытая улыбка с клычками (только в эмоции: в покое улыбка «дышит»
   // до 0.38 — рот Tripo)
   const wink = Math.max(g('wink_L'), g('wink_R'));
-  st.mOmega = c01(wink * 1.5) * (1 - st.mLaugh);
+  // v5g: mouth_omega — закрытая улыбка «ω» без подмигивания (умиление)
+  st.mOmega = c01(Math.max(wink * 1.5, g('mouth_omega'))) * (1 - st.mLaugh);
   st.mHappy = c01((g('smile') - 0.55) * 3) * (1 - st.mLaugh) * (1 - st.mOmega) * (1 - st.mO);
   st.mOff = c01(gum * 1.7) * c01(frown * 1.2);
   st.mAnn = c01(down * 1.3) * (1 - c01(gum * 2)) * (1 - st.mO);
@@ -488,6 +508,7 @@ uniform vec4 uBrowS[2];
 uniform vec4 uBrowP[2];
 uniform vec3 uBrowK;
 uniform float uTear;
+uniform vec2 uTearT;
 uniform vec4 uEye[2];
 varying vec3 vBlushP;`;
 const PAINT_APPLY = `
@@ -533,16 +554,24 @@ const PAINT_APPLY = `
           diffuseColor.rgb = mix(diffuseColor.rgb, tc, clamp(pool * 0.8 + hl, 0.0, 1.0) * uTear);
         }
         // v5d: крупная блестящая капля у нижнего века (реф sad): вытянута вверх, тёмный край, два блика
-        vec2 dc = vec2(vBlushP.x - (e.x - 0.3 * e.z * sign(e.x)), vBlushP.y - (e.y - e.w - 0.010));
+        // v5g: капля нарастает у века (фаза 0…0.3), скатывается по щеке (до 42 мм) и гаснет; за ней — влажная дорожка
+        float ph = i == 0 ? uTearT.x : uTearT.y;
+        float grow = smoothstep(0.0, 0.28, ph), run = smoothstep(0.3, 0.92, ph), fadeD = 1.0 - smoothstep(0.86, 1.0, ph);
+        float dsc = mix(0.45, 1.0, grow) * (1.0 - 0.25 * run);
+        float x0d = e.x - 0.3 * e.z * sign(e.x), y0d = e.y - e.w - 0.006;
+        float yd = y0d - 0.004 * grow - 0.042 * run;
+        vec2 dc = vec2(vBlushP.x - x0d, vBlushP.y - yd) / dsc;
         dc.y = dc.y > 0.0 ? dc.y * 0.5 : dc.y;
         float dr = length(dc);
+        float tr = (1.0 - smoothstep(0.0012, 0.0022, abs(vBlushP.x - x0d))) * step(yd, vBlushP.y) * step(vBlushP.y, y0d) * step(0.08, vBlushP.z);
+        diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * 1.08 + vec3(0.05, 0.08, 0.12), tr * run * fadeD * uTear * 0.55);
         float drop = (1.0 - smoothstep(0.0048, 0.0058, dr)) * step(0.08, vBlushP.z);
         float edgeD = smoothstep(0.0032, 0.0056, dr);
         float spec = 1.0 - smoothstep(0.0006, 0.0016, length(dc - vec2(-0.0016, 0.0016)));
         float spec2 = 1.0 - smoothstep(0.0003, 0.0008, length(dc - vec2(0.0018, -0.0018)));
         vec3 dcol = mix(vec3(0.45, 0.74, 1.0), vec3(0.22, 0.45, 0.85), edgeD);
         dcol = mix(dcol, vec3(1.0), max(spec, spec2));
-        diffuseColor.rgb = mix(diffuseColor.rgb, dcol, drop * uTear * 0.95);
+        diffuseColor.rgb = mix(diffuseColor.rgb, dcol, drop * uTear * 0.9 * fadeD);
       }
     }
   }`;
@@ -553,6 +582,8 @@ export interface V5PaintU {
   /** v5e: поза бровей по сторонам (м): сдвиг внутр./внешн. конца, концы к переносице, доп. дуга */
   browPose: { value: THREE.Vector4[] };
   tear: { value: number };
+  /** v5g: фаза капли слезы по глазам 0..1 (v5TearPhase) */
+  tearT: { value: THREE.Vector2 };
   /** v5e: брови рисует шейдер и в покое (в текстуре их нет — asset.extras.glitterV5.brows) */
   browsDrawn: boolean;
 }
@@ -570,6 +601,7 @@ function patchPaint(m: THREE.Material, u: V5PaintU, centers: THREE.Vector3[], bg
     sh.uniforms.uBrowP = u.browPose;
     sh.uniforms.uBrowK = { value: bk };
     sh.uniforms.uTear = u.tear;
+    sh.uniforms.uTearT = u.tearT;
     sh.uniforms.uEye = { value: eyes };
     sh.vertexShader = sh.vertexShader
       .replace('#include <common>', '#include <common>' + PAINT_VS)
@@ -579,7 +611,7 @@ function patchPaint(m: THREE.Material, u: V5PaintU, centers: THREE.Vector3[], bg
       .replace('#include <color_fragment>', '#include <color_fragment>' + PAINT_APPLY);
   };
   const prevKey = m.customProgramCacheKey?.bind(m);
-  m.customProgramCacheKey = () => (prevKey ? prevKey() : '') + '|v5-paint-3';
+  m.customProgramCacheKey = () => (prevKey ? prevKey() : '') + '|v5-paint-4';
   m.needsUpdate = true;
 }
 
@@ -619,7 +651,7 @@ export function attachV5Paint(model: THREE.Object3D, marks: Marks | undefined, b
   if (!marks) return null;
   const u: V5PaintU = {
     blush: { value: 0 }, browInk: { value: new THREE.Vector2() }, browPose: { value: [new THREE.Vector4(), new THREE.Vector4()] },
-    tear: { value: 0 }, browsDrawn: !!(bro?.L && bro?.R),
+    tear: { value: 0 }, tearT: { value: new THREE.Vector2(0.3, 0.3) }, browsDrawn: !!(bro?.L && bro?.R),
   };
   const centers = v5CheekCenters(marks).map((c) => new THREE.Vector3(...c));
   const { bg, bs, eyes } = browsEyes(marks, bro);
@@ -778,6 +810,7 @@ uniform float uEHi;
 uniform float uESpiral;
 uniform float uETime;
 uniform float uEWet;
+uniform float uESpark;
 uniform vec2 uEClosed;
 uniform vec4 uLidE[60];
 uniform vec4 uLidX;
@@ -828,10 +861,17 @@ const EYE_MAP = `
       col = mix(col, spc, uESpiral * inE * (1.0 - smoothstep(1.0, 1.08, r)));
     }
     // влажные блики: большой мягкий сверху-справа (свет сцены) и маленький снизу-слева — едут с радужкой
-    vec2 h1 = q - vec2(0.34, -0.36), h2 = q - vec2(-0.30, 0.34);
-    float b1 = 1.0 - smoothstep(0.11, 0.2, length(h1 * vec2(1.0, 1.25)));
-    float b2 = 1.0 - smoothstep(0.035, 0.075, length(h2));
-    v5Hl = (b1 * 0.85 + b2 * 0.7) * uEHi * inE * (1.0 - uESpiral);
+    // v5g: умиление — блики крупнее («сияющие» глаза), слёзы — влажная дуга-блик по низу радужки и третий блик
+    float sk = 1.0 + 0.7 * uESpark;
+    vec2 h1 = q - vec2(0.34, -0.36) * mix(1.0, 0.92, uESpark), h2 = q - vec2(-0.30, 0.34);
+    float b1 = 1.0 - smoothstep(0.11 * sk, 0.2 * sk, length(h1 * vec2(1.0, 1.25)));
+    float b2 = 1.0 - smoothstep(0.035 * (1.0 + 1.3 * uESpark), 0.075 * (1.0 + 1.3 * uESpark), length(h2));
+    vec2 h3 = q - vec2(0.0, 0.5);
+    float wa = abs(length(h3 * vec2(0.62, 1.0)) - 0.42);
+    float b3 = (1.0 - smoothstep(0.015, 0.045, wa)) * smoothstep(0.55, 0.85, q.y) * (1.0 - smoothstep(0.5, 0.75, abs(q.x)));
+    float b4 = 1.0 - smoothstep(0.02, 0.05, length(q - vec2(0.12, -0.52)));
+    v5Hl = (b1 * 0.85 + b2 * 0.7 + (b3 * 0.55 + b4 * 0.6) * uEWet) * uEHi * inE * (1.0 - uESpiral);
+    col = mix(col, col * 1.12 + vec3(0.02, 0.04, 0.06), 0.6 * uEWet * inE);
     // влага у нижнего края (слёзы): блестящая полоска по низу белка
     // v5e: глаз закрыт (моргание, «^») — накладки нет: под кромкой века не просвечивает полоска радужки
     diffuseColor *= vec4(col, clamp(base.a / 0.75, 0.0, 1.0) * (1.0 - (si == 0 ? uEClosed.x : uEClosed.y)) * (1.0 - v5LidHide(vEP)));
@@ -851,6 +891,9 @@ export interface V5EyesU {
   hi: { value: number };
   spiral: { value: number };
   time: { value: number };
+  /** v5g: влажность глаз и сияние бликов */
+  wet: { value: number };
+  spark: { value: number };
 }
 
 /** накладка глаз Eyes_V5: шейдер белка/радужки/зрачка/бликов; null — у модели нет */
@@ -860,6 +903,7 @@ export function attachV5Eyes(model: THREE.Object3D, info: V5EyesInfo | undefined
   const u: V5EyesU = {
     gaze: { value: [new THREE.Vector4(0, 0, 1, 1), new THREE.Vector4(0, 0, 1, 1)] },
     pupil: { value: 1 }, hi: { value: 1 }, spiral: { value: 0 }, time: { value: 0 }, closed: { value: new THREE.Vector2() },
+    wet: { value: 0 }, spark: { value: 0 },
     lidE: { value: Array.from({ length: 60 }, () => new THREE.Vector4(0, 0, -1, -1)) }, lidX: { value: new THREE.Vector4(0, 0, 0, 0) },
   };
   const sides = [info.L, info.R];
@@ -878,7 +922,7 @@ export function attachV5Eyes(model: THREE.Object3D, info: V5EyesInfo | undefined
     sh.uniforms.uEPlate = { value: plate }; sh.uniforms.uEC = { value: cc }; sh.uniforms.uEAi = { value: ai };
     sh.uniforms.uEIris = { value: iris }; sh.uniforms.uEGaze = u.gaze; sh.uniforms.uEPr0 = { value: (info.L.pupil + info.R.pupil) / 2 };
     sh.uniforms.uEPupil = u.pupil; sh.uniforms.uEHi = u.hi; sh.uniforms.uESpiral = u.spiral; sh.uniforms.uETime = u.time;
-    sh.uniforms.uEWet = { value: 0 };
+    sh.uniforms.uEWet = u.wet; sh.uniforms.uESpark = u.spark;
     sh.uniforms.uEClosed = u.closed;
     sh.uniforms.uLidE = u.lidE; sh.uniforms.uLidX = u.lidX;
     sh.vertexShader = sh.vertexShader
@@ -889,7 +933,7 @@ export function attachV5Eyes(model: THREE.Object3D, info: V5EyesInfo | undefined
       .replace('#include <map_fragment>', EYE_MAP)
       .replace('#include <emissivemap_fragment>', EYE_EMIT);
   };
-  m.customProgramCacheKey = () => 'v5-eyes-4';
+  m.customProgramCacheKey = () => 'v5-eyes-5';
   m.needsUpdate = true;
   mesh.renderOrder = 1;
   return { mesh, u, info };
@@ -1127,7 +1171,15 @@ export class V5FaceRig {
     this.gz[0] = ps.gaze[0]; this.gz[1] = ps.gaze[1];
     this.gaze.update(dt, { aim, pupils, idle, bias, wide: this.st.wide, spiral, emo: this.gz, focus: ps.focus });
     this.gaze.write(this.eyes.u, this.eyes.info.mmPerPx, spiral);
+    // v5g: влага и сияние — по позе эмоции; капля слезы — свой цикл (нарастает у века и скатывается по щеке)
+    this.eyes.u.wet.value = c01(Math.max(ps.wet, this.st.tear));
+    this.eyes.u.spark.value = c01(ps.sparkle);
+    if (this.paint) {
+      this.tearClock = this.st.tear > 0.02 ? this.tearClock + dt : 0;
+      this.paint.tearT.value.set(v5TearPhase(this.tearClock, 0), v5TearPhase(this.tearClock, 1));
+    }
   }
+  private tearClock = 0;
 }
 
 /** собрать лицо v5c/v5d модели (asset.extras.glitterV5) */
